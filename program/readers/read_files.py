@@ -10,7 +10,7 @@ import xarray as xr
 import netCDF4 as nc
 
 # Read measurement
-def data_arrays(fpath):
+def short_reader(fpath):
     
     """
     General:
@@ -194,14 +194,16 @@ def channel_metadata(file):
             'Dead_Time_Correction_Type',
             'Detected_Wavelength',
             'Emitted_Wavelength',
-            'First_Signal_Rangebin',
             'Full_Overlap_Range',
             'Laser_Polarization',
             'Laser_Repetition_Rate',
             'PMT_High_Voltage',
-            'Raw_Data_Range_Resolution']
+            'Raw_Data_Range_Resolution',
+            'Trigger_Delay',
+            'Trigger_Delay_Bins']
     
     data = [file.variables[key].values for key in keys if key in file.variables]
+    keys = [key for key in keys if key in file.variables]
 
     channel_info = pd.DataFrame(data = np.array(data, dtype = object).T, 
                                 index = channels, 
