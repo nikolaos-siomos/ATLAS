@@ -8,30 +8,25 @@ Processing routines for signals
 =================================
 Signal in 3D xarray dataset with dimensions [time, channel, bin/range]
 
-fucntions
- -- background calculation: Calculated the solar background per timeframe and channel 
- -- dead time correction: Applied to the photon channels to account for the dead time effect
+Fucntions
+ -- average_by_time: Average signals across the timeframes
+ -- background_calculation: Calculates the solar background per timeframe and channel 
+ -- background_correction: Performs the background correction on signals
+ -- dark_correction: Removes the dark signals from the normal ananlog signals
+ -- dead time correction: Performs the dead time correction onphoton channels
+ -- height_calculation: Calculates the height values per bin and channel
+ -- range calculation: Calculates the range values per bin and channel
+ -- range_correction: Performs the range correction on signals
+ -- smoothing: Smooths the signals (sliding average)
  -- trigger_delay: Perform the trigger correction per channel
  -- trim_vertically: Trim channels up to a maximum altitude
  -- unit_conv_counts_to_MHz: Converts raw counts to MHz for the photon channels
- --f2:  average by time
- --f3:  resolution change
- --f4:  signal dimensions conversion
- --f8:  background subtraction
- --f9:  range correction
- --f10: dark signal structure correction
- --f11: signal upper trimming
- --f12: construction of total signal
- --f13: total signal depolarization correction 
 
 """
 
 import numpy as np
-from molecular import height_scales
-from lidar_processing.construct import add_param_err
-# from helper_functions.helper_functions import datetime_unit, check_timedelta
+
 import xarray as xr
-import sys
 
 def average_by_time(sig, timescale):
 
@@ -46,7 +41,7 @@ def average_by_time(sig, timescale):
             dead time corrected yet
             
         timescale: 
-            The temporal avraging step, in hours. E.g. if set to 1 then 1h
+            The temporal avraging step, in seconds. E.g. if set to 3600 then 1h
             averages will be generated from the original signals
 
               
@@ -68,11 +63,13 @@ def average_by_time(sig, timescale):
     # Calculate the time duration (hours) between first and last measurement
     dt = time_arr[-1] - time_arr[0]
     
-    meas_dur = np.ceil(dt / np.timedelta64(60,'m'))
+    meas_dur = np.ceil(dt / np.timedelta64(1,'s'))
+    
+    if not timescale:
+        timescale = meas_dur
     
     # average the sig only if the timescale is not empty and the sig time dim is >1
-    if np.isnan(timescale) or \
-        (not np.isnan(timescale) and timescale >= meas_dur):
+    if timescale >= meas_dur:
                 
         m_time = time_arr[0] + dt / 2.
         
@@ -89,24 +86,24 @@ def average_by_time(sig, timescale):
         
 
     else:
-        halfscale_m = int(timescale * 60/ 2)
+        halfscale_m = int(timescale / 2)
 
-        timescale_m = int(timescale * 60)
+        timescale_m = int(timescale)
 
         # Define how many averaged timeframes will be created
         avg_num = int(np.ceil(meas_dur/timescale))
         
         # Calculate the new time index based on the timescale of averaging.
         # -> It is also the middle time in the time slice for averaging
-        m_time = [(time_arr[0] + ii * np.timedelta64(halfscale_m,'m')) 
+        m_time = [(time_arr[0] + ii * np.timedelta64(halfscale_m,'s')) 
                   for ii in range(avg_num)]
 
         # Calculate the starting time in the time slice for averaging
-        s_time = [(time_arr[0] + ii * np.timedelta64(timescale_m,'m')) 
+        s_time = [(time_arr[0] + ii * np.timedelta64(timescale_m,'s')) 
                   for ii in range(avg_num)]
 
         # Calculate the ending time in the time slice for averaging
-        e_time = [(time_arr[0] + (ii + 1) * np.timedelta64(timescale_m,'m')) 
+        e_time = [(time_arr[0] + (ii + 1) * np.timedelta64(timescale_m,'s')) 
                   for ii in range(avg_num)]        
 
         # Create a new xarray with reduced size of time dimension based on number of averaged timeframes
@@ -142,7 +139,7 @@ def average_by_time(sig, timescale):
 
     return(sig_out, frames)
 
-def background(sig, lower_bin, upper_bin):
+def background_calculation(sig, lower_bin, upper_bin):
 
     """
     General:
@@ -187,6 +184,74 @@ def background(sig, lower_bin, upper_bin):
         bgr.loc[ch_d] = sig.loc[ch_d].loc[bin_d].mean(dim = 'bins', skipna = True)
         
     return(bgr)
+
+def background_correction(sig, bgr):
+    
+    """
+    General:
+        Performs the solar background subtraction 
+        
+    Input:
+        sig: 
+            An xarray with the lidar signals. It must include a time demension
+            
+        bgr: 
+            An xarray with the background signals. It must be the same 
+            dimensions as sig, excluding only time
+              
+    Returns:
+        
+        sig_out: 
+            An xarray in the same dimensions with sig with the background
+            corrected signals
+            
+    """
+    
+    sig_out = (sig.copy() - bgr.copy()).transpose('time','channel','bins')
+    
+    return(sig_out)
+
+def dark_correction(sig, drk): 
+   
+    """
+    General:
+        Removes the dark signal from the normal signal for all analog channels
+        
+    Input:
+        sig: 
+            An xarray with the lidar signals, it should include the 
+            following dimensions: (..., time, channel, ...). 
+            
+        drk: 
+            An xarray with the dark signals, it should include the 
+            following dimensions: (..., time, channel, ...). It should have 
+            the same coordinates as sig with the exception of the time
+            dimension             
+
+    Returns:
+        
+        sig_out: 
+            An xarray in the same coordinates as sig with the dark corrected
+            signals
+            
+    """
+            
+    drk_mean = drk.mean(dim='time', skipna = True).copy()
+
+    channels = sig.channel.values
+    
+    sig_out = sig.copy()
+    
+    for ch in channels:
+
+        ch_d = dict(channel = ch)
+
+        if ch[2] == 'a': #3rd digit of channel name is the acquisition mode (a or p)
+     
+            sig_out.loc[ch_d] = sig_out.loc[ch_d] - drk_mean.loc[ch_d]
+
+            
+    return(sig_out)
 
 def dead_time_correction(sig, dead_time, dead_time_cor_type):
    
@@ -242,6 +307,152 @@ def dead_time_correction(sig, dead_time, dead_time_cor_type):
             
             sig_out.loc[ch_d] = sig.loc[ch_d]
             
+    return(sig_out)
+
+def height_calculation(bins, resol, ground_alt, zenith_angle):
+ 
+    """
+    General:
+        Creates an xarray with the height (altitude) values per bin and channel
+        
+    Input:
+        bins: 
+            An 1D numpy array with the signal bins
+            
+        ground_alt: 
+            A float with the ground altitude of the lidar in m
+            
+        zenith_angle:
+            A float with the zenith angle where the lidar points to
+            
+        resol:
+            A pandas series with the range resolution in m per channel. 
+            The index should correspond to the channel dimension of sig
+            
+    Returns:
+        
+        heights: 
+            An xarray with the height values per bin and channel in meters
+            
+    """
+    
+    bins = xr.DataArray(bins, 
+                        dims = ['bins'], 
+                        coords = [bins])
+    
+    resolution = xr.DataArray(resol.values,
+                              dims = ['channel'],
+                              coords = [resol.index.values]).astype(float)
+    
+    heights = resolution * bins * np.cos(zenith_angle) + ground_alt
+    
+    return(heights)
+
+def range_calculation(bins, resol):
+ 
+    """
+    General:
+        Creates an xarray with the altitude values per bin and channel
+        
+    Input:
+        bins: 
+            An 1D numpy array with the signal bins
+                
+        resol:
+            A pandas series with the range resolution in m per channel. 
+            The index should correspond to the channel dimension of sig
+            
+    Returns:
+        
+        ranges: 
+            An xarray with the range values per bin and channel in meters
+            
+    """
+    
+    bins = xr.DataArray(bins, 
+                        dims = ['bins'], 
+                        coords = [bins])
+    
+    resolution = xr.DataArray(resol.values,
+                              dims = ['channel'],
+                              coords = [resol.index.values]).astype(float)
+    ranges = resolution * bins
+
+    return(ranges)
+
+def range_correction(sig, ranges):
+
+    """
+    General:
+        Performs the range correction 
+        
+    Input:
+        sig: 
+            An xarray with the lidar signals. It must include at least the 
+            following dimensions (channel, bins)
+            
+        ranges: 
+            An xarray with the ranges per channel and bin. It must include at 
+            least the following dimensions (channel, bins)
+              
+    Returns:
+        
+        sig_out: 
+            An xarray in the same dimensions with sig with the range
+            corrected signals
+            
+    """
+    
+    sig_out = (sig.copy() * np.power(ranges.copy(), 2))\
+        .transpose('time','channel','bins')
+    
+    return(sig_out)
+
+def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
+
+    """
+    General:
+        A simple sliding average smoothing routine
+        
+    Input:
+        sig: 
+            An xarray with the lidar signals. It must include at least the 
+            following dimensions (bins)
+            
+        window: 
+            The number of bins that will be used for the averaging
+        
+        smoothing_sbin:
+            An integer with the starting bin for smoothing. No smoothing will 
+            be applied before it.
+            
+        smoothing_ebin:
+            An integer with the ending bin for smoothing. No smoothing will 
+            be applied after it.
+              
+    Returns:
+        
+        sig_out: 
+            An xarray in the same dimensions with sig with the smoothed signals
+            
+    """   
+    
+    sig_out = sig.copy()
+          
+    smoothing_hwindow = int(smoothing_window / 2.)
+    
+    if smoothing_sbin == None:
+        smoothing_sbin = 1
+        
+    if smoothing_ebin == None:
+        smoothing_ebin = sig.bins.size
+        
+    bins_d = dict(bins = slice(smoothing_sbin, smoothing_ebin))
+
+    sig_out.loc[bins_d] = sig.copy()\
+        .rolling(bins = smoothing_window, center = True, 
+                 min_periods = smoothing_hwindow).mean().loc[bins_d]
+        
     return(sig_out)
 
 def trigger_delay(sig, trigger_delay_bins):
@@ -336,7 +547,6 @@ def trim_vertically(sig, ground_alt, zenith_angle, alt_lim, resol):
   
     return(sig_out)
 
-
 def unit_conv_counts_to_MHz(sig, shots, resol):
     
     """
@@ -372,13 +582,13 @@ def unit_conv_counts_to_MHz(sig, shots, resol):
     sig_out = np.nan * sig.copy()
     
     for ch in channels:
-        
+
         ch_d = dict(channel = ch)
     
         if ch[2] == 'p': #3rd digit of channel name is the acquisition mode (a or p)
             
             sampl_rate = 150. / resol.loc[ch]
-            
+
             sig_out.loc[ch_d] = sig.loc[ch_d] * sampl_rate / shots.loc[:,ch]
         
         if ch[2] == 'a': #3rd digit of channel name is the acquisition mode (a or p)
@@ -387,136 +597,6 @@ def unit_conv_counts_to_MHz(sig, shots, resol):
     
     return(sig_out) 
 
-
-
-# def average_by_time(signal, timescale):
-
-#     adj_timescale = timescale
-
-#     time_arr = signal.time.values
-#     # average the signal only if the timescale is not empty and the signal time dim is >1
-#     if timescale != '' and len(time_arr) > 1:
-                
-#         # calculate the time duration (min) between first and last measurement
-#         dt = time_arr[-1] - time_arr[0]
-#         meas_dur = np.ceil(dt / np.timedelta64(1, 'm'))
-            
-#         # convert timescale in minutes
-#         t_avg = int(''.join(filter(str.isdigit, timescale)))
-#         freq = (datetime_unit(timescale)).lower()
-        
-#         if freq == 'h':
-#             t_avg = t_avg * 60.
-#         if freq == 'd':
-#             t_avg = t_avg * 24. * 60.
-#         if freq == 's':
-#             t_avg = t_avg / 60.
-        
-#         freq = 'm'
-        
-#         #if the measurement time < given timescale, adjust the returned timescale 
-#         adj_timescale = check_timedelta(signal.time.values, timescale, freq)        
-        
-#         # define how many averaged timeframes will be created
-#         avg_num = int(np.ceil(meas_dur/t_avg))
-        
-#         # Calculate the new time index based on the timescale of averaging.
-#         # -> It is also the starting time in the time slice for averaging
-#         t_index = [(time_arr[0]+ii*np.timedelta64(t_avg,freq)) for ii in range(avg_num)]
-#         # print(f't_index: {t_index}')
-        
-#         # Calculate the ending time in the time slice for averaging
-#         t_slice = [(time_arr[0]+(ii+1)*np.timedelta64(t_avg,freq)) for ii in range(avg_num)]
-        
-#         # Create a new xarray with reduced size of time dimension based on number of averaged timeframes
-#         sig_avg = signal.reindex(time=t_index, fill_value=np.nan)
-        
-#         count_occur = []
-        
-#         for i in range(avg_num):
-#             # select a slice of timeframes to be averaged in one timeframe
-#             sel_tslice = dict(time=slice(t_index[i],t_slice[i]))
-#             t_idx = dict(time = i)
-            
-#             # counting the occurences in each slice of timeframe
-#             count_occur.append(signal.loc[sel_tslice].time.size)
-            
-#             # Insert in the new xarray the averaged signal from the sliced timeframes
-#             sig_avg[t_idx] = signal.loc[sel_tslice].mean(dim='time').values #3-d array [iters, channel, bins]
-            
-#         frames = xr.DataArray(data = count_occur, 
-#                               dims = ['time'], 
-#                               coords = [sig_avg.time.values])
-        
-#         # Mask the averaged timeframes for time occureneces below 95% of the max count occurence
-#         mask_time = (count_occur < np.max(count_occur)*0.95)
-
-#         #Drop the timeframes with occurences below the 95% of the max count occurence
-#         signal = sig_avg.drop_sel(time = sig_avg.time.values[mask_time])
-#         frames = frames.drop_sel(time = frames.time.values[mask_time])
-
-#     else:
-#     # If no timescale ('') is given then returns the raw temporal resolution
-       
-#         # calc the timedelta between timeframes to find raw temporal resolution   
-#         deltat = [(time_arr[t+1]-time_arr[t])/np.timedelta64(1,'s') for t in range(time_arr.size-1)]
-
-#         if len(deltat) > 0:
-#             # minimum time delta -> raw temporal resolution (+- 1 sec)
-#             t_resol = int(min(deltat))
-#             adj_timescale = f'{t_resol}s'     
-         
-#         frames = xr.DataArray(data = np.ones(time_arr.size), 
-#                   dims = ['time'], 
-#                   coords = [time_arr])
-#     # elif timescale == '' and len(time_arr) > 1:
-#     # # If no timescale ('') is given then returns the raw temporal resolution
-       
-#     #     # calc the timedelta between timeframes to find raw temporal resolution   
-#     #     deltat = [(time_arr[t+1]-time_arr[t])/np.timedelta64(1,'s') for t in range(time_arr.size-1)]
-#     #     if len(deltat) > 0:
-#     #         # minimum time delta -> raw temporal resolution (+- 1 sec)
-#     #         t_resol = int(min(deltat))
-#     #         adj_timescale = f'{t_resol}s'     
-         
-#     #         frames = xr.DataArray(data = np.ones(time_arr.size), 
-#     #                   dims = ['time'], coords = [time_arr])
-#     # else: 
-#     #     frames = xr.DataArray(data = np.ones(time_arr.size), 
-#     #                           dims = ['time'], coords = [time_arr])      
-
-#     return(signal, frames, adj_timescale)
-
-# #--f2.2 (implementing time resampling)    
-# def average_by_time_resampling(signal, timescale):
-
-#     adj_timescale = timescale
-
-#     # average the signal if the timescale is not empty
-#     if timescale != '':
-#         # Sampling the measurements considering the time of the first measurement 
-#         indicator = datetime_unit(timescale)
-    
-#         # #Set the base_val to start sampling with respect to the first measurement            
-#         # base_val = int(signal.time[0].dt.strftime(f'%{indicator}').values)
-
-#         count_occur = signal.time.resample(time=timescale, skipna=True, #base=base_val,
-#                                             closed='left', label='left').count(dim='time').values
-
-#         #if the measurement time is less than the given timescale, adjust the timescale
-#         adj_timescale = check_timedelta(signal.time.values, timescale, indicator)        
-
-#         # Mask the resampled timeframes for time occureneces below 75% of the max count occurence
-#         mask_time = (count_occur < np.max(count_occur)*0.75)
-        
-#         # Time resampling and averaging of the signals inside each timeframe
-#         signal = signal.resample(time=timescale, skipna=True, #base=base_val,
-#                                  closed='left', label='left').mean(dim='time', skipna=True)
-        
-#         #Drop the timeframes with occurences below the 75% of the max count occurence
-#         signal = signal.drop_sel(time = signal.time.values[mask_time])                                                                   
-        
-#     return(signal, adj_timescale)
 
 # #--f3
 # def change_resol(signal, info, resol):  
@@ -565,34 +645,6 @@ def unit_conv_counts_to_MHz(sig, shots, resol):
 #         rename_dim = {dim_name:new_dim_name}
 #         signal = signal.rename(rename_dim)
 #         #signal[new_dim_name] = signal[new_dim_name].reset_index(new_dim_name)
-#     return(signal)
-
-
-
-
-
-
-# #--f8        
-# def background_correction(signal, bc):
-#     signal = signal - bc
-#     return(signal)
-
-# #--f9
-# def range_correction(signal):
-#     signal = signal*np.power(signal.range.values, 2)
-#     return(signal)
-
-# #--f10
-# def dark_correction(signal, info, dark): 
-    
-#     an_ch = dict(channel = info.index[info.ch_mode == 0].values) #analog channel indexes
-    
-#     drk_mean = dark.mean(dim='time', skipna = True).loc[an_ch]
-    
-#     for t in range (signal.time.size):
-#         ind_t = dict(time = t)      
-#         signal[ind_t].loc[an_ch] = signal[ind_t].loc[an_ch] - drk_mean
-
 #     return(signal)
   
 # #--f12

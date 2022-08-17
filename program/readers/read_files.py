@@ -22,7 +22,7 @@ def short_reader(fpath):
             
     Returns:
         
-        lidar_info: 
+        meas_info: 
             A pandas series with all the necessary lidar metadata fetched 
             from the QA file
             
@@ -76,26 +76,29 @@ def short_reader(fpath):
     channel_info = channel_metadata(file)
 
     # Read lidar metadata
-    lidar_info = lidar_metadata(file)
+    meas_info = lidar_metadata(file)
     
     # Read time 
-    time_info = time_metadata(file, lidar_info)
+    time_info = time_metadata(file, meas_info)
     if 'Background_Profile' in file.data_vars: 
-        time_info_d = time_metadata_d(file, lidar_info)
+        time_info_d = time_metadata_d(file, meas_info)
 
     # Reading the licel signals
     signal = signals(file, time_info = time_info, channel_info = channel_info)
     if 'Background_Profile' in file.data_vars: 
-        signal_d = signals(file, time_info = time_info_d, channel_info = channel_info)
+        signal_d = signals(file, time_info = time_info_d, 
+                           channel_info = channel_info, isdark = True)
 
     # Reading the laser shots
     shots = laser_shots(file, time_info = time_info, channel_info = channel_info)
     if 'Background_Profile' in file.data_vars: 
-        shots_d = laser_shots(file, time_info = time_info_d, channel_info = channel_info)
+        shots_d = laser_shots(file, time_info = time_info_d, 
+                              channel_info = channel_info, isdark = True)
 
     print('-- Input file succesfully parsed!')
     
-    return(lidar_info, channel_info, time_info, time_info_d, signal, signal_d, shots, shots_d)
+    return(meas_info, channel_info, time_info, time_info_d,
+           signal, signal_d, shots, shots_d)
 
 def lidar_metadata(file):
     
@@ -109,7 +112,7 @@ def lidar_metadata(file):
             
     Returns:
         
-        lidar_info: 
+        meas_info: 
             A pandas series with all the necessary lidar metadata fetched 
             from the QA file
           
@@ -158,9 +161,9 @@ def lidar_metadata(file):
     keys.extend(keys_vars)
     keys.extend(keys_extras)
     
-    lidar_info = pd.Series(data = data, index = keys, dtype = object)
+    meas_info = pd.Series(data = data, index = keys, dtype = object)
     
-    return(lidar_info)
+    return(meas_info)
 
 def channel_metadata(file):
     
@@ -216,7 +219,7 @@ def channel_metadata(file):
 
     return(channel_info)
 
-def time_metadata(file, lidar_info):
+def time_metadata(file, meas_info):
     
     """
     General:
@@ -226,7 +229,7 @@ def time_metadata(file, lidar_info):
         file: 
             An xarray dataset with all the QA file information
 
-        lidar_info: 
+        meas_info: 
             A pandas series with all the necessary lidar metadata fetched 
             from the QA file
             
@@ -238,29 +241,45 @@ def time_metadata(file, lidar_info):
             
     """
     
-    keys = ['Raw_Data_Start_Time',
-            'Raw_Data_Stop_Time',
-            'sector',
-            'position']
+    all_keys = ['Raw_Data_Start_Time',
+                'Raw_Data_Stop_Time',
+                'Filename',
+                'sector',
+                'position']
     
-    data = np.array([np.squeeze(file.variables[key].values) for key in keys if key in file.variables])
-    keys = np.array([key for key in keys if key in file.variables])    
+    data = []
+    keys = []
     
-    sdate = lidar_info['RawData_Start_Date']
+    for key in all_keys:
+        
+        if key in file.variables:
+        
+            if len(file.variables[key].shape) == 2:
+                data.append(np.squeeze(file.variables[key].values, axis = 1))
+    
+            else:
+                data.append(file.variables[key].values)
+            
+            keys.append(key)
 
-    stime = lidar_info['RawData_Start_Time_UT']
+    data = np.array(data)    
+    keys = np.array(keys) 
 
-    tscale = file['Raw_Data_Start_Time'].values[:,0].astype(float)
+    sdate = meas_info['RawData_Start_Date']
 
-    timeframes = time_array(sdate = sdate, stime = stime, tscale = tscale)
+    stime = meas_info['RawData_Start_Time_UT']
 
+    start_t = file['Raw_Data_Start_Time'].values[:,0].astype(float)
+
+    timeframes = time_array(sdate = sdate, stime = stime, start_t = start_t)
+    
     time_info = pd.DataFrame(data = np.array(data, dtype = object).T, 
                              index = timeframes, 
                              columns = keys, dtype = object)
     
     return(time_info)
 
-def time_metadata_d(file, lidar_info):
+def time_metadata_d(file, meas_info):
     
     """
     General:
@@ -271,7 +290,7 @@ def time_metadata_d(file, lidar_info):
         file: 
             An xarray dataset with all the QA file information
 
-        lidar_info: 
+        meas_info: 
             A pandas series with all the necessary lidar metadata fetched 
             from the QA file
             
@@ -283,19 +302,37 @@ def time_metadata_d(file, lidar_info):
             
     """
     
-    keys = ['Bck_Data_Start_Time',
-            'Bck_Data_Stop_Time']
+    all_keys = ['Bck_Data_Start_Time',
+                'Bck_Data_Stop_Time',
+                'Filename_Bck']
+
+    data = []
+    keys = []
     
-    data = np.array([np.squeeze(file.variables[key].values) for key in keys if key in file.variables])
-    keys = np.array([key for key in keys if key in file.variables])    
+    for key in all_keys:
+        
+        if key in file.variables:
+
+            if len(file.variables[key].shape) == 2:
+                data.append(np.squeeze(file.variables[key].values, axis = 1))
     
-    sdate = lidar_info['RawBck_Start_Date']
+            else:
+                data.append(file.variables[key].values)
+                
+            keys.append(key)
 
-    stime = lidar_info['RawBck_Start_Time_UT']
+    data = np.array(data)    
+    keys = np.array(keys)    
 
-    tscale = file['Bck_Data_Start_Time'].values[:,0].astype(float)
+    sdate = meas_info['RawBck_Start_Date']
 
-    timeframes = time_array(sdate = sdate, stime = stime, tscale = tscale)
+    stime = meas_info['RawBck_Start_Time_UT']
+
+    start_t = file['Bck_Data_Start_Time'].values[:,0].astype(float)
+
+    stop_t = file['Bck_Data_Stop_Time'].values[:,0].astype(float)
+
+    timeframes = time_array(sdate = sdate, stime = stime, start_t = start_t)
 
     time_info = pd.DataFrame(data = np.array(data, dtype = object).T, 
                              index = timeframes, 
@@ -303,7 +340,7 @@ def time_metadata_d(file, lidar_info):
     
     return(time_info)
 
-def time_array(sdate, stime, tscale):
+def time_array(sdate, stime, start_t):
     
     """
     General:
@@ -316,26 +353,28 @@ def time_array(sdate, stime, tscale):
         stime: 
             A string with the measurement starting time information (hhmmss)
 
-        tscale:
+        start_t:
             An 1D numpy array with the starting time of each measurement 
             time frame - in seconds after the measurement start  
             
     Returns:
         
-        time_info_d : 
-            A pandas Dataframe with all the necessary metadata for each 
-            dark measurement timeframe fetched from the QA file
+        timeframes : 
+            A 1D numpy array with the datetime objects for each measurement
+            starting time
             
     """
     
     # Convert and store start time
     sdt = dt.datetime.strptime(sdate + ' ' + stime, "%Y%m%d %H%M%S")
 
-    timeframes = np.array([sdt + dt.timedelta(seconds = t) for t in tscale])
+    start_dt = np.array([sdt + dt.timedelta(seconds = t) for t in start_t])
+    
+    timeframes = start_dt 
     
     return(timeframes)
 
-def laser_shots(file, time_info, channel_info):
+def laser_shots(file, time_info, channel_info, isdark = False):
 
     """
     General:
@@ -353,6 +392,9 @@ def laser_shots(file, time_info, channel_info):
         channel_info : 
             A pandas Dataframe with all the necessary metadata for each 
             channel fetched from the QA file
+
+        isdark :
+            A boolean value. If set to Treu, the dark signals are read instead
             
     Returns:
         
@@ -366,7 +408,11 @@ def laser_shots(file, time_info, channel_info):
     
     channels = channel_info.index.values
     
-    shots_arr = file.Laser_Shots.values
+    if not isdark:
+        shots_arr = file.Laser_Shots.values
+    else:
+        shots_arr = file.Background_Shots.values
+        
     
     shots = xr.DataArray(shots_arr, 
                          dims = ['time', 'channel'],
@@ -377,7 +423,7 @@ def laser_shots(file, time_info, channel_info):
 
     return(shots)
 
-def signals(file, time_info, channel_info):
+def signals(file, time_info, channel_info, isdark = False):
  
     """
     General:
@@ -395,6 +441,9 @@ def signals(file, time_info, channel_info):
         channel_info : 
             A pandas Dataframe with all the necessary metadata for each 
             channel fetched from the QA file
+        
+        isdark :
+            A boolean value. If set to Treu, the dark signals are read instead
             
     Returns:
         
@@ -403,8 +452,11 @@ def signals(file, time_info, channel_info):
             from the QA file. The dimensions should be (time, channel, bins/range)
     
     """
-    
-    signal_arr = file.Raw_Lidar_Data.values
+    if not isdark:
+        signal_arr = file.Raw_Lidar_Data.values
+    else:
+        signal_arr = file.Background_Profile.values
+        
 
     bins = 1. + np.arange(0, signal_arr.shape[-1])
     

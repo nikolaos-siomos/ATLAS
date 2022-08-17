@@ -9,27 +9,47 @@ from numpy.polynomial.polynomial import polyfit, polyval, polyder
 import xarray as xr
 import matplotlib.pyplot as plt
 
-def get_win(x, lims, wins, step):
+def get_win(ranges, flt_node_ranges, flt_node_windows, resol):
+    
+    '''
+    General:
+        Calculates the half smoothing windows 
+        
+    Input:
+        ranges :
+            A 2D xarray with dimensions (time, channel) that includes 
+            the singal range values per channel and bin
+            
+        flt_node_ranges : numpy array
+            A numpy array with the range limits of each smoothing node
+            
+        flt_node_windows : 
+            A numpy array with the window length of each smoothing node
+            
+        resol:
+            A pandas series with the range resolution in m per channel. 
+            The index should correspond to the channel dimension of sig
+                
+
+    Output
+        half_flt_window : (M,) array
+            An xarray with the half window in bins for each range and channel
+
     '''
 
-    Parameters
-    ----------
-    x : (M,) array
-        singal range values.
-    lims : array
-        range limits of each signal node.
-    wins : array
-        window length limits of each signal node.
-    step : float
-        resolution.
+    channels = ranges.channel.values
+    
+    # Use the uppermost signal range in the last smoothing node if it is higher 
+    if flt_node_ranges and sig.range.values[-1] > lims[-1]:
+        lims[-1] = sig.range.values[-1]
 
-    Returns
-    -------
-    ihwin : (M,) array
-        The half window bins for each range .
+    half_flt_window = np.nan * ranges.copy()
+    
+        
+    for ch in channels:
 
-    '''
-    win = np.zeros(x.shape)
+        ch_d = dict(channel = ch)
+    
     
     # set a variable window value per range bin (0 below first range limit)
     mask_win = (x > lims[0]) & (x <= lims[-1])
@@ -43,7 +63,7 @@ def get_win(x, lims, wins, step):
     win[mask_up] = 2.*(x[-1] - x[mask_up])
 
     # Convert float variable window to even half bin window
-    ihwin = np.floor(win/(2.*step)).astype(int)
+    half_flt_window = np.floor(win/(2.*step)).astype(int)
 
     return(ihwin)
 
