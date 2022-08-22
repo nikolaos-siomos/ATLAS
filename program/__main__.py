@@ -22,57 +22,52 @@ meas_info, channel_info, time_info, time_info_d, \
         read_files.short_reader(args['input_file'])
 
 if meas_info.Measurement_type == 'drk' or not isinstance(sig_raw_d, list):
-    drk, drk_pack = short_prepro.dark(sig_raw = sig_raw_d, 
-                                      shots = shots_d, 
-                                      meas_info = meas_info, 
-                                      channel_info = channel_info, 
-                                      time_info = time_info_d,
-                                      external_info = args)
+    drk, drk_pack, time_info_d = short_prepro.dark(sig_raw = sig_raw_d, 
+                                                   shots = shots_d, 
+                                                   meas_info = meas_info, 
+                                                   channel_info = channel_info, 
+                                                   time_info = time_info_d,
+                                                   external_info = args)
     
 if meas_info.Measurement_type == 'ray':
-    sig, sig_pack = short_prepro.rayleigh(sig_raw = sig_raw, 
-                                         shots = shots, 
-                                         meas_info = meas_info, 
-                                         channel_info = channel_info, 
-                                         time_info = time_info,
-                                         external_info = args,
-                                         sig_drk = drk_pack['sig_rnc'])
+    sig, sig_pack, time_info = short_prepro.rayleigh(sig_raw = sig_raw, 
+                                                     shots = shots, 
+                                                     meas_info = meas_info, 
+                                                     channel_info = channel_info, 
+                                                     time_info = time_info,
+                                                     external_info = args,
+                                                     sig_drk = drk_pack['sig_flt'])
 
 if meas_info.Measurement_type == 'tlc':
-    sig, sig_pack = short_prepro.telecover(sig_raw = sig_raw, 
-                                           shots = shots, 
-                                           meas_info = meas_info, 
-                                           channel_info = channel_info, 
-                                           time_info = time_info,
-                                           external_info = args,
-                                           sig_drk = drk_pack['sig_rnc'])
+    sig, sig_pack, time_info = \
+        short_prepro.telecover(sig_raw = sig_raw, 
+                               shots = shots, 
+                               meas_info = meas_info, 
+                               channel_info = channel_info, 
+                               time_info = time_info,
+                               external_info = args,
+                               sig_drk = drk_pack['sig_flt'])
 
 if meas_info.Measurement_type == 'pcl':
-    sig, sig_pack = short_prepro.calibration(sig_raw = sig_raw, 
-                                             shots = shots, 
-                                             meas_info = meas_info, 
-                                             channel_info = channel_info, 
-                                             time_info = time_info,
-                                             external_info = args,
-                                             sig_drk = drk_pack['sig_rnc'])
+    sig, sig_pack, time_info = \
+        short_prepro.calibration(sig_raw = sig_raw, 
+                                 shots = shots, 
+                                 meas_info = meas_info, 
+                                 channel_info = channel_info, 
+                                 time_info = time_info,
+                                 external_info = args,
+                                 sig_drk = drk_pack['sig_flt'])
 
 if args['quicklook']:
-    sig, sig_pack = short_prepro.quicklook(sig_raw = sig_raw, 
+    qck, qck_pack = short_prepro.quicklook(sig_raw = sig_raw, 
                                            shots = shots, 
                                            meas_info = meas_info, 
                                            channel_info = channel_info, 
-                                           time_info = time_info,
                                            external_info = args,
-                                           sig_drk = drk_pack['sig_rnc'])
+                                           sig_drk = drk_pack['sig_flt'])
     
     
-# # --------------------------------------------------
-# # Detect and Screen Overflows
-# # --------------------------------------------------
-# sig = signal.screen_overflows(sig = sig.copy(), 
-#                               dead_time = dead_time, 
-#                               daq_range = daq_range,
-#                               iscr = iscr)
+
  
 # if iscr and external_info['debug']: pack_out['sig_ovf'] = sig.copy()
 

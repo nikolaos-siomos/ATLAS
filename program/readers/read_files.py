@@ -245,26 +245,31 @@ def time_metadata(file, meas_info):
                 'Raw_Data_Stop_Time',
                 'Filename',
                 'sector',
-                'position']
+                'calibrator_position']
+    
+    types = [int, int, str, str, str]
     
     data = []
     keys = []
     
-    for key in all_keys:
+    for i in range(len(all_keys)):
         
-        if key in file.variables:
-        
-            if len(file.variables[key].shape) == 2:
-                data.append(np.squeeze(file.variables[key].values, axis = 1))
+        if all_keys[i] in file.variables:
+
+            var = file.variables[all_keys[i]].values.astype(types[i])
+            
+            if len(var.shape) == 2:
+                data_i = np.squeeze(var, axis = 1)
     
             else:
-                data.append(file.variables[key].values)
-            
-            keys.append(key)
+                data_i = var
 
-    data = np.array(data)    
-    keys = np.array(keys) 
+            data.append(data_i)
+            keys.append(all_keys[i])
 
+    data = np.array(data, dtype = object)    
+    keys = np.array(keys, dtype = object) 
+    
     sdate = meas_info['RawData_Start_Date']
 
     stime = meas_info['RawData_Start_Time_UT']
@@ -306,31 +311,34 @@ def time_metadata_d(file, meas_info):
                 'Bck_Data_Stop_Time',
                 'Filename_Bck']
 
+    types = [int, int, str]
+    
     data = []
     keys = []
     
-    for key in all_keys:
+    for i in range(len(all_keys)):
         
-        if key in file.variables:
+        if all_keys[i] in file.variables:
 
-            if len(file.variables[key].shape) == 2:
-                data.append(np.squeeze(file.variables[key].values, axis = 1))
+            var = file.variables[all_keys[i]].values.astype(types[i])
+            
+            if len(var.shape) == 2:
+                data_i = np.squeeze(var, axis = 1)
     
             else:
-                data.append(file.variables[key].values)
-                
-            keys.append(key)
+                data_i = var
 
-    data = np.array(data)    
-    keys = np.array(keys)    
+            data.append(data_i)
+            keys.append(all_keys[i])
+
+    data = np.array(data, dtype = object)    
+    keys = np.array(keys, dtype = object)  
 
     sdate = meas_info['RawBck_Start_Date']
 
     stime = meas_info['RawBck_Start_Time_UT']
 
     start_t = file['Bck_Data_Start_Time'].values[:,0].astype(float)
-
-    stop_t = file['Bck_Data_Stop_Time'].values[:,0].astype(float)
 
     timeframes = time_array(sdate = sdate, stime = stime, start_t = start_t)
 

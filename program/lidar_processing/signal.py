@@ -28,6 +28,86 @@ import numpy as np
 
 import xarray as xr
 
+import pandas as pd
+
+def average_by_group(sig, time_info, grouper, start_time, stop_time):
+
+    """
+    General:
+        Averages the lidar signals across the time deminsion 
+        
+    Input:
+        sig: 
+            A 3D xarray with the lidar signals, it should include the following
+            dimensions: (time, channel, bins). The photon signals must not be
+            dead time corrected yet
+        
+        time_info : 
+                A pandas Dataframe with all the necessary metadata for each 
+                temporal frame fetched from the QA file
+                
+        grouper: 
+            A string with the column name of time_info that contains the 
+            flag used for grouping the data (e.g. telecover sector)
+
+        start_time: 
+            A string with the column name of time_info that contains the 
+            starting time in seconds since the beginning of the measurement 
+            per timeframe
+        
+        stop_time: 
+            A string with the column name of time_info that contains the 
+            ending time in seconds since the beginning of the measurement 
+            per timeframe
+              
+    Returns:
+        sig_out: 
+            An xarray in the same dimensions with sig but with the time dim
+            reduced by averaging. An average is generated each time the group
+            changes
+            
+        time_info : 
+                A pandas Dataframe with all the necessary metadata for each 
+                temporal frame reformed according to the new temporal scale
+                
+            
+    """
+    
+    grp = time_info.loc[:,grouper].values
+    stime = time_info.loc[:,start_time].values
+    etime = time_info.loc[:,stop_time].values
+
+    start_dt = np.datetime64(sig.time.values[0], 's')
+    print(start_dt)
+    sep = np.hstack([0, np.where(grp[:-1] != grp[1:])[0] + 1, grp.size])
+
+    group_stime = np.array([stime[sep[i]] for i in range(0,sep.size-1)])
+    group_etime = np.array([etime[sep[i]-1] for i in range(1,sep.size)])
+    group_dtime = np.floor(group_stime + \
+                           (group_etime - group_stime)/2.).astype(int)
+    group_mtime = np.array([start_dt + np.timedelta64(gr_t, 's')
+                            for gr_t in group_dtime])
+    frames = np.array([sep[i+1] - sep[i] for i in range(0,sep.size-1)])
+    
+    group_grouper = np.array([grp[sep[i]] for i in range(0,sep.size-1)])
+    
+    sig_out = np.nan * sig[dict(time = range(len(group_mtime)))].copy()\
+        .drop("time").assign_coords({'time' : group_mtime})
+    
+    for i in range(sep.size-1):
+        t_d = dict(time = slice(sep[i], sep[i+1]))
+        sig_out[dict(time = i)] =  sig[t_d].copy().mean(dim = 'time').values
+    
+    cols = [start_time, stop_time, grouper, 'timeframes']
+
+    data = np.array([group_stime, group_etime, group_grouper, frames],
+                    dtype = object).T
+
+    time_info_out = pd.DataFrame(data, index = group_mtime, columns = cols,
+                                 dtype = object)
+    
+    return(sig_out, time_info_out)
+
 def average_by_time(sig, timescale):
 
     """
@@ -42,7 +122,8 @@ def average_by_time(sig, timescale):
             
         timescale: 
             The temporal avraging step, in seconds. E.g. if set to 3600 then 1h
-            averages will be generated from the original signals
+            averages will be generated from the original signals. If set to -1
+            (default) then all timeframes will be averaged
 
               
     Returns:
@@ -65,7 +146,7 @@ def average_by_time(sig, timescale):
     
     meas_dur = np.ceil(dt / np.timedelta64(1,'s'))
     
-    if not timescale:
+    if timescale == -1:
         timescale = meas_dur
     
     # average the sig only if the timescale is not empty and the sig time dim is >1
@@ -424,11 +505,11 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
         
         smoothing_sbin:
             An integer with the starting bin for smoothing. No smoothing will 
-            be applied before it.
+            be applied before it. If set to -1 the first bin will be used
             
         smoothing_ebin:
             An integer with the ending bin for smoothing. No smoothing will 
-            be applied after it.
+            be applied after it. If set to -1 the last bin will be used
               
     Returns:
         
@@ -438,20 +519,17 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
     """   
     
     sig_out = sig.copy()
-          
-    smoothing_hwindow = int(smoothing_window / 2.)
-    
-    if smoothing_sbin == None:
+
+    if smoothing_sbin == -1:
         smoothing_sbin = 1
         
-    if smoothing_ebin == None:
+    if smoothing_ebin == -1:
         smoothing_ebin = sig.bins.size
-        
+
     bins_d = dict(bins = slice(smoothing_sbin, smoothing_ebin))
 
     sig_out.loc[bins_d] = sig.copy()\
-        .rolling(bins = smoothing_window, center = True, 
-                 min_periods = smoothing_hwindow).mean().loc[bins_d]
+        .rolling(bins = smoothing_window, center = True).mean().loc[bins_d]
         
     return(sig_out)
 

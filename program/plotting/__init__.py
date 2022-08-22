@@ -1,2 +1,2 @@
-__all__ = ["plotting"]
+__all__ = ["make_colormap","quicklook"]
 
