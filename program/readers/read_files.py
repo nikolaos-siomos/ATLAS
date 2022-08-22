@@ -184,8 +184,9 @@ def channel_metadata(file):
     """
 
     channels = [file.channel_label.values.astype(str)[i] + \
-        file.Detected_Wavelength.values.astype('int').astype(str)[i] for i in \
-            range(file.channel_label.size)]
+                file.Detected_Wavelength.values\
+                    .astype('int').astype(str)[i].zfill(4)
+                for i in range(file.channel_label.size)]
 
     keys = ['ADC_resolution',
             'Background_Low',

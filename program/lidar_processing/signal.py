@@ -78,7 +78,7 @@ def average_by_group(sig, time_info, grouper, start_time, stop_time):
     etime = time_info.loc[:,stop_time].values
 
     start_dt = np.datetime64(sig.time.values[0], 's')
-    print(start_dt)
+
     sep = np.hstack([0, np.where(grp[:-1] != grp[1:])[0] + 1, grp.size])
 
     group_stime = np.array([stime[sep[i]] for i in range(0,sep.size-1)])
