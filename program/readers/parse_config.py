@@ -117,6 +117,7 @@ def parse_config():
     for key in args.keys():
         print(f"{key} = {args[key]}")
     print("-------------------------------------------------------------------")
+    print("")
 
     if not os.path.exists(args['input_file']):
         sys.exit(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}!")  

@@ -59,10 +59,7 @@ def short_reader(fpath):
             
     """
 
-    print('-----------------------------------------')
-    print('Start reading the QA file...')
-    print('-----------------------------------------')
-    
+
     # Setting signal, info, and time as empty lists in the beggining    
     signal = []
     signal_d = []
@@ -94,8 +91,6 @@ def short_reader(fpath):
     if 'Background_Profile' in file.data_vars: 
         shots_d = laser_shots(file, time_info = time_info_d, 
                               channel_info = channel_info, isdark = True)
-
-    print('-- Input file succesfully parsed!')
     
     return(meas_info, channel_info, time_info, time_info_d,
            signal, signal_d, shots, shots_d)
