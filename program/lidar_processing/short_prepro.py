@@ -455,7 +455,7 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
                            smoothing_sbin = 750,
                            smoothing_ebin = -1)
         
-    if external_info['debug']: pack_out['sig_flt'] = sig.copy()
+    pack_out['sig_flt'] = sig.copy()
     
     print('-- Signal smoothing complete!')
         

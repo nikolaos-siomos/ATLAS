@@ -6,17 +6,20 @@ Created on Tue Aug 23 20:11:12 2022
 @author: nick
 """
 
-from molecular import us_std
+from lidar_molecular import us_std
 import xarray as xr
 import os 
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
+from scipy.integrate import cumtrapz
 from lidar_molecular.raman_scattering import GaussianFilter
-from lidar_molecular.raman_scattering import RotationalRamanBackscatter
+from lidar_molecular.raman_scattering import RotationalRaman
 from lidar_molecular import make_gas, rayleigh_scattering 
+from lidar_molecular.utilities import number_density_at_pt
 
-def short_molec(heights, meas_info, channel_info, time_info, external_info):
+def short_molec(heights, ranges, meas_info, channel_info, 
+                time_info, external_info):
     
     if 'Sounding_File_Name' in meas_info.keys() :
         rsonde_path = os.path.join(os.path.dirname(external_info['input_file']),  
@@ -45,73 +48,171 @@ def short_molec(heights, meas_info, channel_info, time_info, external_info):
     
     bdw = channel_info.Channel_Bandwidth
     
-    gaussian_iff = GaussianFilter(dwl,bdw)    
+    pol = channel_info.Laser_Polarization
     
-    c_N2 = 0.780796
-    c_O2 = 0.209448
-    c_Ar = 0.009339
-    c_CO2 = 0.000416
+    ch_type = pd.Series([ch[1] for ch in channel_info.index], index = channels)
+
+    ch_stype = pd.Series([ch[3] for ch in channel_info.index], index = channels)
     
-    c_td = c_N2 + c_O2 + c_Ar + c_CO2
+    properties = ['bxs_tot', 'exs_fth', 'exs_bck',  
+                  'bcf_tot', 'ecf_fth', 'ecf_bck', 
+                  'mdr', 'atb']
+    
+    molec = xr.DataArray(dims = ['properties', 'channel', 'bins'],
+                         coords = [properties, channels, bins])
+    
+    
+    c_N2_default = 0.780796
+    c_O2_default = 0.209448
+    c_Ar_default = 0.009339
+    c_CO2_default = 0.000416
+    
+    c_total = c_N2_default + c_O2_default + c_Ar_default + c_CO2_default
 
-    def saturation_vapour_pressure(P, T):
-        ewp = (1.0007 + 3.46 * 1E-6 * P) * 6.1121 * \
-            np.exp(17.502 * (T - 273.15)/(240.97 + T - 273.15))
-        return(ewp)
-
-    sel_bins = np.linspace(bins[0], bins[-1], 100).astype(int)
-
-    ldr_flt = np.nan * np.zeros(size = sel_bins.size)
-
-    bxs_flt = np.nan * np.zeros(size = sel_bins.size)
     
     for ch in channels:
+
+        ch_d = dict(channel = ch)
         
+        ewl_ch = ewl.loc[ch]
+
+        max_bin = meteo.loc[ch_d].dropna(dim = 'bins', how = 'any').loc[dict(properties  = 'number_density')].bins.values[-1]
+        sel_bins = np.linspace(bins[0], max_bin, 10).astype(int)
         sl_d = dict(channel = ch, bins = sel_bins)
-        
+            
+        # Defining a gaussian filter for the IFF
+        gaussian_iff = GaussianFilter(dwl.loc[ch],bdw.loc[ch])    
+
+        # Extracting molecular parameters in specific range bins
+        N = meteo.loc[ch_d].loc[dict(properties  = 'number_density')] .values
         P = meteo.loc[sl_d].loc[dict(properties  = 'pressure')].values
         T = meteo.loc[sl_d].loc[dict(properties  = 'temperature')].values
         RH = meteo.loc[sl_d].loc[dict(properties  = 'humidity')] .values
-        
+
+        # Convert Relative humidity to water vapor molar fraction
         ewp = saturation_vapour_pressure(P = P, T = T)
-        
-        c_H2O = ewp * (RH / 100.) / P 
+        c_H2O = ewp * (RH / 100.) / P         
+        c_H2O[np.isnan(c_H2O)] = 0.
+
+        # Calculate the molar fraction profiles for the other gases taking into account the water vapor profile
+        c_N2  = c_N2_default  / (c_total + c_H2O) 
+        c_O2  = c_O2_default  / (c_total + c_H2O) 
+        c_Ar  = c_Ar_default  / (c_total + c_H2O)
+        c_CO2 = c_CO2_default / (c_total + c_H2O)
+
+        mdr_i = np.nan * np.zeros(sel_bins.size)
+        bxs_tot_i = np.nan * np.zeros(sel_bins.size)
+        exs_fth_i = np.nan * np.zeros(sel_bins.size)
+        exs_bck_i = np.nan * np.zeros(sel_bins.size)
+
+        # Automatically calculate the Raman vibrational shift from the emitted wavelength
+        if ch_type.loc[ch] != 'v':
+            swl_ch = ewl.loc[ch]
+        else:
+            if ch_stype.loc[ch] == 'n':
+                swl_ch = 1./(1./ewl.loc[ch] - 2331.*1E-7) # N2 wavenumber shift is 2331 cm-1
+            else:
+                print(f'-- Warning: Molecular atmosphere calculations are only supported for N2. No molecular calculations were performed for channel {ch}')
 
         for i in range(sel_bins.size):
             
-            c_N2_i = c_N2/(c_td + c_H2O[i]) 
-            c_O2_i = c_O2/(c_td + c_H2O[i]) 
-            c_Ar_i = c_Ar/(c_td + c_H2O[i])
-            c_CO2_i = c_CO2/(c_td + c_H2O[i])
-            c_H2O_i = c_H2O[i]
-        
-            N2 = make_gas.N2(ewl,relative_concentration = c_N2_i)
-            O2 = make_gas.O2(ewl,relative_concentration = c_O2_i)
-            Ar = make_gas.Ar(ewl,relative_concentration = c_Ar_i)
-            CO2 = make_gas.CO2(ewl,relative_concentration = c_CO2_i)
-            H2O = make_gas.H2O(ewl,relative_concentration = c_H2O_i)
-        
-            rrb = RotationalRamanBackscatter(wavelength = ewl, 
-                                             max_J = 101, 
-                                             temperature = T[i], 
-                                             optical_filter = gaussian_iff,
-                                             N2_parameters = N2, 
-                                             O2_parameters = O2, 
-                                             Ar_parameters = Ar, 
-                                             CO2_parameters = CO2, 
-                                             H2O_parameters = H2O) 
-            
-            ldr_flt[i] = rrb.delta_mol_rayleigh(method = 'line_summation')
+            # Create the gas dictonaries needed for the Raman calculations
+            N2 = make_gas.N2(swl_ch,relative_concentration = c_N2[i])
+            O2 = make_gas.O2(swl_ch,relative_concentration = c_O2[i])
+            Ar = make_gas.Ar(swl_ch,relative_concentration = c_Ar[i])
+            CO2 = make_gas.CO2(swl_ch,relative_concentration = c_CO2[i])
+            H2O = make_gas.H2O(swl_ch,relative_concentration = c_H2O[i])
 
-            bxs_flt[i], _, _ = rrb.quantum_mechanic_rayleigh_cross_section()
-            
-        
+            # Create the RR object for the backscatter cross sections
+            rrb = RotationalRaman(wavelength = swl_ch, 
+                                  max_J = 51, 
+                                  temperature = T[i], 
+                                  optical_filter = gaussian_iff,
+                                  N2_parameters = N2, 
+                                  O2_parameters = O2, 
+                                  Ar_parameters = Ar, 
+                                  CO2_parameters = CO2, 
+                                  H2O_parameters = H2O) 
 
+            # Create the RR object for the scattering/extinction cross sections            
+            rre = RotationalRaman(wavelength = ewl_ch, 
+                                  max_J = 51, 
+                                  temperature = T[i], 
+                                  N2_parameters = N2, 
+                                  O2_parameters = O2, 
+                                  Ar_parameters = Ar, 
+                                  CO2_parameters = CO2, 
+                                  H2O_parameters = H2O,
+                                  istotal = True) 
+
+            if ch_type.loc[ch] == 'v':
+                # Create the RR object for the scattering/extinction cross sections            
+                rrv = RotationalRaman(wavelength = swl_ch, 
+                                      max_J = 51, 
+                                      temperature = T[i], 
+                                      N2_parameters = N2, 
+                                      O2_parameters = O2, 
+                                      Ar_parameters = Ar, 
+                                      CO2_parameters = CO2, 
+                                      H2O_parameters = H2O,
+                                      istotal = True) 
+                
             
-    
-    
-    molec = meteo.copy()
-    
+            bxs_tot_i[i], _, _ = rrb.quantum_mechanic_rayleigh_cross_section()
+            exs_fth_i[i], _, _ = rre.quantum_mechanic_rayleigh_cross_section()
+            if ch_type.loc[ch] == 'v':
+                exs_bck_i[i], _, _ = rrv.quantum_mechanic_rayleigh_cross_section()
+            else:
+                exs_bck_i[i] = exs_fth_i[i]   
+            mdr_i[i] = rrb.delta_mol_rayleigh(method = 'line_summation')
+            
+        # Interpolate for every range bin (calculations are performed only on selected bins)
+        bxs_tot_f = interp1d(sel_bins, bxs_tot_i, bounds_error = False, fill_value = np.nan)
+        exs_fth_f = interp1d(sel_bins, exs_fth_i, bounds_error = False, fill_value = np.nan)
+        exs_bck_f = interp1d(sel_bins, exs_bck_i, bounds_error = False, fill_value = np.nan)
+        mdr_f = interp1d(sel_bins, mdr_i, bounds_error = False, fill_value = np.nan)
+        
+        bxs_tot = bxs_tot_f(bins)  
+        exs_bck = exs_bck_f(bins)
+        exs_fth = exs_fth_f(bins)
+        bcf_tot = N * bxs_tot 
+        ecf_bck = N * exs_bck
+        ecf_fth = N * exs_fth
+
+        if pol.loc[ch] == 1 and ch_type.loc[ch] in ['p', 'c']:
+            mdr = mdr_f(bins)
+        elif pol.loc[ch] == 3 and ch_type.loc[ch] in ['o', 'x']:
+            mdr = 2. * mdr_f(bins) / (1. - mdr_f(bins))
+        elif (pol.loc[ch] == 3 and ch_type.loc[ch] in ['p', 'c']) or \
+            (pol.loc[ch] == 1 and ch_type.loc[ch] in ['o', 'x']) or \
+                (ch_type.loc[ch] not in ['p', 'c', 'o', 'x']):
+            mdr = np.ones(bins.size)
+        else:
+            print(f'-- Warning: Elliptical polarization not supported. Molecular calculation will assume unpolarized backscater radiation for channel {ch}')
+            mdr = np.ones(bins.size)
+
+        rng = ranges.loc[ch_d].values
+        trn_bck = transmittance(x_range = rng, extinction = ecf_bck)
+        trn_fth = transmittance(x_range = rng, extinction = ecf_fth)
+        
+        if ch_type.loc[ch] in ['t', 'v', 'r', 'f']:
+            atb = bcf_tot * trn_fth * trn_bck
+        if ch_type.loc[ch] in ['p', 'o']:
+            atb = bcf_tot * trn_fth * trn_bck / (1. + mdr) 
+        if ch_type.loc[ch] in ['s', 'x']:
+            atb = bcf_tot * mdr * trn_fth * trn_bck / (1. + mdr) 
+                            
+        # Pack into a single xarray object
+        molec.loc[dict(properties = 'bxs_tot')].loc[ch_d] = bxs_tot       
+        molec.loc[dict(properties = 'exs_bck')].loc[ch_d] = exs_bck
+        molec.loc[dict(properties = 'exs_fth')].loc[ch_d] = exs_fth
+        molec.loc[dict(properties = 'bcf_tot')].loc[ch_d] = bcf_tot               
+        molec.loc[dict(properties = 'ecf_bck')].loc[ch_d] = ecf_bck   
+        molec.loc[dict(properties = 'ecf_fth')].loc[ch_d] = ecf_fth   
+        molec.loc[dict(properties = 'mdr')].loc[ch_d] = mdr
+        molec.loc[dict(properties = 'atb')].loc[ch_d] = atb
+
+        
     return(molec, molec_info)
         
 def from_us_std(pressure, temperature, elevation, heights):
@@ -120,7 +221,7 @@ def from_us_std(pressure, temperature, elevation, heights):
     
     bins = heights.bins
     
-    properties = ['pressure','temperature','humidity']
+    properties = ['pressure', 'temperature', 'humidity', 'number_density']
     
     meteo = xr.DataArray(coords = [properties, channels, bins],
                          dims = ['properties', 'channel', 'bins'])
@@ -139,11 +240,20 @@ def from_us_std(pressure, temperature, elevation, heights):
         
         T = np.array([atm.temperature(h) for h in heights.loc[ch_d].values]) 
         
+        RH = np.zeros(P.size)
+        
+        N = number_density_at_pt(pressure = P, 
+                                 temperature = T, 
+                                 relative_humidity = RH, 
+                                 ideal = True)
+        
         meteo.loc[ch_d].loc[dict(properties = 'pressure')] = P
         
         meteo.loc[ch_d].loc[dict(properties = 'temperature')] = T
         
-        meteo.loc[ch_d].loc[dict(properties = 'humidity')] = np.zeros(P.size)
+        meteo.loc[ch_d].loc[dict(properties = 'humidity')] = RH
+
+        meteo.loc[ch_d].loc[dict(properties = 'number_density')] = N
     
     return(meteo, molec_info)
 
@@ -174,7 +284,7 @@ def from_rsonde(path, heights):
     for key in attrs.keys():
         molec_info[key] = attrs[key]
     
-    properties = ['pressure','temperature','humidity']
+    properties = ['pressure', 'temperature', 'humidity', 'number_density']
     
     meteo = xr.DataArray(coords = [properties, channels, bins],
                          dims = ['properties', 'channel', 'bins'])
@@ -185,17 +295,47 @@ def from_rsonde(path, heights):
         T_f = interp1d(H, T, bounds_error = False, fill_value = np.nan)
         
         RH_f = interp1d(H, RH, bounds_error = False, fill_value = np.nan)
-        
-        ch_d = dict(channel = ch)
-        
+
         height_arr = heights.loc[ch].values
         
-        meteo.loc[ch_d].loc[dict(properties = 'pressure')] = P_f(height_arr)
+        P_i = P_f(height_arr)
         
-        meteo.loc[ch_d].loc[dict(properties = 'temperature')] = T_f(height_arr)
+        T_i = T_f(height_arr)
         
-        meteo.loc[ch_d].loc[dict(properties = 'humidity')] = RH_f(height_arr)
+        RH_i = RH_f(height_arr)
+        
+        N_i = number_density_at_pt(pressure = P_i, 
+                                   temperature = T_i, 
+                                   relative_humidity = RH_i, 
+                                   ideal = True)
+        
+        ch_d = dict(channel = ch)
+                
+        meteo.loc[ch_d].loc[dict(properties = 'pressure')] = P_i
+        
+        meteo.loc[ch_d].loc[dict(properties = 'temperature')] = T_i
+        
+        meteo.loc[ch_d].loc[dict(properties = 'humidity')] = RH_i
+        
+        meteo.loc[ch_d].loc[dict(properties = 'number_density')] = N_i
     
     return(meteo, molec_info)
+
+def saturation_vapour_pressure(P, T):
+    
+    ewp = (1.0007 + 3.46 * 1E-6 * P) * 6.1121 * \
+        np.exp(17.502 * (T - 273.15)/(240.97 + T - 273.15))
+        
+    return(ewp)
+
+def transmittance(x_range, extinction):
+    
+    #Calculate transmittance
+    Transmittance = np.exp(-cumtrapz(extinction, x_range))
+    
+    # Copy the first transmission values to the 0 range bin
+    Transmittance = np.insert(Transmittance, 0, 1)
+
+    return(Transmittance)
     
     

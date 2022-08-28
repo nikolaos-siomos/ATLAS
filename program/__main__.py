@@ -10,7 +10,7 @@ import warnings, os, sys
 from readers.parse_config import parse_config
 from readers import read_files
 from lidar_processing import short_prepro
-from molecular import atmosphere
+from lidar_molecular import atmosphere
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
@@ -128,6 +128,7 @@ if 'Sounding_File_Name' in meas_info.keys() or \
         'Temperature_at_Lidar_Station' in meas_info.keys()):
             molec, molec_info = \
                 atmosphere.short_molec(heights = sig_pack['heights'],
+                                       ranges = sig_pack['ranges'],
                                        meas_info = meas_info, 
                                        channel_info = channel_info, 
                                        time_info = time_info,

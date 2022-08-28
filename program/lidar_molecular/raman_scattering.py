@@ -105,7 +105,7 @@ def raman_shift_antistokes(J, molecular_parameters):
     return delta_n
 
 
-def cross_section_stokes(n_incident, J, temperature, molecular_parameters):
+def qm_cross_section_stokes(n_incident, J, temperature, molecular_parameters, istotal = False):
     """ Calculates the rotational Raman backsattering cross section for the Stokes
     branch for quantum number J at a temperature T.
 
@@ -113,18 +113,27 @@ def cross_section_stokes(n_incident, J, temperature, molecular_parameters):
     ----------
     n_incident : float
        Wavenumber of incident light [m-1]
+       
     J : int
        Rotational quantum number
+       
     temperature : float
        The ambient temperature [K]
+       
     molecular_parameters : dict
        A dictionary containing molecular parameters.
+       
+    istotal : bool
+       A scalar. If set to True then the total scattering cross section
+       is returned instead of the backscattering cross section
 
     Returns
     -------
     b_s : float
-       Scattering cross section [m^{2}sr^{-1}]
+       Backscattering [m^{2}sr^{-1}] or total scattering cross section [m^{2}]
+       
     """
+    
     B0 = molecular_parameters['B0']
 
     # Check if callable or just a number
@@ -148,13 +157,18 @@ def cross_section_stokes(n_incident, J, temperature, molecular_parameters):
     
     n_shifted = (n_incident + raman_shift_stokes(J, molecular_parameters))
     
+    # Backscattering cross section
     b_s = 112. * (np.pi ** 4) * g * (n_shifted ** 4) * X * gamma_square * E_factor /\
         (15. * Q_rot  * (4. * np.pi * eps_o) ** 2) 
+    
+    # Converts to the total scattering cross section
+    if istotal:
+        b_s = b_s * (8. * np.pi / 3.) * (10. / 7.)                                
 
     return b_s
 
 
-def cross_section_antistokes(n_incident, J, temperature, molecular_parameters):
+def qm_cross_section_antistokes(n_incident, J, temperature, molecular_parameters, istotal = False):
     """ Calculates the rotational Raman backsattering cross section for the Stokes
     branch for quantum number J at a temperature T.
 
@@ -162,18 +176,27 @@ def cross_section_antistokes(n_incident, J, temperature, molecular_parameters):
     ----------
     n_incident : float
        Wavenumber of incident light [m-1]
+       
     J : int
        Rotational quantum number
+       
     temperature : float
        The ambient temperature [K]
+       
     molecular_parameters : dict
        A dictionary containing molecular parameters.
+       
+    istotal : bool
+       A scalar. If set to True then the total scattering cross section
+       is returned instead of the backscattering cross section
 
     Returns
     -------
     b_s : float
-       Scattering cross section [m^{2}sr^{-1}]
+       Backscattering [m^{2}sr^{-1}] or total scattering cross section [m^{2}]
+       
     """
+    
     B0 = molecular_parameters['B0']
 
     # Check if callable or just a number
@@ -197,13 +220,17 @@ def cross_section_antistokes(n_incident, J, temperature, molecular_parameters):
     
     n_shifted = (n_incident + raman_shift_antistokes(J, molecular_parameters))
     
+    # Backscattering cross section
     b_s = 112. * (np.pi ** 4) * g * (n_shifted ** 4) * X * gamma_square * E_factor /\
         (15. * Q_rot * (4. * np.pi * eps_o) ** 2) 
 
+    # Converts to the total scattering cross section
+    if istotal:
+        b_s = b_s * (8. * np.pi / 3.) * (10. / 7.)                                
         
     return b_s
 
-def cross_section_rr_branch(n_incident, J, max_J, temperature, molecular_parameters, branch):
+def qm_cross_section_rr_branch(n_incident, J, max_J, temperature, molecular_parameters, branch, istotal = False):
     """ Calculates the rotational Raman backsattering cross section for the Stokes/AntiStokes/Central
     branches for quantum number J at a temperature T.
 
@@ -211,21 +238,31 @@ def cross_section_rr_branch(n_incident, J, max_J, temperature, molecular_paramet
     ----------
     n_incident : float
        Wavenumber of incident light [m-1]
+       
     J : int
        Rotational quantum number
+       
     max_J : float
-       Maximum rotational quantum number (number of lines considered)  
+       Maximum rotational quantum number (number of lines considered) 
+       
     temperature : float
        The ambient temperature [K]
+       
     molecular_parameters : dict
        A dictionary containing molecular parameters.
+       
     branch : string
-       Select one of Q (central), S (Stokes), O (anti-stokes)     
+       Select one of Q (central), S (Stokes), O (anti-stokes) 
+       
+    istotal : bool
+       A scalar. If set to True then the total scattering cross section
+       is returned instead of the backscattering cross section
 
     Returns
     -------
     b_s : float
-       Scattering cross section [m^{2}sr^{-1}]
+       Backscattering [m^{2}sr^{-1}] or total scattering cross section [m^{2}]
+       
     """
 
     # Check if callable or just a number
@@ -272,11 +309,15 @@ def cross_section_rr_branch(n_incident, J, max_J, temperature, molecular_paramet
         sys.exit(f'-- Error! Rotational Raman branch type does not exist ({branch} provided)')        
     
     b_s = 112. * (np.pi ** 4) * (n_shifted ** 4) * P * X * gamma_square /\
-        (45. * Q_rot * CGS_to_SI)                                   
+        (45. * Q_rot * CGS_to_SI)   
+
+    # Converts to the total scattering cross section
+    if istotal:
+        b_s = b_s * (8. * np.pi / 3.) * (10. / 7.)                                
 
     return b_s
 
-def cross_section_isotropic_linear(n_incident, J, max_J, temperature, molecular_parameters):
+def qm_cross_section_isotropic(n_incident, J, max_J, temperature, molecular_parameters, istotal = False):
     """ Calculates the backsattering cross section of the isotropically scattered part 
     of the Cabannes line (excluding the Q branch contribution). Based on Eq. 9 of Adam 2009
 
@@ -287,19 +328,28 @@ def cross_section_isotropic_linear(n_incident, J, max_J, temperature, molecular_
     ----------
     n_incident : float
        Wavenumber of incident light [m-1]
+       
     J : int or 1D array of integers
        Rotational quantum number
+       
     max_J : float
        Maximum rotational quantum number (number of lines considered)     
+       
     temperature : float
        The ambient temperature [K]
+       
     molecular_parameters : dict
        A dictionary containing molecular parameters.
+       
+    istotal : bool
+       A scalar. If set to True then the total scattering cross section
+       is returned instead of the backscattering cross section
 
     Returns
     -------
-    b_s : float or 1D array of floats (same as J)
-       Scattering cross section [m^{2}sr^{-1}]
+    b_s : float
+       Backscattering [m^{2}sr^{-1}] or total scattering cross section [m^{2}]
+       
     """
 
     # Check if callable or just a number
@@ -319,13 +369,18 @@ def cross_section_isotropic_linear(n_incident, J, max_J, temperature, molecular_
     E_factor = np.exp(-rotational_energy(J, molecular_parameters) / (k_b * temperature))
     
     CGS_to_SI = (4. * np.pi * eps_o) ** 2 
-    
+
+    # Converts to the total scattering cross section    
     b_s = 112. * (np.pi ** 4) * (n_incident ** 4) * g * (2. * J + 1.) * E_factor * 45. * alpha_square /\
-        (45. * Q_rot * 7. * CGS_to_SI)                                   
+        (45. * Q_rot * 7. * CGS_to_SI)     
+
+    # Converts to the total scattering cross section
+    if istotal:
+        b_s = b_s * (8. * np.pi / 3.)                                                          
 
     return b_s
 
-def cross_section_cabannes(n_incident, alpha_square, epsilon):
+def el_cross_section_cabannes(n_incident, alpha_square, epsilon, istotal = False):
     """ Calculates the backsattering cross section of the isotropically scattered part 
     of the Cabannes line for a spherical molecule or atom (She et al. 2001)
     
@@ -340,19 +395,77 @@ def cross_section_cabannes(n_incident, alpha_square, epsilon):
     epsilon : float or 1D array of floats
        The square normalized polarizability
 
+    istotal : bool
+       A scalar. If set to True then the total scattering cross section
+       is returned instead of the backscattering cross section
+
     Returns
     -------
-    b_s : float or 1D array of floats (same as J)
-       Scattering cross section [m^{2}sr^{-1}]
+    b_s : float
+       Backscattering [m^{2}sr^{-1}] or total scattering cross section [m^{2}]
+       
     """
     
     CGS_to_SI = (4. * np.pi * eps_o) ** 2 
     
-    b_s = 16. * (np.pi ** 4) * (n_incident ** 4) * alpha_square * (1. + 7. * epsilon / 180.) / CGS_to_SI
+    b_i = 16. * (np.pi ** 4) * (n_incident ** 4) * alpha_square / CGS_to_SI
 
+    b_q = 16. * (np.pi ** 4) * (n_incident ** 4) * (7. * epsilon / 180.) / CGS_to_SI
+    
+    # Converts to the total scattering cross section
+    if istotal:
+        b_i = b_i * (8. * np.pi / 3.)
+
+        b_q = b_q * (8. * np.pi / 3.) * (10. / 7.)                                                                                          
+    
+    b_s = b_i + b_q
+    
     return b_s
 
-def cross_section_isotropic_spherical(n_incident, alpha_square):
+def el_cross_section_rayleigh(n_incident, alpha_square, epsilon, istotal = False):
+    """ Calculates the backsattering cross section of the rayleigh spectrum
+    (isotropic + anisotropic --> Cabanes + O and S branches
+     for a linear molecule or atom (She et al. 2001)
+    
+    Parameters
+    ----------
+    n_incident : float
+       Wavenumber of incident light [m-1]
+    
+    alpha_square : float or 1D array of floats
+       The isotropic polarizability square (F * m)^2
+       
+    epsilon : float or 1D array of floats
+       The square normalized polarizability
+
+    istotal : bool
+       A scalar. If set to True then the total scattering cross section
+       is returned instead of the backscattering cross section
+
+    Returns
+    -------
+    b_s : float
+       Backscattering [m^{2}sr^{-1}] or total scattering cross section [m^{2}]
+       
+    """
+    
+    CGS_to_SI = (4. * np.pi * eps_o) ** 2 
+    
+    b_i = 16. * (np.pi ** 4) * (n_incident ** 4) * alpha_square / CGS_to_SI
+
+    b_q = 16. * (np.pi ** 4) * (n_incident ** 4) * (2. * epsilon / 9.) / CGS_to_SI
+    
+    # Converts to the total scattering cross section
+    if istotal:
+        b_i = b_i * (8. * np.pi / 3.)
+
+        b_q = b_q * (8. * np.pi / 3.) * (10. / 7.)                                                                                          
+    
+    b_s = b_i + b_q
+    
+    return b_s
+
+def el_cross_section_isotropic(n_incident, alpha_square, istotal = False):
     """ Calculates the backsattering cross section of the isotropically scattered part 
     of the Cabannes line for a molecule or atom (She et al. 2001). The equation
     holds for any kind of molecule (linear, assymetrical etc.)
@@ -367,16 +480,25 @@ def cross_section_isotropic_spherical(n_incident, alpha_square):
        
     epsilon : float or 1D array of floats
        The square normalized polarizability
+       
+    istotal : bool
+       A scalar. If set to True then the total scattering cross section
+       is returned instead of the backscattering cross section
 
     Returns
     -------
     b_s : float or 1D array of floats (same as J)
        Scattering cross section [m^{2}sr^{-1}]
+       
     """
     
     CGS_to_SI = (4. * np.pi * eps_o) ** 2 
     
     b_s = 16. * (np.pi ** 4) * (n_incident ** 4) * alpha_square / CGS_to_SI
+
+    # Converts to the total scattering cross section
+    if istotal:
+        b_s = b_s * (8. * np.pi / 3.)     
 
     return b_s
 
@@ -541,9 +663,9 @@ def delta_mol_by_summing(ds_isotropic, ds_anisotropic):
     return(delta_m)
 
 
-class RotationalRamanBackscatter:
+class RotationalRaman:
 
-    def __init__(self, wavelength, temperature, max_J=40, N2_parameters=None, O2_parameters=None, Ar_parameters=None, CO2_parameters=None, H2O_parameters=None, optical_filter = None):
+    def __init__(self, wavelength, temperature, max_J=40, N2_parameters=None, O2_parameters=None, Ar_parameters=None, CO2_parameters=None, H2O_parameters=None, optical_filter = None, istotal = False):
         """
         This class calculates the volume depolarization ratio of the molecular
         backscatter signal detected with a polarization lidar.
@@ -618,37 +740,116 @@ class RotationalRamanBackscatter:
         self.dl_stokes_CO2 = 1 / (1 / self.wavelength + np.array(self.dn_stokes_CO2) * 10 ** -9)
         self.dl_astokes_CO2 = 1 / (1 / self.wavelength + np.array(self.dn_astokes_CO2) * 10 ** -9)
         
-        self.ds_Q_N2 = np.array([cross_section_rr_branch(
-            self.wavenumber, J, max_J, temperature, self.N2_parameters, branch='Q') for J in self.Js])
-        self.ds_stokes_N2 = np.array([cross_section_rr_branch(
-            self.wavenumber, J, max_J, temperature, self.N2_parameters, branch='S') for J in self.Js])
-        self.ds_astokes_N2 = np.array([cross_section_rr_branch(
-            self.wavenumber, J, max_J, temperature, self.N2_parameters, branch='O') for J in self.Js])
+        self.ds_Q_N2 = np.array([qm_cross_section_rr_branch(
+            self.wavenumber, J, max_J, temperature, self.N2_parameters, branch='Q', istotal = istotal) for J in self.Js])
+        self.ds_stokes_N2 = np.array([qm_cross_section_rr_branch(
+            self.wavenumber, J, max_J, temperature, self.N2_parameters, branch='S', istotal = istotal) for J in self.Js])
+        self.ds_astokes_N2 = np.array([qm_cross_section_rr_branch(
+            self.wavenumber, J, max_J, temperature, self.N2_parameters, branch='O', istotal = istotal) for J in self.Js])
 
-        self.ds_Q_O2 = np.array([cross_section_rr_branch(
-            self.wavenumber, J, max_J, temperature, self.O2_parameters, branch='Q') for J in self.Js])
-        self.ds_stokes_O2 = np.array([cross_section_rr_branch(
-            self.wavenumber, J, max_J, temperature, self.O2_parameters, branch='S') for J in self.Js])
-        self.ds_astokes_O2 = np.array([cross_section_rr_branch(
-            self.wavenumber, J, max_J, temperature, self.O2_parameters, branch='O') for J in self.Js])
+        self.ds_Q_O2 = np.array([qm_cross_section_rr_branch(
+            self.wavenumber, J, max_J, temperature, self.O2_parameters, branch='Q', istotal = istotal) for J in self.Js])
+        self.ds_stokes_O2 = np.array([qm_cross_section_rr_branch(
+            self.wavenumber, J, max_J, temperature, self.O2_parameters, branch='S', istotal = istotal) for J in self.Js])
+        self.ds_astokes_O2 = np.array([qm_cross_section_rr_branch(
+            self.wavenumber, J, max_J, temperature, self.O2_parameters, branch='O', istotal = istotal) for J in self.Js])
 
-        self.ds_Q_CO2 = np.array([cross_section_rr_branch(
-            self.wavenumber, J, max_J, temperature, self.CO2_parameters, branch='Q') for J in self.Js])
-        self.ds_stokes_CO2 = np.array([cross_section_rr_branch(
-            self.wavenumber, J, max_J, temperature, self.CO2_parameters, branch='S') for J in self.Js])
-        self.ds_astokes_CO2 = np.array([cross_section_rr_branch(
-            self.wavenumber, J, max_J, temperature, self.CO2_parameters, branch='O') for J in self.Js])
+        self.ds_Q_CO2 = np.array([qm_cross_section_rr_branch(
+            self.wavenumber, J, max_J, temperature, self.CO2_parameters, branch='Q', istotal = istotal) for J in self.Js])
+        self.ds_stokes_CO2 = np.array([qm_cross_section_rr_branch(
+            self.wavenumber, J, max_J, temperature, self.CO2_parameters, branch='S', istotal = istotal) for J in self.Js])
+        self.ds_astokes_CO2 = np.array([qm_cross_section_rr_branch(
+            self.wavenumber, J, max_J, temperature, self.CO2_parameters, branch='O', istotal = istotal) for J in self.Js])
 
-        self.ds_isotr_N2 = cross_section_isotropic_spherical(self.wavenumber, self.N2_parameters['alpha_square'])
-        self.ds_isotr_O2 = cross_section_isotropic_spherical(self.wavenumber, self.O2_parameters['alpha_square'])
-        self.ds_isotr_CO2 = cross_section_isotropic_spherical(self.wavenumber, self.CO2_parameters['alpha_square'])
-        self.ds_isotr_Ar = cross_section_isotropic_spherical(self.wavenumber, self.Ar_parameters['alpha_square'])
-        self.ds_isotr_H2O = cross_section_isotropic_spherical(self.wavenumber, self.H2O_parameters['alpha_square'])
+        self.ds_isotr_N2 = el_cross_section_isotropic(self.wavenumber, self.N2_parameters['alpha_square'], istotal = istotal)
+        self.ds_isotr_O2 = el_cross_section_isotropic(self.wavenumber, self.O2_parameters['alpha_square'], istotal = istotal)
+        self.ds_isotr_CO2 = el_cross_section_isotropic(self.wavenumber, self.CO2_parameters['alpha_square'], istotal = istotal)
+        self.ds_isotr_Ar = el_cross_section_isotropic(self.wavenumber, self.Ar_parameters['alpha_square'], istotal = istotal)
+        self.ds_isotr_H2O = el_cross_section_isotropic(self.wavenumber, self.H2O_parameters['alpha_square'], istotal = istotal)
+
+        self.ds_el_cab_N2 = el_cross_section_cabannes(self.wavenumber, self.N2_parameters['alpha_square'], self.N2_parameters['epsilon'], istotal = istotal)
+        self.ds_el_cab_O2 = el_cross_section_cabannes(self.wavenumber, self.O2_parameters['alpha_square'], self.O2_parameters['epsilon'], istotal = istotal)
+        self.ds_el_cab_CO2 = el_cross_section_cabannes(self.wavenumber, self.CO2_parameters['alpha_square'], self.CO2_parameters['epsilon'], istotal = istotal)
+        self.ds_el_cab_Ar = el_cross_section_cabannes(self.wavenumber, self.Ar_parameters['alpha_square'], self.Ar_parameters['epsilon'], istotal = istotal)
+        self.ds_el_cab_H2O = el_cross_section_cabannes(self.wavenumber, self.H2O_parameters['alpha_square'], self.H2O_parameters['epsilon'], istotal = istotal)
+
+        self.ds_el_ray_N2 = el_cross_section_rayleigh(self.wavenumber, self.N2_parameters['alpha_square'], self.N2_parameters['epsilon'], istotal = istotal)
+        self.ds_el_ray_O2 = el_cross_section_rayleigh(self.wavenumber, self.O2_parameters['alpha_square'], self.O2_parameters['epsilon'], istotal = istotal)
+        self.ds_el_ray_CO2 = el_cross_section_rayleigh(self.wavenumber, self.CO2_parameters['alpha_square'], self.CO2_parameters['epsilon'], istotal = istotal)
+        self.ds_el_ray_Ar = el_cross_section_rayleigh(self.wavenumber, self.Ar_parameters['alpha_square'], self.Ar_parameters['epsilon'], istotal = istotal)
+        self.ds_el_ray_H2O = el_cross_section_rayleigh(self.wavenumber, self.H2O_parameters['alpha_square'], self.H2O_parameters['epsilon'], istotal = istotal)
       
 
-    def electromagnetic_rr_cross_section(self, pressure=1013.25):
-        """ Cacluate the backscattering cross section for the full Rotational Raman wings. 
+    def electromagnetic_rayleigh_cross_section(self, pressure=1013.25):
+        """ Caclulate the backscattering cross section for the 
+        Rayleigh spectrum(Cabannes + O and S branches)
         
+        Parameters
+        ----------
+        
+        pressure: float
+           The atmospheric pressure [hPa]
+    
+        Returns
+        -------
+        
+        cross_section:
+           The backscattering or total scattering cross section of the 
+           Rayleigh spectrum (Cabannes + O and S branches) for a linear 
+           molecule or atom. Units are either [m2sr-1] or [m2].  
+    
+           Cross section type depends on istotal given as input to the
+           RotationalRaman class
+           
+           The calculation for a single molecule is based on 
+           She et al. 2001, Eq. 6.
+           
+        cross_sections:
+           Same as cross_sections but given separately for each gas
+        
+        sigma:
+           The backscattering or total volumetric 
+           scattering coefficient (crossection * number density)
+            
+        """
+        
+        ds_N2 = np.nansum(self.ds_el_ray_N2) 
+        
+        ds_O2 = np.nansum(self.ds_el_ray_O2) 
+        
+        ds_CO2 = np.nansum(self.ds_el_ray_CO2)
+
+        ds_Ar = np.nansum(self.ds_el_ray_Ar) 
+    
+        ds_H2O = np.nansum(self.ds_el_ray_H2O) 
+        
+        cross_section_gas = np.array([ds_N2, ds_O2, ds_Ar, ds_CO2, ds_H2O])
+        
+        N = number_density_at_pt(pressure, self.temperature, relative_humidity=0., ideal=True)
+    
+        c_N2 = self.N2_parameters['relative_concentration']
+        c_O2 = self.O2_parameters['relative_concentration']
+        c_Ar = self.Ar_parameters['relative_concentration']
+        c_CO2 = self.CO2_parameters['relative_concentration']
+        c_H2O = self.H2O_parameters['relative_concentration']
+        
+        c = np.array([c_N2, c_O2, c_Ar, c_CO2, c_H2O])
+
+        gases = {'N2' : '', 'O2' : '', 'Ar' : '', 'CO2' : '', 'H2O' : ''} 
+        
+        cross_section = np.nansum(c * cross_section_gas) 
+    
+        sigma = N * cross_section
+        
+        cross_sections = dict(zip(gases, cross_section_gas))
+
+        return(cross_section, cross_sections, sigma)
+
+
+    def electromagnetic_cabannes_cross_section(self, pressure = 1013.25):
+        
+        """ Caclulate the backscattering cross section for the cabannes line. 
+    
         Parameters
         ----------
         
@@ -659,34 +860,36 @@ class RotationalRamanBackscatter:
         -------
         
         cross_section:
-           The backscattering cross section of the Rotational Raman wings for a single molecule
-           of a specific gas [m2sr-1].  
+           The backscattering or total scattering cross section of the 
+           Cabannes line (isotropic + Q branch) for a linear 
+           molecule or atom. Units are either [m2sr-1] or [m2].  
            
-           The calculation for a single molecule is based on She et al. 2001, Eq. 4.
+           Cross section type depends on istotal given as input to the
+           RotationalRaman class
+
+        cross_sections:
+           Same as cross_sections but given separately for each gas
         
         sigma:
-           The backscattering cross section of the Rotational Raman wings of a specific gas [m2sr-1].  
-           The cross_section is calculated first and then it is multiplied by the number
-           of molecules
+           The backscattering or total volumetric 
+           scattering coefficient (crossection * number density)
             
         """
-                
-        X_all = self.rr_contribution()
+            
+        ds_N2 = np.nansum(self.ds_el_cab_N2) 
         
-        X_N2 = X_all['N2']
-        X_O2 = X_all['O2']
-        X_Ar = X_all['Ar']
-        X_CO2 = X_all['CO2']
-        X_H2O = X_all['H2O']
+        ds_O2 = np.nansum(self.ds_el_cab_O2) 
         
-        x = np.array([X_N2, X_O2, X_Ar, X_CO2, X_H2O])
+        ds_CO2 = np.nansum(self.ds_el_cab_CO2)
 
-        # Convert wavelegth to meters
-        lamda_m = self.wavelength * 10 ** -9
+        ds_Ar = np.nansum(self.ds_el_cab_Ar) 
+    
+        ds_H2O = np.nansum(self.ds_el_cab_H2O) 
         
-        # Calculate properties of an ideal gas
+        cross_section_gas = np.array([ds_N2, ds_O2, ds_Ar, ds_CO2, ds_H2O])
+        
         N = number_density_at_pt(pressure, self.temperature, relative_humidity=0., ideal=True)
-        
+    
         c_N2 = self.N2_parameters['relative_concentration']
         c_O2 = self.O2_parameters['relative_concentration']
         c_Ar = self.Ar_parameters['relative_concentration']
@@ -694,37 +897,137 @@ class RotationalRamanBackscatter:
         c_H2O = self.H2O_parameters['relative_concentration']
         
         c = np.array([c_N2, c_O2, c_Ar, c_CO2, c_H2O])
-    
-        a2_N2 = self.N2_parameters['alpha_square']
-        a2_O2 = self.O2_parameters['alpha_square']
-        a2_Ar = self.Ar_parameters['alpha_square']
-        a2_CO2 = self.CO2_parameters['alpha_square']
-        a2_H2O = self.H2O_parameters['alpha_square']
-    
-        a2 = np.array([a2_N2, a2_O2, a2_Ar, a2_CO2, a2_H2O])
-        
-        e_N2 = self.N2_parameters['epsilon']
-        e_O2 = self.O2_parameters['epsilon']
-        e_Ar = self.Ar_parameters['epsilon']
-        e_CO2 = self.CO2_parameters['epsilon']
-        e_H2O = self.H2O_parameters['epsilon']
-    
-        e = np.array([e_N2, e_O2, e_Ar, e_CO2, e_H2O])
-        
+
         gases = {'N2' : '', 'O2' : '', 'Ar' : '', 'CO2' : '', 'H2O' : ''} 
-                
-        cross_section_rr_gas = np.pi ** 2 * a2 * (21. * e / 180.) / (lamda_m ** 4 * eps_o ** 2)
-                
-        cross_section_rr = np.nansum(x * c * cross_section_rr_gas)
-
-        sigma_rr = N * cross_section_rr
-
-        cross_sections_rr = dict(zip(gases, cross_section_rr_gas))
         
-        return cross_section_rr, cross_sections_rr, sigma_rr
+        cross_section = np.nansum(c * cross_section_gas) 
+    
+        sigma = N * cross_section
+        
+        cross_sections = dict(zip(gases, cross_section_gas))
+    
+        return(cross_section, cross_sections, sigma)
 
-    def quantum_mechanic_rr_cross_section(self, pressure = 1013.25):
+    def quantum_mechanic_rayleigh_cross_section(self, pressure = 1013.25):
 
+        """ Caclulate the backscattering cross section for the 
+        Rayleigh spectrum (Cabannes + O and S branches) 
+        by summing the lines
+    
+        Parameters
+        ----------
+        
+        pressure: float
+           The atmospheric pressure [hPa]
+        
+        Returns
+        -------
+        
+        cross_section:
+           The backscattering or total scattering cross section of the 
+           Rayleigh spectrum (Cabannes + O and S branches) for a linear 
+           molecule or atom. Units are either [m2sr-1] or [m2].  
+        
+           Cross section type depends on istotal given as input to the
+           RotationalRaman class
+           
+        cross_sections:
+           Same as cross_sections but given separately for each gas
+        
+        sigma:
+           The backscattering or total volumetric 
+           scattering coefficient (crossection * number density)
+            
+        """
+        
+        optical_filter = self.optical_filter
+        
+        if optical_filter:
+            ds_N2 = optical_filter(self.wavelength)*\
+                (np.nansum(self.ds_Q_N2) + np.nansum(self.ds_isotr_N2)) +\
+                    np.nansum(optical_filter(self.dl_stokes_N2) * self.ds_stokes_N2) +\
+                        np.nansum(optical_filter(self.dl_astokes_N2) * self.ds_astokes_N2)
+                        
+            ds_O2 = optical_filter(self.wavelength)*\
+                (np.nansum(self.ds_Q_O2) + np.nansum(self.ds_isotr_O2)) +\
+                    np.nansum(optical_filter(self.dl_stokes_O2) * self.ds_stokes_O2) +\
+                        np.nansum(optical_filter(self.dl_astokes_O2) * self.ds_astokes_O2)
+                
+            ds_CO2 = optical_filter(self.wavelength)*\
+                (np.nansum(self.ds_Q_CO2) + np.nansum(self.ds_isotr_CO2)) +\
+                    np.nansum(optical_filter(self.dl_stokes_CO2) * self.ds_stokes_CO2) +\
+                        np.nansum(optical_filter(self.dl_astokes_CO2) * self.ds_astokes_CO2)
+
+            ds_Ar = optical_filter(self.wavelength) * np.nansum(self.ds_isotr_Ar) 
+
+            ds_H2O = optical_filter(self.wavelength) * np.nansum(self.ds_isotr_H2O) 
+
+        else:
+            ds_N2 = np.nansum(self.ds_isotr_N2) +  np.nansum(self.ds_stokes_N2) + np.nansum(self.ds_astokes_N2) + np.nansum(self.ds_Q_N2)
+            
+            ds_O2 = np.nansum(self.ds_isotr_O2) + np.nansum(self.ds_stokes_O2) + np.nansum(self.ds_astokes_O2) + np.nansum(self.ds_Q_O2)
+
+            ds_CO2 = np.nansum(self.ds_isotr_CO2) + np.nansum(self.ds_stokes_CO2) + np.nansum(self.ds_astokes_CO2) + np.nansum(self.ds_Q_CO2)
+
+            ds_Ar = np.nansum(self.ds_isotr_Ar) 
+        
+            ds_H2O = np.nansum(self.ds_isotr_H2O) 
+            
+        
+        cross_section_gas = np.array([ds_N2, ds_O2, ds_Ar, ds_CO2, ds_H2O])
+        
+        N = number_density_at_pt(pressure, self.temperature, relative_humidity=0., ideal=True)
+    
+        c_N2 = self.N2_parameters['relative_concentration']
+        c_O2 = self.O2_parameters['relative_concentration']
+        c_Ar = self.Ar_parameters['relative_concentration']
+        c_CO2 = self.CO2_parameters['relative_concentration']
+        c_H2O = self.H2O_parameters['relative_concentration']
+        
+        c = np.array([c_N2, c_O2, c_Ar, c_CO2, c_H2O])
+
+        gases = {'N2' : '', 'O2' : '', 'Ar' : '', 'CO2' : '', 'H2O' : ''} 
+        
+        cross_section = np.nansum(c * cross_section_gas)
+
+        sigma = N * cross_section
+                    
+        cross_sections = dict(zip(gases, cross_section_gas))
+
+        return cross_section, cross_sections, sigma
+
+
+    def quantum_mechanic_rr_cross_section(self, pressure = 1013.25, istotal = False):
+
+        """ Caclulate the backscattering cross section for the 
+        RR Wings (O and S branches) by summing the lines
+    
+        Parameters
+        ----------
+        
+        pressure: float
+           The atmospheric pressure [hPa]
+        
+        Returns
+        -------
+        
+        cross_section:
+           The backscattering or total scattering cross section of the 
+           RR Wings (O and S branches) for a linear molecule or atom. 
+           Units are either [m2sr-1] or [m2].  
+        
+           Cross section type depends on istotal given as input to the
+           RotationalRaman class
+
+        cross_sections:
+           Same as cross_sections but given separately for each gas
+        
+        sigma:
+           The backscattering or total volumetric 
+           scattering coefficient (crossection * number density)
+            
+        """
+        
         optical_filter = self.optical_filter
 
         if optical_filter:
@@ -769,154 +1072,38 @@ class RotationalRamanBackscatter:
                     
         return cross_section_rr, cross_sections_rr, sigma_rr 
 
-    def electromagnetic_cabannes_cross_section(self, pressure = 1013.25):
-        
-        """ Cacluate the backscattering cross section for the cabannes line. 
-        
+
+    def quantum_mechanic_cabannes_cross_section(self, pressure = 1013.25):
+
+        """ Caclulate the backscattering cross section for the 
+        Cabannes line (isotropic + Q branch) by summing the lines
+    
         Parameters
         ----------
         
-        wavelength: float
-           Light wavelegnth in nm
-           
-        alpha_square: float
-           The isotropic polarizability of the gas (in general depends on the wavelength)
-    
-        epsilon: float
-           The normalized polarizability of the gas (in general depends on the wavelength)
-    
         pressure: float
            The atmospheric pressure [hPa]
-           
-        temperature: float
-           The atmospheric temperature [K]   
-           
+        
         Returns
         -------
         
         cross_section:
-           The backscattering cross section of the Cabannes line for a single molecule
-           of a specific gas [m2sr-1].  
-           
-           The calculation for a single molecule is based on She et al. 2001, Eq. 4.
+           The backscattering or total scattering cross section of the 
+           Cabannes line (isotropic + Q branch) for a linear molecule or atom. 
+           Units are either [m2sr-1] or [m2].  
+        
+           Cross section type depends on istotal given as input to the
+           RotationalRaman class
+
+        cross_sections:
+           Same as cross_sections but given separately for each gas
         
         sigma:
-           The backscattering cross section of the Cabannes line of a specific gas [m2sr-1].  
-           The cross_section is calculated first and then it is multiplied by the number
-           of molecules
+           The backscattering or total volumetric 
+           scattering coefficient (crossection * number density)
             
         """
         
-        optical_filter = self.optical_filter
-
-        if optical_filter:
-            transmission_cabannes = optical_filter(self.wavelength)
-        else:
-            transmission_cabannes = 1.         
-            
-        # Convert wavelegth to meters
-        lamda_m = (1. / self.wavelength) * 10 ** 9
-        
-        # Calculate properties of an ideal gas
-        N = number_density_at_pt(pressure, self.temperature, relative_humidity=0., ideal=True)
-        
-        c_N2 = self.N2_parameters['relative_concentration']
-        c_O2 = self.O2_parameters['relative_concentration']
-        c_Ar = self.Ar_parameters['relative_concentration']
-        c_CO2 = self.CO2_parameters['relative_concentration']
-        c_H2O = self.H2O_parameters['relative_concentration']
-        
-        c = np.array([c_N2, c_O2, c_Ar, c_CO2, c_H2O])
-    
-        a2_N2 = self.N2_parameters['alpha_square']
-        a2_O2 = self.O2_parameters['alpha_square']
-        a2_Ar = self.Ar_parameters['alpha_square']
-        a2_CO2 = self.CO2_parameters['alpha_square']
-        a2_H2O = self.H2O_parameters['alpha_square']
-    
-        a2 = np.array([a2_N2, a2_O2, a2_Ar, a2_CO2, a2_H2O])
-        
-        e_N2 = self.N2_parameters['epsilon']
-        e_O2 = self.O2_parameters['epsilon']
-        e_Ar = self.Ar_parameters['epsilon']
-        e_CO2 = self.CO2_parameters['epsilon']
-        e_H2O = self.H2O_parameters['epsilon']
-    
-        e = np.array([e_N2, e_O2, e_Ar, e_CO2, e_H2O])
-    
-        gases = {'N2' : '', 'O2' : '', 'Ar' : '', 'CO2' : '', 'H2O' : ''} 
-        
-        cross_section_cab_gas = cross_section_cabannes(n_incident = lamda_m, alpha_square = a2, epsilon = e)
-        # cross_section_cab_gas = np.pi ** 2 * a2 * (1. + 7. * e / 180.) / (lamda_m ** 4 * eps_o ** 2)
-    
-        cross_section_cab = np.sum(c * cross_section_cab_gas) * transmission_cabannes
-    
-        sigma_cab = N * cross_section_cab
-        
-        cross_sections_cab = dict(zip(gases, cross_section_cab_gas))
-    
-        return(cross_section_cab, cross_sections_cab, sigma_cab)
-
-    def quantum_mechanic_rayleigh_cross_section(self, pressure = 1013.25):
-
-        optical_filter = self.optical_filter
-        
-        if optical_filter:
-            ds_N2 = optical_filter(self.wavelength)*\
-                (np.nansum(self.ds_Q_N2) + np.nansum(self.ds_isotr_N2)) +\
-                    np.nansum(optical_filter(self.dl_stokes_N2) * self.ds_stokes_N2) +\
-                        np.nansum(optical_filter(self.dl_astokes_N2) * self.ds_astokes_N2)
-                        
-            ds_O2 = optical_filter(self.wavelength)*\
-                (np.nansum(self.ds_Q_O2) + np.nansum(self.ds_isotr_O2)) +\
-                    np.nansum(optical_filter(self.dl_stokes_O2) * self.ds_stokes_O2) +\
-                        np.nansum(optical_filter(self.dl_astokes_O2) * self.ds_astokes_O2)
-                
-            ds_CO2 = optical_filter(self.wavelength)*\
-                (np.nansum(self.ds_Q_CO2) + np.nansum(self.ds_isotr_CO2)) +\
-                    np.nansum(optical_filter(self.dl_stokes_CO2) * self.ds_stokes_CO2) +\
-                        np.nansum(optical_filter(self.dl_astokes_CO2) * self.ds_astokes_CO2)
-
-            ds_Ar = optical_filter(self.wavelength) * np.nansum(self.ds_isotr_Ar) 
-
-            ds_H2O = optical_filter(self.wavelength) * np.nansum(self.ds_isotr_H2O) 
-
-        else:
-            ds_N2 = np.nansum(self.ds_isotr_N2) +  np.nansum(self.ds_stokes_N2) + np.nansum(self.ds_astokes_N2) + np.nansum(self.ds_Q_N2)
-            
-            ds_O2 = np.nansum(self.ds_isotr_O2) + np.nansum(self.ds_stokes_O2) + np.nansum(self.ds_astokes_O2) + np.nansum(self.ds_Q_O2)
-
-            ds_CO2 = np.nansum(self.ds_isotr_CO2) + np.nansum(self.ds_stokes_CO2) + np.nansum(self.ds_astokes_CO2) + np.nansum(self.ds_Q_CO2)
-
-            ds_Ar = np.nansum(self.ds_isotr_Ar) 
-        
-            ds_H2O = np.nansum(self.ds_isotr_H2O) 
-            
-        
-        cross_section_ray_gas = np.array([ds_N2, ds_O2, ds_Ar, ds_CO2, ds_H2O])
-        
-        N = number_density_at_pt(pressure, self.temperature, relative_humidity=0., ideal=True)
-    
-        c_N2 = self.N2_parameters['relative_concentration']
-        c_O2 = self.O2_parameters['relative_concentration']
-        c_Ar = self.Ar_parameters['relative_concentration']
-        c_CO2 = self.CO2_parameters['relative_concentration']
-        c_H2O = self.H2O_parameters['relative_concentration']
-        
-        c = np.array([c_N2, c_O2, c_Ar, c_CO2, c_H2O])
-
-        gases = {'N2' : '', 'O2' : '', 'Ar' : '', 'CO2' : '', 'H2O' : ''} 
-        
-        cross_section_ray = np.nansum(c * cross_section_ray_gas)
-
-        sigma_ray = N * cross_section_ray
-                    
-        cross_sections_ray = dict(zip(gases, cross_section_ray_gas))
-
-        return cross_section_ray, cross_sections_ray, sigma_ray 
-
-    def quantum_mechanic_cabannes_cross_section(self, pressure = 1013.25):
-
         optical_filter = self.optical_filter
         
         if optical_filter:
@@ -968,6 +1155,35 @@ class RotationalRamanBackscatter:
 
     def quantum_mechanic_isotropic_cross_section(self, pressure = 1013.25):
 
+        """ Caclulate the backscattering cross section for the 
+        isotropic part (electromagnetic calculations prefered over 
+        line summation for isotropic scattering)
+    
+        Parameters
+        ----------
+        pressure: float
+           The atmospheric pressure [hPa]
+        
+        Returns
+        -------
+        
+        cross_section:
+           The backscattering or total scattering cross section of the 
+           isotropic part for a linear molecule or atom. 
+           Units are either [m2sr-1] or [m2].  
+        
+           Cross section type depends on istotal given as input to the
+           RotationalRaman class
+
+        cross_sections:
+           Same as cross_sections but given separately for each gas
+        
+        sigma:
+           The backscattering or total volumetric 
+           scattering coefficient (crossection * number density)
+            
+        """
+        
         optical_filter = self.optical_filter
         
         if optical_filter:
@@ -1015,6 +1231,35 @@ class RotationalRamanBackscatter:
         return cross_section_iso, cross_sections_iso, sigma_iso 
 
     def quantum_mechanic_anisotropic_cross_section(self, pressure = 1013.25):
+ 
+        """ Caclulate the backscattering cross section for the 
+        RR spectrum (O, S, and Q branches) by summing the lines
+    
+        Parameters
+        ----------
+        
+        pressure: float
+           The atmospheric pressure [hPa]
+        
+        Returns
+        -------
+        
+        cross_section:
+           The backscattering or total scattering cross section of the 
+           RR spectrum (O, S, and Q branches) for a linear molecule or atom. 
+           Units are either [m2sr-1] or [m2].  
+        
+           Cross section type depends on istotal given as input to the
+           RotationalRaman class
+
+        cross_sections:
+           Same as cross_sections but given separately for each gas
+        
+        sigma:
+           The backscattering or total volumetric 
+           scattering coefficient (crossection * number density)
+            
+        """
         
         optical_filter = self.optical_filter
 
@@ -1233,9 +1478,9 @@ class RotationalRamanBackscatter:
     def _single_molecule_spectra(self, temperature, molecular_parameters):
         """ Calculate the scattering parameters for a single molecule type, as described by the parameters.
         """
-        ds_stokes = np.array([cross_section_stokes(
+        ds_stokes = np.array([qm_cross_section_stokes(
             self.wavenumber, J, temperature, molecular_parameters) for J in self.Js])
-        ds_astokes = np.array([cross_section_antistokes(
+        ds_astokes = np.array([qm_cross_section_antistokes(
             self.wavenumber, J, temperature, molecular_parameters) for J in self.Js])
         dn_stokes = np.array(
             [raman_shift_stokes(J, molecular_parameters) for J in self.Js])
