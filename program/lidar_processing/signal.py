@@ -66,7 +66,7 @@ def average_by_group(sig, time_info, grouper, start_time, stop_time):
             reduced by averaging. An average is generated each time the group
             changes
             
-        time_info : 
+        time_info_out : 
                 A pandas Dataframe with all the necessary metadata for each 
                 temporal frame reformed according to the new temporal scale
                 
@@ -98,7 +98,7 @@ def average_by_group(sig, time_info, grouper, start_time, stop_time):
         t_d = dict(time = slice(sep[i], sep[i+1]))
         sig_out[dict(time = i)] =  sig[t_d].copy().mean(dim = 'time').values
     
-    cols = [start_time, stop_time, grouper, 'timeframes']
+    cols = [start_time, stop_time, grouper, 'Timeframes']
 
     data = np.array([group_stime, group_etime, group_grouper, frames],
                     dtype = object).T
@@ -108,7 +108,7 @@ def average_by_group(sig, time_info, grouper, start_time, stop_time):
     
     return(sig_out, time_info_out)
 
-def average_by_time(sig, timescale):
+def average_by_time(sig, time_info, timescale, start_time, stop_time):
 
     """
     General:
@@ -119,11 +119,25 @@ def average_by_time(sig, timescale):
             A 3D xarray with the lidar signals, it should include the following
             dimensions: (time, channel, bins). The photon signals must not be
             dead time corrected yet
-            
+
+        time_info : 
+                A pandas Dataframe with all the necessary metadata for each 
+                temporal frame fetched from the QA file
+                
         timescale: 
             The temporal avraging step, in seconds. E.g. if set to 3600 then 1h
             averages will be generated from the original signals. If set to -1
             (default) then all timeframes will be averaged
+            
+        start_time: 
+            A string with the column name of time_info that contains the 
+            starting time in seconds since the beginning of the measurement 
+            per timeframe
+        
+        stop_time: 
+            A string with the column name of time_info that contains the 
+            ending time in seconds since the beginning of the measurement 
+            per timeframe
 
               
     Returns:
@@ -132,15 +146,17 @@ def average_by_time(sig, timescale):
             An xarray in the same dimensions with sig but with the time dim
             reduced by averaging, according to the provided timescale
         
-        frames:
-            An xarray with a single dimension ('time') which coincides with the
-            sig_out time dimension. It provied the number of averaged profiles
-            per temporal timeframe of sig_out
+        time_info_out : 
+                A pandas Dataframe with all the necessary metadata for each 
+                temporal frame reformed according to the new temporal scale
+                
             
     """
     
     time_arr = sig.time.values
-
+    stime = time_info.loc[:,start_time].values
+    etime = time_info.loc[:,stop_time].values
+    
     # Calculate the time duration (hours) between first and last measurement
     dt = time_arr[-1] - time_arr[0]
     
@@ -152,7 +168,7 @@ def average_by_time(sig, timescale):
     # average the sig only if the timescale is not empty and the sig time dim is >1
     if timescale >= meas_dur:
                 
-        m_time = time_arr[0] + dt / 2.
+        m_time = np.datetime64(time_arr[0] + dt / 2.,'us').item()
         
         sig_avg = sig.mean(dim = 'time').values
         
@@ -160,10 +176,20 @@ def average_by_time(sig, timescale):
 
         sig_out.loc[dict(time = m_time)] = sig_avg
         
-        # Store the time frame information per slice to use it for the error simulation
-        frames = xr.DataArray(data = time_arr.size, 
-                              dims = ['time'], 
-                              coords = [sig_out.time.values])
+        # Creat the time_info object according to the new timescale
+        cols = [start_time, stop_time, 'Timeframes']
+
+        group_stime = np.array([stime[0]])
+        group_etime = np.array([etime[-1]])
+        group_count = np.array([time_arr.size])
+        
+        data = np.array([group_stime, group_etime, group_count],
+                        dtype = object).T
+    
+        time_info_out = pd.DataFrame(data, 
+                                     index = [m_time],
+                                     columns = cols,
+                                     dtype = object)
         
 
     else:
@@ -203,22 +229,29 @@ def average_by_time(sig, timescale):
             
             # Insert in the new xarray the averaged sig from the sliced timeframes
             sig_out[t_idx] = sig.loc[tslice].mean(dim='time').values
+            
+        # Creat the time_info object according to the new timescale
+        cols = [start_time, stop_time, 'Timeframes']
 
-        # Store the time frame information per slice to use it for the error simulation
-        frames = xr.DataArray(data = count_occur, 
-                              dims = ['time'], 
-                              coords = [sig_out.time.values])
+        group_stime = np.array([stime[np.sum(count_occur[:i])] for i in range(0,count_occur.size-1)])
+        group_etime = np.array([etime[np.sum(count_occur[:i])-1] for i in range(1,count_occur.size)])
+        
+        data = np.array([group_stime, group_etime, count_occur],
+                        dtype = object).T
+    
+        time_info_out = pd.DataFrame(data, index = m_time, columns = cols,
+                                     dtype = object)
         
         # Mask the averaged timeframes for time occureneces below 75% of the max count occurence
         mask_time = (count_occur < np.max(count_occur) * 0.75)
 
         #Drop the timeframes with occurences below the 75% of the max count occurence
         sig_out = sig_out.drop_sel(time = sig_out.time.values[mask_time])
+        
+        #Drop the timeframes with occurences below the 75% of the max count occurence
+        time_info_out = time_info_out[mask_time,:]
 
-        #Drop the timeframes with occurences below the 75% of the max count occurence        
-        frames = frames.drop_sel(time = frames.time.values[mask_time])
-
-    return(sig_out, frames)
+    return(sig_out, time_info_out)
 
 def background_calculation(sig, lower_bin, upper_bin):
 

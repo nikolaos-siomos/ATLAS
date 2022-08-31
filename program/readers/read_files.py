@@ -115,6 +115,8 @@ def lidar_metadata(file):
 
     keys_attrs = ['Sounding_File_Name',
                   'Rayleigh_File_Name',
+                  'Lidar_Name',
+                  'Lidar_ID',
                   'Altitude_meter_asl',
                   'Latitude_degrees_north',
                   'Longitude_degrees_east',
@@ -474,6 +476,7 @@ def signals(file, time_info, channel_info, isdark = False):
     
     # Sort by time
     signal = signal.copy().sortby('time')
+    signal = signal.copy().where(signal != nc.default_fillvals['f8'])
     
     return(signal)
 
@@ -519,5 +522,6 @@ def dark(file, time_info, channel_info):
     
     # Sort by time
     signal = signal.copy().sortby('time')
-    
+    signal = signal.copy().where(signal != nc.default_fillvals['f8'])
+
     return(signal)

@@ -24,176 +24,156 @@ lgd_fsz = 20
 x_inches = 12
 y_inches = 6
 
-def sig_quicklook(cfg, sig, info, options, ver=''):
+def sig_quicklook(sig, ranges, heights, meas_info, channel_info, external_info):
 
-    # set the mpl rc params for plotting
-    with mpl.rc_context({'lines.linewidth':ln_wdth,
-                        'axes.titlesize':ax_tlsz, 'axes.labelpad':ax_lblpd,
-                        'axes.labelsize':ax_lblsz, 'legend.fontsize':lgd_fsz,
-                        'xtick.labelsize':xtck_lblsz, 'ytick.labelsize':ytck_lblsz}):         
+# set the mpl rc params for plotting
+# with mpl.rc_context({'lines.linewidth':ln_wdth,
+#                     'axes.titlesize':ax_tlsz, 'axes.labelpad':ax_lblpd,
+#                     'axes.labelsize':ax_lblsz, 'legend.fontsize':lgd_fsz,
+#                     'xtick.labelsize':xtck_lblsz, 'ytick.labelsize':ytck_lblsz}):         
 
-        colormap_style = select_colormap(options.qcklk) # make_colormap.cmap # 'Spectral_r' # 
+    # colormap_style = select_colormap(options.qcklk) # make_colormap.cmap # 'Spectral_r' # 
+    
+    out_dir = os.path.join(external_info['output_folder'],'plots', quicklooks)
+
+    # Create dir if not exist           
+    os.makedirs(out_dir, exist_ok = True)    
+
+    # Extract info from config file
+    sza = np.round(meas_info.Laser_Pointing_Angle, decimals=1)
+    lat = np.round(meas_info.Latitude_degrees_north, decimals=1)
+    lon = np.round(meas_info.Longitude_degrees_east)
+    elev = np.round(meas_info.Altitude_meter_asl, decimals=0)
         
-        ql_dir = cfg.directories.plots
-        isig = int(options.qcklk.isig[0])
-    
-        if isig == 1 and len(sig) > 0:
-            # Create dir if not exist
-            # out_dir = os.path.join(ql_dir,'pre_processing')
-            out_dir = os.path.join(ql_dir,'quicklooks')            
-            os.makedirs(out_dir, exist_ok=True)
-    
-            # Extract info from config file
-            sza = np.round(float(cfg.angles.zenith), decimals=1)
-            location = cfg.lidar.location
-            lat = np.round(float(cfg.lidar.latitude), decimals=1)
-            lon = np.round(float(cfg.lidar.longitude), decimals=1)
-            elev = int(np.round(float(cfg.lidar.altitude), decimals=0))
-            lidar = cfg.lidar.lr_name
-            isig_hscale = cfg.isig_hscale
-            
-            loc_info = f'{location} (lat: {lat}, lon: {lon}, elev: {elev} m)'
-    
-            # Extract plotting options
-            dpi_val = int(options.qcklk.dpi[0])    
-            inorm = int(options.qcklk.inorm[0])
-            itime = int(options.qcklk.itime[0])
-            check_class_attr(options.qcklk,'scale_sig','linear')
-            scale_sig = options.qcklk.scale_sig[0]
-            # check_class_attr(options.qcklk,'scale_sig','linear')
-            # color_map = 
-            
-            vis_sig = options.qlk_vis_sig
-            min_sig = options.qlk_min_sig
-            max_sig = options.qlk_max_sig
-            step_sig = options.qlk_step_sig
-        
-            # datetime title settings
-            if itime == 1:
-                tstart = mdates.date2num(np.datetime64(options.qcklk.tstart[0]))
-                tstop = mdates.date2num(np.datetime64(options.qcklk.tstop[0]))
-            
-            date = sig.time[0].dt.strftime('%Y/%m/%d').values        
-            date_out = sig.time[0].dt.strftime('%Y%m%d').values
-            t1 = sig.time[0].dt.strftime('%H:%M').values
-            t1_out = sig.time[0].dt.strftime('%H%M').values
-            t2 = sig.time[-1].dt.strftime('%H:%M').values
-            t2_out = sig.time[-1].dt.strftime('%H%M').values        
-            
-            # convert meas timeframe to numbers (easier to plot)
-            date_num = mdates.date2num(sig.time.values)
-            
-            # formating the time in x label
-            tstep = int(options.qcklk.step_time[0])
-            minutes = mdates.MinuteLocator(interval = tstep)#4 #20
-            t_fmt = mdates.DateFormatter('%H:%M')
-            
-    
-            # Select the desired products for plotting
-            ch_list = vis_sig
-            sig_plt = sig.loc[{'channel':ch_list}].copy()#*1e5      
-            
-            if inorm == 1:
-                rc_att = 'att_bsc'
-                plt_info = 'Atten. Volume Backscatter Signal' #'Attenuatted Volume Backscatter Signal'
-                # cbar_unit = '$sr^{-1} m^{-1}$'    
-            else:
-                rc_att = 'rc'
-                plt_info = 'RC Signal'
-                # cbar_unit = '[A.U.]'    
-            
-            # Define the height scale
-            if isig_hscale =='altitude':
-                ytype = 'altitude a.s.l.'
-                alt = sig.altitude.values/1e3                    
-            else:
-                ytype = 'range'
-                alt = sig.range.values/1e3        
-                
-            cbar_unit = '[A.U.]'
-                            
-            # altitude/range axis settings
-            ymin = float(options.qcklk.min_alt[0])/1e3# m to km
-            ymax = float(options.qcklk.max_alt[0])/1e3 # m to km
-            ystep = float(options.qcklk.step_alt[0])/1e3 # m to km
-            alt_tick = np.arange(ymin, ymax+ystep, ystep)
-            h_lim = f'{int(ymax)}km'
-    
-            
-            for i in range(len(ch_list)): 
-            
-                ch = ch_list[i]
-                ind = dict(channel=ch)
-                #colorbar settings
-                vllim = float(min_sig[i])
-                vulim = float(max_sig[i])
-                vstep = float(step_sig[i])
-                vlevel = np.arange(vllim, vulim+vstep, vstep)
-                
-                
-                # signal info (total/co-pol/cross-pol for lin/cir)
-                #laser polarization
-                if info.laser_pol.loc[ch] == 1.0:
-                    sig_info = 'Linear'
-                else:
-                    sig_info = 'Circular'
-    
-                # channel type (total, co-/cross-polar)
-                if info.ch_pol.loc[ch] in ['p','r']:
-                    sig_info = ' '.join((sig_info,'co-pol'))
-                if info.ch_pol.loc[ch] in ['s','l']:
-                    sig_info = ' '.join((sig_info,'cross-pol'))
-    
-                plt_info_c = ' '.join((sig_info, plt_info))
-    
-         
-                # Title
-                plt_title = make_title(date, t1, t2, sza, lidar, loc_info)
-           
-                #Create the figure
-                fig, ax = plt.subplots(figsize=(x_inches,y_inches))
-            
-                # Set the axes limits and xaxis format
-                ax.axis([date_num.min(), date_num.max(), ymin, ymax])
-                plt.xticks(rotation=30)
-                ax.xaxis.set_major_locator(minutes)
-                ax.xaxis.set_major_formatter(t_fmt)
+    loc_info = f'{location} (lat: {lat}, lon: {lon}, elev: {elev} m)'
 
-                # 2-D plot                
-                if scale_sig == 'log': # sig colorbar logarithmic scale 
-                    qlook = ax.pcolormesh(date_num, alt, sig_plt.loc[ind].transpose().values,
-                                          cmap=colormap_style,
-                                          norm=mpl.colors.LogNorm(vmin=vllim, vmax=vulim))
-                    cbar = fig.colorbar(qlook, pad=0.01)
-                    scale_type = '_log'
-                
-                else: # sig colorbar linear scale 
-                    qlook = ax.pcolormesh(date_num, alt, sig_plt.loc[:,ch,:].transpose().values,
-                                          cmap=colormap_style, vmin=vllim, vmax=vulim)
-                
-                    cbar = fig.colorbar(qlook, pad=0.01, ticks=vlevel) 
-                    cbar.ax.ticklabel_format(style='sci', scilimits=(0, 0))    
-                    scale_type=''
-                    
-                # apply colorbar settings
-                cbar.set_label(f'{plt_info_c} {cbar_unit}')
+    # Extract plotting options
+    dpi_val = external_info['dpi']    
+    channels = external_info['channels'] 
+    z_scale = external_info['scale_mode'] 
+    y_scale = external_info['use_height'] 
+    z_lims = external_info['z_lims'] 
+    z_lvls = external_info['z_lvls'] 
+    x_lims = external_info['x_lims'] 
+    x_tick = external_info['x_tick'] 
+    y_lims = external_info['y_lims'] 
+    y_tick = external_info['y_tick'] 
     
-                # axes settings
-                ax.set(ylabel=f'{ytype.capitalize()} [km]', yticks= alt_tick, 
-                       xlabel='Time [UTC]', xlim=[date_num[0],date_num[-1]])
-                ax.set_title(plt_title, pad=15.)
-                ax.minorticks_on()
-            
-                if itime == 1: # plot vertical lines to indicate the averaged timeframe for retrieval
-                    ax.axvline(x=tstart, ymin=0, ymax=1, ls='--', lw='2.', c='k')
-                    ax.axvline(x=tstop, ymin=0, ymax=1, ls='--', lw='2.', c='k')
+    if vis_sig == None:
+        channels = sig.channels.values
+    else:
+        channels = vis_sig
     
-                fig_name = f'{lidar.lower()}_quicklook{scale_type}_{date_out}_{t1_out}_{t2_out}_{ytype[:8]}_{rc_att}_{ch}_{h_lim}{ver}.png'
-                fig.savefig(os.path.join(out_dir, fig_name), 
-                            bbox_inches = 'tight', dpi = dpi_val)
-                plt.close()    
+        # datetime title settings
+        if itime == 1:
+            tstart = mdates.date2num(np.datetime64(options.qcklk.tstart[0]))
+            tstop = mdates.date2num(np.datetime64(options.qcklk.tstop[0]))
+        
+    date = sig.time[0].dt.strftime('%Y/%m/%d').values        
+    date_out = sig.time[0].dt.strftime('%Y%m%d').values
+    t1 = sig.time[0].dt.strftime('%H:%M').values
+    t1_out = sig.time[0].dt.strftime('%H%M').values
+    t2 = sig.time[-1].dt.strftime('%H:%M').values
+    t2_out = sig.time[-1].dt.strftime('%H%M').values        
+    
+    # convert meas timeframe to numbers (easier to plot)
+    time_idx = mdates.date2num(sig.time.values)
+    
+    # formating the time in x label
+    minutes = mdates.MinuteLocator(interval = time_idx)
+    t_fmt = mdates.DateFormatter('%H:%M')
+    
+
+    # Select the desired products for plotting
+    for ch in channels:            
+        ch_d = dict(channel = ch)
+        # Define the height scale
+        if y_scale:
+            ytype = 'altitude a.s.l.'
+            yscale = heights.loc[ch_d].values/1e3                    
+        else:
+            ytype = 'range'
+            yscale = ranges.loc[ch_d].values/1e3      
             
-            print('-- Quicklook plots of signals complete!')
+        cbar_unit = '[A.U.]'
+                        
+        # altitude/range axis settings
+        y_ticks = np.arange(ylims[0], ylims[-1] + y_tick, y_tick)    
+        
+        
+        ch = ch_list[i]
+        ind = dict(channel=ch)
+        #colorbar settings
+        vllim = float(min_sig[i])
+        vulim = float(max_sig[i])
+        vstep = float(step_sig[i])
+        vlevel = np.arange(vllim, vulim+vstep, vstep)
+        
+        
+        # signal info (total/co-pol/cross-pol for lin/cir)
+        #laser polarization
+        if info.laser_pol.loc[ch] == 1.0:
+            sig_info = 'Linear'
+        else:
+            sig_info = 'Circular'
+
+        # channel type (total, co-/cross-polar)
+        if info.ch_pol.loc[ch] in ['p','r']:
+            sig_info = ' '.join((sig_info,'co-pol'))
+        if info.ch_pol.loc[ch] in ['s','l']:
+            sig_info = ' '.join((sig_info,'cross-pol'))
+
+        plt_info_c = ' '.join((sig_info, plt_info))
+
+ 
+        # Title
+        plt_title = make_title(date, t1, t2, sza, lidar, loc_info)
+   
+        #Create the figure
+        fig, ax = plt.subplots(figsize=(x_inches,y_inches))
+    
+        # Set the axes limits and xaxis format
+        ax.axis([date_num.min(), date_num.max(), ymin, ymax])
+        plt.xticks(rotation=30)
+        ax.xaxis.set_major_locator(minutes)
+        ax.xaxis.set_major_formatter(t_fmt)
+
+        # 2-D plot                
+        if scale_sig == 'log': # sig colorbar logarithmic scale 
+            qlook = ax.pcolormesh(date_num, alt, sig_plt.loc[ind].transpose().values,
+                                  cmap=colormap_style,
+                                  norm=mpl.colors.LogNorm(vmin=vllim, vmax=vulim))
+            cbar = fig.colorbar(qlook, pad=0.01)
+            scale_type = '_log'
+        
+        else: # sig colorbar linear scale 
+            qlook = ax.pcolormesh(date_num, alt, sig_plt.loc[:,ch,:].transpose().values,
+                                  cmap=colormap_style, vmin=vllim, vmax=vulim)
+        
+            cbar = fig.colorbar(qlook, pad=0.01, ticks=vlevel) 
+            cbar.ax.ticklabel_format(style='sci', scilimits=(0, 0))    
+            scale_type=''
+            
+        # apply colorbar settings
+        cbar.set_label(f'{plt_info_c} {cbar_unit}')
+
+        # axes settings
+        ax.set(ylabel=f'{ytype.capitalize()} [km]', yticks= alt_tick, 
+               xlabel='Time [UTC]', xlim=[date_num[0],date_num[-1]])
+        ax.set_title(plt_title, pad=15.)
+        ax.minorticks_on()
+    
+        if itime == 1: # plot vertical lines to indicate the averaged timeframe for retrieval
+            ax.axvline(x=tstart, ymin=0, ymax=1, ls='--', lw='2.', c='k')
+            ax.axvline(x=tstop, ymin=0, ymax=1, ls='--', lw='2.', c='k')
+
+        h_lim = f'{int(ymax)}km'
+        fig_name = f'{lidar.lower()}_quicklook{scale_type}_{date_out}_{t1_out}_{t2_out}_{ytype[:8]}_{rc_att}_{ch}_{h_lim}{ver}.png'
+        fig.savefig(os.path.join(out_dir, fig_name), 
+                    bbox_inches = 'tight', dpi = dpi_val)
+        plt.close()    
+    
+    print('-- Quicklook plots of signals complete!')
             
     return()
 
@@ -270,7 +250,6 @@ def prod_quicklook(cfg, prod, info_prod, options, ver=''):
             ymax = float(options.qcklk.max_alt[0])/1e3 # m to km
             ystep = float(options.qcklk.step_alt[0])/1e3 # m to km
             alt_tick = np.arange(ymin, ymax+ystep, ystep)
-            h_lim = f'{int(ymax)}km'
             
             # Select the desired products for plotting
             p_list = vis_prod
@@ -321,6 +300,7 @@ def prod_quicklook(cfg, prod, info_prod, options, ver=''):
                     ax.axvline(x=tstart, ymin=0, ymax=1, ls='--', lw='2.', c='k')
                     ax.axvline(x=tstop, ymin=0, ymax=1, ls='--', lw='2.', c='k')
                     
+                h_lim = f'{int(ymax)}km'
                 fig_name = f'{lidar.lower()}_quicklook_{date_out}_{t1_out}_{t2_out}_{ytype[:8]}_{info_prod.type_short[p]}_{h_lim}{ver}.png'
                 fig.savefig(os.path.join(out_dir, fig_name), 
                             bbox_inches = 'tight', dpi = dpi_val)

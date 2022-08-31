@@ -31,8 +31,6 @@ def standard(sig_raw, shots, meas_info, channel_info,
      
      -- range_correction: Performs the range correction on signals
      
-     -- smoothing: Smooths the signals (sliding average)
-
     Returns:
         
     - sig:
@@ -125,15 +123,23 @@ def standard(sig_raw, shots, meas_info, channel_info,
     # --------------------------------------------------   
     if meas_type == 'ray' or meas_type == 'drk':
 
-        sig, frames = signal.average_by_time(sig = sig.copy(), 
-                                             timescale = -1)
+        sig, time_info = \
+            signal.average_by_time(sig = sig.copy(),
+                                   time_info = time_info,
+                                   timescale = -1,
+                                   start_time = 'Raw_Data_Start_Time',
+                                   stop_time = 'Raw_Data_Stop_Time')
 
         print('-- Temporal averaging complete! All timeframes have been used')            
     
     elif meas_type == 'nrm':
 
-        sig, frames = signal.average_by_time(sig = sig.copy(), 
-                                             timescale = timescale)
+        sig, time_info = \
+            signal.average_by_time(sig = sig.copy(),
+                                   time_info = time_info,
+                                   timescale = timescale,
+                                    start_time = 'Raw_Data_Start_Time',
+                                    stop_time = 'Raw_Data_Stop_Time')
 
         if external_info['debug']: pack_out['sig_avg'] = sig.copy()
 
@@ -368,8 +374,12 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
     # --------------------------------------------------
     # Temporal averaging 
     # --------------------------------------------------   
-    sig, frames = signal.average_by_time(sig = sig.copy(), 
-                                          timescale = -1)
+    sig, time_info = \
+        signal.average_by_time(sig = sig.copy(), 
+                               time_info = time_info,
+                               timescale = -1,
+                               start_time = 'Bck_Data_Start_Time',
+                               stop_time = 'Bck_Data_Stop_Time')
     
     if external_info['debug']: pack_out['sig_avg'] = sig.copy()
     

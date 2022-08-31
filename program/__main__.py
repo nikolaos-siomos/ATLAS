@@ -7,16 +7,20 @@ Created on Wed Aug 10 10:48:11 2022
 """
 
 import warnings, os, sys
-from readers.parse_config import parse_config
+from readers.parse_config import main_parser
 from readers import read_files
 from lidar_processing import short_prepro
 from lidar_molecular import atmosphere
+from export import nc_dataset
+from version import __version__
+
+# -f /mnt/DATA/Big_data/Databases/POLIS/data/181016/results/ray_20181016mun2024.nc -o /mnt/DATA/Big_data/Databases/POLIS/data/POLIS/atlas_out -c /mnt/DATA/Big_data/Databases/POLIS/data/POLIS/atlas_config -s -t 3600 -q
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
 # Get the command line argument information
-args = parse_config()
+args = main_parser()
 
 print('-----------------------------------------')
 print('Start reading the QA file(s)...')
@@ -39,8 +43,17 @@ if 'Rayleigh_File_Name' in meas_info.keys():
     meas_info_r, channel_info_r, time_info_r, time_info_dr, \
         sig_raw_r, sig_raw_dr, shots_r, shots_dr = \
             read_files.short_reader(ray_path)
-
-    print(f"-- {meas_label['ray']} QA file succesfully parsed!")
+    
+    if all([ch in channel_info_r.index.values 
+            for ch in channel_info.index.values]):
+        print(f"-- {meas_label['ray']} QA file used for calibration "+
+              "succesfully parsed!")
+    else:
+        sys.exit("-- Error! The Rayleigh measurement accompaning the " +
+                 "calibration measurement {meas_info['Rayleigh_File_Name']} " +
+                 "lacks at least of the calibration measurement channels! " +
+                 "Please make sure that the Rayleigh measuremen contains " +
+                 "at least the channels channels necessary for the calibration")
 
 print('-----------------------------------------')
 print("")
@@ -66,7 +79,7 @@ if 'Rayleigh_File_Name' in meas_info.keys() and not isinstance(sig_raw_d, list):
     
 if meas_type == 'ray':
             
-    sig, sig_pack, time_info = \
+    ray, ray_pack, time_info_ray = \
         short_prepro.standard(sig_raw = sig_raw, 
                               shots = shots, 
                               meas_info = meas_info, 
@@ -75,10 +88,30 @@ if meas_type == 'ray':
                               external_info = args,
                               meas_type = meas_type,
                               sig_drk = drk_pack['sig_flt'])
+    
+    molec, molec_info, meteo = \
+        atmosphere.short_molec(heights = ray_pack['heights'],
+                               ranges = ray_pack['ranges'],
+                               meas_info = meas_info, 
+                               channel_info = channel_info, 
+                               time_info = time_info_ray,
+                               external_info = args)
+    
+    nc_ray = nc_dataset.rayleigh(sig = ray, 
+                                 molec = molec,
+                                 meteo = meteo,
+                                 meas_info = meas_info, 
+                                 channel_info = channel_info, 
+                                 time_info = time_info_ray, 
+                                 molec_info = molec_info, 
+                                 heights = ray_pack['heights'], 
+                                 ranges = ray_pack['ranges'],
+                                 version = __version__,
+                                 dir_out = args['output_folder'])
 
 if meas_type == 'tlc':
     
-    sig, sig_pack, time_info = \
+    tlc, tlc_pack, time_info_tlc = \
         short_prepro.standard(sig_raw = sig_raw, 
                               shots = shots, 
                               meas_info = meas_info, 
@@ -87,10 +120,19 @@ if meas_type == 'tlc':
                               external_info = args,
                               meas_type = meas_type,
                               sig_drk = drk_pack['sig_flt'])
+
+    nc_tlc = nc_dataset.telecover(sig = tlc, 
+                                  meas_info = meas_info, 
+                                  channel_info = channel_info, 
+                                  time_info = time_info_tlc, 
+                                  heights = tlc_pack['heights'], 
+                                  ranges = tlc_pack['ranges'],
+                                  version = __version__,
+                                  dir_out = args['output_folder'])
 
 if meas_type == 'pcl':
             
-    sig, sig_pack, time_info = \
+    pcl, pcl_pack, time_info_pcl = \
         short_prepro.standard(sig_raw = sig_raw, 
                               shots = shots, 
                               meas_info = meas_info, 
@@ -99,8 +141,8 @@ if meas_type == 'pcl':
                               external_info = args,
                               meas_type = meas_type,
                               sig_drk = drk_pack['sig_flt'])
-
-    sig_r, sig_pack_r, time_info_r = \
+    
+    ray, ray_pack, time_info_ray = \
         short_prepro.standard(sig_raw = sig_raw_r, 
                               shots = shots_r, 
                               meas_info = meas_info_r, 
@@ -109,10 +151,38 @@ if meas_type == 'pcl':
                               external_info = args,
                               meas_type = 'ray',
                               sig_drk = drk_pack_r['sig_flt'])
+    
+    molec, molec_info, meteo = \
+        atmosphere.short_molec(heights = ray_pack['heights'],
+                               ranges = ray_pack['ranges'],
+                               meas_info = meas_info_r, 
+                               channel_info = channel_info_r, 
+                               time_info = time_info_ray,
+                               external_info = args)
+        
+    pcl_ch = pcl.channel.values
+    
+    nc_pcl = nc_dataset.calibration(sig = pcl, 
+                                    sig_ray = ray.loc[dict(channel = pcl_ch)],
+                                    molec = molec.loc[dict(channel = pcl_ch)],
+                                    meteo = meteo.loc[dict(channel = pcl_ch)],
+                                    meas_info = meas_info, 
+                                    meas_info_ray = meas_info_r, 
+                                    channel_info = channel_info, 
+                                    channel_info_ray = channel_info.loc[pcl_ch], 
+                                    time_info = time_info_pcl, 
+                                    time_info_ray = time_info_ray, 
+                                    molec_info = molec_info, 
+                                    heights = pcl_pack['heights'], 
+                                    ranges = pcl_pack['ranges'],
+                                    ranges_ray = ray_pack['ranges'],
+                                    heights_ray = ray_pack['heights'], 
+                                    version = __version__,
+                                    dir_out = args['output_folder'])
 
 if args['quicklook']:
             
-    qck, qck_pack, time_info = \
+    qck, qck_pack, time_info_qck = \
         short_prepro.standard(sig_raw = sig_raw, 
                               shots = shots, 
                               meas_info = meas_info, 
@@ -121,19 +191,15 @@ if args['quicklook']:
                               external_info = args,
                               meas_type = 'qck',
                               sig_drk = drk_pack['sig_flt'])
-
-
-if 'Sounding_File_Name' in meas_info.keys() or \
-    ('Pressure_at_Lidar_Station' in meas_info.keys() and \
-        'Temperature_at_Lidar_Station' in meas_info.keys()):
-            molec, molec_info = \
-                atmosphere.short_molec(heights = sig_pack['heights'],
-                                       ranges = sig_pack['ranges'],
-                                       meas_info = meas_info, 
-                                       channel_info = channel_info, 
-                                       time_info = time_info,
-                                       external_info = args)
-
+        
+    nc_qck = nc_dataset.quicklook(sig = qck, 
+                                 meas_info = meas_info, 
+                                 channel_info = channel_info, 
+                                 time_info = time_info_qck, 
+                                 heights = qck_pack['heights'], 
+                                 ranges = qck_pack['ranges'],
+                                 version = __version__,
+                                 dir_out = args['output_folder'])
 
     
     

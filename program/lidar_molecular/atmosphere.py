@@ -20,13 +20,20 @@ from lidar_molecular.utilities import number_density_at_pt
 
 def short_molec(heights, ranges, meas_info, channel_info, 
                 time_info, external_info):
-    
+
+    print('-----------------------------------------')
+    print('Start making molecular calculations...')
+    print('-----------------------------------------')
+        
     if 'Sounding_File_Name' in meas_info.keys() :
         rsonde_path = os.path.join(os.path.dirname(external_info['input_file']),  
                                    meas_info['Sounding_File_Name'])
         
         meteo, molec_info = from_rsonde(path = rsonde_path, 
                                         heights = heights)
+        
+        print('-- Radiosond file succesfully parsed!')
+
         
     elif 'Pressure_at_Lidar_Station' in meas_info.keys() and \
         'Temperature_at_Lidar_Station' in meas_info.keys():
@@ -36,6 +43,8 @@ def short_molec(heights, ranges, meas_info, channel_info,
                         pressure = meas_info.Pressure_at_Lidar_Station, 
                         temperature = meas_info.Temperature_at_Lidar_Station,
                         elevation = meas_info.Altitude_meter_asl)
+
+        print('-- US Standard Atmosphere succesfully constructed!')
     
     
     channels = heights.channel.values
@@ -54,9 +63,14 @@ def short_molec(heights, ranges, meas_info, channel_info,
 
     ch_stype = pd.Series([ch[3] for ch in channel_info.index], index = channels)
     
-    properties = ['bxs_tot', 'exs_fth', 'exs_bck',  
-                  'bcf_tot', 'ecf_fth', 'ecf_bck', 
-                  'mdr', 'atb']
+    properties = ['Backscatter_Cross_Section', 
+                  'Extinction_Cross_Section_Forward', 
+                  'Extinction_Cross_Section_Backward',  
+                  'Backscatter_Coefficient', 
+                  'Extinction_Coefficient_Forward', 
+                  'Extinction_Coefficient_Backward', 
+                  'Molecular_Linear_Depolarization_Ratio', 
+                  'Attenuated_Backscatter']
     
     molec = xr.DataArray(dims = ['properties', 'channel', 'bins'],
                          coords = [properties, channels, bins])
@@ -68,15 +82,16 @@ def short_molec(heights, ranges, meas_info, channel_info,
     c_CO2_default = 0.000416
     
     c_total = c_N2_default + c_O2_default + c_Ar_default + c_CO2_default
-
     
     for ch in channels:
+        print(f'-- Processing channel {ch}')
 
         ch_d = dict(channel = ch)
         
         ewl_ch = ewl.loc[ch]
 
-        max_bin = meteo.loc[ch_d].dropna(dim = 'bins', how = 'any').loc[dict(properties  = 'number_density')].bins.values[-1]
+        max_bin = meteo.loc[ch_d].dropna(dim = 'bins', how = 'any')\
+            .loc[dict(properties  = 'Number_Density')].bins.values[-1]
         sel_bins = np.linspace(bins[0], max_bin, 10).astype(int)
         sl_d = dict(channel = ch, bins = sel_bins)
             
@@ -84,10 +99,10 @@ def short_molec(heights, ranges, meas_info, channel_info,
         gaussian_iff = GaussianFilter(dwl.loc[ch],bdw.loc[ch])    
 
         # Extracting molecular parameters in specific range bins
-        N = meteo.loc[ch_d].loc[dict(properties  = 'number_density')] .values
-        P = meteo.loc[sl_d].loc[dict(properties  = 'pressure')].values
-        T = meteo.loc[sl_d].loc[dict(properties  = 'temperature')].values
-        RH = meteo.loc[sl_d].loc[dict(properties  = 'humidity')] .values
+        N = meteo.loc[ch_d].loc[dict(properties  = 'Number_Density')] .values
+        P = meteo.loc[sl_d].loc[dict(properties  = 'Pressure')].values
+        T = meteo.loc[sl_d].loc[dict(properties  = 'Temperature')].values
+        RH = meteo.loc[sl_d].loc[dict(properties  = 'Relative_Humidity')].values
 
         # Convert Relative humidity to water vapor molar fraction
         ewp = saturation_vapour_pressure(P = P, T = T)
@@ -203,17 +218,28 @@ def short_molec(heights, ranges, meas_info, channel_info,
             atb = bcf_tot * mdr * trn_fth * trn_bck / (1. + mdr) 
                             
         # Pack into a single xarray object
-        molec.loc[dict(properties = 'bxs_tot')].loc[ch_d] = bxs_tot       
-        molec.loc[dict(properties = 'exs_bck')].loc[ch_d] = exs_bck
-        molec.loc[dict(properties = 'exs_fth')].loc[ch_d] = exs_fth
-        molec.loc[dict(properties = 'bcf_tot')].loc[ch_d] = bcf_tot               
-        molec.loc[dict(properties = 'ecf_bck')].loc[ch_d] = ecf_bck   
-        molec.loc[dict(properties = 'ecf_fth')].loc[ch_d] = ecf_fth   
-        molec.loc[dict(properties = 'mdr')].loc[ch_d] = mdr
-        molec.loc[dict(properties = 'atb')].loc[ch_d] = atb
+        molec.loc[dict(properties = 'Backscatter_Cross_Section')]\
+            .loc[ch_d] = bxs_tot       
+        molec.loc[dict(properties = 'Extinction_Cross_Section_Forward')]\
+            .loc[ch_d] = exs_bck
+        molec.loc[dict(properties = 'Extinction_Cross_Section_Backward')]\
+            .loc[ch_d] = exs_fth
+        molec.loc[dict(properties = 'Backscatter_Coefficient')]\
+            .loc[ch_d] = bcf_tot               
+        molec.loc[dict(properties = 'Extinction_Coefficient_Forward')]\
+            .loc[ch_d] = ecf_bck   
+        molec.loc[dict(properties = 'Extinction_Coefficient_Backward')]\
+            .loc[ch_d] = ecf_fth   
+        molec.loc[dict(properties = 'Molecular_Linear_Depolarization_Ratio')]\
+            .loc[ch_d] = mdr
+        molec.loc[dict(properties = 'Attenuated_Backscatter')]\
+            .loc[ch_d] = atb
 
+    print('-- Molecular calculations succesfully complete!')
+    print('-----------------------------------------')
+    print('')
         
-    return(molec, molec_info)
+    return(molec, molec_info, meteo)
         
 def from_us_std(pressure, temperature, elevation, heights):
     
@@ -221,14 +247,15 @@ def from_us_std(pressure, temperature, elevation, heights):
     
     bins = heights.bins
     
-    properties = ['pressure', 'temperature', 'humidity', 'number_density']
+    properties = ['Pressure', 'Temperature', 
+                  'Relative_Humidity', 'Number_Density']
     
     meteo = xr.DataArray(coords = [properties, channels, bins],
                          dims = ['properties', 'channel', 'bins'])
     
     molec_info = pd.Series()
     
-    molec_info['method'] = 'US_Standard_Atmosphere'
+    molec_info['Molecular_atmosphere_method'] = 'US_Standard_Atmosphere'
     
     atm = us_std.Atmosphere(t_r = temperature, p_r = pressure, alt = elevation)
 
@@ -247,13 +274,13 @@ def from_us_std(pressure, temperature, elevation, heights):
                                  relative_humidity = RH, 
                                  ideal = True)
         
-        meteo.loc[ch_d].loc[dict(properties = 'pressure')] = P
+        meteo.loc[ch_d].loc[dict(properties = 'Pressure')] = P
         
-        meteo.loc[ch_d].loc[dict(properties = 'temperature')] = T
+        meteo.loc[ch_d].loc[dict(properties = 'Temperature')] = T
         
-        meteo.loc[ch_d].loc[dict(properties = 'humidity')] = RH
+        meteo.loc[ch_d].loc[dict(properties = 'Relative_Humidity')] = RH
 
-        meteo.loc[ch_d].loc[dict(properties = 'number_density')] = N
+        meteo.loc[ch_d].loc[dict(properties = 'Number_Density')] = N
     
     return(meteo, molec_info)
 
@@ -277,15 +304,16 @@ def from_rsonde(path, heights):
     
     molec_info = pd.Series()
     
-    molec_info['method'] = 'Radiosonde'
+    molec_info['Molecular_atmosphere_method'] = 'Radiosonde'
 
     attrs = file.attrs
     
     for key in attrs.keys():
         molec_info[key] = attrs[key]
     
-    properties = ['pressure', 'temperature', 'humidity', 'number_density']
-    
+    properties = ['Pressure', 'Temperature', 
+                  'Relative_Humidity', 'Number_Density']
+        
     meteo = xr.DataArray(coords = [properties, channels, bins],
                          dims = ['properties', 'channel', 'bins'])
     
@@ -311,13 +339,13 @@ def from_rsonde(path, heights):
         
         ch_d = dict(channel = ch)
                 
-        meteo.loc[ch_d].loc[dict(properties = 'pressure')] = P_i
+        meteo.loc[ch_d].loc[dict(properties = 'Pressure')] = P_i
         
-        meteo.loc[ch_d].loc[dict(properties = 'temperature')] = T_i
+        meteo.loc[ch_d].loc[dict(properties = 'Temperature')] = T_i
         
-        meteo.loc[ch_d].loc[dict(properties = 'humidity')] = RH_i
+        meteo.loc[ch_d].loc[dict(properties = 'Relative_Humidity')] = RH_i
         
-        meteo.loc[ch_d].loc[dict(properties = 'number_density')] = N_i
+        meteo.loc[ch_d].loc[dict(properties = 'Number_Density')] = N_i
     
     return(meteo, molec_info)
 

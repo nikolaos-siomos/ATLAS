@@ -5,6 +5,18 @@ Colorbars for contour plotting
 """
 
 import matplotlib.colors as mcolors
+import numpy as np
+
+def custom_rgb(rgb, name):
+    
+    bins = np.linspace(0,1,rgb.shape[0])
+    
+    color_list = list(zip(bins,rgb))
+
+    cmap = mcolors.LinearSegmentedColormap.from_list(name, color_list)
+    
+    return(cmap)
+
 
 def make_colormap(seq):
     """Return a LinearSegmentedColormap
