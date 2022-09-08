@@ -159,8 +159,8 @@ def telecover(sig, meas_info, channel_info, time_info,
         idx_east  = np.where(sector == 2)[0]
         idx_south = np.where(sector == 3)[0]
         idx_west  = np.where(sector == 4)[0]
-        idx_west  = np.where(sector == 5)[0]
-        idx_west  = np.where(sector == 6)[0]
+        idx_outer  = np.where(sector == 5)[0]
+        idx_inner  = np.where(sector == 6)[0]
 
         nc_file = xr.Dataset(coords = {'time_n' : time[idx_north],
                                        'time_e' : time[idx_east],
@@ -188,12 +188,12 @@ def telecover(sig, meas_info, channel_info, time_info,
              .fillna(netCDF4.default_fillvals['f8']).values)
                 
         nc_file['Range_Corrected_Signals_Inner_Ring'] = \
-            (['time','channel','bins'], sig[dict(time = idx_inner)]\
-             .fillna(netCDF4.default_fillvals['f8']))  
+            (['time_i','channel','bins'], sig[dict(time = idx_inner)]\
+             .fillna(netCDF4.default_fillvals['f8']).values)  
 
         nc_file['Range_Corrected_Signals_Outer_Ring'] = \
-            (['time','channel','bins'], sig[dict(time = idx_outer)]\
-             .fillna(netCDF4.default_fillvals['f8']))     
+            (['time_o','channel','bins'], sig[dict(time = idx_outer)]\
+             .fillna(netCDF4.default_fillvals['f8']).values)     
 
         
         for clm in time_info.columns.values:

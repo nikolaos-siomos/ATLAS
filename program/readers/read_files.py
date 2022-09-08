@@ -63,8 +63,12 @@ def short_reader(fpath):
     # Setting signal, info, and time as empty lists in the beggining    
     signal = []
     signal_d = []
+    
     shots = []
-    shots_d = []    
+    shots_d = []   
+    
+    time_info = [] 
+    time_info_d = []
         
     # Read QA netcdf file
     file = xr.open_dataset(fpath)

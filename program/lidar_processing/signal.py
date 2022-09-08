@@ -458,7 +458,9 @@ def height_calculation(bins, resol, ground_alt, zenith_angle):
                               dims = ['channel'],
                               coords = [resol.index.values]).astype(float)
     
-    heights = resolution * bins * np.cos(zenith_angle) + ground_alt
+    zenith_angle_rad = np.deg2rad(zenith_angle)
+    
+    heights = resolution * bins * np.cos(zenith_angle_rad) + float(ground_alt)
     
     return(heights)
 

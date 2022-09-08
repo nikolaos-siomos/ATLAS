@@ -17,6 +17,17 @@ def custom_rgb(rgb, name):
     
     return(cmap)
 
+def custom_rgb_log(rgb, name):
+    
+    bins = np.logspace(np.log10(1E-5), np.log10(1), rgb.shape[0] - 1)
+    
+    bins = np.insert(bins, 0, 0)
+    
+    color_list = list(zip(bins, rgb))
+
+    cmap = mcolors.LinearSegmentedColormap.from_list(name, color_list)
+    
+    return(cmap)
 
 def make_colormap(seq):
     """Return a LinearSegmentedColormap

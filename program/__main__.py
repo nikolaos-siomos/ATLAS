@@ -67,6 +67,9 @@ if meas_type == 'drk' or not isinstance(sig_raw_d, list):
                           channel_info = channel_info, 
                           time_info = time_info_d,
                           external_info = args)
+    sig_drk = drk_pack['sig_flt']
+else:
+    sig_drk = []
 
 if 'Rayleigh_File_Name' in meas_info.keys() and not isinstance(sig_raw_d, list):
         drk_r, drk_pack_r, time_info_dr = \
@@ -87,7 +90,7 @@ if meas_type == 'ray':
                               time_info = time_info,
                               external_info = args,
                               meas_type = meas_type,
-                              sig_drk = drk_pack['sig_flt'])
+                              sig_drk = sig_drk)
     
     molec, molec_info, meteo = \
         atmosphere.short_molec(heights = ray_pack['heights'],
@@ -119,7 +122,7 @@ if meas_type == 'tlc':
                               time_info = time_info,
                               external_info = args,
                               meas_type = meas_type,
-                              sig_drk = drk_pack['sig_flt'])
+                              sig_drk = sig_drk)
 
     nc_tlc = nc_dataset.telecover(sig = tlc, 
                                   meas_info = meas_info, 
@@ -140,7 +143,7 @@ if meas_type == 'pcl':
                               time_info = time_info,
                               external_info = args,
                               meas_type = meas_type,
-                              sig_drk = drk_pack['sig_flt'])
+                              sig_drk = sig_drk)
     
     ray, ray_pack, time_info_ray = \
         short_prepro.standard(sig_raw = sig_raw_r, 
@@ -150,7 +153,7 @@ if meas_type == 'pcl':
                               time_info = time_info_r,
                               external_info = args,
                               meas_type = 'ray',
-                              sig_drk = drk_pack_r['sig_flt'])
+                              sig_drk = sig_drk)
     
     molec, molec_info, meteo = \
         atmosphere.short_molec(heights = ray_pack['heights'],
@@ -190,7 +193,7 @@ if args['quicklook']:
                               time_info = time_info,
                               external_info = args,
                               meas_type = 'qck',
-                              sig_drk = drk_pack['sig_flt'])
+                              sig_drk = sig_drk)
         
     nc_qck = nc_dataset.quicklook(sig = qck, 
                                  meas_info = meas_info, 
