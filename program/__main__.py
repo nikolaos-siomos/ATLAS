@@ -14,8 +14,6 @@ from lidar_molecular import atmosphere
 from export import nc_dataset
 from version import __version__
 
-# -f /mnt/DATA/Big_data/Databases/POLIS/data/181016/results/ray_20181016mun2024.nc -o /mnt/DATA/Big_data/Databases/POLIS/data/POLIS/atlas_out -c /mnt/DATA/Big_data/Databases/POLIS/data/POLIS/atlas_config -s -t 3600 -q
-
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
@@ -72,14 +70,17 @@ else:
     sig_drk = []
 
 if 'Rayleigh_File_Name' in meas_info.keys() and not isinstance(sig_raw_d, list):
-        drk_r, drk_pack_r, time_info_dr = \
-            short_prepro.dark(sig_raw = sig_raw_dr, 
-                              shots = shots_dr, 
-                              meas_info = meas_info_r, 
-                              channel_info = channel_info_r, 
-                              time_info = time_info_dr,
-                              external_info = args)
-    
+    drk_r, drk_pack_r, time_info_dr = \
+        short_prepro.dark(sig_raw = sig_raw_dr, 
+                          shots = shots_dr, 
+                          meas_info = meas_info_r, 
+                          channel_info = channel_info_r, 
+                          time_info = time_info_dr,
+                          external_info = args)
+    sig_drk_r = drk_pack_r['sig_flt']
+else:
+    sig_drk_r = []
+        
 if meas_type == 'ray':
             
     ray, ray_pack, time_info_ray = \
@@ -153,7 +154,7 @@ if meas_type == 'pcl':
                               time_info = time_info_r,
                               external_info = args,
                               meas_type = 'ray',
-                              sig_drk = sig_drk)
+                              sig_drk = sig_drk_r)
     
     molec, molec_info, meteo = \
         atmosphere.short_molec(heights = ray_pack['heights'],

@@ -64,6 +64,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
     isdk = external_info['skip_dark_subtraction']
     isdt = external_info['skip_dead_time_correction']
     itrv = external_info['vertical_trimming']
+    iflt = external_info['signal_smoothing']
     
     alt_lim = external_info['vertical_limit']
     bg_low = channel_info.Background_Low
@@ -76,6 +77,10 @@ def standard(sig_raw, shots, meas_info, channel_info,
     timescale = external_info['timescale']
     trd_bins = channel_info.Trigger_Delay_Bins
     zenith_angle = meas_info.Laser_Pointing_Angle
+
+    sm_hwin = external_info['smoothing_window']
+    sm_sbin = external_info['smoothing_sbin']    
+    sm_ebin = external_info['smoothing_ebin']
     
     sig = sig_raw.copy()
     
@@ -262,6 +267,21 @@ def standard(sig_raw, shots, meas_info, channel_info,
     pack_out['sig_rnc'] = sig.copy()
     
     print('-- Range correction complete!')
+    
+    
+    # --------------------------------------------------
+    # Smoothing
+    # --------------------------------------------------
+    if iflt:
+        sig = signal.smoothing(sig = sig, 
+                               smoothing_window = sm_hwin,
+                               smoothing_sbin = sm_sbin,
+                               smoothing_ebin = sm_ebin)
+            
+        pack_out['sig_flt'] = sig.copy()
+        
+        print('-- Signal smoothing complete!')
+        
 
     print('-----------------------------------------')
     print('')

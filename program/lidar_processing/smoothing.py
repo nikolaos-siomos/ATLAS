@@ -62,7 +62,7 @@ def sliding_average_1D(y_vals, x_vals, x_sm_lims, x_sm_hwin, expo):
     
     y_vals = y_vals.copy()
     y_vals_sm = y_vals.copy()
-    y_vals_err = np.nan * np.zeros(y_vals.shape)
+    y_vals_sem = np.nan * np.zeros(y_vals.shape)
     
     if expo:
         ihwins[s_bin:e_bin] = \
@@ -88,10 +88,11 @@ def sliding_average_1D(y_vals, x_vals, x_sm_lims, x_sm_hwin, expo):
         if ihwin > 0 and not np.isnan(ihwin):
             y_vals_sm[i] = np.nanmean(y_vals[i-int(ihwin):i+int(ihwin)+1])
             
-            y_vals_err[i] = np.nanstd(y_vals[i-int(ihwin):i+int(ihwin)+1])
+            y_vals_sem[i] = np.nanstd(y_vals[i-int(ihwin):i+int(ihwin)+1]) /\
+                np.sqrt(2. * ihwin + 1.)
 
         
         if np.isnan(ihwin):
             y_vals_sm[i] = np.nan
     
-    return(y_vals_sm, y_vals_err)
+    return(y_vals_sm, y_vals_sem)

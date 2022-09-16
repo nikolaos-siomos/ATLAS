@@ -213,45 +213,69 @@ for ch in channels:
                                    y_sm_lims = args['smoothing_range'],
                                    y_sm_hwin = args['half_window'],
                                    expo = args['smooth_exponential'])
+        
+        else:
+            y_m_sm_n = y_m_n
+            y_m_sm_e = y_m_e
+            y_m_sm_s = y_m_s
+            y_m_sm_w = y_m_w
+            
+            if len(y_n2) > 0: y_sm_n2 = y_n2
+            else: y_sm_n2 = []
+           
+            if len(y_e2) > 0: y_sm_e2 = y_e2
+            else: y_sm_e2 = []
 
-        y_l_sm_n = np.nanmin(y_sm_n[:,:iters], axis = 1) / y_m_sm_n
-        y_l_sm_e = np.nanmin(y_sm_e[:,:iters], axis = 1) / y_m_sm_e
-        y_l_sm_s = np.nanmin(y_sm_s[:,:iters], axis = 1) / y_m_sm_s
-        y_l_sm_w = np.nanmin(y_sm_w[:,:iters], axis = 1) / y_m_sm_w
+            if len(y_s2) > 0: y_sm_s2 = y_s2
+            else: y_sm_s2 = []
+            
+            if len(y_w2) > 0: y_sm_w2 = y_w2
+            else: y_sm_w2 = []
+            
+            y_sm_n = y_n.T
+            y_sm_e = y_e.T
+            y_sm_s = y_s.T
+            y_sm_w = y_w.T
+            
 
-        y_u_sm_n = np.nanmax(y_sm_n[:,:iters], axis = 1) / y_m_sm_n
-        y_u_sm_e = np.nanmax(y_sm_e[:,:iters], axis = 1) / y_m_sm_e
-        y_u_sm_s = np.nanmax(y_sm_s[:,:iters], axis = 1) / y_m_sm_s
-        y_u_sm_w = np.nanmax(y_sm_w[:,:iters], axis = 1) / y_m_sm_w
+        y_l_sm_n = np.nanmin(y_sm_n[:,:iters], axis = 1)
+        y_l_sm_e = np.nanmin(y_sm_e[:,:iters], axis = 1)
+        y_l_sm_s = np.nanmin(y_sm_s[:,:iters], axis = 1)
+        y_l_sm_w = np.nanmin(y_sm_w[:,:iters], axis = 1)
+
+        y_u_sm_n = np.nanmax(y_sm_n[:,:iters], axis = 1)
+        y_u_sm_e = np.nanmax(y_sm_e[:,:iters], axis = 1)
+        y_u_sm_s = np.nanmax(y_sm_s[:,:iters], axis = 1)
+        y_u_sm_w = np.nanmax(y_sm_w[:,:iters], axis = 1)
         
         # Normalization for smoothed signals
-        y_m_nr_n = normalize.to_a_point(sig = y_m_sm_n, 
-                                        sig_b = np.ones(y_m_sm_n.shape), 
-                                        x_vals = x_vals,
-                                        norm = args['normalization_height'],
-                                        hwin = args['half_normalization_window'],
-                                        axis = 0)
+        n_coef = normalize.to_a_point(sig = y_m_sm_n, 
+                                      sig_b = np.ones(y_m_sm_n.shape), 
+                                      x_vals = x_vals,
+                                      norm = args['normalization_height'],
+                                      hwin = args['half_normalization_window'],
+                                      axis = 0)
     
-        y_m_nr_e = normalize.to_a_point(sig = y_m_sm_e, 
-                                        sig_b = np.ones(y_m_sm_e.shape), 
-                                        x_vals = x_vals,
-                                        norm = args['normalization_height'],
-                                        hwin = args['half_normalization_window'],
-                                        axis = 0)
+        e_coef = normalize.to_a_point(sig = y_m_sm_e, 
+                                      sig_b = np.ones(y_m_sm_e.shape), 
+                                      x_vals = x_vals,
+                                      norm = args['normalization_height'],
+                                      hwin = args['half_normalization_window'],
+                                      axis = 0)
     
-        y_m_nr_s = normalize.to_a_point(sig = y_m_sm_s, 
-                                        sig_b = np.ones(y_m_sm_s.shape), 
-                                        x_vals = x_vals,
-                                        norm = args['normalization_height'],
-                                        hwin = args['half_normalization_window'],
-                                        axis = 0)
+        s_coef = normalize.to_a_point(sig = y_m_sm_s, 
+                                      sig_b = np.ones(y_m_sm_s.shape), 
+                                      x_vals = x_vals,
+                                      norm = args['normalization_height'],
+                                      hwin = args['half_normalization_window'],
+                                      axis = 0)
     
-        y_m_nr_w = normalize.to_a_point(sig = y_m_sm_w, 
-                                        sig_b = np.ones(y_m_sm_w.shape), 
-                                        x_vals = x_vals,
-                                        norm = args['normalization_height'],
-                                        hwin = args['half_normalization_window'],
-                                        axis = 0)
+        w_coef = normalize.to_a_point(sig = y_m_sm_w, 
+                                      sig_b = np.ones(y_m_sm_w.shape), 
+                                      x_vals = x_vals,
+                                      norm = args['normalization_height'],
+                                      hwin = args['half_normalization_window'],
+                                      axis = 0)
     
         # Create the y axis (signal)
         y_llim, y_ulim, y_llim_nr, y_ulim_nr = \
@@ -259,10 +283,10 @@ for ch in channels:
                                          y_m_sm_e[slice(x_lbin,x_ubin+1)],
                                          y_m_sm_s[slice(x_lbin,x_ubin+1)],
                                          y_m_sm_w[slice(x_lbin,x_ubin+1)]],
-                                  sig_nr = [y_m_nr_n[slice(x_lbin,x_ubin+1)],
-                                            y_m_nr_e[slice(x_lbin,x_ubin+1)],
-                                            y_m_nr_s[slice(x_lbin,x_ubin+1)],
-                                            y_m_nr_w[slice(x_lbin,x_ubin+1)]],
+                                  sig_nr = [n_coef * y_m_sm_n[slice(x_lbin,x_ubin+1)],
+                                            e_coef * y_m_sm_e[slice(x_lbin,x_ubin+1)],
+                                            s_coef * y_m_sm_s[slice(x_lbin,x_ubin+1)],
+                                            w_coef * y_m_sm_w[slice(x_lbin,x_ubin+1)]],
                                   y_lims = args['y_lims'])
         
                 
@@ -288,16 +312,26 @@ for ch in channels:
                                     x_refr = args['normalization_height'],
                                     refr_hwin = args['half_normalization_window'],
                                     x_vals = x_vals, 
-                                    y1_vals = y_m_sm_n, y2_vals = y_m_sm_e, 
-                                    y3_vals = y_m_sm_s, y4_vals = y_m_sm_w,
-                                    y1_norm = y_m_nr_n, y2_norm = y_m_nr_e, 
-                                    y3_norm = y_m_nr_s, y4_norm = y_m_nr_w,
-                                    y1_extr = y_sm_n2, y2_extr = y_sm_e2, 
-                                    y3_extr = y_sm_s2, y4_extr = y_sm_w2,
-                                    y1_lvar = y_l_sm_n, y2_lvar = y_l_sm_e, 
-                                    y3_lvar = y_l_sm_s, y4_lvar = y_l_sm_w,
-                                    y1_uvar = y_u_sm_n, y2_uvar = y_u_sm_e, 
-                                    y3_uvar = y_u_sm_s, y4_uvar = y_u_sm_w,
+                                    y1_vals = y_m_sm_n, 
+                                    y2_vals = y_m_sm_e, 
+                                    y3_vals = y_m_sm_s, 
+                                    y4_vals = y_m_sm_w,
+                                    y1_extr = y_sm_n2, 
+                                    y2_extr = y_sm_e2, 
+                                    y3_extr = y_sm_s2, 
+                                    y4_extr = y_sm_w2, 
+                                    y1_lvar = y_l_sm_n, 
+                                    y2_lvar = y_l_sm_e, 
+                                    y3_lvar = y_l_sm_s, 
+                                    y4_lvar = y_l_sm_w,
+                                    y1_uvar = y_u_sm_n, 
+                                    y2_uvar = y_u_sm_e, 
+                                    y3_uvar = y_u_sm_s, 
+                                    y4_uvar = y_u_sm_w,
+                                    coef_1 = n_coef, 
+                                    coef_2 = e_coef, 
+                                    coef_3 = s_coef, 
+                                    coef_4 = w_coef,
                                     x_lbin = x_lbin, x_ubin = x_ubin,
                                     x_llim = x_llim, x_ulim = x_ulim, 
                                     y_llim = y_llim, y_ulim = y_ulim, 
@@ -348,35 +382,42 @@ for ch in channels:
                                    y_sm_lims = args['smoothing_range'],
                                    y_sm_hwin = args['half_window'],
                                    expo = args['smooth_exponential'])
+
+        else:
+            y_m_sm_o = y_m_o
+            y_m_sm_i = y_m_i
+            
+            y_sm_o = y_o.T
+            y_sm_i = y_i.T
                 
         # Calculate the atmospheric variability limits
-        y_l_sm_o = np.nanmin(y_sm_o[:,:iters], axis = 1) / y_m_sm_o
-        y_l_sm_i = np.nanmin(y_sm_i[:,:iters], axis = 1) / y_m_sm_i
+        y_l_sm_o = np.nanmin(y_sm_o[:,:iters], axis = 1)
+        y_l_sm_i = np.nanmin(y_sm_i[:,:iters], axis = 1)
 
-        y_u_sm_o = np.nanmax(y_sm_o[:,:iters], axis = 1) / y_m_sm_o
-        y_u_sm_i = np.nanmax(y_sm_i[:,:iters], axis = 1) / y_m_sm_i
+        y_u_sm_o = np.nanmax(y_sm_o[:,:iters], axis = 1)
+        y_u_sm_i = np.nanmax(y_sm_i[:,:iters], axis = 1)
         
         # Normalization for smoothed signals
-        y_m_nr_o = normalize.to_a_point(sig = y_m_sm_o, 
-                                        sig_b = np.ones(y_m_sm_o.shape), 
-                                        x_vals = x_vals,
-                                        norm = args['normalization_height'],
-                                        hwin = args['half_normalization_window'],
-                                        axis = 0)
+        o_coef = normalize.to_a_point(sig = y_m_sm_o, 
+                                      sig_b = np.ones(y_m_sm_o.shape), 
+                                      x_vals = x_vals,
+                                      norm = args['normalization_height'],
+                                      hwin = args['half_normalization_window'],
+                                      axis = 0)
     
-        y_m_nr_i = normalize.to_a_point(sig = y_m_sm_i, 
-                                        sig_b = np.ones(y_m_sm_i.shape), 
-                                        x_vals = x_vals,
-                                        norm = args['normalization_height'],
-                                        hwin = args['half_normalization_window'],
-                                        axis = 0)
+        i_coef = normalize.to_a_point(sig = y_m_sm_i, 
+                                      sig_b = np.ones(y_m_sm_i.shape), 
+                                      x_vals = x_vals,
+                                      norm = args['normalization_height'],
+                                      hwin = args['half_normalization_window'],
+                                      axis = 0)
     
         # Create the y axis (signal)
         y_llim, y_ulim, y_llim_nr, y_ulim_nr = \
             make_axis.telecover_y(sig = [y_m_sm_o[slice(x_lbin,x_ubin+1)],
                                          y_m_sm_i[slice(x_lbin,x_ubin+1)]],
-                                  sig_nr = [y_m_nr_o[slice(x_lbin,x_ubin+1)],
-                                            y_m_nr_i[slice(x_lbin,x_ubin+1)]],
+                                  sig_nr = [o_coef * y_m_sm_o[slice(x_lbin,x_ubin+1)],
+                                            i_coef * y_m_sm_i[slice(x_lbin,x_ubin+1)]],
                                   y_lims = args['y_lims'])
         
                 
@@ -396,16 +437,20 @@ for ch in channels:
     
         # Make the plot
         fpath = \
-            make_plot.telecover_rin(dir_out = args['output_folder'], 
+            make_plot.telecover_sec(dir_out = args['output_folder'], 
                                     fname = fname, title = title,
                                     dpi_val = args['dpi'],
                                     x_refr = args['normalization_height'],
                                     refr_hwin = args['half_normalization_window'],
                                     x_vals = x_vals, 
-                                    y1_vals = y_m_sm_o, y2_vals = y_m_sm_i, 
-                                    y1_norm = y_m_nr_o, y2_norm = y_m_nr_i, 
-                                    y1_lvar = y_l_sm_o, y2_lvar = y_l_sm_i, 
-                                    y1_uvar = y_u_sm_o, y2_uvar = y_u_sm_i, 
+                                    y1_vals = y_m_sm_o, 
+                                    y2_vals = y_m_sm_i, 
+                                    y1_lvar = y_l_sm_o, 
+                                    y2_lvar = y_l_sm_i, 
+                                    y1_uvar = y_u_sm_o, 
+                                    y2_uvar = y_u_sm_i, 
+                                    coef_1 = o_coef, 
+                                    coef_2 = i_coef, 
                                     x_lbin = x_lbin, x_ubin = x_ubin,
                                     x_llim = x_llim, x_ulim = x_ulim, 
                                     y_llim = y_llim, y_ulim = y_ulim, 

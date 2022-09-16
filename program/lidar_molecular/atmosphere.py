@@ -209,7 +209,7 @@ def short_molec(heights, ranges, meas_info, channel_info,
         rng = ranges.loc[ch_d].values
         trn_bck = transmittance(x_range = rng, extinction = ecf_bck)
         trn_fth = transmittance(x_range = rng, extinction = ecf_fth)
-        
+
         if ch_type.loc[ch] in ['t', 'v', 'r', 'f']:
             atb = bcf_tot * trn_fth * trn_bck
         if ch_type.loc[ch] in ['p', 'o']:
@@ -295,7 +295,7 @@ def from_rsonde(path, heights):
     P = file.Pressure.values
     T = file.Temperature.values
     H = file.Altitude.values
-    
+        
     if 'RelativeHumidity' in file.variables:
         RH = file.RelativeHumidity
     
@@ -318,13 +318,22 @@ def from_rsonde(path, heights):
                          dims = ['properties', 'channel', 'bins'])
     
     for ch in channels:
+        
+        height_arr = heights.loc[ch].values
+        
+        # Extrapolate near ground if the first radiosonde altitude is above the lidar ground altitude
+        if H[0] > height_arr[0]:
+            H = np.insert(H, 0, height_arr[0])
+            P = np.insert(P, 0, P[0])
+            T = np.insert(T, 0, T[0])
+            RH = np.insert(RH, 0, RH[0])
+
         P_f = interp1d(H, P, bounds_error = False, fill_value = np.nan)
         
         T_f = interp1d(H, T, bounds_error = False, fill_value = np.nan)
         
         RH_f = interp1d(H, RH, bounds_error = False, fill_value = np.nan)
 
-        height_arr = heights.loc[ch].values
         
         P_i = P_f(height_arr)
         
@@ -357,7 +366,7 @@ def saturation_vapour_pressure(P, T):
     return(ewp)
 
 def transmittance(x_range, extinction):
-    
+
     #Calculate transmittance
     Transmittance = np.exp(-cumtrapz(extinction, x_range))
     

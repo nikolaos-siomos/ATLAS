@@ -61,33 +61,28 @@ for ch in channels:
 
     # Smoothing
     if args['smooth']:
-        y_vals_sm, y_vals_err = \
+        y_vals_sm, y_errs = \
             sliding_average_1D(y_vals = sig_ch.copy(), 
                                x_vals = x_vals,
                                x_sm_lims = args['smoothing_range'],
                                x_sm_hwin = args['half_window'],
                                expo = args['smooth_exponential'])
-    
-        # Normalization for smoothed signals
-        y_vals_sm = normalize.to_a_point(sig = y_vals_sm, 
-                                         sig_b = atb_ch.copy(), 
-                                         x_vals = x_vals,
-                                         norm = args['reference_height'],
-                                         hwin = args['half_reference_window'],
-                                         axis = 0)
 
-    
-    # Normalization for unsmoothed signals
-    y_vals = normalize.to_a_point(sig = sig_ch.copy(), 
-                                  sig_b = atb_ch.copy(), 
-                                  x_vals = x_vals,
-                                  norm = args['reference_height'],
-                                  hwin = args['half_reference_window'],
-                                  axis = 0)
+    else:
+        y_vals_sm = sig_ch.copy()
+        y_errs = np.nan * y_vals_sm
 
+    # Normalization of the signals
+    coef = normalize.to_a_point(sig = y_vals_sm, 
+                                sig_b = atb_ch.copy(), 
+                                x_vals = x_vals,
+                                norm = args['reference_height'],
+                                hwin = args['half_reference_window'],
+                                axis = 0)
+        
     # Create the y axis (signal)
     y_llim, y_ulim, y_label = \
-        make_axis.rayleigh_y(sig = y_vals[slice(x_lbin,x_ubin+1)], 
+        make_axis.rayleigh_y(sig = coef * y_vals_sm[slice(x_lbin,x_ubin+1)], 
                              atb = atb_ch.copy(), 
                              y_lims = args['y_lims'] , 
                              use_lin = args['use_lin_scale'])
@@ -114,8 +109,11 @@ for ch in channels:
                                use_lin = args['use_lin_scale'],
                                x_refr = args['reference_height'],
                                refr_hwin = args['half_reference_window'],
-                               x_vals = x_vals, y1_vals = y_vals_sm,
-                               y2_vals = atb_ch.copy(), y3_vals = y_vals,
+                               x_vals = x_vals, 
+                               y1_vals = y_vals_sm,
+                               y2_vals = atb_ch.copy(),
+                               y1_errs = y_errs,
+                               coef = coef,
                                x_lbin = x_lbin, x_ubin = x_ubin,
                                x_llim = x_llim, x_ulim = x_ulim, 
                                y_llim = y_llim, y_ulim = y_ulim, 

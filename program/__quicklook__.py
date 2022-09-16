@@ -15,6 +15,7 @@ from readers.parse_config import quicklook_parser, check_channels
 from plotting import make_axis, make_title, make_plot
 from lidar_processing.smoothing import sliding_average_2D
 
+#-i /mnt/DATA/Big_data/Databases/POLIS/data/220913/02/out/atlas/qck_20220913mun0234_ATLAS_0.0.1.nc --smooth --smoothing_range 1 14 --half_window 5 500 --channels xpar0355 xppr0355 xcat0355 xcpt0355 xpat0532 xppt0532 xcar0532 xcpr0532 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
@@ -64,8 +65,10 @@ for ch in channels:
     # Create the z axis (signal)
     z_llim, z_ulim, z_label, z_vals = \
         make_axis.quicklook_z(sig = sig_ch, 
+                              y_vals = y_vals,
                               z_lims = args['z_lims'] , 
-                              use_log = args['use_log_scale'])
+                              use_log = args['use_log_scale'],
+                              z_max_zone = args['z_max_zone'])
     
     # Smoothing
     if args['smooth']:
