@@ -81,3 +81,28 @@ def telecover(start_date, start_time, end_time, lidar, channel,
                     f' {zan}'+r'$^{o}$ off-zenith' 
     
     return(title)
+
+def polarization_calibration(start_date, start_time, end_time, lidar, 
+                             channel_r, channel_t, zan, lat, lon, elv):
+    
+    zan = np.round(float(zan), decimals = 1)
+    
+    lat = np.round(float(lat), decimals = 3)
+
+    lon = np.round(float(lon), decimals = 3)
+
+    elv = np.round(float(elv), decimals = 0)
+    
+    loc = f'lat: {lat}$^o$, lon: {lon}$^o$, alt: {elv} m'
+        
+    date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
+    
+    start = f'{start_time[:2]}:{start_time[2:4]}'
+
+    end = f'{end_time[:2]}:{end_time[2:4]}'
+        
+    title = f'Ratio {channel_r} to {channel_t}: {lidar} at {loc}\n'+\
+                f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+\
+                    f' {zan}'+r'$^{o}$ off-zenith' 
+    
+    return(title)

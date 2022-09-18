@@ -279,6 +279,94 @@ def telecover_y(sig, sig_nr, y_lims):
     
     return(y_llim, y_ulim, y_llim_nr, y_ulim_nr)
 
+
+def polarization_calibration_cal_x(ratio_m, ratio_p, x_lims_cal):
+    
+    # Get the max signal bin and value       
+    x_max_cal = np.nanmax([ratio_m, ratio_p])
+    x_min_cal = np.nanmin([ratio_m, ratio_p])
+
+    # Get the eta upper limit
+    if x_lims_cal[-1] == None:
+        x_ulim_cal = 1.2 * x_max_cal
+        
+    else:
+       x_ulim_cal = x_lims_cal[-1]
+    
+    # Get the vertical lower limit
+    if x_lims_cal[0] == None:
+        x_llim_cal = 0.8 * x_min_cal
+        
+    else:
+       x_llim_cal = x_lims_cal[0]
+    
+    return(x_llim_cal, x_ulim_cal)
+
+def polarization_calibration_ray_x(ratio, x_lims_ray):
+    
+    # Get the max signal bin and value       
+    x_max_ray = np.nanmax(ratio)
+
+    # Get the delta upper limit
+    if x_lims_ray[-1] == None:
+        x_ulim_ray = 1.2 * x_max_ray
+        
+    else:
+       x_ulim_ray = x_lims_ray[-1]
+    
+    # Get the vertical lower limit
+    if x_lims_ray[0] == None:
+        x_llim_ray = 0.
+        
+    else:
+       x_llim_ray = x_lims_ray[0]
+    
+    return(x_llim_ray, x_ulim_ray)
+
+
+def polarization_calibration_y(heights, ranges, y_lims, use_dis):
+
+    # Use altitude or distance for the y axis  
+    if use_dis:
+        y_vals = 1E-3 * ranges
+        
+        y_label = 'Distance from the Lidar [km]'
+        
+    else:
+        y_vals = 1E-3 * heights       
+        y_label = 'Altitude [km]'
+
+    # Get the altitude/distance lower limit and bin
+    if y_lims[0] == None or y_lims[0] < y_vals[0]:
+        y_lbin = 0
+        y_llim = y_vals[y_lbin]
+
+    else:
+        y_lbin = np.where(y_vals >= y_lims[0])[0][0]
+        
+        if y_lbin > 0:
+            y_lbin = y_lbin - 1
+        
+        y_llim = y_lims[0]
+
+
+    # Get the altitude/distance upper limit and bin
+    if y_lims[-1] == None or y_lims[-1] > y_vals[-1]:
+        y_ubin = y_vals.size - 1
+        y_ulim = y_vals[y_ubin]
+
+    else:
+        y_ubin = np.where(y_vals <= y_lims[-1])[0][-1] 
+        
+        if y_ubin < y_vals.size:
+            y_ubin = y_ubin + 1
+
+        y_ulim = y_lims[-1]
+        
+
+    return(y_lbin, y_ubin, y_llim, y_ulim, y_vals, y_label)
+
+
 def intercomparison_x(heights, ranges, x_lims, use_dis):
 
     # Use altitude or distance for the y axis  

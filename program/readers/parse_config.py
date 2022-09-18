@@ -106,7 +106,7 @@ def main_parser():
     for i in range(len(mandatory_args)):
         if not args[mandatory_args[i]]:
             print(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')
-            sys.exit('-- Program stopped') 
+            raise Exception('-- Program stopped') 
             
     if args['output_folder'] == None:
         out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas')
@@ -121,13 +121,13 @@ def main_parser():
     print("")
 
     if not os.path.exists(args['input_file']):
-        sys.exit(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}!")  
+        raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}!")  
     
     if os.path.basename(args['input_file'])[:3] not in ['ray','tlc','pcl','drk']:
-        sys.exit('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh), tlc (telecover), or pcl(polarization calibration) ')
+        raise Exception('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh), tlc (telecover), or pcl(polarization calibration) ')
     
     if not os.path.exists(args['output_folder']):
-        sys.exit(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}!")  
+        raise Exception(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}!")  
     
 
     return(args)
@@ -246,7 +246,7 @@ def quicklook_parser():
     for i in range(len(mandatory_args)):
         if not args[mandatory_args[i]]:
             print(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')
-            sys.exit('-- Program stopped')    
+            raise Exception('-- Program stopped')    
 
     if args['output_folder'] == None:
         out_path = os.path.join(os.path.dirname(args['input_file']),'..',
@@ -262,13 +262,13 @@ def quicklook_parser():
     print("")
 
     if not os.path.exists(args['input_file']):
-        sys.exit(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}!")  
+        raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}!")  
     
     if os.path.basename(args['input_file'])[:3] != 'qck':
-        sys.exit('---- Error: Measurement filename not understood! Please start the filename with qck (quicklook)')
+        raise Exception('---- Error: Measurement filename not understood! Please start the filename with qck (quicklook)')
     
     if not os.path.exists(args['output_folder']):
-        sys.exit(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}!")  
+        raise Exception(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}!")  
     
 
     return(args)
@@ -363,7 +363,7 @@ def rayleigh_parser():
     for i in range(len(mandatory_args)):
         if not args[mandatory_args[i]]:
             print(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')
-            sys.exit('-- Program stopped')            
+            raise Exception('-- Program stopped')            
     
     if args['output_folder'] == None:
         out_path = os.path.join(os.path.dirname(args['input_file']),'..',
@@ -379,13 +379,13 @@ def rayleigh_parser():
     print("")
 
     if not os.path.exists(args['input_file']):
-        sys.exit(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
+        raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
     
     if os.path.basename(args['input_file'])[:3] != 'ray':
-        sys.exit('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
+        raise Exception('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
     
     if not os.path.exists(args['output_folder']):
-        sys.exit(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}")  
+        raise Exception(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}")  
     
 
     return(args)
@@ -475,7 +475,7 @@ def telecover_parser():
     for i in range(len(mandatory_args)):
         if not args[mandatory_args[i]]:
             print(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')
-            sys.exit('-- Program stopped')            
+            raise Exception('-- Program stopped')            
     
     if args['output_folder'] == None:
         out_path = os.path.join(os.path.dirname(args['input_file']),'..',
@@ -491,13 +491,13 @@ def telecover_parser():
     print("")
 
     if not os.path.exists(args['input_file']):
-        sys.exit(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
+        raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
     
     if os.path.basename(args['input_file'])[:3] != 'tlc':
-        sys.exit('---- Error: Measurement filename not understood! Please start the filename with tlc (telecover test)')
+        raise Exception('---- Error: Measurement filename not understood! Please start the filename with tlc (telecover test)')
     
     if not os.path.exists(args['output_folder']):
-        sys.exit(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}")  
+        raise Exception(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}")  
     
 
     return(args)
@@ -541,17 +541,29 @@ def polarization_calibration_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
 
-    parser.add_argument('--y_lims', metavar = 'y_lims',
+    parser.add_argument('--x_lims_calibration', metavar = 'x_lims_clibration',
                         type = float, nargs = 2, default = [None, None], 
-                        help = 'The y axis limits (lower and upper) of the normalized RC signal. Defaults to 0 (lower) 1.2 (upper) when use_lin_scale is True. If use_lin_scale is true then the lower limit becomes 1E-5 ')
+                        help = 'The x axis limits (lower and upper) of the gain ratios at +-45. ')
 
-    parser.add_argument('--x_lims', metavar = 'x_lims',
-                        type = float, nargs = 2, default = [0., 14.], 
-                        help = 'The x axis limits in km (lower and upper). If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
+    parser.add_argument('--x_lims_rayleigh', metavar = 'x_lims_rayleigh',
+                        type = float, nargs = 2, default = [None, None], 
+                        help = 'The x axis limits (lower and upper) of the gain ratios at +-45. ')
 
-    parser.add_argument('--x_tick', metavar = 'x_tick',
+    parser.add_argument('--y_lims_calibration', metavar = 'y_lims_calibration',
+                        type = float, nargs = 2, default = [0., 5.], 
+                        help = 'The y axis limits in km (lower and upper) for the pol. calibration plot. If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
+
+    parser.add_argument('--y_tick_calibration', metavar = 'x_tick_calibration',
+                        type = int, nargs = '?', default = 0.5, 
+                        help = 'The y axis finest tick in km for the pol. calibration plot. Defaults to 0.5km ')
+
+    parser.add_argument('--y_lims_rayleigh', metavar = 'y_lims_rayleigh',
+                        type = float, nargs = 2, default = [0., 10.], 
+                        help = 'The y axis limits in km (lower and upper) for the Rayleigh VDR plot. If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
+
+    parser.add_argument('--y_tick_rayleigh', metavar = 'x_tick_rayleigh',
                         type = int, nargs = '?', default = 1, 
-                        help = 'The x axis finest tick in km. Defaults to 1km ')
+                        help = 'The y axis finest tick in km for the Rayleigh VDR plot. Defaults to 1km ')
 
     parser.add_argument('--ch_r', metavar = 'ch_r',
                         type = str, nargs = '+',
@@ -562,12 +574,20 @@ def polarization_calibration_parser():
                         help = 'Type one or more channel names (e.g. xpat0355) here that correspond to the transmitted channels used for the polarization calibration calculation. The number of transmitted channels must be the same as the number of the respective reflected channels ')
 
     parser.add_argument('--calibration_height', metavar = 'calibration_height',
-                        type = float, nargs = '?', default = 9., 
+                        type = float, nargs = '?', default = 3., 
                         help = 'The calibration height/distance where the signals will be normalized for the Rayleigh fit. If use_distance is called, the limits correspond to distance. Defaults to 9 km ')
 
     parser.add_argument('--half_calibration_window', metavar = 'half_calibration_window',
                         type = float, nargs = '?', default = 500., 
                         help = 'The half window in meters used for the calibration. Defaults to 100 m ')
+
+    parser.add_argument('--rayleigh_height', metavar = 'rayleigh_height',
+                        type = float, nargs = '?', default = 9., 
+                        help = 'The height/distance where the atmosphere contains only insignificant amounts of aerosols. If use_distance is called, the limits correspond to distance. Defaults to 9 km ')
+
+    parser.add_argument('--half_rayleigh_window', metavar = 'half_rayleigh_window',
+                        type = float, nargs = '?', default = 500., 
+                        help = 'The half window in meters used for the molecular caluclations. Defaults to 500 m ')
 
     parser.add_argument('--smooth', metavar = 'smooth',
                         type = bool, default = False, 
@@ -588,8 +608,12 @@ def polarization_calibration_parser():
                         help = 'Half smoothing window in the first and last bin of the smoothing region, in m. The widow progressively changes between from the first to the last value. Use the same value twice to apply a constant window ')
 
     parser.add_argument('-K', "--K", metavar = 'K',
-                        type = float, nargs = '?', default = None, 
+                        type = float, nargs = '+', default = None, 
                         help = 'The K value for each channel pair. Defaults to 1 for all channels ')
+
+    parser.add_argument("--transmission_ratio", metavar = 'transmission_ratio',
+                        type = float, nargs = '+', default = 1., 
+                        help = 'The transmission ratio between the R to T channels per pair. Defaults to 1 for all pairs')
 
     args = vars(parser.parse_args())
     
@@ -600,7 +624,7 @@ def polarization_calibration_parser():
     for i in range(len(mandatory_args)):
         if not args[mandatory_args[i]]:
             print(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')
-            sys.exit('-- Program stopped')            
+            raise Exception('-- Program stopped')            
     
     if args['output_folder'] == None:
         out_path = os.path.join(os.path.dirname(args['input_file']),'..',
@@ -616,16 +640,16 @@ def polarization_calibration_parser():
     print("")
 
     if not os.path.exists(args['input_file']):
-        sys.exit(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
+        raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
     
     if os.path.basename(args['input_file'])[:3] != 'pcl':
-        sys.exit('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
+        raise Exception('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
     
     if not os.path.exists(args['output_folder']):
-        sys.exit(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}")  
+        raise Exception(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}")  
 
     if len(args['ch_r']) != len(args['ch_t']):
-        sys.exit('---- Error: The number of reflected channels is different from the number of transmitted channels! Please provide pairs of trasmitted and reflected channels')
+        raise Exception('---- Error: The number of reflected channels is different from the number of transmitted channels! Please provide pairs of trasmitted and reflected channels')
         
 
     return(args)
@@ -723,7 +747,7 @@ def intercomparison_parser():
     
     for i in range(len(mandatory_args)):
         if not args[mandatory_args[i]]:
-            sys.exit(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')            
+            raise Exception(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')            
 
     print("-- The following values have been used!")
     print("-------------------------------------------------------------------")
@@ -733,20 +757,20 @@ def intercomparison_parser():
     print("")
 
     if not os.path.exists(args['input_files'][0]):
-        sys.exit(f"-- Error: The path to the first input file does not exists. Please provide a valid input file path. Current Path: {args['input_file'][0]}")  
+        raise Exception(f"-- Error: The path to the first input file does not exists. Please provide a valid input file path. Current Path: {args['input_file'][0]}")  
 
     if not os.path.exists(args['input_files'][1]):
-        sys.exit(f"-- Error: The path to the second input file does not exists. Please provide a valid input file path. Current Path: {args['input_file'][1]}")  
+        raise Exception(f"-- Error: The path to the second input file does not exists. Please provide a valid input file path. Current Path: {args['input_file'][1]}")  
         
     if os.path.basename(args['input_files'][0])[:3] != 'ray' or \
         os.path.basename(args['input_files'][1])[:3] != 'ray':
-        sys.exit('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
+        raise Exception('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
     
     if not os.path.exists(args['output_folder']):
-        sys.exit(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}")  
+        raise Exception(f"-- Error: The path to the output folder does not exists. Please provide a output folder file path. Current Path: {args['output_folder']}")  
 
     if len(args['channels_1']) != len(args['channels_2']):
-        sys.exit("-- Error: The number of channels provided in channels_1 is diffirent than the number of channels provided in channels_2. Please provide pair of channels that are going to be intercompared")          
+        raise Exception("-- Error: The number of channels provided in channels_1 is diffirent than the number of channels provided in channels_2. Please provide pair of channels that are going to be intercompared")          
 
     return(args)
 
