@@ -101,16 +101,19 @@ def quicklook_y(heights, ranges, y_lims, use_dis):
 def quicklook_z(sig, y_vals, z_lims, use_log, z_max_zone):
     
     # Get the max signal bin and value
-    sig_m = sig.mean(dim = 'time').rolling(bins = 100, center =True).mean().values
+    sig_m = sig.rolling(bins = 100, center =True).mean().values
     z_vals = sig.transpose('bins','time').values
        
     if z_max_zone[0] == None: 
-        z_maxz = np.nanmax(sig_m)
+        z_max = np.nanmax(sig_m)
     else:
         mask = (y_vals >= z_max_zone[0]) & (y_vals <= z_max_zone[1])
-        z_maxz = np.nanmax(sig_m[mask])
+        z_max = np.nanmax(sig_m[:,mask])
+    # from matplotlib import pyplot as plt
+    # plt.plot(sig_m[mask])
+    # plt.show()
 
-    z_vals = sig.transpose('bins','time').values / z_maxz
+    z_vals = z_vals / z_max
 
     # Get the signal upper limit
     if z_lims[-1] == None:

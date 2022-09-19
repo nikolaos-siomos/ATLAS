@@ -174,7 +174,7 @@ def quicklook_parser():
                         help = 'If called then the input file will be DELETED after processing in order to save space. Use with care! ')
 
     parser.add_argument('--dpi', metavar = 'dpi',
-                        type = int, nargs = 1, default = 100, 
+                        type = int, nargs = 1, default = 150, 
                         help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 100 ')
 
     parser.add_argument('--use_log_scale', metavar = 'use_log_scale',
