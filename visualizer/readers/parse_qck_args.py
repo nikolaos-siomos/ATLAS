@@ -46,18 +46,26 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
 
-    parser.add_argument('--exclude_mode', metavar = 'exclude_mode',
-                        type = str, nargs = '+', default = ['p'], 
-                        help = 'Provide all the channel mode types that you want to EXCLUDE (None: None, a: analogue, p: photon). By default the photon signals are excluded for the quicklooks ')
+    parser.add_argument('-c', '--channels', metavar = 'channels',
+                        type = str, nargs = '+', default = None, 
+                        help = 'Type one or more channel names (e.g. xpar0355) here in order to open the figures in interactive mode ')
 
-    parser.add_argument('--exclude_scattering', metavar = 'exclude_scattering',
-                        type = str, nargs = '+', default = ['None'], 
-                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, p: co-polar linear analyzer, c: cross-polar linear analyzer, t: total (no depol), o: co-polar circular analyzer, x: cross-polar circular analyzer, v: vibrational Raman, r: rotational Raman, a: Cabannes, f: fluorescence). No scattering type is excluded by default for the quicklooks')
+    parser.add_argument('--exclude_field_type', metavar = 'exclude_field_type',
+                        type = str, nargs = '+', default = [], 
+                        help = 'Provide all the channel field types that you want to EXCLUDE (None: None, x: unspecified, n: near field, f: far field ). Nothing is excluded by default in ATLAS preprocessor ')
 
-    parser.add_argument('--exclude_subtype', metavar = 'exclude_subtype',
-                        type = str, nargs = '+', default = ['None'], 
-                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, r: Signal Reflected from a PBS, t: Signal Transmitted through a PBS, n: N2 Ramal line, o: O2 Ramal line, w: H2O Ramal line, c: CH4 Ramal line, h: High Rotational Raman, l: Low Rotational Raman, a: Mie (aerosol) HSRL signal, m: Molecular HSRL signal, b: Broadband Fluorescence, s: Spectral Fluorescence, x: No specific subtype). Water vapor and methane channel subtypes are excluded by default for the rayleigh fit ')
+    parser.add_argument('--exclude_detection_mode', metavar = 'exclude_detection_mode',
+                        type = str, nargs = '+', default = [], 
+                        help = 'Provide all the channel detection mode types that you want to EXCLUDE (None: None, a: analogue, p: photon). Nothing is excluded by default in ATLAS preprocessor ')
 
+    parser.add_argument('--exclude_scattering_type', metavar = 'exclude_scattering_type',
+                        type = str, nargs = '+', default = [], 
+                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, p: co-polar linear analyzer, c: cross-polar linear analyzer, t: total (no depol), o: co-polar circular analyzer, x: cross-polar circular analyzer, v: vibrational Raman, r: rotational Raman, a: Cabannes, f: fluorescence). Nothing is excluded by default in ATLAS preprocessor ')
+
+    parser.add_argument('--exclude_channel_subtype', metavar = 'exclude_channel_subtype',
+                        type = str, nargs = '+', default = [], 
+                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, r: Signal Reflected from a PBS, t: Signal Transmitted through a PBS, n: N2 Ramal line, o: O2 Ramal line, w: H2O Ramal line, c: CH4 Ramal line, h: High Rotational Raman, l: Low Rotational Raman, a: Mie (aerosol) HSRL signal, m: Molecular HSRL signal, b: Broadband Fluorescence, s: Spectral Fluorescence, x: No specific subtype). Nothing is excluded by default in ATLAS preprocessor ')
+    
     parser.add_argument('--x_lims', metavar = 'x_lims',
                         type = int, nargs = 2, default = [None, None], 
                         help = 'The x axis limits (lower and upper). Use two integers corresponding to the first and last timeframe (not date!) that will be plotted. Use 1 to start from the first timeframe. If values below 1 or above the total number of timeframes are used, they will be ignored')
@@ -89,10 +97,6 @@ def call_parser():
     parser.add_argument('--z_max_zone', metavar = 'z_max_zone',
                         type = float, nargs = 2, default = [None, None], 
                         help = 'Provide the zone (min and max height/distance) in km that will be used for the calculation of the max signal value. The signals are normalized to 1 with this value, that is the uppermost limit of the colorscale. Particularly useful in order to avoid scaling the colors with a cloud ')
-
-    parser.add_argument('-c', '--channels', metavar = 'channels',
-                        type = str, nargs = '+', default = None, 
-                        help = 'Type one or more channel names (e.g. xpar0355) here in order to open the figures in interactive mode ')
 
     parser.add_argument('--smooth', metavar = 'smooth',
                         type = bool, default = False, 
@@ -144,6 +148,8 @@ def check_parser(args):
     if args['output_folder'] == None:
         out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas_visualizer', 'qck')
         args['output_folder'] = out_path
-    os.makedirs(args['output_folder'], exist_ok = True)
+        os.makedirs(args['output_folder'], exist_ok = True)
+    elif not os.path.exists(args['output_folder'] ):
+        raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
         
     return(args)

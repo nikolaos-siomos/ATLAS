@@ -51,7 +51,7 @@ def quicklook_x(x_lims, x_tick, t_tick, time):
             t_tick = 1
     
     # Identify bins where temporal gaps are encountered (10% acceptance)
-    nodes = np.where(time[1:]-time[:-1] > 1.1*np.min(time[1:]-time[:-1]))[0]
+    nodes = np.where(time[1:]-time[:-1] > 1.15 * np.min(time[1:]-time[:-1]))[0]
 
     
     return(x_llim, x_ulim, x_vals, t_vals, x_label, t_label, 

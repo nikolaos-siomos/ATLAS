@@ -12,7 +12,7 @@ import numpy as np
 import netCDF4 as nc
 from matplotlib import pyplot as plt
 from .readers.parse_cmp_args import call_parser, check_parser
-from .readers.check import check_channels
+from .readers.check import check_channels_no_exclude as check_channels
 from .plotting import make_axis, make_title, make_plot
 from .tools.smoothing import sliding_average_1D
 from .tools import normalize
@@ -63,7 +63,7 @@ def main(args):
     
     # iterate over the channels
     for j in range(channels1.size):
-        print(f"-- channels: {channels1[j]} & channels2[j]")
+        print(f"-- ch: {channels1[j]} & {channels2[j]}")
 
         
         ch1_d = dict(channel = channels1[j])
@@ -170,8 +170,8 @@ def main(args):
                                           x_tick = args['x_tick'],
                                           lidars = [data1.Lidar_Name, data2.Lidar_Name])  
 
-        print('-----------------------------------------')
-        print(' ')
+    print('-----------------------------------------')
+    print(' ')
     return()
 
 if __name__ == '__main__':

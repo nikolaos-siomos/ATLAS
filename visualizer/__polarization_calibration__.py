@@ -12,7 +12,7 @@ import numpy as np
 import netCDF4 as nc
 from matplotlib import pyplot as plt
 from .readers.parse_pcl_args import call_parser, check_parser
-from .readers.check import check_channels
+from .readers.check import check_channels_no_exclude as check_channels
 from .tools import normalize
 from .plotting import make_axis, make_title, make_plot
 from .tools.smoothing import sliding_average_1D

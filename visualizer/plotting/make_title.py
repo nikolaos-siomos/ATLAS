@@ -22,9 +22,9 @@ def quicklook(start_time, end_time, lidar, channel, zan, lat, lon, elv):
         
     date = np.datetime64(start_time,'us').item().strftime('%d.%m.%Y')
     
-    start = np.datetime64(start_time,'us').item().strftime('%H:%M')
+    start = np.datetime64(start_time,'us').item().strftime('%H:%M:%S')
     
-    end = np.datetime64(end_time,'us').item().strftime('%H:%M')
+    end = np.datetime64(end_time,'us').item().strftime('%H:%M:%S')
     
     title = f'Channel {channel} : {lidar} at {loc}\n'+\
                 f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+\
@@ -47,9 +47,9 @@ def rayleigh(start_date, start_time, end_time, lidar, channel,
         
     date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
     
-    start = f'{start_time[:2]}:{start_time[2:4]}'
+    start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
 
-    end = f'{end_time[:2]}:{end_time[2:4]}'
+    end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
         
     title = f'Channel {channel} : {lidar} at {loc}\n'+\
                 f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+\
@@ -72,9 +72,9 @@ def telecover(start_date, start_time, end_time, lidar, channel,
         
     date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
     
-    start = f'{start_time[:2]}:{start_time[2:4]}'
+    start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
 
-    end = f'{end_time[:2]}:{end_time[2:4]}'
+    end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
         
     title = f'Channel {channel} : {lidar} at {loc}\n'+\
                 f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+\
@@ -97,9 +97,9 @@ def polarization_calibration(start_date, start_time, end_time, lidar,
         
     date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
     
-    start = f'{start_time[:2]}:{start_time[2:4]}'
+    start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
 
-    end = f'{end_time[:2]}:{end_time[2:4]}'
+    end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
         
     title = f'Ratio {channel_r} to {channel_t}: {lidar} at {loc}\n'+\
                 f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+\

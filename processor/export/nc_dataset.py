@@ -61,10 +61,8 @@ def rayleigh(sig, molec, meteo, meas_info, channel_info, time_info,
     
     fname = f'ray_{meas_info.Measurement_ID}_ATLAS_{version}.nc'
     
-    nc_file.to_netcdf(path = os.path.join(dir_out, fname))
-    
-    nc_file.close()
-    
+    nc_file.to_netcdf(path = os.path.join(dir_out, fname), mode = 'w')
+        
     print('-- Rayleigh ATLAS file succesfully created!')
     print('-----------------------------------------')
     print('')
@@ -236,9 +234,7 @@ def telecover(sig, meas_info, channel_info, time_info,
     
     fname = f'tlc_{meas_info.Measurement_ID}_ATLAS_{version}.nc'
     
-    nc_file.to_netcdf(path = os.path.join(dir_out, fname))
-    
-    nc_file.close()
+    nc_file.to_netcdf(path = os.path.join(dir_out, fname), mode = 'w')
 
     print('-- Telecover ATLAS file succesfully created!')
     print('-----------------------------------------')
@@ -336,10 +332,8 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
     nc_file.attrs['processing_software'] = 'ATLAS'
     
     fname = f'pcl_{meas_info.Measurement_ID}_ATLAS_{version}.nc'
-    
-    nc_file.to_netcdf(path = os.path.join(dir_out, fname))
-    
-    nc_file.close()
+
+    nc_file.to_netcdf(path = os.path.join(dir_out, fname), mode = 'w')
     
     print('-- Calibration ATLAS file succesfully created!')
     print('-----------------------------------------')
@@ -378,7 +372,7 @@ def quicklook(sig, meas_info, channel_info, time_info,
     
     fname = f'qck_{meas_info.Measurement_ID}_ATLAS_{version}.nc'
     
-    nc_file.to_netcdf(path = os.path.join(dir_out, fname))
+    nc_file.to_netcdf(path = os.path.join(dir_out, fname), mode = 'w')
     
     print('-- Quicklook ATLAS file succesfully created!')
     print('-----------------------------------------')

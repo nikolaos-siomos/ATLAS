@@ -38,7 +38,7 @@ quicklook = {'rayleigh_fit' : True,
              'telecover' : False,
              'polarization_calibration' : False}
 
-parent_folder = '/mnt/DATA/Big_data/Databases/POLIS/220922/01'
+parent_folder = '/mnt/DATA/Big_data/Databases/ALPHA/220922'
 output_folder = os.path.join(parent_folder, 'out')
 
 # Create the main output folder
@@ -50,8 +50,8 @@ cnv_args = parse_cnv()
 
 cnv_args['parent_folder'] = parent_folder
 cnv_args['output_folder'] = os.path.join(output_folder, 'scc_converter')
-cnv_args['config_file'] = '/mnt/DATA/Big_data/Databases/POLIS/configs/polis_bucharest_all_channels.ini'
-cnv_args['measurement_identifier'] = 'm'
+cnv_args['config_file'] = '/mnt/DATA/Big_data/Databases/ALPHA/configs/alpha_bucharest_all_channels.ini'
+cnv_args['measurement_identifier'] = 'RM'
 cnv_args['trim_overflows'] = 2
 cnv_args['files_per_sector'] = 3
 
@@ -73,7 +73,7 @@ if isday == True:
 # Common plotting arguments
 vis_inp = prs_args['output_folder']
 use_distance = True
-dpi = 150
+dpi = 300
 
 # Quicklook arguments
 qck_args = parse_qck()
@@ -83,8 +83,8 @@ qck_args['y_lims'] = [0., 14.]
 
 qck_args['smooth'] = True 
 qck_args['smoothing_exponential'] = True
-qck_args['smoothing_range'] = [0.050, 14.]
-qck_args['half_window'] = [5., 1000.]
+qck_args['smoothing_range'] = [2., 14.]
+qck_args['half_window'] = [5., 200.]
 
 qck_args['exclude_detection_mode'] = ['p']
 qck_args['exclude_scattering_type'] = ['v', 'r']
@@ -96,7 +96,7 @@ ray_args = parse_ray()
 ray_args['x_lims'] = [0., prs_args['vertical_limit']]
 ray_args['x_tick'] = 2.
 
-ray_args['reference_height'] = 7.
+ray_args['reference_height'] = 7.0 
 ray_args['half_reference_window'] = 500.
 
 ray_args['smooth'] = True 

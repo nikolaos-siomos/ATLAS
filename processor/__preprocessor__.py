@@ -20,14 +20,33 @@ def main(args, __version__):
     
     # Check the command line argument information
     args = check_parser(args)
-            
+          
+    output_files = {'rayleigh' : None, 
+                    'telecover: ' : None, 
+                    'polarization_calibration' : None, 
+                    'quicklook' : None}
+    
+    print('-----------------------------------------')
+    print('Initializing ATLAS Preprocessor...')
+    print('-----------------------------------------')
+    print(' ')
+    
     print('-----------------------------------------')
     print('Start reading the QA file(s)...')
-    print('-----------------------------------------')
     
     meas_info, channel_info, time_info, time_info_d, \
         sig_raw, sig_raw_d, shots, shots_d = \
-            read_files.short_reader(args['input_file'])
+            read_files.short_reader(
+                args['input_file'],
+                exclude_field_type = args['exclude_field_type'], 
+                exclude_scattering_type = args['exclude_scattering_type'], 
+                exclude_detection_mode = args['exclude_detection_mode'], 
+                exclude_channel_subtype = args['exclude_channel_subtype'], 
+                use_channels = args['channels'])
+    
+    print(f'Lidar: {meas_info.Lidar_Name}')
+    print('-----------------------------------------')
+    print(' ')
     
     meas_type = meas_info.Measurement_type
     meas_label = {'ray' : 'Rayleigh', 
@@ -41,7 +60,13 @@ def main(args, __version__):
         
         meas_info_r, channel_info_r, time_info_r, time_info_dr, \
             sig_raw_r, sig_raw_dr, shots_r, shots_dr = \
-                read_files.short_reader(ray_path)
+                read_files.short_reader(
+                    ray_path,
+                    exclude_field_type = args['exclude_field_type'], 
+                    exclude_scattering_type = args['exclude_scattering_type'], 
+                    exclude_detection_mode = args['exclude_detection_mode'], 
+                    exclude_channel_subtype = args['exclude_channel_subtype'], 
+                    use_channels = args['channels'])
         
         if all([ch in channel_info_r.index.values 
                 for ch in channel_info.index.values]):
@@ -102,17 +127,18 @@ def main(args, __version__):
                                    time_info = time_info_ray,
                                    external_info = args)
         
-        nc_ray = nc_dataset.rayleigh(sig = ray, 
-                                     molec = molec,
-                                     meteo = meteo,
-                                     meas_info = meas_info, 
-                                     channel_info = channel_info, 
-                                     time_info = time_info_ray, 
-                                     molec_info = molec_info, 
-                                     heights = ray_pack['heights'], 
-                                     ranges = ray_pack['ranges'],
-                                     version = __version__,
-                                     dir_out = args['output_folder'])
+        output_files['ray'] = \
+            nc_dataset.rayleigh(sig = ray, 
+                                molec = molec,
+                                meteo = meteo,
+                                meas_info = meas_info, 
+                                channel_info = channel_info, 
+                                time_info = time_info_ray, 
+                                molec_info = molec_info, 
+                                heights = ray_pack['heights'], 
+                                ranges = ray_pack['ranges'],
+                                version = __version__,
+                                dir_out = args['output_folder'])
     
     if meas_type == 'tlc':
         
@@ -126,14 +152,15 @@ def main(args, __version__):
                                   meas_type = meas_type,
                                   sig_drk = sig_drk)
     
-        nc_tlc = nc_dataset.telecover(sig = tlc, 
-                                      meas_info = meas_info, 
-                                      channel_info = channel_info, 
-                                      time_info = time_info_tlc, 
-                                      heights = tlc_pack['heights'], 
-                                      ranges = tlc_pack['ranges'],
-                                      version = __version__,
-                                      dir_out = args['output_folder'])
+        output_files['tlc'] = \
+            nc_dataset.telecover(sig = tlc, 
+                                 meas_info = meas_info, 
+                                 channel_info = channel_info, 
+                                 time_info = time_info_tlc, 
+                                 heights = tlc_pack['heights'], 
+                                 ranges = tlc_pack['ranges'],
+                                 version = __version__,
+                                 dir_out = args['output_folder'])
     
     if meas_type == 'pcl':
                 
@@ -167,23 +194,24 @@ def main(args, __version__):
             
         pcl_ch = pcl.channel.values
         
-        nc_pcl = nc_dataset.calibration(sig = pcl, 
-                                        sig_ray = ray.loc[dict(channel = pcl_ch)],
-                                        molec = molec.loc[dict(channel = pcl_ch)],
-                                        meteo = meteo.loc[dict(channel = pcl_ch)],
-                                        meas_info = meas_info, 
-                                        meas_info_ray = meas_info_r, 
-                                        channel_info = channel_info, 
-                                        channel_info_ray = channel_info.loc[pcl_ch], 
-                                        time_info = time_info_pcl, 
-                                        time_info_ray = time_info_ray, 
-                                        molec_info = molec_info, 
-                                        heights = pcl_pack['heights'], 
-                                        ranges = pcl_pack['ranges'],
-                                        ranges_ray = ray_pack['ranges'],
-                                        heights_ray = ray_pack['heights'], 
-                                        version = __version__,
-                                        dir_out = args['output_folder'])
+        output_files['pcl'] = \
+            nc_dataset.calibration(sig = pcl, 
+                                   sig_ray = ray.loc[dict(channel = pcl_ch)],
+                                   molec = molec.loc[dict(channel = pcl_ch)],
+                                   meteo = meteo.loc[dict(channel = pcl_ch)],
+                                   meas_info = meas_info, 
+                                   meas_info_ray = meas_info_r, 
+                                   channel_info = channel_info, 
+                                   channel_info_ray = channel_info.loc[pcl_ch], 
+                                   time_info = time_info_pcl, 
+                                   time_info_ray = time_info_ray, 
+                                   molec_info = molec_info, 
+                                   heights = pcl_pack['heights'], 
+                                   ranges = pcl_pack['ranges'],
+                                   ranges_ray = ray_pack['ranges'],
+                                   heights_ray = ray_pack['heights'], 
+                                   version = __version__,
+                                   dir_out = args['output_folder'])
     
     if args['quicklook']:
                 
@@ -197,16 +225,17 @@ def main(args, __version__):
                                   meas_type = 'qck',
                                   sig_drk = sig_drk)
             
-        nc_qck = nc_dataset.quicklook(sig = qck, 
-                                     meas_info = meas_info, 
-                                     channel_info = channel_info, 
-                                     time_info = time_info_qck, 
-                                     heights = qck_pack['heights'], 
-                                     ranges = qck_pack['ranges'],
-                                     version = __version__,
-                                     dir_out = args['output_folder'])
+        output_files['qck'] = \
+            nc_dataset.quicklook(sig = qck, 
+                                 meas_info = meas_info, 
+                                 channel_info = channel_info, 
+                                 time_info = time_info_qck, 
+                                 heights = qck_pack['heights'], 
+                                 ranges = qck_pack['ranges'],
+                                 version = __version__,
+                                 dir_out = args['output_folder'])
 
-    return()
+    return(output_files)
     
         
 if __name__ == '__main__':

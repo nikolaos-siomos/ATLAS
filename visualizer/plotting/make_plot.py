@@ -158,6 +158,13 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     
     ax2.grid(which = 'both')
     ax2.legend(loc = 'lower left')
+    
+    ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
+                alpha = 0.2, facecolor = 'tab:grey')
+
+    ax2.scatter(X[x_refr_bin], 
+                np.mean(Y2[x_refr_bin-refr_hbin:x_refr_bin+refr_hbin+1]), 
+                marker = '*', s = 300, color = 'black', zorder = 2)
         
     fpath = os.path.join(dir_out, fname)
     
@@ -569,7 +576,8 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
 
     # ax2.set_title('', pad = 15)
 
-    ax2.plot(X, 2. * (Y1 - Y2) / (Y1 + Y2), color = 'tab:blue')
+    frac_bias = 2. * (Y1 - Y2) / (Y1 + Y2)
+    ax2.plot(X, frac_bias, color = 'tab:blue')
 
     x_ticks = np.arange(2. * x_tick * np.floor(x_llim / x_tick), 
                         2. * x_tick * (np.ceil(x_ulim / x_tick) + 1.), 
@@ -585,6 +593,16 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax2.set_ylabel(f'Fractional Bias ({lidars[0]} - {lidars[1]})')
     
     ax2.grid(which = 'both')
+    
+    ax2.axhline(c = 'k')
+
+    ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
+                alpha = 0.2, facecolor = 'tab:grey')
+
+    ax2.scatter(X[x_refr_bin], 
+                np.mean(frac_bias[x_refr_bin-refr_hbin:x_refr_bin+refr_hbin+1]), 
+                marker = '*', s = 300, color = 'black', zorder = 2)
+    
         
     fpath = os.path.join(dir_out, fname)
     

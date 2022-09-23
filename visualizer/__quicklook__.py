@@ -43,8 +43,13 @@ def main(args):
     bins = sig.bins.values
     
     # Check if the parsed channels exist
-    channels = check_channels(sel_channels = args['channels'], 
-                              all_channels = data.channel.values)
+    channels = \
+        check_channels(sel_channels = args['channels'], 
+                       all_channels = data.channel.values,
+                       exclude_field_type = args['exclude_field_type'], 
+                       exclude_scattering_type = args['exclude_scattering_type'], 
+                       exclude_detection_mode = args['exclude_detection_mode'], 
+                       exclude_channel_subtype = args['exclude_channel_subtype'])
     
     # Create the x axis (time)
     x_lbin, x_ubin, x_vals, t_vals, x_label, t_label, x_tick, t_tick, nodes, = \

@@ -46,18 +46,6 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
 
-    parser.add_argument('--exclude_mode', metavar = 'exclude_mode',
-                        type = str, nargs = '+', default = ['a'], 
-                        help = 'Provide all the channel mode types that you want to EXCLUDE (None: None, a: analogue, p: photon). By default the analog signals are excluded for the polarization calibration ')
-
-    parser.add_argument('--exclude_scattering', metavar = 'exclude_scattering',
-                        type = str, nargs = '+', default = ['t', 'v', 'r', 'a', 'f'], 
-                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, p: co-polar linear analyzer, c: cross-polar linear analyzer, t: total (no depol), o: co-polar circular analyzer, x: cross-polar circular analyzer, v: vibrational Raman, r: rotational Raman, a: Cabannes, f: fluorescence). The following types are excluded by default for the polarization calibration: t, v, r, a, f ')
-
-    parser.add_argument('--exclude_subtype', metavar = 'exclude_subtype',
-                        type = str, nargs = '+', default = ['w', 'c', 'n', 'o', 'h', 'l', 'a', 'm', 'b' ,'s'], 
-                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, r: Signal Reflected from a PBS, t: Signal Transmitted through a PBS, n: N2 Ramal line, o: O2 Ramal line, w: H2O Ramal line, c: CH4 Ramal line, h: High Rotational Raman, l: Low Rotational Raman, a: Mie (aerosol) HSRL signal, m: Molecular HSRL signal, b: Broadband Fluorescence, s: Spectral Fluorescence, x: No specific subtype). Only the r and t subtypes are not excluded by default for the polarization calibration')
-
     parser.add_argument('--x_lims_calibration', metavar = 'x_lims_clibration',
                         type = float, nargs = 2, default = [None, None], 
                         help = 'The x axis limits (lower and upper) of the gain ratios at +-45. ')
@@ -163,8 +151,10 @@ def check_parser(args):
     if args['output_folder'] == None:
         out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas_visualizer', 'pcl')
         args['output_folder'] = out_path
-    os.makedirs(args['output_folder'], exist_ok = True)
-    
+        os.makedirs(args['output_folder'], exist_ok = True)
+    elif not os.path.exists(args['output_folder'] ):
+        raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
+
     if len(args['ch_r']) != len(args['ch_t']):
         raise Exception('---- Error: The number of reflected channels is different from the number of transmitted channels! Please provide pairs of trasmitted and reflected channels')
         

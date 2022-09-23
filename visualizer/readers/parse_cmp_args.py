@@ -98,14 +98,14 @@ def call_parser():
 
 def check_parser(args):
     
-    mandatory_args = ['input_files','output_folder']
+    mandatory_args = ['input_files','output_folder','channels_1', 'channels_2']
 
-    mandatory_args_abr = ['-i','-o']
+    mandatory_args_abr = ['-i','-o','--channels_1','--channels_2']
     
     for i in range(len(mandatory_args)):
         if not args[mandatory_args[i]]:
-            raise Exception(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path1> <path2>')            
-
+            raise Exception(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')            
+        
     print(" ")
     print("-- Intercomparison arguments!")
     print("-------------------------------------------------------------------")
@@ -125,9 +125,14 @@ def check_parser(args):
         raise Exception('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
     
     if args['output_folder'] == None:
-        out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas_visualizer', 'tlc')
+        out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas_visualizer', 'cmp')
         args['output_folder'] = out_path
-    os.makedirs(args['output_folder'], exist_ok = True)
+        os.makedirs(args['output_folder'], exist_ok = True)
+    elif not os.path.exists(args['output_folder'] ):
+        raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
+
+    if len(args['channels_1']) != len(args['channels_2']):
+        raise Exception("-- Error: The number of channels provided in channels_1 is diffirent than the number of channels provided in channels_2. Please provide pair of channels that are going to be intercompared")          
     
     if len(args['channels_1']) != len(args['channels_2']):
         raise Exception("-- Error: The number of channels provided in channels_1 is diffirent than the number of channels provided in channels_2. Please provide pair of channels that are going to be intercompared")          

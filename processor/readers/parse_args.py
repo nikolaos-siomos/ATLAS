@@ -44,6 +44,26 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If called then quiclook preprocessed files will be generated (original temporal resolution). ')
     
+    parser.add_argument('-c', '--channels', metavar = 'channels',
+                        type = str, nargs = '+', default = None, 
+                        help = 'Type one or more channel names (e.g. xpar0355) here in order to open the figures in interactive mode ')
+
+    parser.add_argument('--exclude_field_type', metavar = 'exclude_field_type',
+                        type = str, nargs = '+', default = [], 
+                        help = 'Provide all the channel field types that you want to EXCLUDE (None: None, x: unspecified, n: near field, f: far field ). Nothing is excluded by default in ATLAS preprocessor ')
+
+    parser.add_argument('--exclude_detection_mode', metavar = 'exclude_detection_mode',
+                        type = str, nargs = '+', default = [], 
+                        help = 'Provide all the channel detection mode types that you want to EXCLUDE (None: None, a: analogue, p: photon). Nothing is excluded by default in ATLAS preprocessor ')
+
+    parser.add_argument('--exclude_scattering_type', metavar = 'exclude_scattering_type',
+                        type = str, nargs = '+', default = [], 
+                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, p: co-polar linear analyzer, c: cross-polar linear analyzer, t: total (no depol), o: co-polar circular analyzer, x: cross-polar circular analyzer, v: vibrational Raman, r: rotational Raman, a: Cabannes, f: fluorescence). Nothing is excluded by default in ATLAS preprocessor ')
+
+    parser.add_argument('--exclude_channel_subtype', metavar = 'exclude_channel_subtype',
+                        type = str, nargs = '+', default = [], 
+                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, r: Signal Reflected from a PBS, t: Signal Transmitted through a PBS, n: N2 Ramal line, o: O2 Ramal line, w: H2O Ramal line, c: CH4 Ramal line, h: High Rotational Raman, l: Low Rotational Raman, a: Mie (aerosol) HSRL signal, m: Molecular HSRL signal, b: Broadband Fluorescence, s: Spectral Fluorescence, x: No specific subtype). Nothing is excluded by default in ATLAS preprocessor ')
+    
     parser.add_argument('--skip_dead_time_correction', metavar = 'skip_dead_time_correction', 
                         type = bool,  default = False, 
                         action = argparse.BooleanOptionalAction,
@@ -115,7 +135,10 @@ def check_parser(args):
     if args['output_folder'] == None:
         out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas_preprocessor')
         args['output_folder'] = out_path
-    os.makedirs(args['output_folder'], exist_ok = True)
+        os.makedirs(args['output_folder'], exist_ok = True)
+    elif not os.path.exists(args['output_folder']):
+        raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
+
     
     return(args)
 

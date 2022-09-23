@@ -10,7 +10,9 @@ import xarray as xr
 import netCDF4 as nc
 
 # Read measurement
-def short_reader(fpath):
+def short_reader(fpath, exclude_field_type, exclude_scattering_type, 
+                 exclude_detection_mode, exclude_channel_subtype, 
+                 use_channels):
     
     """
     General:
@@ -19,6 +21,26 @@ def short_reader(fpath):
     Input:
         fpath: 
             The path to the input QA netcdf file (string)
+        
+        exclude_field_type:
+            Channel with a field type (1rd letter of the ID) in
+            exclude_field_type will be excluded 
+                    
+        exclude_scattering_type:
+            Channel with a scattering type (2rd letter of the ID) in
+            exclude_scattering will be excluded 
+                    
+        exclude_detection_mode:
+            Channel with a scattering type (3rd letter of the ID) in
+            exclude_mode will be excluded 
+            
+        exclude_channel_subtype:
+            Channel with a subtype (4rd letter of the ID) in
+            exclude_subtype will be excluded 
+            
+        use_channels:
+            Channel IDs to include for the calculations
+            
             
     Returns:
         
@@ -72,9 +94,27 @@ def short_reader(fpath):
         
     # Read QA netcdf file
     file = xr.open_dataset(fpath)
-    
+        
     # Read channel metadata
-    channel_info = channel_metadata(file)
+    channel_info = \
+        channel_metadata(file)
+    
+    # Mask out channels based on their characteristics
+    channels = channel_info.index.values
+    
+    if use_channels == None:
+        use_channels = channels
+    
+    mask = np.array([ch[0] not in exclude_field_type and
+                     ch[1] not  in exclude_scattering_type and
+                     ch[2] not  in exclude_detection_mode and
+                     ch[3] not  in exclude_channel_subtype and
+                     ch in use_channels for ch in channels])
+    
+    if all(~mask):
+        raise Exception('-- Error: The provided channel filtering arguments are too strict and exclude all channels. Please revide the following arguments: exclude_field_type, exclude_scattering_type, exclude_detection_mode, exclude_channel_subtype, channels')
+    
+    valid_channels = channels[mask]
 
     # Read lidar metadata
     meas_info = lidar_metadata(file)
@@ -86,15 +126,22 @@ def short_reader(fpath):
 
     # Reading the licel signals
     signal = signals(file, time_info = time_info, channel_info = channel_info)
+    signal = signal.copy().loc[dict(channel = valid_channels)]
     if 'Background_Profile' in file.data_vars: 
         signal_d = signals(file, time_info = time_info_d, 
                            channel_info = channel_info, isdark = True)
+        signal_d = signal_d.copy().loc[dict(channel = valid_channels)]
+
 
     # Reading the laser shots
     shots = laser_shots(file, time_info = time_info, channel_info = channel_info)
+    shots = shots.copy().loc[dict(channel = valid_channels)]
     if 'Background_Profile' in file.data_vars: 
         shots_d = laser_shots(file, time_info = time_info_d, 
                               channel_info = channel_info, isdark = True)
+        shots_d = shots_d.copy().loc[dict(channel = valid_channels)]
+
+    channel_info = channel_info.loc[valid_channels,:]
     
     return(meas_info, channel_info, time_info, time_info_d,
            signal, signal_d, shots, shots_d)
@@ -184,10 +231,10 @@ def channel_metadata(file):
 
     """
 
-    channels = [file.channel_label.values.astype(str)[i] + \
-                file.Detected_Wavelength.values\
-                    .astype('int').astype(str)[i].zfill(4)
-                for i in range(file.channel_label.size)]
+    channels = np.array([file.channel_label.values.astype(str)[i] + \
+                         file.Detected_Wavelength.values\
+                             .astype('int').astype(str)[i].zfill(4)
+                             for i in range(file.channel_label.size)])
 
     keys = ['ADC_resolution',
             'Background_Low',
@@ -218,7 +265,7 @@ def channel_metadata(file):
         channel_info[channel_info.values == nc.default_fillvals['f8']] = np.nan
     if (channel_info.values == nc.default_fillvals['i4']).any():
         channel_info[channel_info.values == nc.default_fillvals['i4']] = np.nan
-
+    
     return(channel_info)
 
 def time_metadata(file, meas_info):
