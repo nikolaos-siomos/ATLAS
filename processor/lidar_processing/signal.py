@@ -568,6 +568,41 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
         
     return(sig_out)
 
+# def trim_clouds(sig, trigger_delay_bins):
+
+#     time = sig.time.values
+#     bins = sig.bins.values    
+#     channels = sig.channel.values
+
+#     mask_clouds = np.zeros()
+    
+#     skip_bins = 100
+    
+#     diff_bins = 25
+    
+#     smooth_bins = 10
+    
+#     sig_sm = 
+    
+#     for ch in channels:
+        
+#         ch_d = dict(channel = ch)
+        
+#         zero_bins = trigger_delay_bins.loc[ch]
+        
+#         start = dict(bins = slice(zero_bins + skip_bin ,bins.size - ))
+        
+#         delta_sig = sig.loc[].copy() - \
+#             sig.loc[dict(bins = slice(100,10000))].copy()
+        
+#     delta_sig = np.abs(delta_sig.max(dim = 'bins')) / np.abs(delta_sig.min(dim = 'bins'))
+    
+#     mask_clouds = (delta_sig > 100.).any(dim = 'channel').values
+    
+#     sig = sig.copy().loc[dict(time = time[~mask_clouds])]
+                         
+#     return(sig)
+
 def trigger_delay(sig, trigger_delay_bins):
 
     """

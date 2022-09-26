@@ -36,7 +36,7 @@ def quicklook(dir_out, fname, title, dpi_val, use_log,
     
     # Create the figure
     fig = plt.figure(figsize=(10. , 5.))
-    ax = fig.add_axes([0.07,0.13,0.9,0.7])
+    ax = fig.add_axes([0.07,0.13,1.,0.7])
     
     ax.set_title(title, pad = 15)
     
@@ -46,9 +46,21 @@ def quicklook(dir_out, fname, title, dpi_val, use_log,
     ax.set_xlabel(t_label)
     ax.set_ylabel(y_label)
 
-    y_ticks = np.arange(2. * y_tick * np.floor(y_llim / y_tick), 
-                        2. * y_tick * (np.ceil(y_ulim / y_tick) + 1.), 
-                        2. * y_tick)
+    y_ticks = np.arange(y_tick * np.ceil(y_llim / y_tick), 
+                        y_tick * (np.floor(y_ulim / y_tick) + 1.), 
+                        y_tick)
+    
+    if np.abs(y_llim - y_ticks[0]) < y_tick * 0.25:
+        y_ticks[0] = y_llim
+    else:
+        y_ticks = np.hstack((y_llim, y_ticks))
+
+    if np.abs(y_ulim - y_ticks[-1]) < y_tick * 0.25:
+        y_ticks[-1] = y_ulim
+    else:
+        y_ticks = np.hstack((y_ticks, y_ulim))
+        
+    y_ticks = np.round(y_ticks, decimals = 2)
     
     ax.set_yticks(y_ticks, labels = y_ticks)
     ax.set_ylim([y_llim, y_ulim])
@@ -96,9 +108,21 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
 
     ax.fill_between(X, Y1 - Y1E, Y1 + Y1E, color = 'tab:blue', alpha = 0.3)
     
-    x_ticks = np.arange(x_tick * np.floor(x_llim / x_tick), 
-                        x_tick * (np.ceil(x_ulim / x_tick) + 1.), 
+    x_ticks = np.arange(x_tick * np.ceil(x_llim / x_tick), 
+                        x_tick * (np.floor(x_ulim / x_tick) + 1.), 
                         x_tick)
+    
+    if np.abs(x_llim - x_ticks[0]) < x_tick * 0.25:
+        x_ticks[0] = x_llim
+    else:
+        x_ticks = np.hstack((x_llim, x_ticks))
+
+    if np.abs(x_ulim - x_ticks[-1]) < x_tick * 0.25:
+        x_ticks[-1] = x_ulim
+    else:
+        x_ticks = np.hstack((x_ticks, x_ulim))
+
+    x_ticks = np.round(x_ticks, decimals = 2)
 
     ax.set_xticks(x_ticks, labels = x_ticks)
     ax.set_xlim([x_llim, x_ulim])
@@ -118,10 +142,6 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                alpha = 0.2, facecolor = 'tab:grey')
 
-    ax.scatter(X[x_refr_bin], 
-               np.mean(Y2[x_refr_bin-refr_hbin:x_refr_bin+refr_hbin+1]), 
-               marker = '*', s = 300, color = 'black', zorder = 2)
-    
     if use_lin == False:
         ax.text(0.55 * x_ulim, 0.60 * y_ulim, f'normalize: {x_refr} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
@@ -162,10 +182,6 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
 
-    ax2.scatter(X[x_refr_bin], 
-                np.mean(Y2[x_refr_bin-refr_hbin:x_refr_bin+refr_hbin+1]), 
-                marker = '*', s = 300, color = 'black', zorder = 2)
-        
     fpath = os.path.join(dir_out, fname)
     
     fig.savefig(fpath, dpi = dpi_val)
@@ -240,11 +256,22 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
 
     Y_DIFF = 2. * (Y_E - Y_O) / (Y_E + Y_O)
     
+    x_ticks = np.arange(x_tick * np.ceil(x_llim / x_tick), 
+                        x_tick * (np.floor(x_ulim / x_tick) + 1.), 
+                        x_tick)
         
-    x_ticks = np.round(np.arange(x_tick * np.floor(x_llim / x_tick), 
-                        x_tick * (np.ceil(x_ulim / x_tick) + 1.), 
-                        x_tick), decimals = 2)
+    if np.abs(x_llim - x_ticks[0]) < x_tick * 0.25:
+        x_ticks[0] = x_llim
+    else:
+        x_ticks = np.hstack((x_llim, x_ticks))
+
+    if np.abs(x_ulim - x_ticks[-1]) < x_tick * 0.25:
+        x_ticks[-1] = x_ulim
+    else:
+        x_ticks = np.hstack((x_ticks, x_ulim))
     
+    x_ticks = np.round(x_ticks, decimals = 2)
+
     x_refr_bin = np.where(X >= x_refr)[0][0]
     refr_hbin = int(1E-3 * refr_hwin / (x_vals[1] - x_vals[0]))
     
@@ -308,10 +335,6 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
 
-    ax2.scatter(X[x_refr_bin], 
-                np.mean(Y_NM[x_refr_bin-refr_hbin:x_refr_bin+refr_hbin+1]), 
-                marker = '*', s = 300, color = 'black', zorder = 8)
-    
     ax2.text(0.55 * x_ulim, 0.9 * y_ulim_nr, f'normalize: {x_refr} km',
              bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 9))
     ax2.text(0.55 * x_ulim, 0.75 * y_ulim_nr, f'window: {2. * refr_hwin} m',
@@ -399,9 +422,22 @@ def telecover_rin(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     
     Y_NM = np.mean([Y1_N, Y2_N], axis = 0) 
 
-    x_ticks = np.round(np.arange(x_tick * np.floor(x_llim / x_tick), 
-                        x_tick * (np.ceil(x_ulim / x_tick) + 1.), 
-                        x_tick), decimals = 2)
+    x_ticks = np.arange(x_tick * np.ceil(x_llim / x_tick), 
+                        x_tick * (np.floor(x_ulim / x_tick) + 1.), 
+                        x_tick)
+    
+    x_ticks = np.round(x_ticks, decimals = 2)
+
+        
+    if np.abs(x_llim - x_ticks[0]) < x_tick * 0.25:
+        x_ticks[0] = x_llim
+    else:
+        x_ticks = np.hstack((x_llim, x_ticks))
+
+    if np.abs(x_ulim - x_ticks[-1]) < x_tick * 0.25:
+        x_ticks[-1] = x_ulim
+    else:
+        x_ticks = np.hstack((x_ticks, x_ulim))
     
     x_refr_bin = np.where(X >= x_refr)[0][0]
     refr_hbin = int(1E-3 * refr_hwin / (x_vals[1] - x_vals[0]))
@@ -456,10 +492,6 @@ def telecover_rin(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
 
-    ax2.scatter(X[x_refr_bin], 
-                np.mean(Y_NM[x_refr_bin-refr_hbin:x_refr_bin+refr_hbin+1]), 
-                marker = '*', s = 300, color = 'black', zorder = 4)
-    
     ax2.text(0.55 * x_ulim, 0.9 * y_ulim_nr, f'normalize: {x_refr} km',
              bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 5))
     ax2.text(0.55 * x_ulim, 0.75 * y_ulim_nr, f'window: {2. * refr_hwin} m',
@@ -530,9 +562,21 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax.plot(X, Y1, color = 'tab:blue', label = lidars[0])
     ax.plot(X, Y2, color = 'tab:red', label = lidars[1])
 
-    x_ticks = np.arange(x_tick * np.floor(x_llim / x_tick), 
-                        x_tick * (np.ceil(x_ulim / x_tick) + 1.), 
+    x_ticks = np.arange(x_tick * np.ceil(x_llim / x_tick), 
+                        x_tick * (np.floor(x_ulim / x_tick) + 1.), 
                         x_tick)
+        
+    if np.abs(x_llim - x_ticks[0]) < x_tick * 0.25:
+        x_ticks[0] = x_llim
+    else:
+        x_ticks = np.hstack((x_llim, x_ticks))
+
+    if np.abs(x_ulim - x_ticks[-1]) < x_tick * 0.25:
+        x_ticks[-1] = x_ulim
+    else:
+        x_ticks = np.hstack((x_ticks, x_ulim))
+        
+    x_ticks = np.round(x_ticks, decimals = 2)
 
     ax.set_xticks(x_ticks, labels = x_ticks)
     ax.set_xlim([x_llim, x_ulim])
@@ -540,6 +584,7 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
 
     ax.set_ylim([y_llim, y_ulim])
     ax.set_ylabel(y_label)
+    use_lin = True
     if use_lin == False:
         ax.set_yscale('log')
 
@@ -555,10 +600,6 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                alpha = 0.2, facecolor = 'tab:grey')
 
-    ax.scatter(X[x_refr_bin], 
-               np.mean(Y2[x_refr_bin-refr_hbin:x_refr_bin+refr_hbin+1]), 
-               marker = '*', s = 300, color = 'black', zorder = 2)
-    
     if use_lin == False:
         ax.text(0.55 * x_ulim, 0.60 * y_ulim, f'normalize: {x_refr} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
@@ -598,12 +639,135 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
 
     ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
-
-    ax2.scatter(X[x_refr_bin], 
-                np.mean(frac_bias[x_refr_bin-refr_hbin:x_refr_bin+refr_hbin+1]), 
-                marker = '*', s = 300, color = 'black', zorder = 2)
     
         
+    fpath = os.path.join(dir_out, fname)
+    
+    fig.savefig(fpath, dpi = dpi_val)
+    
+    fig.clf()
+
+    plt.close()
+    
+    return(fpath)
+
+def polarization_calibration(dir_out, fname, title, dpi_val, 
+                             y_cal, cal_hwin, y_vdr, vdr_hwin,
+                             y_vals, x1_vals, x2_vals, x3_vals, x4_vals, x5_vals,
+                             x1_errs, x2_errs, x3_errs, x4_errs,
+                             y_lbin_cal, y_ubin_cal, 
+                             y_llim_cal, y_ulim_cal, 
+                             x_llim_cal, x_ulim_cal, 
+                             y_lbin_vdr, y_ubin_vdr, 
+                             y_llim_vdr, y_ulim_vdr, 
+                             x_llim_vdr, x_ulim_vdr, 
+                             x_label_cal, y_label_cal, y_tick_cal,
+                             x_label_vdr, y_label_vdr, y_tick_vdr):
+        
+    # Create the variables to be plotted X, Y
+    Y = y_vals[slice(y_lbin_cal, y_ubin_cal)]
+    
+    X1 = x1_vals[slice(y_lbin_cal, y_ubin_cal)]
+    X2 = x2_vals[slice(y_lbin_cal, y_ubin_cal)]
+    X3 = x3_vals[slice(y_lbin_cal, y_ubin_cal)]
+    X4 = x4_vals[slice(y_lbin_cal, y_ubin_cal)]
+    X5 = x5_vals[slice(y_lbin_cal, y_ubin_cal)]
+    
+    X1E = x1_errs[slice(y_lbin_cal, y_ubin_cal)]
+    X2E = x2_errs[slice(y_lbin_cal, y_ubin_cal)]
+    X3E = x3_errs[slice(y_lbin_cal, y_ubin_cal)]
+    X4E = x4_errs[slice(y_lbin_cal, y_ubin_cal)]
+    
+    # Create the figure
+    fig = plt.figure(figsize=(12. , 4.))
+    fig.suptitle(title)
+
+    ax = fig.add_axes([0.07,0.13,0.50,0.7])
+        
+    ax.plot(Y, X1, color = 'tab:purple', label = '$η_{-45}$')
+    ax.plot(Y, X2, color = 'tab:orange', label = '$η_{+45}$')
+    ax.plot(Y, X3, color = 'tab:green', label = 'η')
+
+    ax.fill_between(Y, X1 - X1E, X1 + X1E, color = 'tab:purple', alpha = 0.3)
+    ax.fill_between(Y, X2 - X2E, X2 + X2E, color = 'tab:orange', alpha = 0.3)
+    ax.fill_between(Y, X3 - X3E, X3 + X3E, color = 'tab:green', alpha = 0.3)
+    
+    y_ticks_cal = np.arange(y_tick_cal * np.ceil(y_llim_cal / y_tick_cal), 
+                            y_tick_cal * (np.floor(y_ulim_cal / y_tick_cal) + 1.), 
+                            y_tick_cal)
+        
+    if np.abs(y_llim_cal - y_ticks_cal[0]) < y_tick_cal * 0.25:
+        y_ticks_cal[0] = y_llim_cal
+    else:
+        y_ticks_cal = np.hstack((y_llim_cal, y_ticks_cal))
+
+    if np.abs(y_ulim_cal - y_ticks_cal[-1]) < y_tick_cal * 0.25:
+        y_ticks_cal[-1] = y_ulim_cal
+    else:
+        y_ticks_cal = np.hstack((y_ticks_cal, y_ulim_cal))
+
+    y_ticks_cal = np.round(y_ticks_cal, decimals = 2)
+
+    ax.set_xticks(y_ticks_cal, labels = y_ticks_cal)
+    ax.set_xlim([y_llim_cal, y_ulim_cal])
+    ax.set_xlabel(y_label_cal)
+
+    ax.set_ylim([x_llim_cal, x_ulim_cal])
+    ax.set_ylabel(x_label_cal)
+
+    ax.grid(which = 'both')
+    ax.legend(loc = 'upper right')
+
+    cal_bin = np.where(Y >= y_cal)[0][0]
+    cal_hwin = int(1E-3 * cal_hwin / (y_vals[1] - y_vals[0]))
+
+    ax.axvspan(Y[cal_bin - cal_hwin], Y[cal_bin + cal_hwin + 1],
+               alpha = 0.2, facecolor = 'tab:grey')
+
+    # ax.text(0.55 * y_ulim_cal, 0.9 * x_ulim_cal, f'normalize: {x_refr} km',
+    #         bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+    # ax.text(0.55 * y_ulim_cal, 0.75 * x_ulim_cal, f'window: {2. * refr_hwin} m',
+    #         bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))   
+
+    ax2 = fig.add_axes([0.65,0.13,0.30,0.7])
+
+    ax2.plot(Y, X4, color = 'tab:blue', label = 'measured')
+    ax2.plot(Y, X5, color = 'tab:red', label = 'molecular')
+
+    ax2.fill_between(Y, X4 - X4E, X4 + X4E, color = 'tab:blue', alpha = 0.3)
+    
+    y_ticks_vdr = np.arange(y_tick_vdr * np.ceil(y_llim_vdr / y_tick_vdr), 
+                            y_tick_vdr * (np.floor(y_ulim_vdr / y_tick_vdr) + 1.), 
+                            y_tick_vdr)
+        
+    if np.abs(y_llim_vdr - y_ticks_vdr[0]) < y_tick_vdr * 0.25:
+        y_ticks_vdr[0] = y_llim_vdr
+    else:
+        y_ticks_vdr = np.hstack((y_llim_vdr, y_ticks_vdr))
+
+    if np.abs(y_ulim_vdr - y_ticks_vdr[-1]) < y_tick_vdr * 0.25:
+        y_ticks_vdr[-1] = y_ulim_vdr
+    else:
+        y_ticks_vdr = np.hstack((y_ticks_vdr, y_ulim_vdr))
+
+    y_ticks_vdr = np.round(y_ticks_vdr, decimals = 2)
+
+    ax2.set_xticks(y_ticks_vdr, labels = y_ticks_vdr)
+    ax2.set_xlim([y_llim_vdr, y_ulim_vdr])
+    ax2.set_xlabel(y_label_vdr)
+
+    ax2.set_ylim([x_llim_vdr, x_ulim_vdr])
+    ax2.set_ylabel(x_label_vdr)
+
+    ax2.grid(which = 'both')
+    ax2.legend(loc = 'upper right')
+
+    cal_bin = np.where(Y >= y_vdr)[0][0]
+    cal_hwin = int(1E-3 * cal_hwin / (y_vals[1] - y_vals[0]))
+
+    ax2.axvspan(Y[cal_bin - cal_hwin], Y[cal_bin + cal_hwin + 1],
+               alpha = 0.2, facecolor = 'tab:grey')
+
     fpath = os.path.join(dir_out, fname)
     
     fig.savefig(fpath, dpi = dpi_val)

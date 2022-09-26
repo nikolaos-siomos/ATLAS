@@ -43,7 +43,12 @@ def call_parser():
                         type = bool, default = False, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called then quiclook preprocessed files will be generated (original temporal resolution). ')
-    
+
+    parser.add_argument('--cloud_trimming', metavar = 'cloud_trimming', 
+                        type = bool, default = False, 
+                        action = argparse.BooleanOptionalAction,
+                        help = 'If called then an automated cloud trimming will be atempted. it is still expirmental ')
+        
     parser.add_argument('-c', '--channels', metavar = 'channels',
                         type = str, nargs = '+', default = None, 
                         help = 'Type one or more channel names (e.g. xpar0355) here in order to open the figures in interactive mode ')

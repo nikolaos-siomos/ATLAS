@@ -64,6 +64,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
     isdk = external_info['skip_dark_subtraction']
     isdt = external_info['skip_dead_time_correction']
     itrv = external_info['vertical_trimming']
+    itrc = external_info['cloud_trimming'] 
 
     # iflt = external_info['signal_smoothing']
     
@@ -105,7 +106,13 @@ def standard(sig_raw, shots, meas_info, channel_info,
     diagnose.detect_overflows(sig = sig.copy(), 
                               dead_time = dead_time, 
                               daq_range = daq_range)
-    
+
+    # # --------------------------------------------------
+    # # Detect and screen sharp clouds 
+    # # --------------------------------------------------    
+    # if itrc:
+    #     sig = signal.trim_clouds(sig = sig.copy(),
+    #                              trigger_delay_bins = trd_bins)
 
     # --------------------------------------------------
     # Dead time correction on photon counting channels 
@@ -268,7 +275,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
     pack_out['sig_rnc'] = sig.copy()
     
     print('-- Range correction complete!')
-    
+
     
     # # --------------------------------------------------
     # # Smoothing

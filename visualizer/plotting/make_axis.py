@@ -72,7 +72,7 @@ def quicklook_y(heights, ranges, y_lims, use_dis):
     # Get the altitude/distance lower limit and bin
     if y_lims[0] == None or y_lims[0] < y_vals[0]:
         y_lbin = 0
-        y_llim = y_vals[y_lbin]
+        y_llim = np.round(y_vals[y_lbin], decimals = 2)
 
     else:
         y_lbin = np.where(y_vals >= y_lims[0])[0][0]
@@ -86,7 +86,7 @@ def quicklook_y(heights, ranges, y_lims, use_dis):
     # Get the altitude/distance upper limit and bin
     if y_lims[-1] == None or y_lims[-1] > y_vals[-1]:
         y_ubin = y_vals.size - 1
-        y_ulim = y_vals[y_ubin]
+        y_ulim = np.round(y_vals[y_ubin], decimals = 2)
 
     else:
         y_ubin = np.where(y_vals <= y_lims[-1])[0][-1] 
@@ -153,7 +153,7 @@ def rayleigh_x(heights, ranges, x_lims, use_dis):
     # Get the altitude/distance lower limit and bin
     if x_lims[0] == None or x_lims[0] < x_vals[0]:
         x_lbin = 0
-        x_llim = x_vals[x_lbin]
+        x_llim = np.round(x_vals[x_lbin], decimals = 2)
 
     else:
         x_lbin = np.where(x_vals >= x_lims[0])[0][0]
@@ -163,11 +163,10 @@ def rayleigh_x(heights, ranges, x_lims, use_dis):
         
         x_llim = x_lims[0]
 
-
     # Get the altitude/distance upper limit and bin
     if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
         x_ubin = x_vals.size - 1
-        x_ulim = x_vals[x_ubin]
+        x_ulim = np.round(x_vals[x_ubin], decimals = 2)
 
     else:
         x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
@@ -183,36 +182,35 @@ def rayleigh_y(sig, atb, y_lims, use_lin):
     
     # Get the max signal bin and value       
     y_max = np.nanmax([np.nanmax(sig),np.nanmax(atb)])
-    y_abs_min = np.nanmin(np.abs(atb))
+    y_min = np.nanmin(np.abs(atb))
 
     # Get the signal upper limit
-    if use_lin == False and y_lims[-1] == None:
-        y_ulim = 2. * y_max
-
-    elif use_lin and y_lims[-1] == None:
-        y_ulim = 2. * y_max
-        
-    else:
-       y_ulim = y_lims[-1]
-    
-    # Get the vertical lower limit
-    if use_lin == False and y_lims[0] == None:
-        y_llim = 0.5 * y_abs_min
-        
-    elif use_lin and y_lims[0] == None:
-        y_llim = 0.
-    
-    else:
-       y_llim = y_lims[0]
-       
-    if np.isnan(y_ulim) or y_ulim <= 0.:
-        y_llim = 1.
-
-    if np.isnan(y_llim) or y_llim < 0.:
-        if use_lin:
-            y_llim = 0.
+    if use_lin == False:
+        if y_lims[-1] == None:
+            if np.isnan(y_max) or np.isinf(y_max) or y_max <= 0:
+                y_ulim = 1
+            else:
+                y_ulim = 2. * y_max
         else:
-            y_llim = 1E-1
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_ulim = 1
+            else:
+                y_ulim =  y_lims[-1]
+        
+    # Get the vertical lower limit
+    if use_lin == False:
+        if y_lims[0] == None:
+            if np.isnan(y_min) or np.isinf(y_min) or y_min <= 0:
+                y_llim = 1E-3
+            else:
+                y_llim = 0.5 * y_min
+        else:
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_llim = 0.
+            else:
+                y_llim =  y_lims[0]
     
     # Get the y axis labels
     y_label = 'Attenuated Backscatter [$m^{-1} sr^{-1}$]'
@@ -235,6 +233,7 @@ def telecover_x(heights, ranges, x_lims, use_dis):
     if x_lims[0] == None or x_lims[0] < x_vals[0]:
         x_lbin = 0
         x_llim = x_vals[x_lbin]
+        x_llim = np.round(x_vals[x_lbin], decimals = 2)
 
     else:
         x_lbin = np.where(x_vals >= x_lims[0])[0][0]
@@ -244,11 +243,11 @@ def telecover_x(heights, ranges, x_lims, use_dis):
         
         x_llim = x_lims[0]
 
-
     # Get the altitude/distance upper limit and bin
     if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
         x_ubin = x_vals.size - 1
-        x_ulim = x_vals[x_ubin]
+        x_ulim = np.round(x_vals[x_ubin], decimals = 2)
+
 
     else:
         x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
@@ -356,7 +355,8 @@ def polarization_calibration_y(heights, ranges, y_lims, use_dis):
     # Get the altitude/distance lower limit and bin
     if y_lims[0] == None or y_lims[0] < y_vals[0]:
         y_lbin = 0
-        y_llim = y_vals[y_lbin]
+        y_llim = np.round(y_vals[y_lbin], decimals = 2)
+
 
     else:
         y_lbin = np.where(y_vals >= y_lims[0])[0][0]
@@ -370,7 +370,7 @@ def polarization_calibration_y(heights, ranges, y_lims, use_dis):
     # Get the altitude/distance upper limit and bin
     if y_lims[-1] == None or y_lims[-1] > y_vals[-1]:
         y_ubin = y_vals.size - 1
-        y_ulim = y_vals[y_ubin]
+        y_ulim = np.round(y_vals[y_ubin], decimals = 2)
 
     else:
         y_ubin = np.where(y_vals <= y_lims[-1])[0][-1] 
@@ -399,7 +399,7 @@ def intercomparison_x(heights, ranges, x_lims, use_dis):
     # Get the altitude/distance lower limit and bin
     if x_lims[0] == None or x_lims[0] < x_vals[0]:
         x_lbin = 0
-        x_llim = x_vals[x_lbin]
+        x_llim = np.round(x_vals[x_lbin], decimals = 2)
 
     else:
         x_lbin = np.where(x_vals >= x_lims[0])[0][0]
@@ -413,7 +413,7 @@ def intercomparison_x(heights, ranges, x_lims, use_dis):
     # Get the altitude/distance upper limit and bin
     if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
         x_ubin = x_vals.size - 1
-        x_ulim = x_vals[x_ubin]
+        x_ulim = np.round(x_vals[x_ubin], decimals = 2)
 
     else:
         x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
@@ -428,29 +428,39 @@ def intercomparison_x(heights, ranges, x_lims, use_dis):
 
 def intercomparison_y(sig1, sig2, y_lims, use_lin):
     
-    # Get the max and absolute min signal bin value       
-    y_max = max([np.nanmax(sig1),np.nanmax(sig2)])
-    y_abs_min = np.nanmin(np.abs(sig2))
+    # Get the max signal bin and value       
+    y_max = np.nanmax([np.nanmax(sig1[:int(sig1.size/2)]),
+                       np.nanmax(sig2[:int(sig2.size/2)])])
+    y_min = np.nanmin([np.nanmin(sig1[int(sig1.size/2):]),
+                       np.nanmin(sig2[int(sig2.size/2):])])
 
     # Get the signal upper limit
-    if use_lin == False and y_lims[-1] == None:
-        y_ulim = 2. * y_max
-
-    elif use_lin and y_lims[-1] == None:
-        y_ulim = 2. * y_max
+    if use_lin == False:
+        if y_lims[-1] == None:
+            if np.isnan(y_max) or np.isinf(y_max) or y_max <= 0:
+                y_ulim = 1
+            else:
+                y_ulim = 2. * y_max
+        else:
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_ulim = 1
+            else:
+                y_ulim =  y_lims[-1]
         
-    else:
-       y_ulim = y_lims[-1]
-    
     # Get the vertical lower limit
-    if use_lin == False and y_lims[0] == None:
-        y_llim = 0.5 * y_abs_min
-        
-    elif use_lin and y_lims[0] == None:
-        y_llim = 0.
-    
-    else:
-       y_llim = y_lims[0]
+    if use_lin == False:
+        if y_lims[0] == None:
+            if np.isnan(y_min) or np.isinf(y_min) or y_min <= 0:
+                y_llim = 1E-3
+            else:
+                y_llim = 0.5 * y_min
+        else:
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_llim = 0.
+            else:
+                y_llim =  y_lims[0]
     
     # Get the y axis labels
     y_label = 'Attenuated Backscatter [$m^{-1} sr^{-1}$]'

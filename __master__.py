@@ -20,9 +20,13 @@ from visualizer.readers.parse_pcl_args import call_parser as parse_pcl
 
 warnings.filterwarnings('ignore')
 
-isday = True
+isday = False
 
 # Force reprocessing
+process = {'rayleigh_fit' : True,
+           'telecover' : True,
+           'polarization_calibration' : True}
+
 reprocess = {'scc_converter' : False,
              'atlas_preprocessor' : False,
              'atlas_visualizer' : True}
@@ -38,7 +42,7 @@ quicklook = {'rayleigh_fit' : True,
              'telecover' : False,
              'polarization_calibration' : False}
 
-parent_folder = '/mnt/DATA/Big_data/Databases/POLIS/220922/01'
+parent_folder = '/mnt/DATA/Big_data/Databases/CARS/Systems/RALI/220924/03'
 output_folder = os.path.join(parent_folder, 'out')
 
 # Create the main output folder
@@ -50,12 +54,13 @@ cnv_args = parse_cnv()
 
 cnv_args['parent_folder'] = parent_folder
 cnv_args['output_folder'] = os.path.join(output_folder, 'scc_converter')
-cnv_args['config_file'] = '/mnt/DATA/Big_data/Databases/POLIS/configs/polis_bucharest_all_channels.ini'
-cnv_args['measurement_identifier'] = 'm'
+cnv_args['telecover_sectors_folder'] = os.path.join(parent_folder, 'tlc')
+cnv_args['config_file'] = '/mnt/DATA/Big_data/Databases/CARS/Configurations/rali_bucharest_all_channels_no_pretrigger.ini'
+cnv_args['measurement_identifier'] = 'RM'
 cnv_args['trim_overflows'] = 2
-cnv_args['files_per_sector'] = 3
+cnv_args['files_per_sector'] = 1
 
-cnv_args['radiosonde_folder'] = '/mnt/DATA/Big_data/Databases/POLIS/radiosondes'
+cnv_args['radiosonde_folder'] = '/mnt/DATA/Big_data/Databases/CARS/Radiosondes/ino'
 cnv_args['rsonde_skip_header'] = 4
 cnv_args['rsonde_delimiter'] = 'S'
 cnv_args['rsonde_column_index'] = [2, 1, 3, 5]
@@ -80,13 +85,14 @@ qck_args = parse_qck()
 
 qck_args['z_max_zone'] = [0., 1.]
 qck_args['y_lims'] = [0., 14.]
+qck_args['use_distance'] = True
 
 qck_args['smooth'] = True 
 qck_args['smoothing_exponential'] = True
-qck_args['smoothing_range'] = [0.050, 14.]
-qck_args['half_window'] = [5., 1000.]
+qck_args['smoothing_range'] = [0.150, 14.]
+qck_args['half_window'] = [5., 250.]
 
-qck_args['exclude_detection_mode'] = ['p']
+qck_args['exclude_detection_mode'] = []
 qck_args['exclude_scattering_type'] = ['v', 'r']
 qck_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'qck')
 
@@ -101,23 +107,27 @@ ray_args['half_reference_window'] = 500.
 
 ray_args['smooth'] = True 
 ray_args['smoothing_range'] = [1., prs_args['vertical_limit']]
-ray_args['half_window'] = [5., 1000.]
+ray_args['half_window'] = [100., 100.]
 
-ray_args['exclude_detection_mode'] = ['a']
+ray_args['exclude_detection_mode'] = []
 ray_args['exclude_channel_subtype'] = ['w', 'c']
 ray_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'ray')
 
 # Telecover
 tlc_args = parse_tlc()
 
-tlc_args['normalization_height'] = 1.
-tlc_args['half_normalization_window'] = 200.
+tlc_args['x_lims'] = [0., 3.]
+tlc_args['x_tick'] = 0.5
+
+
+tlc_args['normalization_height'] = 1.2
+tlc_args['half_normalization_window'] = 100.
 
 tlc_args['smooth'] = True 
-tlc_args['smoothing_range'] = [0.2, 4.]
-tlc_args['half_window'] = [10., 500.]
+tlc_args['smoothing_range'] = [0.2, 3.]
+tlc_args['half_window'] = [50., 50.]
 
-tlc_args['exclude_detection_mode'] = ['p']
+tlc_args['exclude_detection_mode'] = []
 tlc_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'tlc')
 
 # Polarization calibration
@@ -141,13 +151,15 @@ pcl_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'pcl
 
 # Call scc_converter sequence
 processing_chain.scc_converter(cnv_args = cnv_args, 
-                               reprocess = reprocess['scc_converter'])
+                               reprocess = reprocess['scc_converter'],
+                               process_cnv = process)
 
 # Call Rayleigh Fit sequence
 processing_chain.QA_test(input_folder = cnv_args['output_folder'], 
                          prs_args = prs_args, 
                          vis_args = ray_args, 
                          test_type = 'ray', 
+                         process = process['rayleigh_fit'],
                          reprocess_prs = reprocess['atlas_preprocessor'], 
                          reprocess_vis = reprocess['atlas_visualizer'],
                          quicklook = quicklook['rayleigh_fit'],
@@ -158,6 +170,7 @@ processing_chain.QA_test(input_folder = cnv_args['output_folder'],
                          prs_args = prs_args, 
                          vis_args = tlc_args, 
                          test_type = 'tlc', 
+                         process = process['telecover'],
                          reprocess_prs = reprocess['atlas_preprocessor'], 
                          reprocess_vis = reprocess['atlas_visualizer'],  
                          quicklook = quicklook['telecover'],
@@ -168,6 +181,7 @@ processing_chain.QA_test(input_folder = cnv_args['output_folder'],
                          prs_args = prs_args, 
                          vis_args = pcl_args, 
                          test_type = 'pcl', 
+                         process = process['polarization_calibration'],
                          reprocess_prs = reprocess['atlas_preprocessor'], 
                          reprocess_vis = reprocess['atlas_visualizer'],
                          quicklook = quicklook['polarization_calibration'],

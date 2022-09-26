@@ -32,11 +32,6 @@ def main(args):
     data1 = xr.open_dataset(args['input_files'][0])
     data2 = xr.open_dataset(args['input_files'][1])
     
-    # Delete all existing png files within
-    pngs = glob.glob(os.path.join(args['output_folder'],'*.png'))
-    for file in pngs:
-        os.remove(file)
-    
     # Extract signal
     sig1 = data1.Range_Corrected_Signals
     sig1 = sig1.copy().where(sig1 != nc.default_fillvals['f8'])
@@ -137,19 +132,22 @@ def main(args):
                                         use_lin = args['use_lin_scale'])    
                 
         # Make title
-        title = make_title.rayleigh(start_date = data2.RawData_Start_Date,
-                                    start_time = data2.RawData_Start_Time_UT, 
-                                    end_time = data2.RawData_Stop_Time_UT, 
-                                    lidar = f'{data1.Lidar_Name} vs {data2.Lidar_Name}', 
-                                    channel = f'{channels1[j]} vs {channels2[j]}', 
-                                    zan = data2.Laser_Pointing_Angle,
-                                    lat = data2.Latitude_degrees_north, 
-                                    lon = data2.Longitude_degrees_east, 
-                                    elv = data2.Altitude_meter_asl)
+        title = \
+            make_title.intercomparison(start_date = data2.RawData_Start_Date,
+                                       start_time = data2.RawData_Start_Time_UT, 
+                                       end_time = data2.RawData_Stop_Time_UT, 
+                                       lidar_1 = data1.Lidar_Name,
+                                       lidar_2 = data2.Lidar_Name, 
+                                       channel_1 = channels1[j],
+                                       channel_2 = channels2[j], 
+                                       zan = data2.Laser_Pointing_Angle,
+                                       lat = data2.Latitude_degrees_north, 
+                                       lon = data2.Longitude_degrees_east, 
+                                       elv = data2.Altitude_meter_asl)
     
         # Make filename
         fname = f'cmp_{data1.Measurement_ID}_{data2.Measurement_ID}_{channels1[j]}_{channels2[j]}.png'
-    
+
         # Make the plot
         fpath = make_plot.intercomparison(dir_out = args['output_folder'], 
                                           fname = fname, title = title,

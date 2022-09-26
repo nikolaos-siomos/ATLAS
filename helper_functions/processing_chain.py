@@ -21,7 +21,7 @@ from visualizer.__intercomparison__ import main as cmp
 
 warnings.filterwarnings('ignore')
 
-def scc_converter(cnv_args, reprocess = True):
+def scc_converter(cnv_args, process_cnv, reprocess = True):
     
     # QA files
     ray_QA_files = glob.glob(os.path.join(cnv_args['output_folder'], 'ray_*.nc'))
@@ -29,18 +29,45 @@ def scc_converter(cnv_args, reprocess = True):
     pcl_QA_files = glob.glob(os.path.join(cnv_args['output_folder'], 'pcl_*.nc'))
 
     # Ececute scc_converter
-    if (len(ray_QA_files) == 0 and len(tlc_QA_files) == 0 and \
-        len(pcl_QA_files) == 0) or reprocess == True:
+    if (len(ray_QA_files) == 0 or reprocess == True) and \
+        process_cnv['rayleigh_fit'] == True:
         
         if os.path.exists(cnv_args['parent_folder']):
             os.makedirs(cnv_args['output_folder'], exist_ok = True)
+        
+        cnv_ray_args = cnv_args.copy()
+        cnv_ray_args['mode'] = 'R'
+        
+        cleaner.files(cnv_ray_args['output_folder'], pattern = 'ray_*', extension = 'nc')
+        converter(cnv_ray_args)
+
+    if (len(tlc_QA_files) == 0 or reprocess == True) and \
+        process_cnv['telecover'] == True:
+        
+        if os.path.exists(cnv_args['parent_folder']):
+            os.makedirs(cnv_args['output_folder'], exist_ok = True)       
             
-        cleaner.files(cnv_args['output_folder'], pattern = '*', extension = 'nc')
-        converter(cnv_args)
+            cnv_tlc_args = cnv_args.copy()
+            cnv_tlc_args['mode'] = 'T'
+                    
+            cleaner.files(cnv_tlc_args['output_folder'], pattern = 'tlc_*', extension = 'nc')
+            converter(cnv_tlc_args)
+    
+    if (len(pcl_QA_files) == 0 or reprocess == True) and \
+        process_cnv == True:
+                
+        if os.path.exists(cnv_args['parent_folder']):
+            os.makedirs(cnv_args['output_folder'], exist_ok = True)
+            
+        cnv_pcl_args = cnv_args.copy()
+        cnv_pcl_args['mode'] = 'C'
+        
+        cleaner.files(cnv_pcl_args['output_folder'], pattern = 'pcl_*', extension = 'nc')
+        converter(cnv_pcl_args)
     
     return
 
-def QA_test(input_folder, prs_args, vis_args, test_type, 
+def QA_test(input_folder, prs_args, vis_args, test_type, process = True,
             reprocess_prs = True, reprocess_vis = True, quicklook = True,
             skip = False):
     
@@ -61,7 +88,7 @@ def QA_test(input_folder, prs_args, vis_args, test_type,
     cnv_files = glob.glob(os.path.join(input_folder, f'{test_type}_*.nc'))
     
     # Excecute ATLAS preprocessor
-    if len(prs_files) == 0 or reprocess_prs == True:
+    if (len(prs_files) == 0 or reprocess_prs == True) and process == True:
         
         os.makedirs(prs_args['output_folder'], exist_ok = True)
             
@@ -89,7 +116,9 @@ def QA_test(input_folder, prs_args, vis_args, test_type,
     else:
         vis_qck_files = []
         
-    if (len(vis_files) == 0 or reprocess_vis == True) and skip == False:
+    if (len(vis_files) == 0 or reprocess_vis == True) and skip == False and \
+        process == True:
+            
         for file in vis_files:  
             if os.path.exists(file): 
                 os.remove(file)
@@ -150,8 +179,8 @@ def intercomparison(input_folder_1, input_folder_2, vis_args, reprocess = True, 
     # Excecute ATLAS visualizer
     if (len(files) == 0 or reprocess == True) and skip == False:
                     
-        cleaner.files(vis_args['output_folder'], pattern = 'cmp_*', 
-                      extension = 'png')
+        # cleaner.files(vis_args['output_folder'], pattern = 'cmp_*', 
+        #               extension = 'png')
         if len(ATLAS_files_1) != 0 and len(ATLAS_files_2) != 0:
             os.makedirs(vis_args['output_folder'], exist_ok = True)
             vis_args['input_files'] = [ATLAS_files_1[0], ATLAS_files_2[0]]

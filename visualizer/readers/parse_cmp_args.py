@@ -42,7 +42,7 @@ def call_parser():
                         help = 'If called, a linear scale will be used for the z axis (signal) ')
 
     parser.add_argument('--use_distance', metavar = 'use_distance',
-                        type = bool, default = False, 
+                        type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
 

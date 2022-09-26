@@ -37,7 +37,7 @@ def call_parser():
                         help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 100 ')
 
     parser.add_argument('--use_distance', metavar = 'use_distance',
-                        type = bool, default = False, 
+                        type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
 
