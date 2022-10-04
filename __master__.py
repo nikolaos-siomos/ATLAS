@@ -20,29 +20,35 @@ from visualizer.readers.parse_pcl_args import call_parser as parse_pcl
 
 warnings.filterwarnings('ignore')
 
-isday = False
+isday = True
+newdata = False
 
 # Force reprocessing
 process = {'rayleigh_fit' : True,
            'telecover' : True,
            'polarization_calibration' : True}
 
-reprocess = {'scc_converter' : False,
-             'atlas_preprocessor' : False,
-             'atlas_visualizer' : True}
-
 # Skip module
 skip_visualizer = {'rayleigh_fit' : False,
                    'telecover' : False,
-                   'polarization_calibration' : True,
+                   'polarization_calibration' : False,
                    'quicklook' : False}
 
 # Control quicklooks
 quicklook = {'rayleigh_fit' : True,
-             'telecover' : False,
-             'polarization_calibration' : False}
+             'telecover' : True,
+             'polarization_calibration' : True}
 
-parent_folder = '/mnt/DATA/Big_data/Databases/CARS/Systems/RALI/220924/03'
+if newdata == False:
+    reprocess = {'scc_converter' : False,
+                 'atlas_preprocessor' : False,
+                 'atlas_visualizer' : True}
+else:
+    reprocess = {'scc_converter' : True,
+                 'atlas_preprocessor' : True,
+                 'atlas_visualizer' : True}
+
+parent_folder = '/mnt/DATA/Big_data/Databases/CARS/Systems/POLIS/220930/03'
 output_folder = os.path.join(parent_folder, 'out')
 
 # Create the main output folder
@@ -54,11 +60,10 @@ cnv_args = parse_cnv()
 
 cnv_args['parent_folder'] = parent_folder
 cnv_args['output_folder'] = os.path.join(output_folder, 'scc_converter')
-cnv_args['telecover_sectors_folder'] = os.path.join(parent_folder, 'tlc')
-cnv_args['config_file'] = '/mnt/DATA/Big_data/Databases/CARS/Configurations/rali_bucharest_all_channels_no_pretrigger.ini'
-cnv_args['measurement_identifier'] = 'RM'
+cnv_args['telecover_sectors_folder'] = os.path.join(parent_folder, 'tlc2')
+cnv_args['config_file'] = '/mnt/DATA/Big_data/Databases/CARS/Configurations/polis_bucharest_all_channels.ini'
 cnv_args['trim_overflows'] = 2
-cnv_args['files_per_sector'] = 1
+cnv_args['files_per_sector'] = 3
 
 cnv_args['radiosonde_folder'] = '/mnt/DATA/Big_data/Databases/CARS/Radiosondes/ino'
 cnv_args['rsonde_skip_header'] = 4
@@ -71,7 +76,7 @@ cnv_args['rsonde_column_units'] = ['m', 'hPa', 'C', 'percent']
 prs_args = parse_prs()
 
 prs_args['output_folder'] = os.path.join(output_folder, 'atlas_preprocessor')
-prs_args['vertical_limit'] = 20.
+prs_args['vertical_limit'] = 30.
 if isday == True:
     prs_args['exclude_scattering_type'] = ['v', 'f']
 
@@ -83,16 +88,17 @@ dpi = 150
 # Quicklook arguments
 qck_args = parse_qck()
 
+qck_urange = 30.
 qck_args['z_max_zone'] = [0., 1.]
-qck_args['y_lims'] = [0., 14.]
+qck_args['y_lims'] = [0., qck_urange]
 qck_args['use_distance'] = True
 
 qck_args['smooth'] = True 
 qck_args['smoothing_exponential'] = True
-qck_args['smoothing_range'] = [0.150, 14.]
-qck_args['half_window'] = [5., 250.]
+qck_args['smoothing_range'] = [0.150, qck_urange]
+qck_args['half_window'] = [5., 1000.]
 
-qck_args['exclude_detection_mode'] = []
+qck_args['exclude_detection_mode'] = ['a']
 qck_args['exclude_scattering_type'] = ['v', 'r']
 qck_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'qck')
 
@@ -102,8 +108,8 @@ ray_args = parse_ray()
 ray_args['x_lims'] = [0., prs_args['vertical_limit']]
 ray_args['x_tick'] = 2.
 
-ray_args['reference_height'] = 7.
-ray_args['half_reference_window'] = 500.
+ray_args['reference_height'] = 5.
+ray_args['half_reference_window'] = 1000.
 
 ray_args['smooth'] = True 
 ray_args['smoothing_range'] = [1., prs_args['vertical_limit']]
@@ -116,36 +122,55 @@ ray_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'ray
 # Telecover
 tlc_args = parse_tlc()
 
-tlc_args['x_lims'] = [0., 3.]
+tlc_args['x_lims'] = [0., 1.6]
 tlc_args['x_tick'] = 0.5
 
 
 tlc_args['normalization_height'] = 1.2
-tlc_args['half_normalization_window'] = 100.
+tlc_args['half_normalization_window'] = 350.
 
-tlc_args['smooth'] = True 
+tlc_args['smooth'] = False 
 tlc_args['smoothing_range'] = [0.2, 3.]
 tlc_args['half_window'] = [50., 50.]
 
-tlc_args['exclude_detection_mode'] = []
+tlc_args['exclude_detection_mode'] = ['p']
 tlc_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'tlc')
 
 # Polarization calibration
 pcl_args = parse_pcl()
 
-pcl_args['channels_r_pcl'] = None
-pcl_args['channels_t_pcl'] = None
+# pcl_args['ch_r'] = ['xppr0355', 'xcpr0532'] # POLIS
+# pcl_args['ch_t'] = ['xcpt0355', 'xppt0532'] # POLIS 
 
-pcl_args['transmission_ratio_pcl'] = None
+pcl_args['ch_r'] = ['nppr0355', 'nppr0532', 'npar1064'] # ALPHA
+pcl_args['ch_t'] = ['ncpt0355', 'ncpt0532', 'ncat1064'] # ALPHA
 
-pcl_args['calibration_height'] = 3.5 
+pcl_args['y_lims_calibration'] = [0.2, 8.]
+pcl_args['y_lims_rayleigh'] = [0.2, 8.]
+pcl_args['x_lims_rayleigh'] = [0., 0.1]
+
+# pcl_args['K'] = [0.99601, 1.04499] # POLIS
+# pcl_args['G_R'] = [ 0.99800,  1.02200] # POLIS
+# pcl_args['G_T'] = [ 1.00200,  0.97800] # POLIS
+# pcl_args['H_R'] = [ 0.99797, -1.02199] # POLIS
+# pcl_args['H_T'] = [-1.00200,  0.97800] # POLIS
+# pcl_args['R_to_T_transmission_ratio'] = [1./0.113, 0.129] # POLIS
+
+pcl_args['H_R'] = [ 0.98198,  0.97213,  0.99984] # ALPHA
+pcl_args['H_T'] = [-0.98141, -0.97215, -0.99977] # ALPHA
+
+# pcl_args['ch_r'] = ['xppr0355', 'xppr0532'] # EMORAL
+# pcl_args['ch_t'] = ['xcpt0355', 'xcpt0532'] # EMORAL
+# pcl_args['R_to_T_transmission_ratio'] = [1./0.0341, 1./0.0563] # EMORAL
+
+pcl_args['calibration_height'] = 2. 
 pcl_args['half_calibration_window'] = 500.
-pcl_args['rayleigh_height'] = 3.5 
+pcl_args['rayleigh_height'] = 6. 
 pcl_args['half_rayleigh_window'] = 500.
 
 pcl_args['smooth'] = True 
-pcl_args['smoothing_range'] = [1., prs_args['vertical_limit']]
-pcl_args['half_window'] = [500., 500.]
+pcl_args['smoothing_range'] = [0.5, prs_args['vertical_limit']]
+pcl_args['half_window'] = [100., 100.]
 
 pcl_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'pcl')
 

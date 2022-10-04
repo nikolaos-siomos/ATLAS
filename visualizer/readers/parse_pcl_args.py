@@ -51,7 +51,7 @@ def call_parser():
                         help = 'The x axis limits (lower and upper) of the gain ratios at +-45. ')
 
     parser.add_argument('--x_lims_rayleigh', metavar = 'x_lims_rayleigh',
-                        type = float, nargs = 2, default = [None, None], 
+                        type = float, nargs = 2, default = [0., 0.05], 
                         help = 'The x axis limits (lower and upper) of the gain ratios at +-45. ')
 
     parser.add_argument('--y_lims_calibration', metavar = 'y_lims_calibration',
@@ -116,9 +116,25 @@ def call_parser():
                         type = float, nargs = '+', default = None, 
                         help = 'The K value for each channel pair. Defaults to 1 for all channels ')
 
-    parser.add_argument("--transmission_ratio", metavar = 'transmission_ratio',
-                        type = float, nargs = '+', default = 1., 
-                        help = 'The transmission ratio between the R to T channels per pair. Defaults to 1 for all pairs')
+    parser.add_argument('-G_R', "--G_R", metavar = 'G_R',
+                        type = float, nargs = '+', default = None, 
+                        help = 'The G value for the reflected channel of the pair. Defaults to 1 for all channels (no receiver optics + emitted pol. state correction) ')
+
+    parser.add_argument('-G_T', "--G_T", metavar = 'G_T',
+                        type = float, nargs = '+', default = None, 
+                        help = 'The G value for the transmitted channel of the pair. Defaults to 1 for all channels (no receiver optics + emitted pol. state correction) ')
+
+    parser.add_argument('-H_R', "--H_R", metavar = 'H_R',
+                        type = float, nargs = '+', default = None, 
+                        help = 'The H value for the reflected channel of the pair. Defaults to 1 or -1 for all co-polar (p) and cross-polar (c) reflected channels, respectively (no receiver optics + emitted pol. state correction) ')
+
+    parser.add_argument('-H_T', "--H_T", metavar = 'H_T',
+                        type = float, nargs = '+', default = None, 
+                        help = 'The H value for the transmitted channel of the pair. Defaults to 1 or -1 for all co-polar (p) and cross-polar (c) transmitted channels, respectively (no receiver optics + emitted pol. state correction) ')
+
+    parser.add_argument("--R_to_T_transmission_ratio", metavar = 'R_to_T_transmission_ratio',
+                        type = float, nargs = '+', default = None, 
+                        help = 'The transmission ratio between the R to T channels per pair (T_R/T_T). The transmission in path R or T is 1. if no filter was applied during calibration. Defaults to 1 for all pairs')
 
     args = vars(parser.parse_args())
 
@@ -126,9 +142,9 @@ def call_parser():
 
 def check_parser(args):
     
-    mandatory_args = ['input_file','ch_r','ch_t']
+    mandatory_args = ['input_file']
 
-    mandatory_args_abr = ['-i','-ch_r','ch_t']
+    mandatory_args_abr = ['-i']
     
     for i in range(len(mandatory_args)):
         if not args[mandatory_args[i]]:
@@ -155,7 +171,8 @@ def check_parser(args):
     elif not os.path.exists(args['output_folder'] ):
         raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
 
-    if len(args['ch_r']) != len(args['ch_t']):
-        raise Exception('---- Error: The number of reflected channels is different from the number of transmitted channels! Please provide pairs of trasmitted and reflected channels')
+    if args['ch_r'] != None and args['ch_t'] != None:
+        if len(args['ch_r']) != len(args['ch_t']):
+            raise Exception('---- Error: The number of reflected channels is different from the number of transmitted channels! Please provide pairs of trasmitted and reflected channels')
         
     return(args)

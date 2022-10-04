@@ -39,7 +39,6 @@ def main(args):
     sig2 = data2.Range_Corrected_Signals
     sig2 = sig2.copy().where(sig2 != nc.default_fillvals['f8'])
     
-    
     # Extract Attenuated Backscatter
     atb1 = data1.Attenuated_Backscatter
     atb2 = data2.Attenuated_Backscatter
@@ -64,27 +63,54 @@ def main(args):
         ch1_d = dict(channel = channels1[j])
         ch2_d = dict(channel = channels2[j])
     
-        sig1_ch = sig1.loc[ch1_d].values
-        sig2_ch = sig2.loc[ch2_d].values
+        sig1_ch = sig1.loc[ch1_d]
+        sig2_ch = sig2.loc[ch2_d]
+        
+        atb1_ch = atb1.loc[ch1_d]
+        atb2_ch = atb2.loc[ch2_d]
         
         alt1 = data1.Height_levels.loc[ch1_d].values
         alt2 = data2.Height_levels.loc[ch2_d].values
+        
         
         alt_com = np.sort(np.unique(np.hstack([alt1,alt2])))
     
         rng1 = data1.Range_levels.loc[ch1_d].values
         rng2 = data2.Range_levels.loc[ch2_d].values
-        
+
         rng_com = np.sort(np.unique(np.hstack([rng1,rng2])))
     
-        sig1_ch = xr.DataArray(sig1_ch, dims = ['altitude'],  coords = [alt1])
-        sig2_ch = xr.DataArray(sig2_ch, dims = ['altitude'],  coords = [alt2])
-        
-        sig1_ch = sig1_ch.interp(altitude = alt_com)
-        sig2_ch = sig2_ch.interp(altitude = alt_com)
+        if args['use_distance'] == False:
+            sig1_ch = xr.DataArray(sig1_ch, dims = ['altitude'],  coords = [alt1])
+            sig2_ch = xr.DataArray(sig2_ch, dims = ['altitude'],  coords = [alt2])
     
+            atb1_ch = xr.DataArray(atb1_ch, dims = ['altitude'],  coords = [alt1])
+            atb2_ch = xr.DataArray(atb2_ch, dims = ['altitude'],  coords = [alt2])
+                    
+            sig1_ch = sig1_ch.interp(altitude = alt_com)
+            sig2_ch = sig2_ch.interp(altitude = alt_com)
+    
+            atb1_ch = atb1_ch.interp(altitude = alt_com)
+            atb2_ch = atb2_ch.interp(altitude = alt_com)
+            
+        else:
+            sig1_ch = xr.DataArray(sig1_ch, dims = ['range'],  coords = [alt1])
+            sig2_ch = xr.DataArray(sig2_ch, dims = ['range'],  coords = [alt2])
+    
+            atb1_ch = xr.DataArray(atb1_ch, dims = ['range'],  coords = [alt1])
+            atb2_ch = xr.DataArray(atb2_ch, dims = ['range'],  coords = [alt2])
+                    
+            sig1_ch = sig1_ch.interp(range = rng_com)
+            sig2_ch = sig2_ch.interp(range = rng_com)
+    
+            atb1_ch = atb1_ch.interp(range = rng_com)
+            atb2_ch = atb2_ch.interp(range = rng_com)            
+        
         sig1_ch = sig1_ch.values
         sig2_ch = sig2_ch.values
+
+        atb1_ch = atb1_ch.values
+        atb2_ch = atb2_ch.values  
         
         # Create the y axis (height/range)
         x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label = \
@@ -115,19 +141,25 @@ def main(args):
             y1_errs = np.nan * y1_vals_sm
             y2_errs = np.nan * y2_vals_sm
     
-        # Normalization of the signals
-        coef = normalize.to_a_point(sig = y1_vals_sm, 
-                                    sig_b = y2_vals_sm, 
-                                    x_vals = x_vals,
-                                    norm = args['normalization_height'],
-                                    hwin = args['half_normalization_window'],
-                                    axis = 0)
+        # Normalization of the signals        
+        coef1 = normalize.to_a_point(sig = y1_vals_sm, 
+                                     sig_b = atb1_ch, 
+                                     x_vals = x_vals,
+                                     norm = args['normalization_height'],
+                                     hwin = args['half_normalization_window'],
+                                     axis = 0)
         
+        coef2 = normalize.to_a_point(sig = y2_vals_sm, 
+                                     sig_b = atb2_ch, 
+                                     x_vals = x_vals,
+                                     norm = args['normalization_height'],
+                                     hwin = args['half_normalization_window'],
+                                     axis = 0)        
     
         # Create the y axis (signal)
         y_llim, y_ulim, y_label = \
-            make_axis.intercomparison_y(sig1 = coef * y1_vals_sm[slice(x_lbin,x_ubin+1)],
-                                        sig2 = y2_vals_sm[slice(x_lbin,x_ubin+1)] , 
+            make_axis.intercomparison_y(sig1 = coef1 * y1_vals_sm[slice(x_lbin,x_ubin+1)],
+                                        sig2 = coef2 * y2_vals_sm[slice(x_lbin,x_ubin+1)] , 
                                         y_lims = args['y_lims'] , 
                                         use_lin = args['use_lin_scale'])    
                 
@@ -160,7 +192,10 @@ def main(args):
                                           y2_vals = y2_vals_sm, 
                                           y1_errs = y1_errs, 
                                           y2_errs = y2_errs,
-                                          coef = coef,
+                                          y3_vals = atb1_ch,
+                                          coef1 = coef1,
+                                          coef2 = coef2,
+                                          use_molecular = args['use_molecular'],
                                           x_lbin = x_lbin, x_ubin = x_ubin,
                                           x_llim = x_llim, x_ulim = x_ulim, 
                                           y_llim = y_llim, y_ulim = y_ulim, 

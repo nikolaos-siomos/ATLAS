@@ -51,7 +51,7 @@ def quicklook_x(x_lims, x_tick, t_tick, time):
             t_tick = 1
     
     # Identify bins where temporal gaps are encountered (10% acceptance)
-    nodes = np.where(time[1:]-time[:-1] > 1.15 * np.min(time[1:]-time[:-1]))[0]
+    nodes = np.where(time[1:]-time[:-1] > 1.50 * np.nanmin(time[1:]-time[:-1]))[0]
 
     
     return(x_llim, x_ulim, x_vals, t_vals, x_label, t_label, 
@@ -182,15 +182,28 @@ def rayleigh_y(sig, atb, y_lims, use_lin):
     
     # Get the max signal bin and value       
     y_max = np.nanmax([np.nanmax(sig),np.nanmax(atb)])
-    y_min = np.nanmin(np.abs(atb))
 
     # Get the signal upper limit
     if use_lin == False:
+        y_min = np.nanmin(np.abs(atb))
         if y_lims[-1] == None:
             if np.isnan(y_max) or np.isinf(y_max) or y_max <= 0:
                 y_ulim = 1
             else:
                 y_ulim = 2. * y_max
+        else:
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_ulim = 1
+            else:
+                y_ulim =  y_lims[-1]
+    else:
+        y_min = np.nanmin(sig)
+        if y_lims[-1] == None:
+            if np.isnan(y_max) or np.isinf(y_max) or y_max <= 0:
+                y_ulim = 1
+            else:
+                y_ulim = 1.2 * y_max
         else:
             if y_lims[0] <= 0:
                 print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
@@ -205,6 +218,18 @@ def rayleigh_y(sig, atb, y_lims, use_lin):
                 y_llim = 1E-3
             else:
                 y_llim = 0.5 * y_min
+        else:
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_llim = 0.
+            else:
+                y_llim =  y_lims[0]
+    else:
+        if y_lims[0] == None:
+            if np.isnan(y_min) or np.isinf(y_min):
+                y_llim = 0
+            else:
+                y_llim = 0.8 * y_min
         else:
             if y_lims[0] <= 0:
                 print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
@@ -303,29 +328,38 @@ def polarization_calibration_cal_x(ratio_m, ratio_p, x_lims_cal):
     x_min_cal = np.nanmin([ratio_m, ratio_p])
 
     # Get the eta upper limit
-    if x_lims_cal[-1] == None:
-        x_ulim_cal = 1.2 * x_max_cal
-        
+    if x_max_cal == x_max_cal:
+        if x_lims_cal[-1] == None:
+            x_ulim_cal = x_max_cal * 2.
+            
+        else:
+           x_ulim_cal = x_lims_cal[-1]
     else:
-       x_ulim_cal = x_lims_cal[-1]
+        x_ulim_cal = 1.
     
     # Get the vertical lower limit
-    if x_lims_cal[0] == None:
-        x_llim_cal = 0.8 * x_min_cal
-        
+    if x_min_cal == x_min_cal:
+        if x_lims_cal[0] == None:
+            x_llim_cal = x_min_cal / 1.5
+            
+        else:
+           x_llim_cal = x_lims_cal[0]
     else:
-       x_llim_cal = x_lims_cal[0]
+        x_llim_cal = 1.
+          
+    x_label_cal = r'Gain ratio $η^{\star}_{f}$'
+        
     
-    return(x_llim_cal, x_ulim_cal)
+    return(x_llim_cal, x_ulim_cal, x_label_cal)
 
 def polarization_calibration_ray_x(ratio, x_lims_ray):
     
     # Get the max signal bin and value       
-    x_max_ray = np.nanmax(ratio)
+    x_max_ray = ratio
 
     # Get the delta upper limit
     if x_lims_ray[-1] == None:
-        x_ulim_ray = 1.2 * x_max_ray
+        x_ulim_ray = x_max_ray * 2.
         
     else:
        x_ulim_ray = x_lims_ray[-1]
@@ -336,8 +370,11 @@ def polarization_calibration_ray_x(ratio, x_lims_ray):
         
     else:
        x_llim_ray = x_lims_ray[0]
+      
+    x_label_ray = 'Linear Dep. Ratio'
+
     
-    return(x_llim_ray, x_ulim_ray)
+    return(x_llim_ray, x_ulim_ray, x_label_ray)
 
 
 def polarization_calibration_y(heights, ranges, y_lims, use_dis):

@@ -36,7 +36,7 @@ def quicklook(dir_out, fname, title, dpi_val, use_log,
     
     # Create the figure
     fig = plt.figure(figsize=(10. , 5.))
-    ax = fig.add_axes([0.07,0.13,1.,0.7])
+    ax = fig.add_axes([0.09,0.13,1.,0.7])
     
     ax.set_title(title, pad = 15)
     
@@ -240,6 +240,9 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
                      np.power((Y2_N - Y_NM) / Y_NM, 2) +\
                      np.power((Y3_N - Y_NM) / Y_NM, 2) +\
                      np.power((Y4_N - Y_NM) / Y_NM, 2)) / 4
+
+    Y_E = np.nan * Y_NM
+    Y_O = np.nan * Y_NM
 
     if len(y1_extr) > 0:
         Y_E = y1_extr[slice(x_lbin, x_ubin)]
@@ -540,27 +543,31 @@ def telecover_rin(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
 
 
 def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
-                    x_vals, y1_vals, y2_vals, y1_errs, y2_errs, coef,
+                    x_vals, y1_vals, y2_vals, y1_errs, y2_errs, y3_vals, 
+                    coef1, coef2, use_molecular, 
                     x_lbin, x_ubin, x_llim, x_ulim, y_llim, y_ulim, 
                     x_label, y_label, x_tick, lidars):
         
     # Create the variables to be plotted X, Y
     X = x_vals[slice(x_lbin, x_ubin)]
-    Y1 = coef * y1_vals[slice(x_lbin, x_ubin)]
-    Y2 = y2_vals[slice(x_lbin, x_ubin)]
-    Y1E = coef * y1_errs[slice(x_lbin, x_ubin)]
-    Y2E = y2_errs[slice(x_lbin, x_ubin)]
+    Y1 = coef1 * y1_vals[slice(x_lbin, x_ubin)]
+    Y2 = coef2 * y2_vals[slice(x_lbin, x_ubin)]
+    Y1E = coef1 * y1_errs[slice(x_lbin, x_ubin)]
+    Y2E = coef2 * y2_errs[slice(x_lbin, x_ubin)]
+    Y3 = y3_vals[slice(x_lbin, x_ubin)]
     
     # Create the figure
     fig = plt.figure(figsize=(12. , 4.))
     fig.suptitle(title)
 
-    ax = fig.add_axes([0.07,0.13,0.50,0.7])
+    ax = fig.add_axes([0.08,0.13,0.50,0.7])
     
     # ax.set_title(title, pad = 15)
     
     ax.plot(X, Y1, color = 'tab:blue', label = lidars[0])
     ax.plot(X, Y2, color = 'tab:red', label = lidars[1])
+    if use_molecular:
+        ax.plot(X, Y3, color = 'tab:green', label = 'molecular', zorder = 0)
 
     x_ticks = np.arange(x_tick * np.ceil(x_llim / x_tick), 
                         x_tick * (np.floor(x_ulim / x_tick) + 1.), 
@@ -583,8 +590,12 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax.set_xlabel(x_label)
 
     ax.set_ylim([y_llim, y_ulim])
-    ax.set_ylabel(y_label)
-    use_lin = True
+    if use_molecular:
+        ax.set_ylabel(y_label)
+        
+    else:
+        ax.set_ylabel('Attenuated Backscatter [A.U.]')
+
     if use_lin == False:
         ax.set_yscale('log')
 
@@ -653,8 +664,10 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
 
 def polarization_calibration(dir_out, fname, title, dpi_val, 
                              y_cal, cal_hwin, y_vdr, vdr_hwin,
-                             y_vals, x1_vals, x2_vals, x3_vals, x4_vals, x5_vals,
-                             x1_errs, x2_errs, x3_errs, x4_errs,
+                             y_vals_cal, y_vals_vdr,
+                             x1_vals, x2_vals, x3_vals, x4_vals, x5_vals, x6_vals,
+                             eta, eta_f_s, eta_s,
+                             delta_m, delta_c, delta, epsilon,
                              y_lbin_cal, y_ubin_cal, 
                              y_llim_cal, y_ulim_cal, 
                              x_llim_cal, x_ulim_cal, 
@@ -665,32 +678,35 @@ def polarization_calibration(dir_out, fname, title, dpi_val,
                              x_label_vdr, y_label_vdr, y_tick_vdr):
         
     # Create the variables to be plotted X, Y
-    Y = y_vals[slice(y_lbin_cal, y_ubin_cal)]
+    YA = y_vals_cal[slice(y_lbin_cal, y_ubin_cal)]
+    YB = y_vals_vdr[slice(y_lbin_vdr, y_ubin_vdr)]
     
     X1 = x1_vals[slice(y_lbin_cal, y_ubin_cal)]
     X2 = x2_vals[slice(y_lbin_cal, y_ubin_cal)]
     X3 = x3_vals[slice(y_lbin_cal, y_ubin_cal)]
-    X4 = x4_vals[slice(y_lbin_cal, y_ubin_cal)]
-    X5 = x5_vals[slice(y_lbin_cal, y_ubin_cal)]
-    
-    X1E = x1_errs[slice(y_lbin_cal, y_ubin_cal)]
-    X2E = x2_errs[slice(y_lbin_cal, y_ubin_cal)]
-    X3E = x3_errs[slice(y_lbin_cal, y_ubin_cal)]
-    X4E = x4_errs[slice(y_lbin_cal, y_ubin_cal)]
+    X4 = x4_vals[slice(y_lbin_vdr, y_ubin_vdr)]
+    X5 = x5_vals[slice(y_lbin_vdr, y_ubin_vdr)]
+    X6 = x6_vals[slice(y_lbin_vdr, y_ubin_vdr)]
+
+    X1E = np.nan * X1
+    X2E = np.nan * X2
+    X3E = np.nan * X3
+    X4E = np.nan * X4
+    X5E = np.nan * X5
     
     # Create the figure
-    fig = plt.figure(figsize=(12. , 4.))
+    fig = plt.figure(figsize=(8. , 6.))
     fig.suptitle(title)
 
-    ax = fig.add_axes([0.07,0.13,0.50,0.7])
+    ax = fig.add_axes([0.07,0.13,0.40,0.70])
         
-    ax.plot(Y, X1, color = 'tab:purple', label = '$η_{-45}$')
-    ax.plot(Y, X2, color = 'tab:orange', label = '$η_{+45}$')
-    ax.plot(Y, X3, color = 'tab:green', label = 'η')
+    ax.plot(X1, YA, color = 'tab:purple', label = 'η')
+    ax.plot(X2, YA, color = 'tab:red', label = '$η_{+45}$')
+    ax.plot(X3, YA, color = 'tab:cyan', label = '$η_{-45}$')
 
-    ax.fill_between(Y, X1 - X1E, X1 + X1E, color = 'tab:purple', alpha = 0.3)
-    ax.fill_between(Y, X2 - X2E, X2 + X2E, color = 'tab:orange', alpha = 0.3)
-    ax.fill_between(Y, X3 - X3E, X3 + X3E, color = 'tab:green', alpha = 0.3)
+    ax.fill_betweenx(YA, X1 - X1E, X1 + X1E, color = 'tab:purple', alpha = 0.3)
+    ax.fill_betweenx(YA, X2 - X2E, X2 + X2E, color = 'tab:red', alpha = 0.3)
+    ax.fill_betweenx(YA, X3 - X3E, X3 + X3E, color = 'tab:cyan', alpha = 0.3)
     
     y_ticks_cal = np.arange(y_tick_cal * np.ceil(y_llim_cal / y_tick_cal), 
                             y_tick_cal * (np.floor(y_ulim_cal / y_tick_cal) + 1.), 
@@ -708,33 +724,50 @@ def polarization_calibration(dir_out, fname, title, dpi_val,
 
     y_ticks_cal = np.round(y_ticks_cal, decimals = 2)
 
-    ax.set_xticks(y_ticks_cal, labels = y_ticks_cal)
-    ax.set_xlim([y_llim_cal, y_ulim_cal])
-    ax.set_xlabel(y_label_cal)
+    ax.set_yticks(y_ticks_cal, labels = y_ticks_cal)
+    ax.set_ylim([y_llim_cal, y_ulim_cal])
+    ax.set_ylabel(y_label_cal)
 
-    ax.set_ylim([x_llim_cal, x_ulim_cal])
-    ax.set_ylabel(x_label_cal)
+    ax.set_xlim([x_llim_cal, x_ulim_cal])
+    ax.set_xlabel(x_label_cal)
 
     ax.grid(which = 'both')
     ax.legend(loc = 'upper right')
 
-    cal_bin = np.where(Y >= y_cal)[0][0]
-    cal_hwin = int(1E-3 * cal_hwin / (y_vals[1] - y_vals[0]))
+    cal_bin = np.where(YB >= y_cal)[0][0]
+    cal_hwin_bins = int(1E-3 * cal_hwin / (y_vals_cal[1] - y_vals_cal[0]))
 
-    ax.axvspan(Y[cal_bin - cal_hwin], Y[cal_bin + cal_hwin + 1],
+    ax.axhspan(YA[cal_bin - cal_hwin_bins], YA[cal_bin + cal_hwin_bins + 1],
                alpha = 0.2, facecolor = 'tab:grey')
 
-    # ax.text(0.55 * y_ulim_cal, 0.9 * x_ulim_cal, f'normalize: {x_refr} km',
-    #         bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
-    # ax.text(0.55 * y_ulim_cal, 0.75 * x_ulim_cal, f'window: {2. * refr_hwin} m',
-    #         bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))   
+    
+    ax.text(0.65 * x_ulim_cal, 0.70 * y_ulim_cal, 
+            f'cal.: {np.round(YA[cal_bin], decimals = 2)} km',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+    ax.text(0.65 * x_ulim_cal, 0.63 * y_ulim_cal, 
+            f'win.: {np.round(2. * cal_hwin, decimals = 0)} m',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))   
+    ax.text(0.65 * x_ulim_cal, 0.56 * y_ulim_cal, 
+            f'ε: {round_it(epsilon,2)}'+'${}^o$',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+    ax.text(0.65 * x_ulim_cal, 0.49 * y_ulim_cal, 
+            r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 3)}',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+    ax.text(0.65 * x_ulim_cal, 0.42 * y_ulim_cal, 
+            r'$η^{\star}$'+f': {round_it(eta_s, 3)}',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+    ax.text(0.65 * x_ulim_cal, 0.35 * y_ulim_cal, 
+            f'η: {round_it(eta, 3)}',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+        
+    ax2 = fig.add_axes([0.56,0.13,0.40,0.70])
 
-    ax2 = fig.add_axes([0.65,0.13,0.30,0.7])
+    ax2.plot(X4, YB, color = 'tab:blue', label = 'measured')
+    ax2.plot(X5, YB, color = 'tab:orange', label = 'corrected')
+    ax2.plot(X6, YB, color = 'tab:green', label = 'molecular')
 
-    ax2.plot(Y, X4, color = 'tab:blue', label = 'measured')
-    ax2.plot(Y, X5, color = 'tab:red', label = 'molecular')
-
-    ax2.fill_between(Y, X4 - X4E, X4 + X4E, color = 'tab:blue', alpha = 0.3)
+    ax2.fill_betweenx(YB, X4 - X4E, X4 + X4E, color = 'tab:blue', alpha = 0.3)
+    ax2.fill_betweenx(YB, X5 - X5E, X5 + X5E, color = 'tab:orange', alpha = 0.3)
     
     y_ticks_vdr = np.arange(y_tick_vdr * np.ceil(y_llim_vdr / y_tick_vdr), 
                             y_tick_vdr * (np.floor(y_ulim_vdr / y_tick_vdr) + 1.), 
@@ -752,21 +785,37 @@ def polarization_calibration(dir_out, fname, title, dpi_val,
 
     y_ticks_vdr = np.round(y_ticks_vdr, decimals = 2)
 
-    ax2.set_xticks(y_ticks_vdr, labels = y_ticks_vdr)
-    ax2.set_xlim([y_llim_vdr, y_ulim_vdr])
-    ax2.set_xlabel(y_label_vdr)
+    ax2.set_yticks(y_ticks_vdr, labels = y_ticks_vdr)
+    ax2.set_ylim([y_llim_vdr, y_ulim_vdr])
+    # ax2.set_ylabel(y_label_vdr)
 
-    ax2.set_ylim([x_llim_vdr, x_ulim_vdr])
-    ax2.set_ylabel(x_label_vdr)
+    ax2.set_xlim([x_llim_vdr, x_ulim_vdr])
+    ax2.set_xlabel(x_label_vdr)
 
     ax2.grid(which = 'both')
     ax2.legend(loc = 'upper right')
 
-    cal_bin = np.where(Y >= y_vdr)[0][0]
-    cal_hwin = int(1E-3 * cal_hwin / (y_vals[1] - y_vals[0]))
+    vdr_bin = np.where(YB >= y_vdr)[0][0]
+    vdr_hwin_bins = int(1E-3 * vdr_hwin / (y_vals_vdr[1] - y_vals_vdr[0]))
 
-    ax2.axvspan(Y[cal_bin - cal_hwin], Y[cal_bin + cal_hwin + 1],
-               alpha = 0.2, facecolor = 'tab:grey')
+    ax2.axhspan(YB[vdr_bin - vdr_hwin_bins], YB[vdr_bin + vdr_hwin_bins + 1],
+                alpha = 0.2, facecolor = 'tab:grey')
+    
+    ax2.text(0.65 * x_ulim_vdr, 0.70 * y_ulim_vdr, 
+             f'mol.: {np.round(YB[vdr_bin], decimals = 2)} km',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+    ax2.text(0.65 * x_ulim_vdr, 0.63 * y_ulim_vdr, 
+             f'win.: {np.round(2. * vdr_hwin, decimals = 0)} m',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))   
+    ax2.text(0.65 * x_ulim_vdr, 0.56 * y_ulim_vdr, 
+            r'$δ^{\star}$'+f': {round_it(delta_c,3)}',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+    ax2.text(0.65 * x_ulim_vdr, 0.49 * y_ulim_vdr, 
+            r'$δ_{c}$'+f': {round_it(delta,3)}',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+    ax2.text(0.65 * x_ulim_vdr, 0.42 * y_ulim_vdr, 
+            r'$δ_m$: '+f'{round_it(delta_m,3)}',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
 
     fpath = os.path.join(dir_out, fname)
     
@@ -777,3 +826,11 @@ def polarization_calibration(dir_out, fname, title, dpi_val,
     plt.close()
     
     return(fpath)
+
+def round_it(x, sig):
+    
+    if not np.isfinite(x) or np.isnan(x):
+        x = -999.
+        sig = 3
+        
+    return np.round(x, sig-int(np.floor(np.log10(abs(x))))-1)

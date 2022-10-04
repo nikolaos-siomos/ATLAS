@@ -29,10 +29,10 @@ def main(args):
     # Read the quicklook file
     data = xr.open_dataset(args['input_file'])
     
-    # Delete all existing png files within
-    pngs = glob.glob(os.path.join(args['output_folder'], '*.png'))
-    for file in pngs:
-        os.remove(file)
+    # # Delete all existing png files within
+    # pngs = glob.glob(os.path.join(args['output_folder'], '*.png'))
+    # for file in pngs:
+    #     os.remove(file)
         
     # Extract signal
     sig = data.Range_Corrected_Signals
@@ -98,10 +98,10 @@ def main(args):
                                      lat = data.Latitude_degrees_north, 
                                      lon = data.Longitude_degrees_east, 
                                      elv = data.Altitude_meter_asl)
-    
+        
         # Make filename
         fname = f'qck_{data.Measurement_ID}_{ch}.png'
-    
+
         # Make the plot
         fpath = make_plot.quicklook(dir_out = args['output_folder'], 
                                     fname = fname, title = title,

@@ -54,7 +54,7 @@ def scc_converter(cnv_args, process_cnv, reprocess = True):
             converter(cnv_tlc_args)
     
     if (len(pcl_QA_files) == 0 or reprocess == True) and \
-        process_cnv == True:
+        process_cnv['polarization_calibration'] == True:
                 
         if os.path.exists(cnv_args['parent_folder']):
             os.makedirs(cnv_args['output_folder'], exist_ok = True)
@@ -62,6 +62,15 @@ def scc_converter(cnv_args, process_cnv, reprocess = True):
         cnv_pcl_args = cnv_args.copy()
         cnv_pcl_args['mode'] = 'C'
         
+        if cnv_pcl_args['rayleigh_filename'] == None:
+            ray_QA_file = glob.glob(os.path.join(cnv_args['output_folder'], 'ray_*.nc'))
+            if len(ray_QA_file) >= 1:
+                cnv_pcl_args['rayleigh_filename'] = ray_QA_file[0]
+                if len(ray_QA_file) > 1:
+                    print(f'-- Warning: More than 1 rayleigh QA files available to link with the calibration. File {ray_QA_file[0]} was automatically selected. Please make sure this is the correct file')
+            else:
+                print(f"-- No rayleigh QA file detected inside {cnv_args['output_folder']}. Please either process a rayleigh measurement or manually provide the file in that folder in order to proceed")
+            
         cleaner.files(cnv_pcl_args['output_folder'], pattern = 'pcl_*', extension = 'nc')
         converter(cnv_pcl_args)
     
@@ -151,8 +160,8 @@ def quicklook(input_folder, vis_args, reprocess = True, skip = False):
     # Excecute ATLAS visualizer
     if (len(files) == 0 or reprocess == True) and skip == False:
                     
-        cleaner.files(vis_args['output_folder'], pattern = 'qck_*', 
-                      extension = 'png')
+        # cleaner.files(vis_args['output_folder'], pattern = 'qck_*', 
+        #               extension = 'png')
         for file in ATLAS_files:
             os.makedirs(vis_args['output_folder'], exist_ok = True)
             vis_args['input_file'] = file

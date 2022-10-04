@@ -46,6 +46,11 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
 
+    parser.add_argument('--use_molecular', metavar = 'use_molecular',
+                        type = bool, default = False, 
+                        action = argparse.BooleanOptionalAction,
+                        help = 'If called, the molecular attenuated backcatter will be plotted along the intercompared signals')
+
     parser.add_argument('--y_lims', metavar = 'y_lims',
                         type = float, nargs = 2, default = [None, None], 
                         help = 'The y axis limits (lower and upper) of the normalized RC signal. Defaults to 0 (lower) 1.2 (upper) when use_lin_scale is True. If use_lin_scale is true then the lower limit becomes 1E-5 ')

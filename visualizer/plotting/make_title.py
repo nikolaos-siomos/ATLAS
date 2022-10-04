@@ -82,8 +82,9 @@ def telecover(start_date, start_time, end_time, lidar, channel,
     
     return(title)
 
-def polarization_calibration(start_date, start_time, end_time, lidar, 
-                             channel_r, channel_t, zan, lat, lon, elv):
+def polarization_calibration(start_date_cal, start_time_cal, end_time_cal,
+                             start_date_ray, start_time_ray, end_time_ray,  
+                             lidar, channel_r, channel_t, zan, lat, lon, elv):
     
     zan = np.round(float(zan), decimals = 1)
     
@@ -95,15 +96,23 @@ def polarization_calibration(start_date, start_time, end_time, lidar,
     
     loc = f'lat: {lat}$^o$, lon: {lon}$^o$, alt: {elv} m'
         
-    date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
+    date_cal = f'{start_date_cal[6:]}.{start_date_cal[4:6]}.{start_date_cal[:4]}'
     
-    start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
+    start_cal = f'{start_time_cal[:2]}:{start_time_cal[2:4]}:{start_time_cal[4:6]}'
 
-    end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
-        
-    title = f'Ratio {channel_r} to {channel_t}: {lidar} at {loc}\n'+\
-                f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+\
-                    f' {zan}'+r'$^{o}$ off-zenith' 
+    end_cal = f'{end_time_cal[:2]}:{end_time_cal[2:4]}:{end_time_cal[4:6]}'
+
+    date_ray = f'{start_date_ray[6:]}.{start_date_ray[4:6]}.{start_date_ray[:4]}'
+    
+    start_ray = f'{start_time_ray[:2]}:{start_time_ray[2:4]}:{start_time_ray[4:6]}'
+
+    end_ray = f'{end_time_ray[:2]}:{end_time_ray[2:4]}:{end_time_ray[4:6]}'
+               
+    title = f'Ratio {channel_r} to {channel_t}: {lidar} at {loc}\n '+\
+                f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\
+                    r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ f'\n'+\
+                        f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
+                            r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'
     
     return(title)
 

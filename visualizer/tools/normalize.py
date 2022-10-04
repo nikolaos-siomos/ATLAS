@@ -23,8 +23,8 @@ def to_a_point(sig, sig_b, x_vals, norm, hwin, axis, axis_b = 0):
                                norm_bin + hwin_bin + 1)
 
     sig_b_sel = choose_from_axis(sig_b, axis_b, 
-                               norm_bin - hwin_bin, 
-                               norm_bin + hwin_bin + 1)    
+                                 norm_bin - hwin_bin, 
+                                 norm_bin + hwin_bin + 1)    
 
     sig_m = np.nanmean(sig_sel, axis = axis, keepdims=True)
     
