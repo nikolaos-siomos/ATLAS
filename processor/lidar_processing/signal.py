@@ -360,7 +360,7 @@ def dark_correction(sig, drk):
 
         ch_d = dict(channel = ch)
 
-        if ch[2] == 'a': #3rd digit of channel name is the acquisition mode (a or p)
+        if ch[6] == 'a': #7th digit of channel name is the acquisition mode (a or p)
      
             sig_out.loc[ch_d] = sig_out.loc[ch_d] - drk_mean.loc[ch_d]
 
@@ -408,7 +408,7 @@ def dead_time_correction(sig, dead_time, dead_time_cor_type):
 
         ch_d = dict(channel = ch)
 
-        if ch[2] == 'p': #3rd digit of channel name is the acquisition mode (a or p)
+        if ch[6] == 'p': #7th digit of channel name is the acquisition mode (a or p)
 
             if (sig.loc[ch_d].values > 1000./dead_time[ch]).any():
                 print(f"-- Warning: Channel {ch} - A countrate value above the maximum allowed value was detected! Consider revising the input file ")
@@ -417,7 +417,7 @@ def dead_time_correction(sig, dead_time, dead_time_cor_type):
                 sig_out.loc[ch_d] = sig.loc[ch_d] / \
                     (1. - sig.loc[ch_d] * dead_time.loc[ch] * 1e-3)
 
-        if ch[2] == 'a': #3rd digit of channel name is the acquisition mode (a or p)
+        if ch[6] == 'a': #7th digit of channel name is the acquisition mode (a or p)
             
             sig_out.loc[ch_d] = sig.loc[ch_d]
             
@@ -733,13 +733,13 @@ def unit_conv_counts_to_MHz(sig, shots, resol):
 
         ch_d = dict(channel = ch)
     
-        if ch[2] == 'p': #3rd digit of channel name is the acquisition mode (a or p)
+        if ch[6] == 'p': #7th digit of channel name is the acquisition mode (a or p)
             
             sampl_rate = 150. / resol.loc[ch]
 
             sig_out.loc[ch_d] = sig.loc[ch_d] * sampl_rate / shots.loc[:,ch]
         
-        if ch[2] == 'a': #3rd digit of channel name is the acquisition mode (a or p)
+        if ch[6] == 'a': #7th digit of channel name is the acquisition mode (a or p)
             
             sig_out.loc[ch_d] = sig.loc[ch_d]
     

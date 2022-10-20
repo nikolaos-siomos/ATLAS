@@ -53,7 +53,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
         
     meas_label = {'ray' : 'Rayleigh', 
                   'tlc' : 'Telecover',
-                  'pcl' : 'Polarization Calibration',
+                  'pcb' : 'Polarization Calibration',
                   'qck' : 'Quicklook'}
     
 
@@ -97,7 +97,6 @@ def standard(sig_raw, shots, meas_info, channel_info,
     
     if external_info['debug']: pack_out['sig_puc'] = sig.copy()
     
-    
     print('-- Unit conversion from raw counts to MHz for the pc channels complete!')
 
     # --------------------------------------------------
@@ -130,7 +129,6 @@ def standard(sig_raw, shots, meas_info, channel_info,
     else:
         print('-- Warning: Dead time correction for pc channels deactivated!')
 
-
     # --------------------------------------------------
     # Temporal averaging 
     # --------------------------------------------------   
@@ -145,19 +143,6 @@ def standard(sig_raw, shots, meas_info, channel_info,
 
         print('-- Temporal averaging complete! All timeframes have been used')            
     
-    # elif meas_type == 'nrm':
-
-    #     sig, time_info = \
-    #         signal.average_by_time(sig = sig.copy(),
-    #                                time_info = time_info,
-    #                                timescale = timescale,
-    #                                 start_time = 'Raw_Data_Start_Time',
-    #                                 stop_time = 'Raw_Data_Stop_Time')
-
-    #     if external_info['debug']: pack_out['sig_avg'] = sig.copy()
-
-    #     print(f'-- Temporal averaging complete! [..{sig.time.size} averaged timeframe(s)]')            
-        
     elif meas_type == 'tlc':
         sig, time_info = \
             signal.average_by_group(sig = sig.copy(),
@@ -170,7 +155,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
     
         print('-- Temporal averaging complete! Averaging by group (sector) has been performed')            
 
-    elif meas_type == 'pcl':
+    elif meas_type == 'pcb':
         sig, time_info = \
             signal.average_by_group(sig = sig.copy(),
                                     time_info = time_info,

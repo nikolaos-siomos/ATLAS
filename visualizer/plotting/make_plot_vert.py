@@ -87,7 +87,7 @@ def quicklook(dir_out, fname, title, dpi_val, use_log,
     return(fpath)
 
 def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
-             x_vals, y1_vals, y2_vals, y1_errs, coef, rsem,
+             x_vals, y1_vals, y2_vals, y1_errs, coef,
              x_lbin, x_ubin, x_llim, x_ulim, y_llim, y_ulim, 
              x_label, y_label, x_tick):
         
@@ -143,27 +143,18 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                alpha = 0.2, facecolor = 'tab:grey')
 
-    n_llim = np.round(x_refr - refr_hwin * 1e-3, decimals = 2)
-    n_ulim = np.round(x_refr + refr_hwin * 1e-3, decimals = 2)
-    
     if use_lin == False:
-
-        ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
-                f'norm: {n_llim} - {n_ulim}m',
+        ax.text(0.55 * x_ulim, 0.60 * y_ulim, f'normalize: {x_refr} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
-
-        ax.text(0.55 * x_ulim, 0.30 * y_ulim, 
-                 f'rsem: {np.round(rsem, decimals = 4)}',
-                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+        ax.text(0.55 * x_ulim, 0.30 * y_ulim, f'window: {2. * refr_hwin} m',
+                bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))  
+        
     else:
-        ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
-                f'norm: {n_llim} - {n_ulim}m',
+        ax.text(0.55 * x_ulim, 0.9 * y_ulim, f'normalize: {x_refr} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
-
-        ax.text(0.55 * x_ulim, 0.82 * y_ulim, 
-                 f'rsem: {np.round(rsem, decimals = 4)}',
-                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
-
+        ax.text(0.55 * x_ulim, 0.75 * y_ulim, f'window: {2. * refr_hwin} m',
+                bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))   
+    
     ax2 = fig.add_axes([0.65,0.13,0.30,0.7])
 
     ax2.fill_between(X, (Y1 - Y1E - Y2) / Y2, 
@@ -193,7 +184,7 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     
     ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
-    
+
     fpath = os.path.join(dir_out, fname)
     
     fig.savefig(fpath, dpi = dpi_val)
@@ -350,13 +341,11 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
 
-    n_llim = np.round(x_refr - refr_hwin * 1e-3, decimals = 2)
-    n_ulim = np.round(x_refr + refr_hwin * 1e-3, decimals = 2)
-    
-    ax2.text(0.55 * x_ulim, 0.9 * y_ulim_nr, 
-             f'norm: {n_llim} - {n_ulim}',
+    ax2.text(0.55 * x_ulim, 0.9 * y_ulim_nr, f'normalize: {x_refr} km',
              bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 9))
-
+    ax2.text(0.55 * x_ulim, 0.75 * y_ulim_nr, f'window: {2. * refr_hwin} m',
+             bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 9))   
+    
     # Subplot: Normalized Deviations
     ax3 = fig.add_axes([0.67,0.13,0.23,0.7])
     
@@ -509,12 +498,10 @@ def telecover_rin(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
 
-    n_llim = np.round(x_refr - refr_hwin * 1e-3, decimals = 2)
-    n_ulim = np.round(x_refr + refr_hwin * 1e-3, decimals = 2)
-    
-    ax2.text(0.55 * x_ulim, 0.9 * y_ulim_nr, 
-             f'norm: {n_llim} - {n_ulim}',
-             bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 9))
+    ax2.text(0.55 * x_ulim, 0.9 * y_ulim_nr, f'normalize: {x_refr} km',
+             bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 5))
+    ax2.text(0.55 * x_ulim, 0.75 * y_ulim_nr, f'window: {2. * refr_hwin} m',
+             bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 5))   
     
     # Subplot: Normalized Deviations
     ax3 = fig.add_axes([0.67,0.13,0.23,0.7])
@@ -628,17 +615,18 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
                alpha = 0.2, facecolor = 'tab:grey')
 
-    n_llim = np.round(x_refr - refr_hwin * 1e-3, decimals = 2)
-    n_ulim = np.round(x_refr + refr_hwin * 1e-3, decimals = 2)
-    
     if use_lin == False:
-        ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
-                f'norm: {n_llim} - {n_ulim}',
+        ax.text(0.55 * x_ulim, 0.60 * y_ulim, f'normalize: {x_refr} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+        ax.text(0.55 * x_ulim, 0.30 * y_ulim, f'window: {2. * refr_hwin} m',
+                bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))  
+        
     else:
-        ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
-                f'norm: {n_llim} - {n_ulim}',
+        ax.text(0.55 * x_ulim, 0.9 * y_ulim, f'normalize: {x_refr} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+        ax.text(0.55 * x_ulim, 0.75 * y_ulim, f'window: {2. * refr_hwin} m',
+                bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))   
+    
         
     ax2 = fig.add_axes([0.65,0.13,0.30,0.7])
 
@@ -693,164 +681,158 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     return(fpath)
 
 def polarization_calibration(dir_out, fname, title, dpi_val, 
-                             x_cal, cal_hwin, x_vdr, vdr_hwin,
-                             x_vals_cal, x_vals_vdr,
-                             y1_vals, y2_vals, y3_vals, y4_vals, y5_vals, y6_vals,
+                             y_cal, cal_hwin, y_vdr, vdr_hwin,
+                             y_vals_cal, y_vals_vdr,
+                             x1_vals, x2_vals, x3_vals, x4_vals, x5_vals, x6_vals,
                              eta, eta_f_s, eta_s,
                              delta_m, delta_c, delta, epsilon,
-                             x_lbin_cal, x_ubin_cal, 
-                             x_llim_cal, x_ulim_cal, 
+                             y_lbin_cal, y_ubin_cal, 
                              y_llim_cal, y_ulim_cal, 
-                             x_lbin_vdr, x_ubin_vdr, 
-                             x_llim_vdr, x_ulim_vdr, 
+                             x_llim_cal, x_ulim_cal, 
+                             y_lbin_vdr, y_ubin_vdr, 
                              y_llim_vdr, y_ulim_vdr, 
-                             K, G_R, G_T, H_R, H_T,
-                             y_label_cal, x_label_cal, x_tick_cal,
-                             y_label_vdr, x_label_vdr, x_tick_vdr):
+                             x_llim_vdr, x_ulim_vdr, 
+                             x_label_cal, y_label_cal, y_tick_cal,
+                             x_label_vdr, y_label_vdr, y_tick_vdr):
         
     # Create the variables to be plotted X, Y
-    XA = x_vals_cal[slice(x_lbin_cal, x_ubin_cal)]
-    XB = x_vals_vdr[slice(x_lbin_vdr, x_ubin_vdr)]
+    YA = y_vals_cal[slice(y_lbin_cal, y_ubin_cal)]
+    YB = y_vals_vdr[slice(y_lbin_vdr, y_ubin_vdr)]
     
-    Y1 = y1_vals[slice(x_lbin_cal, x_ubin_cal)]
-    Y2 = y2_vals[slice(x_lbin_cal, x_ubin_cal)]
-    Y3 = y3_vals[slice(x_lbin_cal, x_ubin_cal)]
-    Y4 = y4_vals[slice(x_lbin_vdr, x_ubin_vdr)]
-    Y5 = y5_vals[slice(x_lbin_vdr, x_ubin_vdr)]
-    Y6 = y6_vals[slice(x_lbin_vdr, x_ubin_vdr)]
+    X1 = x1_vals[slice(y_lbin_cal, y_ubin_cal)]
+    X2 = x2_vals[slice(y_lbin_cal, y_ubin_cal)]
+    X3 = x3_vals[slice(y_lbin_cal, y_ubin_cal)]
+    X4 = x4_vals[slice(y_lbin_vdr, y_ubin_vdr)]
+    X5 = x5_vals[slice(y_lbin_vdr, y_ubin_vdr)]
+    X6 = x6_vals[slice(y_lbin_vdr, y_ubin_vdr)]
 
-    Y1E = np.nan * Y1
-    Y2E = np.nan * Y2
-    Y3E = np.nan * Y3
-    Y4E = np.nan * Y4
-    Y5E = np.nan * Y5
+    X1E = np.nan * X1
+    X2E = np.nan * X2
+    X3E = np.nan * X3
+    X4E = np.nan * X4
+    X5E = np.nan * X5
     
     # Create the figure
-    fig = plt.figure(figsize=(12. , 4.))
+    fig = plt.figure(figsize=(8. , 6.))
     fig.suptitle(title)
 
-    ax = fig.add_axes([0.07,0.13,0.40,0.65])
+    ax = fig.add_axes([0.07,0.13,0.40,0.70])
         
-    ax.plot(XA, Y1, color = 'tab:purple', label = 'η')
-    ax.plot(XA, Y2, color = 'tab:red', label = '$η_{+45}$')
-    ax.plot(XA, Y3, color = 'tab:cyan', label = '$η_{-45}$')
+    ax.plot(X1, YA, color = 'tab:purple', label = 'η')
+    ax.plot(X2, YA, color = 'tab:red', label = '$η_{+45}$')
+    ax.plot(X3, YA, color = 'tab:cyan', label = '$η_{-45}$')
 
-    ax.fill_between(XA, Y1 - Y1E, Y1 + Y1E, color = 'tab:purple', alpha = 0.3)
-    ax.fill_between(XA, Y2 - Y2E, Y2 + Y2E, color = 'tab:red', alpha = 0.3)
-    ax.fill_between(XA, Y3 - Y3E, Y3 + Y3E, color = 'tab:cyan', alpha = 0.3)
+    ax.fill_betweenx(YA, X1 - X1E, X1 + X1E, color = 'tab:purple', alpha = 0.3)
+    ax.fill_betweenx(YA, X2 - X2E, X2 + X2E, color = 'tab:red', alpha = 0.3)
+    ax.fill_betweenx(YA, X3 - X3E, X3 + X3E, color = 'tab:cyan', alpha = 0.3)
     
-    x_ticks_cal = np.arange(x_tick_cal * np.ceil(x_llim_cal / x_tick_cal), 
-                            x_tick_cal * (np.floor(x_ulim_cal / x_tick_cal) + 1.), 
-                            x_tick_cal)
+    y_ticks_cal = np.arange(y_tick_cal * np.ceil(y_llim_cal / y_tick_cal), 
+                            y_tick_cal * (np.floor(y_ulim_cal / y_tick_cal) + 1.), 
+                            y_tick_cal)
         
-    if np.abs(x_llim_cal - x_ticks_cal[0]) < x_tick_cal * 0.25:
-        x_ticks_cal[0] = x_llim_cal
+    if np.abs(y_llim_cal - y_ticks_cal[0]) < y_tick_cal * 0.25:
+        y_ticks_cal[0] = y_llim_cal
     else:
-        x_ticks_cal = np.hstack((x_llim_cal, x_ticks_cal))
+        y_ticks_cal = np.hstack((y_llim_cal, y_ticks_cal))
 
-    if np.abs(x_ulim_cal - x_ticks_cal[-1]) < x_tick_cal * 0.25:
-        x_ticks_cal[-1] = x_ulim_cal
+    if np.abs(y_ulim_cal - y_ticks_cal[-1]) < y_tick_cal * 0.25:
+        y_ticks_cal[-1] = y_ulim_cal
     else:
-        x_ticks_cal = np.hstack((x_ticks_cal, x_ulim_cal))
+        y_ticks_cal = np.hstack((y_ticks_cal, y_ulim_cal))
 
-    x_ticks_cal = np.round(x_ticks_cal, decimals = 2)
+    y_ticks_cal = np.round(y_ticks_cal, decimals = 2)
 
-    ax.set_xticks(x_ticks_cal, labels = x_ticks_cal)
-    ax.set_xlim([x_llim_cal, x_ulim_cal])
-    ax.set_xlabel(x_label_cal)
-
+    ax.set_yticks(y_ticks_cal, labels = y_ticks_cal)
     ax.set_ylim([y_llim_cal, y_ulim_cal])
     ax.set_ylabel(y_label_cal)
+
+    ax.set_xlim([x_llim_cal, x_ulim_cal])
+    ax.set_xlabel(x_label_cal)
 
     ax.grid(which = 'both')
     ax.legend(loc = 'upper right')
 
-    cal_bin = np.where(XB >= x_cal)[0][0]
-    cal_hwin_bins = int(1E-3 * cal_hwin / (x_vals_cal[1] - x_vals_cal[0]))
+    cal_bin = np.where(YB >= y_cal)[0][0]
+    cal_hwin_bins = int(1E-3 * cal_hwin / (y_vals_cal[1] - y_vals_cal[0]))
 
-    ax.axvspan(XA[cal_bin - cal_hwin_bins], XA[cal_bin + cal_hwin_bins + 1],
+    ax.axhspan(YA[cal_bin - cal_hwin_bins], YA[cal_bin + cal_hwin_bins + 1],
                alpha = 0.2, facecolor = 'tab:grey')
 
-    c_llim = np.round(XA[cal_bin] - cal_hwin * 1e-3, decimals = 2)
-    c_ulim = np.round(XA[cal_bin] + cal_hwin * 1e-3, decimals = 2)
-        
-    ax.text(0.55 * x_ulim_cal, 0.95 * y_ulim_cal, 
-            f'cal.: {c_llim} - {c_ulim}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))  
-    ax.text(0.55 * x_ulim_cal, 0.87 * y_ulim_cal, 
-            f'ε: {round_it(epsilon,2)}'+'${}^o$, ' + f'K: {round_it(K, 3)}',
+    
+    ax.text(0.65 * x_ulim_cal, 0.70 * y_ulim_cal, 
+            f'cal.: {np.round(YA[cal_bin], decimals = 2)} km',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+    ax.text(0.65 * x_ulim_cal, 0.63 * y_ulim_cal, 
+            f'win.: {np.round(2. * cal_hwin, decimals = 0)} m',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))   
+    ax.text(0.65 * x_ulim_cal, 0.56 * y_ulim_cal, 
+            f'ε: {round_it(epsilon,2)}'+'${}^o$',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax.text(0.55 * x_ulim_cal, 0.79 * y_ulim_cal, 
+    ax.text(0.65 * x_ulim_cal, 0.49 * y_ulim_cal, 
             r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax.text(0.55 * x_ulim_cal, 0.71 * y_ulim_cal, 
+    ax.text(0.65 * x_ulim_cal, 0.42 * y_ulim_cal, 
             r'$η^{\star}$'+f': {round_it(eta_s, 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax.text(0.55 * x_ulim_cal, 0.63 * y_ulim_cal, 
+    ax.text(0.65 * x_ulim_cal, 0.35 * y_ulim_cal, 
             f'η: {round_it(eta, 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-
-    ax2 = fig.add_axes([0.55,0.13,0.40,0.65])
-
-    ax2.plot(XB, Y4, color = 'tab:blue', label = 'measured')
-    ax2.plot(XB, Y5, color = 'tab:orange', label = 'corrected')
-    ax2.plot(XB, Y6, color = 'tab:green', label = 'molecular')
-
-    ax2.fill_between(XB, Y4 - Y4E, Y4 + Y4E, color = 'tab:blue', alpha = 0.3)
-    ax2.fill_between(XB, Y5 - Y5E, Y5 + Y5E, color = 'tab:orange', alpha = 0.3)
-    
-    x_ticks_vdr = np.arange(x_tick_vdr * np.ceil(x_llim_vdr / x_tick_vdr), 
-                            x_tick_vdr * (np.floor(x_ulim_vdr / x_tick_vdr) + 1.), 
-                            x_tick_vdr)
         
-    if np.abs(x_llim_vdr - x_ticks_vdr[0]) < x_tick_vdr * 0.25:
-        x_ticks_vdr[0] = x_llim_vdr
+    ax2 = fig.add_axes([0.56,0.13,0.40,0.70])
+
+    ax2.plot(X4, YB, color = 'tab:blue', label = 'measured')
+    ax2.plot(X5, YB, color = 'tab:orange', label = 'corrected')
+    ax2.plot(X6, YB, color = 'tab:green', label = 'molecular')
+
+    ax2.fill_betweenx(YB, X4 - X4E, X4 + X4E, color = 'tab:blue', alpha = 0.3)
+    ax2.fill_betweenx(YB, X5 - X5E, X5 + X5E, color = 'tab:orange', alpha = 0.3)
+    
+    y_ticks_vdr = np.arange(y_tick_vdr * np.ceil(y_llim_vdr / y_tick_vdr), 
+                            y_tick_vdr * (np.floor(y_ulim_vdr / y_tick_vdr) + 1.), 
+                            y_tick_vdr)
+        
+    if np.abs(y_llim_vdr - y_ticks_vdr[0]) < y_tick_vdr * 0.25:
+        y_ticks_vdr[0] = y_llim_vdr
     else:
-        x_ticks_vdr = np.hstack((x_llim_vdr, x_ticks_vdr))
+        y_ticks_vdr = np.hstack((y_llim_vdr, y_ticks_vdr))
 
-    if np.abs(x_ulim_vdr - x_ticks_vdr[-1]) < x_tick_vdr * 0.25:
-        x_ticks_vdr[-1] = x_ulim_vdr
+    if np.abs(y_ulim_vdr - y_ticks_vdr[-1]) < y_tick_vdr * 0.25:
+        y_ticks_vdr[-1] = y_ulim_vdr
     else:
-        x_ticks_vdr = np.hstack((x_ticks_vdr, x_ulim_vdr))
+        y_ticks_vdr = np.hstack((y_ticks_vdr, y_ulim_vdr))
 
-    x_ticks_vdr = np.round(x_ticks_vdr, decimals = 2)
+    y_ticks_vdr = np.round(y_ticks_vdr, decimals = 2)
 
-    ax2.set_xticks(x_ticks_vdr, labels = x_ticks_vdr)
+    ax2.set_yticks(y_ticks_vdr, labels = y_ticks_vdr)
+    ax2.set_ylim([y_llim_vdr, y_ulim_vdr])
+    # ax2.set_ylabel(y_label_vdr)
+
     ax2.set_xlim([x_llim_vdr, x_ulim_vdr])
     ax2.set_xlabel(x_label_vdr)
-
-    ax2.set_ylim([y_llim_vdr, y_ulim_vdr])
-    ax2.set_ylabel(y_label_vdr)
 
     ax2.grid(which = 'both')
     ax2.legend(loc = 'upper right')
 
-    vdr_bin = np.where(XB >= x_vdr)[0][0]
-    vdr_hwin_bins = int(1E-3 * vdr_hwin / (x_vals_vdr[1] - x_vals_vdr[0]))
+    vdr_bin = np.where(YB >= y_vdr)[0][0]
+    vdr_hwin_bins = int(1E-3 * vdr_hwin / (y_vals_vdr[1] - y_vals_vdr[0]))
 
-    ax2.axvspan(XB[vdr_bin - vdr_hwin_bins], XB[vdr_bin + vdr_hwin_bins + 1],
+    ax2.axhspan(YB[vdr_bin - vdr_hwin_bins], YB[vdr_bin + vdr_hwin_bins + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
     
-    m_llim = np.round(XB[vdr_bin] - vdr_hwin * 1e-3, decimals = 2)
-    m_ulim = np.round(XB[vdr_bin] + vdr_hwin * 1e-3, decimals = 2)
-        
-    ax2.text(0.50 * x_ulim_vdr, 0.93 * y_ulim_vdr, 
-             f'mol.: {m_llim} - {m_ulim}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))  
-    ax2.text(0.50 * x_ulim_vdr, 0.83 * y_ulim_vdr, 
+    ax2.text(0.65 * x_ulim_vdr, 0.70 * y_ulim_vdr, 
+             f'mol.: {np.round(YB[vdr_bin], decimals = 2)} km',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+    ax2.text(0.65 * x_ulim_vdr, 0.63 * y_ulim_vdr, 
+             f'win.: {np.round(2. * vdr_hwin, decimals = 0)} m',
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))   
+    ax2.text(0.65 * x_ulim_vdr, 0.56 * y_ulim_vdr, 
             r'$δ^{\star}$'+f': {round_it(delta_c,3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax2.text(0.50 * x_ulim_vdr, 0.73 * y_ulim_vdr, 
+    ax2.text(0.65 * x_ulim_vdr, 0.49 * y_ulim_vdr, 
             r'$δ_{c}$'+f': {round_it(delta,3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax2.text(0.50 * x_ulim_vdr, 0.63 * y_ulim_vdr, 
+    ax2.text(0.65 * x_ulim_vdr, 0.42 * y_ulim_vdr, 
             r'$δ_m$: '+f'{round_it(delta_m,3)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax2.text(0.50 * x_ulim_vdr, 0.53 * y_ulim_vdr, 
-            r'$G_R$: '+f'{round_it(G_R,3)}, $G_T$: '+f'{round_it(G_T,3)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax2.text(0.50 * x_ulim_vdr, 0.43 * y_ulim_vdr, 
-            r'$H_R$: '+f'{round_it(H_R,3)}, $H_T$: '+f'{round_it(H_T,3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
 
     fpath = os.path.join(dir_out, fname)

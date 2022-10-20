@@ -29,12 +29,12 @@ def check_channels(sel_channels, all_channels, exclude_field_type,
         channels = all_channels
     
     # Make a channel maskand exclude channels that don't fit the criteria
-    mask = np.array([ch[0] not in exclude_field_type and
-                     ch[1] not  in exclude_scattering_type and
-                     ch[2] not  in exclude_detection_mode and
-                     ch[3] not  in exclude_channel_subtype 
+    mask = np.array([ch[4] not in exclude_field_type and
+                     ch[5] not  in exclude_scattering_type and
+                     ch[6] not  in exclude_detection_mode and
+                     ch[7] not  in exclude_channel_subtype 
                      for ch in channels])
-    
+
     if all(~mask):
         raise Exception('-- Error: The provided channel filtering arguments are too strict and exclude all channels. Please revide the following arguments: exclude_field_type, exclude_scattering_type, exclude_detection_mode, exclude_channel_subtype, channels')
     

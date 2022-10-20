@@ -58,10 +58,10 @@ def short_molec(heights, ranges, meas_info, channel_info,
     bdw = channel_info.Channel_Bandwidth
     
     pol = channel_info.Laser_Polarization
-    
-    ch_type = pd.Series([ch[1] for ch in channel_info.index], index = channels)
 
-    ch_stype = pd.Series([ch[3] for ch in channel_info.index], index = channels)
+    ch_type = pd.Series([ch[5] for ch in channel_info.index], index = channels)
+
+    ch_stype = pd.Series([ch[7] for ch in channel_info.index], index = channels)
     
     properties = ['Backscatter_Cross_Section', 
                   'Extinction_Cross_Section_Forward', 
@@ -180,7 +180,7 @@ def short_molec(heights, ranges, meas_info, channel_info,
             else:
                 exs_bck_i[i] = exs_fth_i[i]   
             mdr_i[i] = rrb.delta_mol_rayleigh(method = 'line_summation')
-            
+
         # Interpolate for every range bin (calculations are performed only on selected bins)
         bxs_tot_f = interp1d(sel_bins, bxs_tot_i, bounds_error = False, fill_value = np.nan)
         exs_fth_f = interp1d(sel_bins, exs_fth_i, bounds_error = False, fill_value = np.nan)
@@ -308,8 +308,20 @@ def from_rsonde(path, heights):
 
     attrs = file.attrs
     
-    for key in attrs.keys():
-        molec_info[key] = attrs[key]
+    keys_alt = ['Altitude_meter_asl', 'Latitude_degrees_north', 
+                'Longitude_degrees_east']
+    
+    keys_org = ['Sounding_Station_Name', 
+                'Sounding_Start_Date', 'Sounding_Start_Time_UT',
+                'WMO_Station_Number', 'WBAN_Station_Number']
+
+    for key in keys_alt:
+        if key in attrs.keys():
+            molec_info[f'Sounding_{key}'] = attrs[key]
+
+    for key in keys_org:
+        if key in attrs.keys():
+            molec_info[key] = attrs[key]
     
     properties = ['Pressure', 'Temperature', 
                   'Relative_Humidity', 'Number_Density']

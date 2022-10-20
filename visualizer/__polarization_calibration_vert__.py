@@ -47,22 +47,6 @@ def main(args, __version__):
     # Extract signal time, channels, and bins
     channels = data.channel.values
     
-    # Extract IFF info
-    dwl = data.Detected_Wavelength_Rayleigh
-    ewl = data.Emitted_Wavelength_Rayleigh
-    bdw = data.Channel_Bandwidth_Rayleigh
-    
-    mol_method = data.Molecular_atmosphere_method
-    if 'Sounding_Station_Name' in data.attrs:
-        st_name = data.Sounding_Station_Name
-    else: st_name = ''
-    if 'WMO_Station_Number' in data.attrs:
-        wmo_id = data.WMO_Station_Number
-    else: wmo_id = ''
-    if 'WBAN_Station_Number' in data.attrs:
-        wban_id = data.WBAN_Station_Number
-    else: wban_id = ''
-    
     if args['ch_r'] == None or args['ch_t'] == None:
         channels_r = []
         channels_t = []
@@ -77,7 +61,7 @@ def main(args, __version__):
     else:
         channels_r = args['ch_r']
         channels_t = args['ch_t']
-
+    
     # Check if the parsed channels exist
     channels_r = check_channels(sel_channels = channels_r, all_channels = channels)
     channels_t = check_channels(sel_channels = channels_t, all_channels = channels)
@@ -149,130 +133,126 @@ def main(args, __version__):
         ch_r_d = dict(channel = ch_r)
         ch_t_d = dict(channel = ch_t)
         
-        dwl_ch = dwl.copy().loc[ch_r_d].values
-        ewl_ch = ewl.copy().loc[ch_r_d].values
-        bdw_ch = bdw.copy().loc[ch_r_d].values
-        
         sig_r_p45_ch = sig_p45.copy().loc[ch_r_d].values
         sig_t_p45_ch = sig_p45.copy().loc[ch_t_d].values
         sig_r_m45_ch = sig_m45.copy().loc[ch_r_d].values
         sig_t_m45_ch = sig_m45.copy().loc[ch_t_d].values
-        sig_r_rax_ch = sig_ray.copy().loc[ch_r_d].values
-        sig_t_rax_ch = sig_ray.copy().loc[ch_t_d].values
+        sig_r_ray_ch = sig_ray.copy().loc[ch_r_d].values
+        sig_t_ray_ch = sig_ray.copy().loc[ch_t_d].values
         
         a_m_ch = a_m.loc[ch_r_d].values
     
         # Create the y axis (height/range)
-        x_lbin_cal, x_ubin_cal, x_llim_cal, x_ulim_cal, x_vals_cal, x_label_cal = \
-            make_axis.polarization_calibration_x(
+        y_lbin_cal, y_ubin_cal, y_llim_cal, y_ulim_cal, y_vals_cal, y_label_cal = \
+            make_axis.polarization_calibration_y(
                 heights = data.Height_levels_Calibration.loc[ch_r_d].values, 
                 ranges = data.Range_levels_Calibration.loc[ch_r_d].values,
-                x_lims = args['x_lims_calibration'], 
+                y_lims = args['y_lims_calibration'], 
                 use_dis = args['use_distance'])
     
         # Create the y axis (height/range)
-        x_lbin_ray, x_ubin_ray, x_llim_ray, x_ulim_ray, x_vals_ray, x_label_ray = \
-            make_axis.polarization_calibration_x(
+        y_lbin_ray, y_ubin_ray, y_llim_ray, y_ulim_ray, y_vals_ray, y_label_ray = \
+            make_axis.polarization_calibration_y(
                 heights = data.Height_levels_Rayleigh.loc[ch_r_d].values, 
                 ranges = data.Range_levels_Rayleigh.loc[ch_r_d].values,
-                x_lims = args['x_lims_rayleigh'], 
+                y_lims = args['y_lims_rayleigh'], 
                 use_dis = args['use_distance'])
     
         # Smoothing
-        y_r_m45_sm, _ = \
+        x_r_m45_sm, _ = \
             sliding_average_1D(y_vals = sig_r_m45_ch, 
-                               x_vals = x_vals_cal,
+                               x_vals = y_vals_cal,
                                x_sm_lims = args['smoothing_range'],
                                x_sm_hwin = args['half_window'],
                                expo = args['smooth_exponential'])
 
-        y_t_m45_sm, _ = \
+        x_t_m45_sm, _ = \
             sliding_average_1D(y_vals = sig_t_m45_ch, 
-                               x_vals = x_vals_cal,
+                               x_vals = y_vals_cal,
                                x_sm_lims = args['smoothing_range'],
                                x_sm_hwin = args['half_window'],
                                expo = args['smooth_exponential'])
             
-        y_r_p45_sm, _ = \
+        x_r_p45_sm, _ = \
             sliding_average_1D(y_vals = sig_r_p45_ch, 
-                               x_vals = x_vals_cal,
+                               x_vals = y_vals_cal,
                                x_sm_lims = args['smoothing_range'],
                                x_sm_hwin = args['half_window'],
                                expo = args['smooth_exponential'])
 
-        y_t_p45_sm, _ = \
+        x_t_p45_sm, _ = \
             sliding_average_1D(y_vals = sig_t_p45_ch, 
-                               x_vals = x_vals_cal,
+                               x_vals = y_vals_cal,
                                x_sm_lims = args['smoothing_range'],
                                x_sm_hwin = args['half_window'],
                                expo = args['smooth_exponential'])
 
-        y_r_rax_sm, _ = \
-            sliding_average_1D(y_vals = sig_r_rax_ch, 
-                               x_vals = x_vals_ray,
+        x_r_ray_sm, _ = \
+            sliding_average_1D(y_vals = sig_r_ray_ch, 
+                               x_vals = y_vals_ray,
                                x_sm_lims = args['smoothing_range'],
                                x_sm_hwin = args['half_window'],
                                expo = args['smooth_exponential'])    
             
-        y_t_rax_sm, _ = \
-            sliding_average_1D(y_vals = sig_t_rax_ch, 
-                               x_vals = x_vals_ray,
+        x_t_ray_sm, _ = \
+            sliding_average_1D(y_vals = sig_t_ray_ch, 
+                               x_vals = y_vals_ray,
                                x_sm_lims = args['smoothing_range'],
                                x_sm_hwin = args['half_window'],
                                expo = args['smooth_exponential'])      
         
         avg_r_m45 = average.region(sig = sig_r_m45_ch, 
-                                   x_vals = x_vals_cal, 
+                                   x_vals = y_vals_cal, 
                                    calibr = args['calibration_height'], 
                                    hwin = args['half_calibration_window'], 
                                    axis = 0,
                                    squeeze = True)
         
         avg_t_m45 = average.region(sig = sig_t_m45_ch, 
-                                   x_vals = x_vals_cal, 
+                                   x_vals = y_vals_cal, 
                                    calibr = args['calibration_height'], 
                                    hwin = args['half_calibration_window'], 
                                    axis = 0,
                                    squeeze = True)
         
         avg_r_p45 = average.region(sig = sig_r_p45_ch, 
-                                   x_vals = x_vals_cal, 
+                                   x_vals = y_vals_cal, 
                                    calibr = args['calibration_height'], 
                                    hwin = args['half_calibration_window'], 
                                    axis = 0,
                                    squeeze = True)
         
         avg_t_p45 = average.region(sig = sig_t_p45_ch, 
-                                   x_vals = x_vals_cal, 
+                                   x_vals = y_vals_cal, 
                                    calibr = args['calibration_height'], 
                                    hwin = args['half_calibration_window'], 
                                    axis = 0,
                                    squeeze = True)
         
-        avg_r_ray = average.region(sig = sig_r_rax_ch, 
-                                   x_vals = x_vals_ray, 
+        avg_r_ray = average.region(sig = sig_r_ray_ch, 
+                                   x_vals = y_vals_ray, 
                                    calibr = args['rayleigh_height'], 
                                    hwin = args['half_rayleigh_window'], 
                                    axis = 0,
                                    squeeze = True)
         
-        avg_t_ray = average.region(sig = sig_t_rax_ch, 
-                                   x_vals = x_vals_ray, 
+        avg_t_ray = average.region(sig = sig_t_ray_ch, 
+                                   x_vals = y_vals_ray, 
                                    calibr = args['rayleigh_height'], 
                                    hwin = args['half_rayleigh_window'], 
                                    axis = 0,
                                    squeeze = True)
 
         avg_a_m_ch = average.region(sig = a_m_ch, 
-                                    x_vals = x_vals_ray, 
+                                    x_vals = y_vals_ray, 
                                     calibr = args['rayleigh_height'], 
                                     hwin = args['half_rayleigh_window'], 
                                     axis = 0,
                                     squeeze = True) 
                 
-        eta_m45_prf = (y_r_m45_sm / y_t_m45_sm) 
+        eta_m45_prf = (x_r_m45_sm / x_t_m45_sm) 
     
-        eta_p45_prf = (y_r_p45_sm / y_t_p45_sm)
+        eta_p45_prf = (x_r_p45_sm / x_t_p45_sm)
         
         eta_prf = np.sqrt(eta_m45_prf * eta_p45_prf)
         
@@ -286,7 +266,7 @@ def main(args, __version__):
 
         eta = eta_s / K_ch
         
-        delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta
+        delta_s_prf = (x_r_ray_sm / x_t_ray_sm) / eta
 
         delta_s = (avg_r_ray / avg_t_ray) / eta
 
@@ -315,15 +295,15 @@ def main(args, __version__):
     
             
         # Create the x axis (calibration)
-        y_llim_cal, y_ulim_cal, y_label_cal = \
-            make_axis.polarization_calibration_cal_y(
+        x_llim_cal, x_ulim_cal, x_label_cal = \
+            make_axis.polarization_calibration_cal_x(
                 ratio_m = eta_f_s_m45, ratio_p = eta_f_s_p45,
-                y_lims_cal = args['y_lims_calibration'])
+                x_lims_cal = args['x_lims_calibration'])
             
         # Create the x axis (rayleigh)
-        y_llim_ray, y_ulim_ray, y_label_ray = \
-            make_axis.polarization_calibration_ray_y(
-                ratio = delta, y_lims_ray = args['y_lims_rayleigh'])
+        x_llim_ray, x_ulim_ray, x_label_ray = \
+            make_axis.polarization_calibration_ray_x(
+                ratio = delta_s, x_lims_ray = args['x_lims_rayleigh'])
         
                 
         # Make title
@@ -338,17 +318,9 @@ def main(args, __version__):
                 channel_r = ch_r, 
                 channel_t = ch_t, 
                 zan = data.Laser_Pointing_Angle_Calibration,
-                loc = data.Lidar_Location_Rayleigh,
-                dwl = dwl_ch,
-                ewl = ewl_ch,
-                bdw = bdw_ch,
-                sm_lims = args['smoothing_range'],
-                sm_hwin = args['half_window'],
-                sm_expo = args['smooth_exponential'],
-                mol_method = mol_method,
-                st_name = st_name,
-                wmo_id = wmo_id,
-                wban_id = wban_id)
+                lat = data.Latitude_degrees_north_Calibration, 
+                lon = data.Longitude_degrees_east_Calibration, 
+                elv = data.Altitude_meter_asl_Calibration)
         
        
         # Make filename
@@ -358,47 +330,42 @@ def main(args, __version__):
             make_plot.polarization_calibration(dir_out = args['output_folder'], 
                                                fname = fname, title = title,
                                                dpi_val = args['dpi'],
-                                               x_cal = args['calibration_height'],
+                                               y_cal = args['calibration_height'],
                                                cal_hwin = args['half_calibration_window'],
-                                               x_vdr = args['rayleigh_height'],
+                                               y_vdr = args['rayleigh_height'],
                                                vdr_hwin = args['half_rayleigh_window'],
-                                               x_vals_cal = x_vals_cal, 
-                                               x_vals_vdr = x_vals_ray, 
-                                               y1_vals = eta_prf, 
-                                               y2_vals = eta_p45_prf, 
-                                               y3_vals = eta_m45_prf, 
-                                               y4_vals = delta_c_prf,
-                                               y5_vals = delta_prf,
-                                               y6_vals = delta_m_prf,
+                                               y_vals_cal = y_vals_cal, 
+                                               y_vals_vdr = y_vals_ray, 
+                                               x1_vals = eta_prf, 
+                                               x2_vals = eta_p45_prf, 
+                                               x3_vals = eta_m45_prf, 
+                                               x4_vals = delta_c_prf,
+                                               x5_vals = delta_prf,
+                                               x6_vals = delta_m_prf,
                                                eta = eta, eta_f_s = eta_f_s, 
                                                eta_s = eta_s, 
                                                delta_m = delta_m,
                                                delta_c = delta_c,
                                                delta = delta,
                                                epsilon = epsilon,
-                                               x_lbin_cal = x_lbin_cal,
-                                               x_ubin_cal = x_ubin_cal, 
-                                               x_llim_cal = x_llim_cal,
-                                               x_ulim_cal = x_ulim_cal, 
-                                               y_llim_cal = y_llim_cal, 
+                                               y_lbin_cal = y_lbin_cal,
+                                               y_ubin_cal = y_ubin_cal, 
+                                               y_llim_cal = y_llim_cal,
                                                y_ulim_cal = y_ulim_cal, 
-                                               x_lbin_vdr = x_lbin_ray, 
-                                               x_ubin_vdr = x_ubin_ray, 
-                                               x_llim_vdr = x_llim_ray, 
-                                               x_ulim_vdr = x_ulim_ray, 
+                                               x_llim_cal = x_llim_cal, 
+                                               x_ulim_cal = x_ulim_cal, 
+                                               y_lbin_vdr = y_lbin_ray, 
+                                               y_ubin_vdr = y_ubin_ray, 
                                                y_llim_vdr = y_llim_ray, 
                                                y_ulim_vdr = y_ulim_ray, 
-                                               y_label_cal = y_label_cal, 
+                                               x_llim_vdr = x_llim_ray, 
+                                               x_ulim_vdr = x_ulim_ray, 
                                                x_label_cal = x_label_cal, 
-                                               K = K_ch,
-                                               G_R = G_R_ch,
-                                               G_T = G_T_ch,
-                                               H_R = H_R_ch,
-                                               H_T = H_T_ch,
-                                               x_tick_cal = args['x_tick_calibration'],
-                                               y_label_vdr = y_label_ray, 
+                                               y_label_cal = y_label_cal, 
+                                               y_tick_cal = args['y_tick_calibration'],
                                                x_label_vdr = x_label_ray, 
-                                               x_tick_vdr = args['x_tick_rayleigh'])  
+                                               y_label_vdr = y_label_ray, 
+                                               y_tick_vdr = args['y_tick_rayleigh'])  
             
     print('-----------------------------------------')
     print(' ')
@@ -434,14 +401,14 @@ if __name__ == '__main__':
     #             "dpi" : f"{args['dpi']}",
     #             "use_log_scale" : f"{args['use_log_scale']}",
     #             "use_distance" : f"{args['use_distance']}",
-    #             "y_lims (lower)" : f"{y_llim}",
-    #             "y_lims (upper)" : f"{y_ulim}",
-    #             "x_lims (lower)" : f"{y_vals[x_llim]}",
-    #             "x_lims (upper)" : f"{y_vals[x_ulim]}",
-    #             "y_lims (lower)" : f"{y_llim}",
-    #             "y_lims (upper)" : f"{y_ulim}",
-    #             "y_tick" : f"{y_tick}",
-    #             "x_tick" : f"{args['x_tick']}"}
+    #             "x_lims (lower)" : f"{x_llim}",
+    #             "x_lims (upper)" : f"{x_ulim}",
+    #             "y_lims (lower)" : f"{y_vals[y_llim]}",
+    #             "y_lims (upper)" : f"{y_vals[y_ulim]}",
+    #             "z_lims (lower)" : f"{z_llim}",
+    #             "z_lims (upper)" : f"{z_ulim}",
+    #             "x_tick" : f"{x_tick}",
+    #             "y_tick" : f"{args['y_tick']}"}
             
     # im = Image.open(fpath)
     # meta = PngImagePlugin.PngInfo()

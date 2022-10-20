@@ -40,7 +40,7 @@ def detect_overflows(sig, dead_time, daq_range):
 
         ch_d = dict(channel = ch)
         
-        if ch[2] == 'p': #3rd digit of channel name is the acquisition mode (a or p)
+        if ch[6] == 'p': #7th digit of channel name is the acquisition mode (a or p)
         
             max_countrate = 0.95 * 1000./dead_time[ch]
 
@@ -48,7 +48,7 @@ def detect_overflows(sig, dead_time, daq_range):
                 print(f"-- Warning: Channel {ch} - Photon signal countrate values above the 95% of the maximum allowed value were detected! ")
 
 
-        if ch[2] == 'a': #3rd digit of channel name is the acquisition mode (a or p)
+        if ch[6] == 'a': #7th digit of channel name is the acquisition mode (a or p)
  
             max_mV = 0.95*daq_range[ch]
 

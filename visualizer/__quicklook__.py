@@ -18,26 +18,21 @@ from .tools.smoothing import sliding_average_2D
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
-def main(args):
+def main(args, __version__, meas_type):
     # Check the command line argument information
     args = check_parser(args)
     
     print('-----------------------------------------')
-    print('Start genrating Quicklooks...')
+    print('Start generating Quicklooks...')
     print('-----------------------------------------')
     
     # Read the quicklook file
     data = xr.open_dataset(args['input_file'])
     
-    # # Delete all existing png files within
-    # pngs = glob.glob(os.path.join(args['output_folder'], '*.png'))
-    # for file in pngs:
-    #     os.remove(file)
-        
     # Extract signal
     sig = data.Range_Corrected_Signals
     sig = sig.copy().where(sig != nc.default_fillvals['f8'])
-    
+
     # Extract signal time, channels, and bins
     time = sig.time.values
     bins = sig.bins.values
@@ -90,17 +85,19 @@ def main(args):
                                         expo = args['smooth_exponential'])
                 
         # Make title
-        title = make_title.quicklook(start_time = t_vals[x_lbin], 
-                                     end_time = t_vals[x_ubin-1], 
-                                     lidar = data.Lidar_Name, 
-                                     channel = ch, 
-                                     zan = data.Laser_Pointing_Angle,
-                                     lat = data.Latitude_degrees_north, 
-                                     lon = data.Longitude_degrees_east, 
-                                     elv = data.Altitude_meter_asl)
+        title = make_title.quicklook(start_date = data.RawData_Start_Date,
+                                    start_time = data.RawData_Start_Time_UT, 
+                                    end_time = data.RawData_Stop_Time_UT, 
+                                    lidar = data.Lidar_Name, 
+                                    channel = ch, 
+                                    zan = data.Laser_Pointing_Angle,
+                                    loc = data.Lidar_Location,
+                                    sm_lims = args['smoothing_range'],
+                                    sm_hwin = args['half_window'],
+                                    sm_expo = args['smooth_exponential'])
         
         # Make filename
-        fname = f'qck_{data.Measurement_ID}_{ch}.png'
+        fname = f'{data.Measurement_ID}_{data.Lidar_Name}_{meas_type}_qck_{ch}_ATLAS_{__version__}.png'
 
         # Make the plot
         fpath = make_plot.quicklook(dir_out = args['output_folder'], 
@@ -156,9 +153,14 @@ def main(args):
     return()
 
 if __name__ == '__main__':
+    
+    sys.path.append('../')
+    
+    from version import __version__
+    
     # Get the command line argument information
     args = call_parser()
     
     # Call main
-    main(args)
+    main(args, __version__)
     

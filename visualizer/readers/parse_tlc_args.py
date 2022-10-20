@@ -33,13 +33,18 @@ def call_parser():
                         help = 'If called then the input file will be DELETED after processing in order to save space. Use with care! ')
 
     parser.add_argument('--dpi', metavar = 'dpi',
-                        type = int, nargs = '?', default = 100, 
+                        type = int, nargs = '?', default = 300, 
                         help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 100 ')
 
     parser.add_argument('--use_distance', metavar = 'use_distance',
                         type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
+
+    parser.add_argument('--use_non_rangecor', metavar = 'use_non_rangecor',
+                        type = bool, default = False, 
+                        action = argparse.BooleanOptionalAction,
+                        help = 'If set to True, the non range corrected signals will be used for the telecover test ')
 
     parser.add_argument('-c', '--channels', metavar = 'channels',
                         type = str, nargs = '+', default = None, 
@@ -113,6 +118,23 @@ def check_parser(args):
         if not args[mandatory_args[i]]:
             raise Exception(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')                    
         
+    if not os.path.exists(args['input_file']):
+        raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
+    
+    if '_tlc_' not in os.path.basename(args['input_file']):
+        raise Exception('---- Error: Measurement filename not understood! The filename should contain the _tlc_ field (telecover)')
+    
+    if args['output_folder'] == None:
+        out_path = os.path.join(os.path.dirname(args['input_file']),'..','..', 'plots')
+        args['output_folder'] = out_path
+        os.makedirs(args['output_folder'], exist_ok = True)
+    elif not os.path.exists(args['output_folder'] ):
+        raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
+
+    return(args)
+
+def view_parser(args):
+    
     print(" ")
     print("-- Telecover Test arguments!")
     print("-------------------------------------------------------------------")
@@ -120,18 +142,5 @@ def check_parser(args):
         print(f"{key} = {args[key]}")
     print("-------------------------------------------------------------------")
     print("")
-
-    if not os.path.exists(args['input_file']):
-        raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
     
-    if os.path.basename(args['input_file'])[:3] != 'tlc':
-        raise Exception('---- Error: Measurement filename not understood! Please start the filename with tlc (telecover test)')
-    
-    if args['output_folder'] == None:
-        out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas_visualizer', 'tlc')
-        args['output_folder'] = out_path
-        os.makedirs(args['output_folder'], exist_ok = True)
-    elif not os.path.exists(args['output_folder'] ):
-        raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
-
-    return(args)
+    return()

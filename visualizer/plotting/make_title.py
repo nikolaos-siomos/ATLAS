@@ -8,42 +8,28 @@ Created on Wed Aug 31 22:34:11 2022
 
 import numpy as np
 
-def quicklook(start_time, end_time, lidar, channel, zan, lat, lon, elv):
+def quicklook(start_date, start_time, end_time, lidar, channel, 
+              zan, loc, sm_lims, sm_hwin, sm_expo):
     
     zan = np.round(float(zan), decimals = 1)
     
-    lat = np.round(float(lat), decimals = 3)
+    sm_llim = np.round(float(sm_lims[0]), decimals = 1)
 
-    lon = np.round(float(lon), decimals = 3)
+    sm_ulim = np.round(float(sm_lims[-1]), decimals = 1)
 
-    elv = np.round(float(elv), decimals = 0)
-    
-    loc = f'lat: {lat}$^o$, lon: {lon}$^o$, alt: {elv} m'
-        
-    date = np.datetime64(start_time,'us').item().strftime('%d.%m.%Y')
-    
-    start = np.datetime64(start_time,'us').item().strftime('%H:%M:%S')
-    
-    end = np.datetime64(end_time,'us').item().strftime('%H:%M:%S')
-    
-    title = f'Channel {channel} : {lidar} at {loc}\n'+\
-                f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+\
-                    f' {zan}'+r'$^{o}$ off-zenith' 
-    
-    return(title)
+    sm_lhwin = np.round(float(sm_hwin[0]), decimals = 0)
 
-def rayleigh(start_date, start_time, end_time, lidar, channel, 
-             zan, lat, lon, elv):
+    sm_uhwin = np.round(float(sm_hwin[-1]), decimals = 0)
     
-    zan = np.round(float(zan), decimals = 1)
-    
-    lat = np.round(float(lat), decimals = 3)
+    if sm_expo == True:
+        sm_type = 'Exponential'
+    else:
+        sm_type = 'Linear'
 
-    lon = np.round(float(lon), decimals = 3)
-
-    elv = np.round(float(elv), decimals = 0)
-    
-    loc = f'lat: {lat}$^o$, lon: {lon}$^o$, alt: {elv} m'
+    if sm_lhwin > sm_uhwin:
+        change = 'Decrease'
+    else:
+        change = 'Increase'
         
     date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
     
@@ -51,24 +37,92 @@ def rayleigh(start_date, start_time, end_time, lidar, channel,
 
     end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
         
-    title = f'Channel {channel} : {lidar} at {loc}\n'+\
-                f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+\
-                    f' {zan}'+r'$^{o}$ off-zenith' 
+    if sm_lhwin == sm_uhwin:
+        title = f'{lidar} {loc} {channel} - Quicklook - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
+                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
+    else:
+        title = f'{lidar} {loc} {channel} - Quicklook - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
+                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
+        
+    return(title)
+
+def rayleigh(start_date, start_time, end_time, lidar, channel, 
+             zan, loc, ewl, dwl, bdw, sm_lims, sm_hwin, sm_expo,
+             mol_method, st_name, wmo_id, wban_id):
+    
+    zan = np.round(float(zan), decimals = 1)
+    
+    ewl = np.round(float(ewl), decimals = 2)
+
+    dwl = np.round(float(dwl), decimals = 2)
+    
+    bdw = np.round(float(bdw), decimals = 2)
+    
+    sm_llim = np.round(float(sm_lims[0]), decimals = 1)
+
+    sm_ulim = np.round(float(sm_lims[-1]), decimals = 1)
+
+    sm_lhwin = np.round(float(sm_hwin[0]), decimals = 0)
+
+    sm_uhwin = np.round(float(sm_hwin[-1]), decimals = 0)
+    
+    if sm_expo == True:
+        sm_type = 'Exponential'
+    else:
+        sm_type = 'Linear'
+        
+    if sm_lhwin > sm_uhwin:
+        change = 'Decrease'
+    else:
+        change = 'Increase'
+        
+    # lat = np.round(float(lat), decimals = 3)
+
+    # lon = np.round(float(lon), decimals = 3)
+
+    # elv = np.round(float(elv), decimals = 0)
+    
+    # loc = f'lat: {lat}$^o$, lon: {lon}$^o$, alt: {elv} m'
+        
+    date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
+    
+    start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
+
+    end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
+        
+    if sm_lhwin == sm_uhwin:
+        title = f'{lidar} {loc} {channel} - Rayleigh Fit - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
+                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
+                        f'{mol_method} {st_name} {wmo_id} {wban_id} - Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'
+    else:
+        title = f'{lidar} {loc} {channel} - Rayleigh Fit - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
+                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
+                        f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'     
     
     return(title)
 
 def telecover(start_date, start_time, end_time, lidar, channel, 
-             zan, lat, lon, elv):
+              zan, loc, sm_lims, sm_hwin, sm_expo):
     
     zan = np.round(float(zan), decimals = 1)
     
-    lat = np.round(float(lat), decimals = 3)
+    sm_llim = np.round(float(sm_lims[0]), decimals = 1)
 
-    lon = np.round(float(lon), decimals = 3)
+    sm_ulim = np.round(float(sm_lims[-1]), decimals = 1)
 
-    elv = np.round(float(elv), decimals = 0)
+    sm_lhwin = np.round(float(sm_hwin[0]), decimals = 0)
+
+    sm_uhwin = np.round(float(sm_hwin[-1]), decimals = 0)
     
-    loc = f'lat: {lat}$^o$, lon: {lon}$^o$, alt: {elv} m'
+    if sm_expo == True:
+        sm_type = 'Exponential'
+    else:
+        sm_type = 'Linear'
+
+    if sm_lhwin > sm_uhwin:
+        change = 'Decrease'
+    else:
+        change = 'Increase'
         
     date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
     
@@ -76,25 +130,47 @@ def telecover(start_date, start_time, end_time, lidar, channel,
 
     end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
         
-    title = f'Channel {channel} : {lidar} at {loc}\n'+\
-                f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+\
-                    f' {zan}'+r'$^{o}$ off-zenith' 
+    if sm_lhwin == sm_uhwin:
+        title = f'{lidar} {loc} {channel} - Telecover Test - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
+                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
+    else:
+        title = f'{lidar} {loc} {channel} - Telecover Test - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
+                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
     
+        
     return(title)
 
 def polarization_calibration(start_date_cal, start_time_cal, end_time_cal,
                              start_date_ray, start_time_ray, end_time_ray,  
-                             lidar, channel_r, channel_t, zan, lat, lon, elv):
+                             lidar, channel_r, channel_t, zan, loc, 
+                             ewl, dwl, bdw, sm_lims, sm_hwin, sm_expo,
+                             mol_method, st_name, wmo_id, wban_id):
     
     zan = np.round(float(zan), decimals = 1)
     
-    lat = np.round(float(lat), decimals = 3)
+    ewl = np.round(float(ewl), decimals = 2)
 
-    lon = np.round(float(lon), decimals = 3)
-
-    elv = np.round(float(elv), decimals = 0)
+    dwl = np.round(float(dwl), decimals = 2)
     
-    loc = f'lat: {lat}$^o$, lon: {lon}$^o$, alt: {elv} m'
+    bdw = np.round(float(bdw), decimals = 2)
+    
+    sm_llim = np.round(float(sm_lims[0]), decimals = 1)
+
+    sm_ulim = np.round(float(sm_lims[-1]), decimals = 1)
+
+    sm_lhwin = np.round(float(sm_hwin[0]), decimals = 0)
+
+    sm_uhwin = np.round(float(sm_hwin[-1]), decimals = 0)
+            
+    if sm_expo == True:
+        sm_type = 'Exponential'
+    else:
+        sm_type = 'Linear'
+
+    if sm_lhwin > sm_uhwin:
+        change = 'Decrease'
+    else:
+        change = 'Increase'
         
     date_cal = f'{start_date_cal[6:]}.{start_date_cal[4:6]}.{start_date_cal[:4]}'
     
@@ -108,11 +184,25 @@ def polarization_calibration(start_date_cal, start_time_cal, end_time_cal,
 
     end_ray = f'{end_time_ray[:2]}:{end_time_ray[2:4]}:{end_time_ray[4:6]}'
                
-    title = f'Ratio {channel_r} to {channel_t}: {lidar} at {loc}\n '+\
-                f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\
-                    r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ f'\n'+\
-                        f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
-                            r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'
+    # title = f'Ratio {channel_r} to {channel_t}: {lidar} at {loc}\n '+\
+    #             f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\
+    #                 r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ f'\n'+\
+    #                     f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
+    #                         r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'
+    if sm_lhwin == sm_uhwin:
+        title = f'{lidar} {loc} {channel_r} to {channel_t} - Pol. Calibration - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
+                    f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\
+                        r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ '\n'+\
+                            f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
+                                r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
+                                    f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'   
+    else:
+        title = f'{lidar} {loc} {channel_r} to {channel_t} - Pol. Calibration - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
+                    f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\
+                        r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ '\n'+\
+                            f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
+                                r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
+                                    f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'   
     
     return(title)
 

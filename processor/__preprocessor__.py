@@ -17,17 +17,11 @@ from .export import nc_dataset
 warnings.filterwarnings('ignore')
 
 def main(args, __version__):
-    
-    # Check the command line argument information
-    args = check_parser(args)
-          
-    output_files = {'rayleigh' : None, 
-                    'telecover: ' : None, 
-                    'polarization_calibration' : None, 
-                    'quicklook' : None}
+              
+    output_files = dict()
     
     print('-----------------------------------------')
-    print('Initializing ATLAS Preprocessor...')
+    print('Initializing Preprocessor...')
     print('-----------------------------------------')
     print(' ')
     
@@ -43,7 +37,7 @@ def main(args, __version__):
                 exclude_detection_mode = args['exclude_detection_mode'], 
                 exclude_channel_subtype = args['exclude_channel_subtype'], 
                 use_channels = args['channels'])
-    
+
     print(f'Lidar: {meas_info.Lidar_Name}')
     print('-----------------------------------------')
     print(' ')
@@ -51,7 +45,7 @@ def main(args, __version__):
     meas_type = meas_info.Measurement_type
     meas_label = {'ray' : 'Rayleigh', 
                   'tlc' : 'Telecover', 
-                  'pcl' : 'Polarization Calibration'}
+                  'pcb' : 'Polarization Calibration'}
     print(f'-- {meas_label[meas_type]} QA file succesfully parsed!')
     
     if 'Rayleigh_File_Name' in meas_info.keys():
@@ -162,9 +156,9 @@ def main(args, __version__):
                                  version = __version__,
                                  dir_out = args['output_folder'])
     
-    if meas_type == 'pcl':
+    if meas_type == 'pcb':
                 
-        pcl, pcl_pack, time_info_pcl = \
+        pcb, pcb_pack, time_info_pcb = \
             short_prepro.standard(sig_raw = sig_raw, 
                                   shots = shots, 
                                   meas_info = meas_info, 
@@ -192,22 +186,22 @@ def main(args, __version__):
                                    time_info = time_info_ray,
                                    external_info = args)
             
-        pcl_ch = pcl.channel.values
+        pcb_ch = pcb.channel.values
         
-        output_files['pcl'] = \
-            nc_dataset.calibration(sig = pcl, 
-                                   sig_ray = ray.loc[dict(channel = pcl_ch)],
-                                   molec = molec.loc[dict(channel = pcl_ch)],
-                                   meteo = meteo.loc[dict(channel = pcl_ch)],
+        output_files['pcb'] = \
+            nc_dataset.calibration(sig = pcb, 
+                                   sig_ray = ray.loc[dict(channel = pcb_ch)],
+                                   molec = molec.loc[dict(channel = pcb_ch)],
+                                   meteo = meteo.loc[dict(channel = pcb_ch)],
                                    meas_info = meas_info, 
                                    meas_info_ray = meas_info_r, 
                                    channel_info = channel_info, 
-                                   channel_info_ray = channel_info.loc[pcl_ch], 
-                                   time_info = time_info_pcl, 
+                                   channel_info_ray = channel_info.loc[pcb_ch], 
+                                   time_info = time_info_pcb, 
                                    time_info_ray = time_info_ray, 
                                    molec_info = molec_info, 
-                                   heights = pcl_pack['heights'], 
-                                   ranges = pcl_pack['ranges'],
+                                   heights = pcb_pack['heights'], 
+                                   ranges = pcb_pack['ranges'],
                                    ranges_ray = ray_pack['ranges'],
                                    heights_ray = ray_pack['heights'], 
                                    version = __version__,
@@ -233,7 +227,11 @@ def main(args, __version__):
                                  heights = qck_pack['heights'], 
                                  ranges = qck_pack['ranges'],
                                  version = __version__,
+                                 meas_type = meas_type,
                                  dir_out = args['output_folder'])
+    
+    else:
+        output_files['qck'] = []
 
     return(output_files)
     

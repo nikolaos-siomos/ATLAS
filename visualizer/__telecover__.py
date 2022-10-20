@@ -19,7 +19,7 @@ from .tools import normalize
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
-def main(args):
+def main(args, __version__):
     # Check the command line argument information
     args = check_parser(args)
     
@@ -29,11 +29,7 @@ def main(args):
     
     # Read the quicklook file
     data = xr.open_dataset(args['input_file'])
-    
-    # Delete all existing png files within
-    pngs = glob.glob(os.path.join(args['output_folder'], '*.png'))
-    for file in pngs:
-        os.remove(file)
+    ranges = data.Range_levels
     
     # Extract signal
     if 'Range_Corrected_Signals_North_Sector' in data.keys():
@@ -46,6 +42,12 @@ def main(args):
         sig_e = sig_e.copy().where(sig_e != nc.default_fillvals['f8'])
         sig_s = sig_s.copy().where(sig_s != nc.default_fillvals['f8'])
         sig_w = sig_w.copy().where(sig_w != nc.default_fillvals['f8'])
+        
+        if args['use_non_rangecor'] == True:
+            sig_n = sig_n.copy() / (ranges.copy() ** 2.)
+            sig_e = sig_e.copy() / (ranges.copy() ** 2.)
+            sig_s = sig_s.copy() / (ranges.copy() ** 2.)
+            sig_w = sig_w.copy() / (ranges.copy() ** 2.)
     
     else:
         sig_n = []
@@ -59,6 +61,10 @@ def main(args):
         
         sig_o = sig_o.copy().where(sig_o != nc.default_fillvals['f8'])
         sig_i = sig_i.copy().where(sig_i != nc.default_fillvals['f8'])
+        
+        if args['use_non_rangecor'] == True:
+            sig_o = sig_o.copy() / (ranges.copy() ** 2.)
+            sig_i = sig_i.copy() / (ranges.copy() ** 2.)    
     
     else:
         sig_o = []
@@ -78,7 +84,7 @@ def main(args):
         print(f"-- channel: {ch}")
         
         ch_d = dict(channel = ch)
-    
+        
         # Create the y axis (height/range)
         x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label = \
             make_axis.rayleigh_x(heights = data.Height_levels.loc[ch_d].values, 
@@ -260,33 +266,33 @@ def main(args):
             y_u_sm_w = np.nanmax(y_sm_w[:,:iters], axis = 1)
             
             # Normalization for smoothed signals
-            n_coef = normalize.to_a_point(sig = y_m_sm_n, 
-                                          sig_b = np.ones(y_m_sm_n.shape), 
-                                          x_vals = x_vals,
-                                          norm = args['normalization_height'],
-                                          hwin = args['half_normalization_window'],
-                                          axis = 0)
+            n_coef, n_bin = normalize.to_a_point(sig = y_m_sm_n, 
+                                                 sig_b = np.ones(y_m_sm_n.shape), 
+                                                 x_vals = x_vals,
+                                                 norm = args['normalization_height'],
+                                                 hwin = args['half_normalization_window'],
+                                                 axis = 0)
         
-            e_coef = normalize.to_a_point(sig = y_m_sm_e, 
-                                          sig_b = np.ones(y_m_sm_e.shape), 
-                                          x_vals = x_vals,
-                                          norm = args['normalization_height'],
-                                          hwin = args['half_normalization_window'],
-                                          axis = 0)
+            e_coef, _ = normalize.to_a_point(sig = y_m_sm_e, 
+                                             sig_b = np.ones(y_m_sm_e.shape), 
+                                             x_vals = x_vals,
+                                             norm = args['normalization_height'],
+                                             hwin = args['half_normalization_window'],
+                                             axis = 0)
         
-            s_coef = normalize.to_a_point(sig = y_m_sm_s, 
-                                          sig_b = np.ones(y_m_sm_s.shape), 
-                                          x_vals = x_vals,
-                                          norm = args['normalization_height'],
-                                          hwin = args['half_normalization_window'],
-                                          axis = 0)
+            s_coef, _ = normalize.to_a_point(sig = y_m_sm_s, 
+                                             sig_b = np.ones(y_m_sm_s.shape), 
+                                             x_vals = x_vals,
+                                             norm = args['normalization_height'],
+                                             hwin = args['half_normalization_window'],
+                                             axis = 0)
         
-            w_coef = normalize.to_a_point(sig = y_m_sm_w, 
-                                          sig_b = np.ones(y_m_sm_w.shape), 
-                                          x_vals = x_vals,
-                                          norm = args['normalization_height'],
-                                          hwin = args['half_normalization_window'],
-                                          axis = 0)
+            w_coef, _ = normalize.to_a_point(sig = y_m_sm_w, 
+                                             sig_b = np.ones(y_m_sm_w.shape), 
+                                             x_vals = x_vals,
+                                             norm = args['normalization_height'],
+                                             hwin = args['half_normalization_window'],
+                                             axis = 0)
         
             # Create the y axis (signal)
             y_llim, y_ulim, y_llim_nr, y_ulim_nr = \
@@ -303,17 +309,19 @@ def main(args):
                     
             # Make title
             title = make_title.telecover(start_date = data.RawData_Start_Date,
-                                         start_time = data.RawData_Start_Time_UT, 
-                                         end_time = data.RawData_Stop_Time_UT, 
-                                         lidar = data.Lidar_Name, 
-                                         channel = ch, 
-                                         zan = data.Laser_Pointing_Angle,
-                                         lat = data.Latitude_degrees_north, 
-                                         lon = data.Longitude_degrees_east, 
-                                         elv = data.Altitude_meter_asl)
+                                        start_time = data.RawData_Start_Time_UT, 
+                                        end_time = data.RawData_Stop_Time_UT, 
+                                        lidar = data.Lidar_Name, 
+                                        channel = ch, 
+                                        zan = data.Laser_Pointing_Angle,
+                                        loc = data.Lidar_Location,
+                                        sm_lims = args['smoothing_range'],
+                                        sm_hwin = args['half_window'],
+                                        sm_expo = args['smooth_exponential'])
+        
         
             # Make filename
-            fname = f'tlc_{data.Measurement_ID}_sectors_{ch}.png'
+            fname = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_sectors_{ch}_ATLAS_{__version__}.png'
         
             # Make the plot
             fpath = \
@@ -409,19 +417,19 @@ def main(args):
             y_u_sm_i = np.nanmax(y_sm_i[:,:iters], axis = 1)
             
             # Normalization for smoothed signals
-            o_coef = normalize.to_a_point(sig = y_m_sm_o, 
-                                          sig_b = np.ones(y_m_sm_o.shape), 
-                                          x_vals = x_vals,
-                                          norm = args['normalization_height'],
-                                          hwin = args['half_normalization_window'],
-                                          axis = 0)
+            o_coef, n_bin = normalize.to_a_point(sig = y_m_sm_o, 
+                                                 sig_b = np.ones(y_m_sm_o.shape), 
+                                                 x_vals = x_vals,
+                                                 norm = args['normalization_height'],
+                                                 hwin = args['half_normalization_window'],
+                                                 axis = 0)
         
-            i_coef = normalize.to_a_point(sig = y_m_sm_i, 
-                                          sig_b = np.ones(y_m_sm_i.shape), 
-                                          x_vals = x_vals,
-                                          norm = args['normalization_height'],
-                                          hwin = args['half_normalization_window'],
-                                          axis = 0)
+            i_coef, _ = normalize.to_a_point(sig = y_m_sm_i, 
+                                             sig_b = np.ones(y_m_sm_i.shape), 
+                                             x_vals = x_vals,
+                                             norm = args['normalization_height'],
+                                             hwin = args['half_normalization_window'],
+                                             axis = 0)
         
             # Create the y axis (signal)
             y_llim, y_ulim, y_llim_nr, y_ulim_nr = \
@@ -439,12 +447,13 @@ def main(args):
                                          lidar = data.Lidar_Name, 
                                          channel = ch, 
                                          zan = data.Laser_Pointing_Angle,
-                                         lat = data.Latitude_degrees_north, 
-                                         lon = data.Longitude_degrees_east, 
-                                         elv = data.Altitude_meter_asl)
+                                         loc = data.Lidar_Location,
+                                         sm_lims = args['smoothing_range'],
+                                         sm_hwin = args['half_window'],
+                                         sm_expo = args['smooth_exponential'])
         
             # Make filename
-            fname = f'tlc_{data.Measurement_ID}_rings_{ch}.png'
+            fname = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_rings_{ch}_ATLAS_{__version__}.png'
         
             # Make the plot
             fpath = \
@@ -476,12 +485,17 @@ def main(args):
     return()
 
 if __name__ == '__main__':
+    
+    sys.path.append('../')
+    
+    from version import __version__
+    
     # Get the command line argument information
     args = call_parser()
     
     # Call main
-    main(args)
-
+    main(args, __version__)
+    
     # sys.exit()
     # # Add metadata to the quicklook plot
     # from PIL import Image

@@ -15,17 +15,17 @@ from processor.readers.parse_args import call_parser as parse_prs
 from visualizer.readers.parse_qck_args import call_parser as parse_qck
 from visualizer.readers.parse_ray_args import call_parser as parse_ray
 from visualizer.readers.parse_tlc_args import call_parser as parse_tlc
-from visualizer.readers.parse_pcl_args import call_parser as parse_pcl
+from visualizer.readers.parse_pcb_args import call_parser as parse_pcb
 # from visualizer.readers.parse_cmp_args import call_parser as parse_cmp
 
 warnings.filterwarnings('ignore')
 
 isday = True
-newdata = False
+newdata = True
 
 # Force reprocessing
-process = {'rayleigh_fit' : True,
-           'telecover' : True,
+process = {'rayleigh_fit' : False,
+           'telecover' : False,
            'polarization_calibration' : True}
 
 # Skip module
@@ -48,7 +48,7 @@ else:
                  'atlas_preprocessor' : True,
                  'atlas_visualizer' : True}
 
-parent_folder = '/mnt/DATA/Big_data/Databases/CARS/Systems/POLIS/220930/03'
+parent_folder = '/mnt/DATA/Big_data/Databases/CARS/Systems/POLIS/220924/01'
 output_folder = os.path.join(parent_folder, 'out')
 
 # Create the main output folder
@@ -60,10 +60,10 @@ cnv_args = parse_cnv()
 
 cnv_args['parent_folder'] = parent_folder
 cnv_args['output_folder'] = os.path.join(output_folder, 'scc_converter')
-cnv_args['telecover_sectors_folder'] = os.path.join(parent_folder, 'tlc2')
+# cnv_args['telecover_sectors_folder'] = os.path.join(parent_folder, 'tlc2')
 cnv_args['config_file'] = '/mnt/DATA/Big_data/Databases/CARS/Configurations/polis_bucharest_all_channels.ini'
 cnv_args['trim_overflows'] = 2
-cnv_args['files_per_sector'] = 3
+cnv_args['files_per_sector'] = 10
 
 cnv_args['radiosonde_folder'] = '/mnt/DATA/Big_data/Databases/CARS/Radiosondes/ino'
 cnv_args['rsonde_skip_header'] = 4
@@ -82,40 +82,38 @@ if isday == True:
 
 # Common plotting arguments
 vis_inp = prs_args['output_folder']
-use_distance = True
 dpi = 150
 
 # Quicklook arguments
 qck_args = parse_qck()
 
-qck_urange = 30.
-qck_args['z_max_zone'] = [0., 1.]
+qck_urange = 9.
+qck_args['z_max_zone'] = [0., 0.5]
 qck_args['y_lims'] = [0., qck_urange]
-qck_args['use_distance'] = True
 
 qck_args['smooth'] = True 
 qck_args['smoothing_exponential'] = True
 qck_args['smoothing_range'] = [0.150, qck_urange]
-qck_args['half_window'] = [5., 1000.]
+qck_args['half_window'] = [5., 500.]
 
-qck_args['exclude_detection_mode'] = ['a']
+qck_args['exclude_detection_mode'] = ['p']
 qck_args['exclude_scattering_type'] = ['v', 'r']
 qck_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'qck')
 
 # Rayleigh fit arguments
 ray_args = parse_ray()
 
-ray_args['x_lims'] = [0., prs_args['vertical_limit']]
+ray_args['x_lims'] = [0., 20.]
 ray_args['x_tick'] = 2.
 
-ray_args['reference_height'] = 5.
-ray_args['half_reference_window'] = 1000.
+ray_args['reference_height'] = 8.
+ray_args['half_reference_window'] = 800.
 
 ray_args['smooth'] = True 
-ray_args['smoothing_range'] = [1., prs_args['vertical_limit']]
-ray_args['half_window'] = [100., 100.]
+ray_args['smoothing_range'] = [0.150, 20.]
+ray_args['half_window'] = [5.,500.]
 
-ray_args['exclude_detection_mode'] = []
+ray_args['exclude_detection_mode'] = ['a']
 ray_args['exclude_channel_subtype'] = ['w', 'c']
 ray_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'ray')
 
@@ -137,42 +135,42 @@ tlc_args['exclude_detection_mode'] = ['p']
 tlc_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'tlc')
 
 # Polarization calibration
-pcl_args = parse_pcl()
+pcb_args = parse_pcb()
 
-# pcl_args['ch_r'] = ['xppr0355', 'xcpr0532'] # POLIS
-# pcl_args['ch_t'] = ['xcpt0355', 'xppt0532'] # POLIS 
+# pcb_args['ch_r'] = ['xppr0355', 'xcpr0532'] # POLIS
+# pcb_args['ch_t'] = ['xcpt0355', 'xppt0532'] # POLIS 
 
-pcl_args['ch_r'] = ['nppr0355', 'nppr0532', 'npar1064'] # ALPHA
-pcl_args['ch_t'] = ['ncpt0355', 'ncpt0532', 'ncat1064'] # ALPHA
+pcb_args['ch_r'] = ['nppr0355', 'nppr0532', 'npar1064'] # ALPHA
+pcb_args['ch_t'] = ['ncpt0355', 'ncpt0532', 'ncat1064'] # ALPHA
 
-pcl_args['y_lims_calibration'] = [0.2, 8.]
-pcl_args['y_lims_rayleigh'] = [0.2, 8.]
-pcl_args['x_lims_rayleigh'] = [0., 0.1]
+pcb_args['y_lims_calibration'] = [0.2, 8.]
+pcb_args['y_lims_rayleigh'] = [0.2, 8.]
+pcb_args['x_lims_rayleigh'] = [0., 0.1]
 
-# pcl_args['K'] = [0.99601, 1.04499] # POLIS
-# pcl_args['G_R'] = [ 0.99800,  1.02200] # POLIS
-# pcl_args['G_T'] = [ 1.00200,  0.97800] # POLIS
-# pcl_args['H_R'] = [ 0.99797, -1.02199] # POLIS
-# pcl_args['H_T'] = [-1.00200,  0.97800] # POLIS
-# pcl_args['R_to_T_transmission_ratio'] = [1./0.113, 0.129] # POLIS
+# pcb_args['K'] = [0.99601, 1.04499] # POLIS
+# pcb_args['G_R'] = [ 0.99800,  1.02200] # POLIS
+# pcb_args['G_T'] = [ 1.00200,  0.97800] # POLIS
+# pcb_args['H_R'] = [ 0.99797, -1.02199] # POLIS
+# pcb_args['H_T'] = [-1.00200,  0.97800] # POLIS
+# pcb_args['R_to_T_transmission_ratio'] = [1./0.113, 0.129] # POLIS
 
-pcl_args['H_R'] = [ 0.98198,  0.97213,  0.99984] # ALPHA
-pcl_args['H_T'] = [-0.98141, -0.97215, -0.99977] # ALPHA
+pcb_args['H_R'] = [ 0.98198,  0.97213,  0.99984] # ALPHA
+pcb_args['H_T'] = [-0.98141, -0.97215, -0.99977] # ALPHA
 
-# pcl_args['ch_r'] = ['xppr0355', 'xppr0532'] # EMORAL
-# pcl_args['ch_t'] = ['xcpt0355', 'xcpt0532'] # EMORAL
-# pcl_args['R_to_T_transmission_ratio'] = [1./0.0341, 1./0.0563] # EMORAL
+# pcb_args['ch_r'] = ['xppr0355', 'xppr0532'] # EMORAL
+# pcb_args['ch_t'] = ['xcpt0355', 'xcpt0532'] # EMORAL
+# pcb_args['R_to_T_transmission_ratio'] = [1./0.0341, 1./0.0563] # EMORAL
 
-pcl_args['calibration_height'] = 2. 
-pcl_args['half_calibration_window'] = 500.
-pcl_args['rayleigh_height'] = 6. 
-pcl_args['half_rayleigh_window'] = 500.
+pcb_args['calibration_height'] = 2. 
+pcb_args['half_calibration_window'] = 500.
+pcb_args['rayleigh_height'] = 6. 
+pcb_args['half_rayleigh_window'] = 500.
 
-pcl_args['smooth'] = True 
-pcl_args['smoothing_range'] = [0.5, prs_args['vertical_limit']]
-pcl_args['half_window'] = [100., 100.]
+pcb_args['smooth'] = True 
+pcb_args['smoothing_range'] = [0.5, prs_args['vertical_limit']]
+pcb_args['half_window'] = [100., 100.]
 
-pcl_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'pcl')
+pcb_args['output_folder'] = os.path.join(output_folder, 'atlas_visualizer', 'pcb')
 
 # Call scc_converter sequence
 processing_chain.scc_converter(cnv_args = cnv_args, 
@@ -204,8 +202,8 @@ processing_chain.QA_test(input_folder = cnv_args['output_folder'],
 # Call Polarization Calibration sequence
 processing_chain.QA_test(input_folder = cnv_args['output_folder'], 
                          prs_args = prs_args, 
-                         vis_args = pcl_args, 
-                         test_type = 'pcl', 
+                         vis_args = pcb_args, 
+                         test_type = 'pcb', 
                          process = process['polarization_calibration'],
                          reprocess_prs = reprocess['atlas_preprocessor'], 
                          reprocess_vis = reprocess['atlas_visualizer'],

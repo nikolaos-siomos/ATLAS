@@ -105,10 +105,10 @@ def short_reader(fpath, exclude_field_type, exclude_scattering_type,
     if use_channels == None:
         use_channels = channels
     
-    mask = np.array([ch[0] not in exclude_field_type and
-                     ch[1] not  in exclude_scattering_type and
-                     ch[2] not  in exclude_detection_mode and
-                     ch[3] not  in exclude_channel_subtype and
+    mask = np.array([ch[4] not in exclude_field_type and
+                     ch[5] not  in exclude_scattering_type and
+                     ch[6] not  in exclude_detection_mode and
+                     ch[7] not  in exclude_channel_subtype and
                      ch in use_channels for ch in channels])
     
     if all(~mask):
@@ -167,6 +167,7 @@ def lidar_metadata(file):
     keys_attrs = ['Sounding_File_Name',
                   'Rayleigh_File_Name',
                   'Lidar_Name',
+                  'Lidar_Location',
                   'Lidar_ID',
                   'Altitude_meter_asl',
                   'Latitude_degrees_north',
@@ -231,10 +232,10 @@ def channel_metadata(file):
 
     """
 
-    channels = np.array([file.channel_label.values.astype(str)[i] + \
-                         file.Detected_Wavelength.values\
-                             .astype('int').astype(str)[i].zfill(4)
-                             for i in range(file.channel_label.size)])
+    channels = np.array([np.round(file.Detected_Wavelength.values,decimals=0)\
+                         .astype('int').astype(str)[i].zfill(4) +\
+                         file.channel_label.values.astype(str)[i] \
+                         for i in range(file.channel_label.size)])
 
     keys = ['ADC_resolution',
             'Background_Low',

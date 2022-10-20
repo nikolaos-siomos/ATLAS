@@ -9,190 +9,447 @@ Created on Wed Sep 21 10:21:48 2022
 from version import __version__
 import os, warnings, glob
 from helper_functions import cleaner
-from scc_converter.__scc_converter__ import main as converter
-from processor.__preprocessor__ import main as processor
-from visualizer.__quicklook__ import main as qck
-from visualizer.__rayleigh_fit__ import main as ray
-from visualizer.__telecover__ import main as tlc
-from visualizer.__polarization_calibration__ import main as pcl
-from visualizer.__intercomparison__ import main as cmp
+from scc_converter.__scc_converter__ import main as __scc_converter__
+from processor.__preprocessor__ import main as __preprocessor__
+from visualizer.__quicklook__ import main as __quicklook__
+from visualizer.__rayleigh_fit__ import main as __rayleigh_fit__
+from visualizer.__telecover__ import main as __telecover__
+from visualizer.__polarization_calibration__ import main as __polarization_calibration__
+from visualizer.__intercomparison__ import main as __intercomparison__
+from scc_converter.readers.parse_args import check_parser as check_cnv
+from processor.readers.parse_args import check_parser as check_prs
+from visualizer.readers.parse_qck_args import check_parser as check_qck
+from visualizer.readers.parse_ray_args import check_parser as check_ray
+from visualizer.readers.parse_tlc_args import check_parser as check_tlc
+from visualizer.readers.parse_pcb_args import check_parser as check_pcb
+from scc_converter.readers.parse_args import view_parser as view_cnv
+from processor.readers.parse_args import view_parser as view_prs
+from visualizer.readers.parse_qck_args import view_parser as view_qck
+from visualizer.readers.parse_ray_args import view_parser as view_ray
+from visualizer.readers.parse_tlc_args import view_parser as view_tlc
+from visualizer.readers.parse_pcb_args import view_parser as view_pcb
 
 # from visualizer.readers.parse_cmp_args import call_parser as parse_cmp
 
 warnings.filterwarnings('ignore')
 
-def scc_converter(cnv_args, process_cnv, reprocess = True):
-    
-    # QA files
-    ray_QA_files = glob.glob(os.path.join(cnv_args['output_folder'], 'ray_*.nc'))
-    tlc_QA_files = glob.glob(os.path.join(cnv_args['output_folder'], 'tlc_*.nc'))
-    pcl_QA_files = glob.glob(os.path.join(cnv_args['output_folder'], 'pcl_*.nc'))
+def converter(cnv_args, cnv_out, processing, reprocess = True):
 
-    # Ececute scc_converter
-    if (len(ray_QA_files) == 0 or reprocess == True) and \
-        process_cnv['rayleigh_fit'] == True:
-        
-        if os.path.exists(cnv_args['parent_folder']):
-            os.makedirs(cnv_args['output_folder'], exist_ok = True)
-        
-        cnv_ray_args = cnv_args.copy()
-        cnv_ray_args['mode'] = 'R'
-        
-        cleaner.files(cnv_ray_args['output_folder'], pattern = 'ray_*', extension = 'nc')
-        converter(cnv_ray_args)
-
-    if (len(tlc_QA_files) == 0 or reprocess == True) and \
-        process_cnv['telecover'] == True:
-        
-        if os.path.exists(cnv_args['parent_folder']):
-            os.makedirs(cnv_args['output_folder'], exist_ok = True)       
-            
-            cnv_tlc_args = cnv_args.copy()
-            cnv_tlc_args['mode'] = 'T'
-                    
-            cleaner.files(cnv_tlc_args['output_folder'], pattern = 'tlc_*', extension = 'nc')
-            converter(cnv_tlc_args)
+    cnv_ray_file = []
+    cnv_tlc_file = []
+    cnv_pcb_file = []
     
-    if (len(pcl_QA_files) == 0 or reprocess == True) and \
-        process_cnv['polarization_calibration'] == True:
+    if processing['ray'] == True:
+        
+        cnv_ray_args = cnv_args.copy()   
+        cnv_ray_args['mode'] = 'R'        
+        cnv_ray_args['output_folder'] = cnv_out 
+        cnv_ray_args = check_cnv(cnv_ray_args)
+    
+        os.makedirs(cnv_out, exist_ok = True)
+    
+        if reprocess == True:
+            for file in glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc')):
+                os.remove(file)
                 
-        if os.path.exists(cnv_args['parent_folder']):
-            os.makedirs(cnv_args['output_folder'], exist_ok = True)
-            
-        cnv_pcl_args = cnv_args.copy()
-        cnv_pcl_args['mode'] = 'C'
-        
-        if cnv_pcl_args['rayleigh_filename'] == None:
-            ray_QA_file = glob.glob(os.path.join(cnv_args['output_folder'], 'ray_*.nc'))
-            if len(ray_QA_file) >= 1:
-                cnv_pcl_args['rayleigh_filename'] = ray_QA_file[0]
-                if len(ray_QA_file) > 1:
-                    print(f'-- Warning: More than 1 rayleigh QA files available to link with the calibration. File {ray_QA_file[0]} was automatically selected. Please make sure this is the correct file')
+        # QA files
+        cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
+        if len(cnv_ray_file) > 1:
+            raise Exception(f'More than one rayleigh fit files detected in folder {cnv_out}. Please make sure that only one rayleigh file exists in that folder ')
+       
+        # Ececute scc_converter
+        if len(cnv_ray_file) == 0 and processing['ray'] == True:
+            view_cnv(cnv_ray_args)
+            files = __scc_converter__(cnv_ray_args, __version__ = __version__)
+            if files['rayleigh'] != None:
+                cnv_ray_file = [files['rayleigh']]
             else:
-                print(f"-- No rayleigh QA file detected inside {cnv_args['output_folder']}. Please either process a rayleigh measurement or manually provide the file in that folder in order to proceed")
-            
-        cleaner.files(cnv_pcl_args['output_folder'], pattern = 'pcl_*', extension = 'nc')
-        converter(cnv_pcl_args)
-    
-    return
-
-def QA_test(input_folder, prs_args, vis_args, test_type, process = True,
-            reprocess_prs = True, reprocess_vis = True, quicklook = True,
-            skip = False):
-    
-    # Find QA files and ascociated telecover files
-    prs_files = \
-        glob.glob(os.path.join(prs_args['output_folder'], 
-                               f'{test_type}_*_ATLAS_*.nc'))
-        
-    if os.path.exists(prs_args['output_folder']):
-        prs_qck_files = \
-            [os.path.join(prs_args['output_folder'], 
-                          f'qck_{os.path.basename(prs_file)[4:]}') 
-                          for prs_file in prs_files]
+                cnv_ray_file = []
     else:
-        prs_qck_files = []
+        # QA files
+        cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
+        if len(cnv_ray_file) > 1:
+            raise Exception(f'More than one rayleigh fit files detected in folder {cnv_out}. Please make sure that only one rayleigh file exists in that folder ')
+       
+        
+    if processing['tlc'] == True:
+        cnv_tlc_args = cnv_args.copy()  
+        cnv_tlc_args['mode'] = 'T'  
+        cnv_tlc_args['output_folder'] = cnv_out 
+        cnv_tlc_args = check_cnv(cnv_tlc_args)
+        
+        os.makedirs(cnv_out, exist_ok = True)
     
-        
-    cnv_files = glob.glob(os.path.join(input_folder, f'{test_type}_*.nc'))
-    
-    # Excecute ATLAS preprocessor
-    if (len(prs_files) == 0 or reprocess_prs == True) and process == True:
-        
-        os.makedirs(prs_args['output_folder'], exist_ok = True)
-            
-        for file in prs_files: 
-            if os.path.exists(file): 
+        if reprocess == True:
+            for file in glob.glob(os.path.join(cnv_out, '*_tlc_ATLAS_*.nc')):
                 os.remove(file)
-        for file in prs_qck_files:
-            if os.path.exists(file): 
-                os.remove(file)
-        for file in cnv_files:
-            prs_args['input_file'] = file
-            prs_args['quicklook'] = quicklook
-            processor(prs_args, __version__)
-
-    prs_files_out = \
-        glob.glob(os.path.join(prs_args['output_folder'], f'{test_type}_*ATLAS*.nc'))
-
-    vis_files = glob.glob(os.path.join(vis_args['output_folder'], '{test_type}_*.png'))
+                
+        # QA files          
+        cnv_tlc_file = glob.glob(os.path.join(cnv_out, '*_tlc_ATLAS_*.nc'))
+        if len(cnv_tlc_file) > 1:
+            raise Exception(f'More than one telecover files detected in folder {cnv_out}. Please make sure that only one telecover file exists in that folder ')
         
-    if os.path.exists(vis_args['output_folder']):
-        vis_qck_files = \
-            [os.path.join(prs_args['output_folder'], 
-                          f'qck_{os.path.basename(vis_file)[4:]}') 
-                          for vis_file in vis_files]
-    else:
-        vis_qck_files = []
-        
-    if (len(vis_files) == 0 or reprocess_vis == True) and skip == False and \
-        process == True:
-            
-        for file in vis_files:  
-            if os.path.exists(file): 
-                os.remove(file)
-        for file in vis_qck_files:  
-            if os.path.exists(file): 
-                os.remove(file)
-        for file in prs_files_out:
-            vis_args['input_file'] = file
-            if test_type == 'ray':
-                os.makedirs(vis_args['output_folder'], exist_ok = True)
-                ray(vis_args)
-            elif test_type == 'tlc':
-                os.makedirs(vis_args['output_folder'], exist_ok = True)
-                tlc(vis_args)
-            elif test_type == 'pcl': 
-                os.makedirs(vis_args['output_folder'], exist_ok = True)
-                pcl(vis_args)
+        # Ececute scc_converter
+        if len(cnv_tlc_file) == 0 and processing['tlc'] == True:
+            view_cnv(cnv_tlc_args)
+            files = __scc_converter__(cnv_tlc_args, __version__ = __version__)
+            if files['telecover'] != None:
+                cnv_tlc_file = [files['telecover']]                
             else:
-                raise Exception(f'Test type {test_type} not recognized please use one of ray, tlc or pcl ')
-    
-    return
-
-def quicklook(input_folder, vis_args, reprocess = True, skip = False):
-
-    files = glob.glob(os.path.join(vis_args['output_folder'], 'qck_*.png'))
-
-    ATLAS_files = \
-        glob.glob(os.path.join(input_folder, 'qck_*_ATLAS_*.nc'))
-
-    # Excecute ATLAS visualizer
-    if (len(files) == 0 or reprocess == True) and skip == False:
-                    
-        # cleaner.files(vis_args['output_folder'], pattern = 'qck_*', 
-        #               extension = 'png')
-        for file in ATLAS_files:
-            os.makedirs(vis_args['output_folder'], exist_ok = True)
-            vis_args['input_file'] = file
-            qck(vis_args)
-    
-    return
-
-def intercomparison(input_folder_1, input_folder_2, vis_args, reprocess = True, skip = False):
-
-    files = glob.glob(os.path.join(vis_args['output_folder'], 'cmp_*.png'))
-
-    ATLAS_files_1 = \
-        glob.glob(os.path.join(input_folder_1, 'ray_*_ATLAS_*.nc'))
+                cnv_ray_file = []
         
-    if len(ATLAS_files_1) > 1:
-        raise Exception(f'Too many input rayleigh files ({ATLAS_files_1}) for the intercomparison for lidar_1. Please make sure there is only one rayleigh file in the folder ')
+    else:
+        # QA files          
+        cnv_tlc_file = glob.glob(os.path.join(cnv_out, '*_tlc_ATLAS_*.nc'))
+        if len(cnv_tlc_file) > 1:
+            raise Exception(f'More than one telecover files detected in folder {cnv_out}. Please make sure that only one telecover file exists in that folder ')
 
-    ATLAS_files_2 = \
-        glob.glob(os.path.join(input_folder_2, 'ray_*_ATLAS_*.nc'))
 
-    if len(ATLAS_files_2) > 1:
-        raise Exception(f'Too many input rayleigh files ({ATLAS_files_2}) for the intercomparison for lidar_2. Please make sure there is only one rayleigh file in the folder ')
+    if processing['pcb'] == True:
+
+        cnv_pcb_args = cnv_args.copy()   
+        cnv_pcb_args['mode'] = 'C' 
+        cnv_pcb_args['output_folder'] = cnv_out 
+        cnv_pcb_args = check_cnv(cnv_pcb_args)
         
-    # Excecute ATLAS visualizer
-    if (len(files) == 0 or reprocess == True) and skip == False:
-                    
-        # cleaner.files(vis_args['output_folder'], pattern = 'cmp_*', 
-        #               extension = 'png')
-        if len(ATLAS_files_1) != 0 and len(ATLAS_files_2) != 0:
-            os.makedirs(vis_args['output_folder'], exist_ok = True)
-            vis_args['input_files'] = [ATLAS_files_1[0], ATLAS_files_2[0]]
-            cmp(vis_args)
+        os.makedirs(cnv_out, exist_ok = True)
     
-    return
+        if reprocess == True:
+            for file in glob.glob(os.path.join(cnv_out, '*_pcb_ATLAS_*.nc')):
+                os.remove(file)
+                
+        # QA files          
+        cnv_pcb_file = glob.glob(os.path.join(cnv_out, '*_pcb_ATLAS_*.nc'))        
+        if len(cnv_pcb_file) > 1:
+            raise Exception(f'More than one polarization calibration files detected in folder {cnv_out}. Please make sure that only one polarization calibration file exists in that folder ')         
+
+        cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
+        if len(cnv_ray_file) > 1:
+            raise Exception(f'More than one rayleigh fit files detected in folder {cnv_out}. Please make sure that only one polarization calibration file exists in that folder ')         
+    
+        if cnv_pcb_args['rayleigh_filename'] == None and len(cnv_ray_file) == 1:
+            cnv_pcb_args['rayleigh_filename'] = os.path.basename(cnv_ray_file[0])
+        else:
+            raise Exception(f'Rayleigh file not found inside {cnv_out}. A Rayleigh measurement is mandatory for the pol. calibration test. Include the Rayleigh files if not already included and reprocess. If the files are already there consider setting newdata = True ')
+    
+        # Ececute scc_converter
+        if len(cnv_pcb_file) == 0 and processing['pcb'] == True:
+            view_cnv(cnv_pcb_args)
+            files = __scc_converter__(cnv_pcb_args, __version__ = __version__)
+            if files['polarization_calibration'] != None:
+                cnv_pcb_file = [files['polarization_calibration']]
+            else:
+                cnv_pcb_file = []
+    else:
+        # QA files          
+        cnv_pcb_file = glob.glob(os.path.join(cnv_out, '*_pcb_ATLAS_*.nc'))        
+        if len(cnv_pcb_file) > 1:
+            raise Exception(f'More than one polarization calibration files detected in folder {cnv_out}. Please make sure that only one polarization calibration file exists in that folder ')         
+
+
+    files_out = {'ray' : cnv_ray_file, 
+                 'tlc' : cnv_tlc_file, 
+                 'pcb' : cnv_pcb_file}
+    
+    return(files_out)
+
+def preprocessor(prs_args, cnv_files, prs_out, quicklook, processing, reprocess = True):
+
+    prs_ray_file = []
+    prs_tlc_file = []
+    prs_pcb_file = []
+
+    prs_ray_qck_file = []
+    prs_tlc_qck_file = []
+    prs_pcb_qck_file = []
+    
+    if processing['ray'] == True and len(cnv_files['ray']) == 1:
+        
+        prs_ray_args = prs_args.copy()  
+        prs_ray_args['input_file'] = cnv_files['ray'][0]   
+        prs_ray_args['quicklook'] = quicklook['ray']   
+        prs_ray_args['output_folder'] = prs_out
+        prs_ray_args = check_prs(prs_ray_args)
+        
+        os.makedirs(prs_out, exist_ok = True)
+        
+        if reprocess == True:
+            for file in glob.glob(os.path.join(prs_out, '*_ray_ATLAS_*.nc')):
+                os.remove(file)
+            for file in glob.glob(os.path.join(prs_out, '*_ray_qck_ATLAS_*.nc')):
+                os.remove(file)
+                
+        # Preprocessed files - shoulde be zero if reprocess is True
+        prs_ray_file = glob.glob(os.path.join(prs_out, '*_ray_ATLAS_*_prepro.nc'))
+         
+        if len(prs_ray_file) > 1:
+            raise Exception(f'More than one rayleigh fit files detected in folder {prs_out}. Please make sure that only one rayleigh file exists in that folder ')
+       
+        if len(prs_ray_file) > 0:
+            meas_ID = os.path.basename(prs_ray_file[0])[:15]
+            prs_ray_qck_file = \
+                glob.glob(os.path.join(prs_out, f'{meas_ID}*_ray_qck_ATLAS_*_prepro.nc'))
+       
+        # Excecute ATLAS preprocessor
+        if len(prs_ray_file) == 0 and processing['ray'] == True:
+            view_prs(prs_ray_args)
+            files = __preprocessor__(prs_ray_args, __version__)
+            prs_ray_file = files['ray']
+            prs_ray_qck_file = files['qck'] 
+
+    else:
+        # Preprocessed files - shoulde be zero if reprocess is True
+        prs_ray_file = glob.glob(os.path.join(prs_out, '*_ray_ATLAS_*_prepro.nc'))
+ 
+        if len(prs_ray_file) > 1:
+            raise Exception(f'More than one rayleigh fit files detected in folder {prs_out}. Please make sure that only one rayleigh file exists in that folder ')
+       
+        if len(prs_ray_file) > 0:
+            meas_ID = os.path.basename(prs_ray_file[0])[:15]
+            prs_ray_qck_file = \
+                glob.glob(os.path.join(prs_out, f'{meas_ID}*_ray_qck_ATLAS_*_prepro.nc'))
+   
+    if processing['tlc'] == True and len(cnv_files['tlc']) == 1:
+        
+        prs_tlc_args = prs_args.copy()   
+        prs_tlc_args['input_file'] = cnv_files['tlc'][0]        
+        prs_tlc_args['quicklook'] = quicklook['tlc'] 
+        prs_tlc_args['output_folder'] = prs_out
+        prs_tlc_args = check_prs(prs_tlc_args)
+    
+        os.makedirs(prs_out, exist_ok = True)
+        
+        if reprocess == True:
+            for file in glob.glob(os.path.join(prs_out, '*_tlc_ATLAS_*.nc')):
+                os.remove(file)
+            for file in glob.glob(os.path.join(prs_out, '*_tlc_qck_ATLAS_*.nc')):
+                os.remove(file)
+                
+        # Preprocessed files - shoulde be zero if reprocess is True
+        prs_tlc_file = glob.glob(os.path.join(prs_out, '*_tlc_ATLAS_*_prepro.nc'))
+    
+        if len(prs_tlc_file) > 1:
+            raise Exception(f'More than one telecover files detected in folder {prs_out}. Please make sure that only one telecover file exists in that folder ')
+    
+        # Excecute ATLAS preprocessor
+        if len(prs_tlc_file) > 0:
+            meas_ID = os.path.basename(prs_tlc_file[0])[:15]
+            prs_tlc_qck_file = \
+                glob.glob(os.path.join(prs_out, f'{meas_ID}*_tlc_qck_ATLAS_*_prepro.nc'))
+    
+        if len(prs_tlc_file) == 0 and processing['tlc'] == True:
+            view_prs(prs_tlc_args)
+            files = __preprocessor__(prs_tlc_args, __version__)
+            prs_tlc_file = files['tlc']
+            prs_tlc_qck_file = files['qck']
+
+    else:
+        # Preprocessed files - shoulde be zero if reprocess is True
+        prs_tlc_file = glob.glob(os.path.join(prs_out, '*_tlc_ATLAS_*_prepro.nc'))
+    
+        if len(prs_tlc_file) > 1:
+            raise Exception(f'More than one telecover files detected in folder {prs_out}. Please make sure that only one telecover file exists in that folder ')
+    
+        # Excecute ATLAS preprocessor
+        if len(prs_tlc_file) > 0:
+            meas_ID = os.path.basename(prs_tlc_file[0])[:15]
+            prs_tlc_qck_file = \
+                glob.glob(os.path.join(prs_out, f'{meas_ID}*_tlc_qck_ATLAS_*_prepro.nc'))
+        else: prs_tlc_qck_file = []
+
+    if processing['pcb'] == True and len(cnv_files['pcb']) == 1:
+
+        prs_pcb_args = prs_args.copy()   
+        prs_pcb_args['input_file'] = cnv_files['pcb'][0]   
+        prs_pcb_args['quicklook'] = quicklook['pcb'] 
+        prs_pcb_args['output_folder'] = prs_out
+        prs_pcb_args = check_prs(prs_pcb_args)
+        
+        os.makedirs(prs_out, exist_ok = True)
+        
+        if reprocess == True:
+            for file in glob.glob(os.path.join(prs_out, '*_pcb_ATLAS_*.nc')):
+                os.remove(file)
+            for file in glob.glob(os.path.join(prs_out, '*_pcb_qck_ATLAS_*.nc')):
+                os.remove(file)
+            
+        # Preprocessed files - shoulde be zero if reprocess is True
+        prs_pcb_file = glob.glob(os.path.join(prs_out, '*_pcb_ATLAS_*_prepro.nc'))
+        
+        if len(prs_pcb_file) > 1:
+            raise Exception(f'More than one polarization calibration files detected in folder {prs_out}. Please make sure that only one polarization calibration file exists in that folder ')
+        
+        # Excecute ATLAS preprocessor            
+        if len(prs_pcb_file) > 0:
+            meas_ID = os.path.basename(prs_pcb_file[0])[:15]
+            prs_pcb_qck_file = \
+                glob.glob(os.path.join(prs_out, f'{meas_ID}*_pcb_qck_ATLAS_*_prepro.nc'))
+    
+        if len(prs_pcb_file) == 0 and processing['pcb'] == True:
+            view_prs(prs_pcb_args)
+            files = __preprocessor__(prs_pcb_args, __version__)
+            prs_pcb_file = files['pcb']
+            prs_pcb_qck_file = files['qck']
+
+    else:
+        # Preprocessed files - shoulde be zero if reprocess is True
+        prs_pcb_file = glob.glob(os.path.join(prs_out, '*_pcb_ATLAS_*_prepro.nc'))
+        
+        if len(prs_pcb_file) > 1:
+            raise Exception(f'More than one polarization calibration files detected in folder {prs_out}. Please make sure that only one polarization calibration file exists in that folder ')
+        
+        # Excecute ATLAS preprocessor            
+        if len(prs_pcb_file) > 0:
+            meas_ID = os.path.basename(prs_pcb_file[0])[:15]
+            prs_pcb_qck_file = \
+                glob.glob(os.path.join(prs_out, f'{meas_ID}*_pcb_qck_ATLAS_*_prepro.nc'))
+            
+    files_out = {'ray' : prs_ray_file, 
+                 'tlc' : prs_tlc_file, 
+                 'pcb' : prs_pcb_file,
+                 'ray_qck' : prs_ray_qck_file, 
+                 'tlc_qck' : prs_tlc_qck_file, 
+                 'pcb_qck' : prs_pcb_qck_file}
+    
+    return(files_out)
+
+def ray_test(ray_args, prs_files, ray_out, processing, reprocess = True):
+
+    if processing['ray'] == True and len(prs_files['ray']) == 1:
+    
+        ray_args = ray_args.copy()   
+        
+        ray_args['input_file'] = prs_files['ray'][0]   
+        
+        ray_args = check_ray(ray_args)
+        
+        ray_args['output_folder'] = ray_out
+        os.makedirs(ray_out, exist_ok = True)
+        
+        if reprocess == True:
+            for file in glob.glob(os.path.join(ray_out, '*_ray_*_ATLAS_*.png')):
+                os.remove(file)
+    
+        # Excecute ATLAS visualizer
+        view_ray(ray_args)
+        __rayleigh_fit__(ray_args, __version__)
+
+    return()
+
+def tlc_test(tlc_args, prs_files, tlc_out, processing, reprocess = True):
+    
+    if processing['tlc'] == True  and len(prs_files['tlc']) == 1:
+        
+        tlc_args = tlc_args.copy()   
+        
+        tlc_args['input_file'] = prs_files['tlc'][0]   
+        
+        tlc_args = check_tlc(tlc_args)
+        
+        tlc_args['output_folder'] = tlc_out
+        os.makedirs(tlc_out, exist_ok = True)
+        
+        if reprocess == True:
+            for file in glob.glob(os.path.join(tlc_out, '*_tlc_*_ATLAS_*.png')):
+                os.remove(file)
+       
+        # Excecute ATLAS visualizer
+        view_tlc(tlc_args)
+        __telecover__(tlc_args, __version__)
+
+    return()
+
+def pcb_test(pcb_args, prs_files, pcb_out, processing, reprocess = True):
+    
+    if processing['pcb'] == True and len(prs_files['pcb']) == 1:
+    
+        pcb_args = pcb_args.copy()   
+        
+        pcb_args['input_file'] = prs_files['pcb'][0]   
+        
+        pcb_args = check_pcb(pcb_args)
+        
+        pcb_args['output_folder'] = pcb_out
+        os.makedirs(pcb_out, exist_ok = True)
+        
+        if reprocess == True:
+            for file in glob.glob(os.path.join(pcb_out, '*_pcb_*_ATLAS_*.png')):
+                os.remove(file)
+    
+        # Excecute ATLAS visualizer
+        view_pcb(pcb_args)
+        __polarization_calibration__(pcb_args, __version__)
+
+    return()
+
+def quicklook(qck_args, prs_files, qck_out, quicklook, reprocess = True):
+
+    if quicklook['ray'] == True and len(prs_files['ray_qck']) == 1:
+
+        qck_ray_args = qck_args.copy()   
+        
+        qck_ray_args['input_file'] = prs_files['ray_qck'][0]   
+        
+        qck_ray_args = check_qck(qck_ray_args)
+       
+        qck_ray_args['output_folder'] = qck_out
+        os.makedirs(qck_out, exist_ok = True)
+        
+        if reprocess == True:
+            for file in glob.glob(os.path.join(qck_out, '*_ray_qck_*_ATLAS_*.png')):
+                os.remove(file)
+    
+        # Excecute ATLAS visualizer
+        view_qck(qck_ray_args)
+        __quicklook__(qck_ray_args, __version__, meas_type = 'ray')
+    
+    elif quicklook['ray'] == True and len(prs_files['ray_qck']) == 0:
+        print('-- Warning: Rayleight quicklook visualization was enabled but no file from the preprocessing stage was found. Please make sure that the quicklook option is enable in the preprocessor. If not, the measurement might need to be reprocessed (set newdata to True)')
+        
+    if quicklook['tlc'] == True and len(prs_files['tlc_qck']) == 1:
+        
+        qck_tlc_args = qck_args.copy() 
+
+        if len(prs_files['tlc_qck']) == 1 and len(prs_files['tlc_qck']) == 1:
+            qck_tlc_args['input_file'] = prs_files['tlc_qck'][0]        
+        
+        qck_tlc_args = check_qck(qck_tlc_args)
+    
+        qck_tlc_args['output_folder'] = qck_out
+        os.makedirs(qck_out, exist_ok = True)
+    
+        if reprocess == True:
+            for file in glob.glob(os.path.join(qck_out, '*_tlc_qck_*_ATLAS_*.nc')):
+                os.remove(file)
+        
+        # Excecute ATLAS visualizer
+        view_qck(qck_tlc_args)
+        __quicklook__(qck_tlc_args, __version__, meas_type = 'tlc')
+
+    elif quicklook['tlc'] == True and len(prs_files['tlc_qck']) == 0:
+        print('-- Warning: Telecover quicklook visualization was enabled but no file from the preprocessing stage was found. Please make sure that the quicklook option is enable in the preprocessor. If not, the measurement might need to be reprocessed (set newdata to True)')
+        
+    if quicklook['pcb'] == True and len(prs_files['pcb_qck']) == 1:
+        
+        qck_pcb_args = qck_args.copy()   
+
+        if len(prs_files['pcb_qck']) == 1 and len(prs_files['pcb_qck']) == 1:
+            qck_pcb_args['input_file'] = prs_files['pcb_qck'][0]   
+        
+        qck_pcb_args = check_qck(qck_pcb_args)    
+        
+        qck_pcb_args['output_folder'] = qck_out
+        os.makedirs(qck_out, exist_ok = True)
+        
+        if reprocess == True:
+            for file in glob.glob(os.path.join(qck_out, '*_pcb_qck_*_ATLAS_*.nc')):
+                os.remove(file)
+            
+        # Excecute ATLAS visualizer
+        view_qck(qck_pcb_args)
+        __quicklook__(qck_pcb_args, __version__, meas_type = 'pcb')
+
+    elif quicklook['pcb'] == True and len(prs_files['pcb_qck']) == 0:
+        print('-- Warning: Polarization calibration quicklook visualization was enabled but no file from the preprocessing stage was found. Please make sure that the quicklook option is enable in the preprocessor. If not, the measurement might need to be reprocessed (set newdata to True)')
+                    
+    return()

@@ -89,10 +89,6 @@ def sliding_average_1D(y_vals, x_vals, x_sm_lims, x_sm_hwin, expo):
             y_vals_sm[i] = np.nanmean(y_vals[i-int(ihwin):i+int(ihwin)+1])
             
             y_vals_sem[i] = np.nanstd(y_vals[i-int(ihwin):i+int(ihwin)+1]) /\
-                np.sqrt(2. * ihwin + 1.)
-
-        
-        if np.isnan(ihwin):
-            y_vals_sm[i] = np.nan
+                np.sqrt(y_vals[i-int(ihwin):i+int(ihwin)+1].size)
     
     return(y_vals_sm, y_vals_sem)

@@ -17,7 +17,7 @@ def to_a_point(sig, sig_b, x_vals, norm, hwin, axis, axis_b = 0):
 
     # Get the reference window in bins    
     hwin_bin = get_hwin_bin(x_vals = x_vals, hwin = hwin)
-        
+
     sig_sel = choose_from_axis(sig, axis, 
                                norm_bin - hwin_bin, 
                                norm_bin + hwin_bin + 1)
@@ -34,7 +34,7 @@ def to_a_point(sig, sig_b, x_vals, norm, hwin, axis, axis_b = 0):
 
     # sig_n = sig * norm_coef
 
-    return(norm_coef)
+    return(norm_coef, norm_bin)
 
 def get_norm_bin(x_vals, norm):
 
@@ -68,11 +68,13 @@ def choose_from_axis(a, axis, start, stop):
         s = [slice(None) for i in range(a.ndim)]
         
         s[axis] = slice(start, stop)
+        
+        s = tuple(s)
 
     else:
         raise('-- Error: The provided axis index is larger than the number ' +
               'of the axises of the array')
-    
+
     return a[s]
 
 def add_axis(a, axis):

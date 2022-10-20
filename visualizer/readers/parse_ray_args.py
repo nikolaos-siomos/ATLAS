@@ -33,13 +33,13 @@ def call_parser():
                         help = 'If called then the input file will be DELETED after processing in order to save space. Use with care! ')
 
     parser.add_argument('--dpi', metavar = 'dpi',
-                        type = int, nargs = '?', default = 100, 
+                        type = int, nargs = '?', default = 300, 
                         help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 100 ')
 
     parser.add_argument('--use_lin_scale', metavar = 'use_lin_scale',
                         type = bool, default = False, 
                         action = argparse.BooleanOptionalAction,
-                        help = 'If called, a linear scale will be used for the z axis (signal) ')
+                        help = 'If called, a linear scale will be used for the x axis (signal) ')
 
     parser.add_argument('--use_distance', metavar = 'use_distance',
                         type = bool, default = True, 
@@ -63,8 +63,8 @@ def call_parser():
                         help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, p: co-polar linear analyzer, c: cross-polar linear analyzer, t: total (no depol), o: co-polar circular analyzer, x: cross-polar circular analyzer, v: vibrational Raman, r: rotational Raman, a: Cabannes, f: fluorescence). Nothing is excluded by default in ATLAS preprocessor ')
 
     parser.add_argument('--exclude_channel_subtype', metavar = 'exclude_channel_subtype',
-                        type = str, nargs = '+', default = [], 
-                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, r: Signal Reflected from a PBS, t: Signal Transmitted through a PBS, n: N2 Ramal line, o: O2 Ramal line, w: H2O Ramal line, c: CH4 Ramal line, h: High Rotational Raman, l: Low Rotational Raman, a: Mie (aerosol) HSRL signal, m: Molecular HSRL signal, b: Broadband Fluorescence, s: Spectral Fluorescence, x: No specific subtype). Nothing is excluded by default in ATLAS preprocessor ')
+                        type = str, nargs = '+', default = ['b', 's', 'a', 'w', 'c'], 
+                        help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, r: Signal Reflected from a PBS, t: Signal Transmitted through a PBS, n: N2 Ramal line, o: O2 Ramal line, w: H2O Ramal line, c: CH4 Ramal line, h: High Rotational Raman, l: Low Rotational Raman, a: Mie (aerosol) HSRL signal, m: Molecular HSRL signal, b: Broadband Fluorescence, s: Spectral Fluorescence, x: No specific subtype). The following subtyoes are excluded by default in ATLAS (b, s, a, w, c) ')
     
     parser.add_argument('--y_lims', metavar = 'y_lims',
                         type = float, nargs = 2, default = [None, None], 
@@ -118,6 +118,23 @@ def check_parser(args):
         if not args[mandatory_args[i]]:
             raise Exception(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')            
 
+    if not os.path.exists(args['input_file']):
+        raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
+    
+    if '_ray_' not in os.path.basename(args['input_file']):
+        raise Exception('---- Error: Measurement filename not understood! The filename should contain the _ray_ field (quicklook)')
+    
+    if args['output_folder'] == None:
+        out_path = os.path.join(os.path.dirname(args['input_file']),'..','..', 'plots')
+        args['output_folder'] = out_path
+        os.makedirs(args['output_folder'], exist_ok = True)
+    elif not os.path.exists(args['output_folder'] ):
+        raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
+        
+    return(args)
+
+def view_parser(args):
+    
     print(" ")
     print("-- Rayleigh Fit arguments!")
     print("-------------------------------------------------------------------")
@@ -125,18 +142,5 @@ def check_parser(args):
         print(f"{key} = {args[key]}")
     print("-------------------------------------------------------------------")
     print("")
-
-    if not os.path.exists(args['input_file']):
-        raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
     
-    if os.path.basename(args['input_file'])[:3] != 'ray':
-        raise Exception('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
-    
-    if args['output_folder'] == None:
-        out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas_visualizer', 'ray')
-        args['output_folder'] = out_path
-        os.makedirs(args['output_folder'], exist_ok = True)
-    elif not os.path.exists(args['output_folder'] ):
-        raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
-        
-    return(args)
+    return()

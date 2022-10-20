@@ -33,42 +33,37 @@ def call_parser():
                         help = 'If called then the input file will be DELETED after processing in order to save space. Use with care! ')
 
     parser.add_argument('--dpi', metavar = 'dpi',
-                        type = int, nargs = '?', default = 100, 
+                        type = int, nargs = '?', default = 300, 
                         help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 100 ')
-
-    parser.add_argument('--use_lin_scale', metavar = 'use_lin_scale',
-                        type = bool, default = False, 
-                        action = argparse.BooleanOptionalAction,
-                        help = 'If called, a linear scale will be used for the z axis (signal) ')
 
     parser.add_argument('--use_distance', metavar = 'use_distance',
                         type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
-                        help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
+                        help = 'If called, the x axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
 
-    parser.add_argument('--x_lims_calibration', metavar = 'x_lims_clibration',
+    parser.add_argument('--y_lims_calibration', metavar = 'y_lims_clibration',
                         type = float, nargs = 2, default = [None, None], 
-                        help = 'The x axis limits (lower and upper) of the gain ratios at +-45. ')
-
-    parser.add_argument('--x_lims_rayleigh', metavar = 'x_lims_rayleigh',
-                        type = float, nargs = 2, default = [0., 0.05], 
-                        help = 'The x axis limits (lower and upper) of the gain ratios at +-45. ')
-
-    parser.add_argument('--y_lims_calibration', metavar = 'y_lims_calibration',
-                        type = float, nargs = 2, default = [0., 5.], 
-                        help = 'The y axis limits in km (lower and upper) for the pol. calibration plot. If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
-
-    parser.add_argument('--y_tick_calibration', metavar = 'x_tick_calibration',
-                        type = int, nargs = '?', default = 0.5, 
-                        help = 'The y axis finest tick in km for the pol. calibration plot. Defaults to 0.5km ')
+                        help = 'The y axis limits (lower and upper) of the gain ratios at +-45. ')
 
     parser.add_argument('--y_lims_rayleigh', metavar = 'y_lims_rayleigh',
-                        type = float, nargs = 2, default = [0., 10.], 
-                        help = 'The y axis limits in km (lower and upper) for the Rayleigh VDR plot. If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
+                        type = float, nargs = 2, default = [None, None], 
+                        help = 'The y axis limits (lower and upper) of the gain ratios at +-45. ')
 
-    parser.add_argument('--y_tick_rayleigh', metavar = 'x_tick_rayleigh',
+    parser.add_argument('--x_lims_calibration', metavar = 'x_lims_calibration',
+                        type = float, nargs = 2, default = [0., 5.], 
+                        help = 'The x axis limits in km (lower and upper) for the pcb. calibration plot. If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
+
+    parser.add_argument('--x_tick_calibration', metavar = 'x_tick_calibration',
+                        type = int, nargs = '?', default = 0.5, 
+                        help = 'The x axis finest tick in km for the pcb. calibration plot. Defaults to 0.5km ')
+
+    parser.add_argument('--x_lims_rayleigh', metavar = 'x_lims_rayleigh',
+                        type = float, nargs = 2, default = [0., 10.], 
+                        help = 'The x axis limits in km (lower and upper) for the Rayleigh VDR plot. If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
+
+    parser.add_argument('--x_tick_rayleigh', metavar = 'x_tick_rayleigh',
                         type = int, nargs = '?', default = 1, 
-                        help = 'The y axis finest tick in km for the Rayleigh VDR plot. Defaults to 1km ')
+                        help = 'The x axis finest tick in km for the Rayleigh VDR plot. Defaults to 1km ')
 
     parser.add_argument('--ch_r', metavar = 'ch_r',
                         type = str, nargs = '+',
@@ -79,12 +74,12 @@ def call_parser():
                         help = 'Type one or more channel names (e.g. xpat0355) here that correspond to the transmitted channels used for the polarization calibration calculation. The number of transmitted channels must be the same as the number of the respective reflected channels ')
 
     parser.add_argument('--calibration_height', metavar = 'calibration_height',
-                        type = float, nargs = '?', default = 3., 
-                        help = 'The calibration height/distance where the signals will be normalized for the Rayleigh fit. If use_distance is called, the limits correspond to distance. Defaults to 9 km ')
+                        type = float, nargs = '?', default = 5., 
+                        help = 'The calibration height/distance where the signals will be normalized for the Rayleigh fit. If use_distance is called, the limits correspond to distance. Defaults to 5 km ')
 
     parser.add_argument('--half_calibration_window', metavar = 'half_calibration_window',
                         type = float, nargs = '?', default = 500., 
-                        help = 'The half window in meters used for the calibration. Defaults to 100 m ')
+                        help = 'The half window in meters used for the calibration. Defaults to 500 m ')
 
     parser.add_argument('--rayleigh_height', metavar = 'rayleigh_height',
                         type = float, nargs = '?', default = 9., 
@@ -118,19 +113,19 @@ def call_parser():
 
     parser.add_argument('-G_R', "--G_R", metavar = 'G_R',
                         type = float, nargs = '+', default = None, 
-                        help = 'The G value for the reflected channel of the pair. Defaults to 1 for all channels (no receiver optics + emitted pol. state correction) ')
+                        help = 'The G value for the reflected channel of the pair. Defaults to 1 for all channels (no receiver optics + emitted pcb. state correction) ')
 
     parser.add_argument('-G_T', "--G_T", metavar = 'G_T',
                         type = float, nargs = '+', default = None, 
-                        help = 'The G value for the transmitted channel of the pair. Defaults to 1 for all channels (no receiver optics + emitted pol. state correction) ')
+                        help = 'The G value for the transmitted channel of the pair. Defaults to 1 for all channels (no receiver optics + emitted pcb. state correction) ')
 
     parser.add_argument('-H_R', "--H_R", metavar = 'H_R',
                         type = float, nargs = '+', default = None, 
-                        help = 'The H value for the reflected channel of the pair. Defaults to 1 or -1 for all co-polar (p) and cross-polar (c) reflected channels, respectively (no receiver optics + emitted pol. state correction) ')
+                        help = 'The H value for the reflected channel of the pair. Defaults to 1 or -1 for all co-polar (p) and cross-polar (c) reflected channels, respectively (no receiver optics + emitted pcb. state correction) ')
 
     parser.add_argument('-H_T', "--H_T", metavar = 'H_T',
                         type = float, nargs = '+', default = None, 
-                        help = 'The H value for the transmitted channel of the pair. Defaults to 1 or -1 for all co-polar (p) and cross-polar (c) transmitted channels, respectively (no receiver optics + emitted pol. state correction) ')
+                        help = 'The H value for the transmitted channel of the pair. Defaults to 1 or -1 for all co-polar (p) and cross-polar (c) transmitted channels, respectively (no receiver optics + emitted pcb. state correction) ')
 
     parser.add_argument("--R_to_T_transmission_ratio", metavar = 'R_to_T_transmission_ratio',
                         type = float, nargs = '+', default = None, 
@@ -149,23 +144,15 @@ def check_parser(args):
     for i in range(len(mandatory_args)):
         if not args[mandatory_args[i]]:
             raise Exception(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')            
-        
-    print(" ")
-    print("-- Pol. Calibration arguments!")
-    print("-------------------------------------------------------------------")
-    for key in args.keys():
-        print(f"{key} = {args[key]}")
-    print("-------------------------------------------------------------------")
-    print("")
 
     if not os.path.exists(args['input_file']):
         raise Exception(f"-- Error: The path to the input file does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
     
-    if os.path.basename(args['input_file'])[:3] != 'pcl':
-        raise Exception('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
+    if '_pcb_' not in os.path.basename(args['input_file']):
+        raise Exception('---- Error: Measurement filename not understood! The filename should contain the _pcb_ field (polarization_calibration)')
     
     if args['output_folder'] == None:
-        out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas_visualizer', 'pcl')
+        out_path = os.path.join(os.path.dirname(args['input_file']),'..','..', 'plots')
         args['output_folder'] = out_path
         os.makedirs(args['output_folder'], exist_ok = True)
     elif not os.path.exists(args['output_folder'] ):
@@ -176,3 +163,15 @@ def check_parser(args):
             raise Exception('---- Error: The number of reflected channels is different from the number of transmitted channels! Please provide pairs of trasmitted and reflected channels')
         
     return(args)
+
+def view_parser(args):
+    
+    print(" ")
+    print("-- Pol. Calibration arguments!")
+    print("-------------------------------------------------------------------")
+    for key in args.keys():
+        print(f"{key} = {args[key]}")
+    print("-------------------------------------------------------------------")
+    print("")
+    
+    return()

@@ -40,16 +40,8 @@ def rayleigh(sig, molec, meteo, meas_info, channel_info, time_info,
         nc_file[prop] = (['channel', 'bins'], 
                          molec.loc[dict(properties = prop)].values)
 
-    nc_file.attrs['Molecular_atmosphere_method'] = \
-        molec_info['Molecular_atmosphere_method']
-        
-    if molec_info['Molecular_atmosphere_method'] == 'Radiosonde':
-        discard = ['Molecular_atmosphere_method', 'Measurement_type']
-        keys = [key for key in molec_info.index.values if key not in discard]
-        
-        for idx in keys:
-            nc_file.attrs[f'Radiosonde_{idx}'] = molec_info[idx]
-    
+    for key in molec_info.index.values:
+        nc_file.attrs[key] = molec_info.loc[key]
             
     nc_file['Height_levels'] = heights   
 
@@ -59,15 +51,17 @@ def rayleigh(sig, molec, meteo, meas_info, channel_info, time_info,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
     
-    fname = f'ray_{meas_info.Measurement_ID}_ATLAS_{version}.nc'
+    fname = f'{meas_info.Measurement_ID}_{meas_info.Lidar_Name}_ray_ATLAS_{version}_prepro.nc'
     
-    nc_file.to_netcdf(path = os.path.join(dir_out, fname), mode = 'w')
-        
+    fpath = os.path.join(dir_out, fname)
+    
+    nc_file.to_netcdf(path = fpath, mode = 'w')
+
     print('-- Rayleigh ATLAS file succesfully created!')
     print('-----------------------------------------')
     print('')
 
-    return(nc_file)
+    return([fpath])
 
 def telecover(sig, meas_info, channel_info, time_info, 
               heights, ranges, version, dir_out):
@@ -232,15 +226,17 @@ def telecover(sig, meas_info, channel_info, time_info,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
     
-    fname = f'tlc_{meas_info.Measurement_ID}_ATLAS_{version}.nc'
+    fname = f'{meas_info.Measurement_ID}_{meas_info.Lidar_Name}_tlc_ATLAS_{version}_prepro.nc'
     
-    nc_file.to_netcdf(path = os.path.join(dir_out, fname), mode = 'w')
+    fpath = os.path.join(dir_out, fname)
+    
+    nc_file.to_netcdf(path = fpath, mode = 'w')
 
     print('-- Telecover ATLAS file succesfully created!')
     print('-----------------------------------------')
     print('')
 
-    return(nc_file)
+    return([fpath])
 
 def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray, 
                 channel_info, channel_info_ray, time_info, time_info_ray, 
@@ -315,34 +311,28 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
     for prop in molec.properties.values:
         nc_file[prop] = (['channel', 'bins'], 
                          molec.loc[dict(properties = prop)].values)
-    
-    nc_file.attrs['Molecular_atmosphere_method'] = \
-        molec_info['Molecular_atmosphere_method']
-        
-    if molec_info['Molecular_atmosphere_method'] == 'Radiosonde':
-        discard = ['Molecular_atmosphere_method', 'Measurement_type']
-        keys = [key for key in molec_info.index.values if key not in discard]
-        
-        for idx in keys:
-            nc_file.attrs[f'Radiosonde_{idx}'] = molec_info[idx]
-    
+
+    for key in molec_info.index.values:
+        nc_file.attrs[key] = molec_info.loc[key]    
 
     nc_file.attrs['version'] = version
 
     nc_file.attrs['processing_software'] = 'ATLAS'
     
-    fname = f'pcl_{meas_info.Measurement_ID}_ATLAS_{version}.nc'
+    fname = f'{meas_info.Measurement_ID}_{meas_info.Lidar_Name}_pcb_ATLAS_{version}_prepro.nc'
 
-    nc_file.to_netcdf(path = os.path.join(dir_out, fname), mode = 'w')
+    fpath = os.path.join(dir_out, fname)
+    
+    nc_file.to_netcdf(path = fpath, mode = 'w')
     
     print('-- Calibration ATLAS file succesfully created!')
     print('-----------------------------------------')
     print('')
 
-    return(nc_file)
+    return([fpath])
 
 def quicklook(sig, meas_info, channel_info, time_info, 
-              heights, ranges, version, dir_out):
+              heights, ranges, version, meas_type, dir_out):
 
     print('-----------------------------------------')
     print('Start exporting to a Quicklook ATLAS file...')
@@ -369,13 +359,14 @@ def quicklook(sig, meas_info, channel_info, time_info,
     nc_file.attrs['version'] = version
 
     nc_file.attrs['processing_software'] = 'ATLAS'
+
+    fname = f'{meas_info.Measurement_ID}_{meas_info.Lidar_Name}_{meas_type}_qck_ATLAS_{version}_prepro.nc'
     
-    fname = f'qck_{meas_info.Measurement_ID}_ATLAS_{version}.nc'
-    
-    nc_file.to_netcdf(path = os.path.join(dir_out, fname), mode = 'w')
+    fpath = os.path.join(dir_out, fname)
+    nc_file.to_netcdf(path = fpath, mode = 'w')
     
     print('-- Quicklook ATLAS file succesfully created!')
     print('-----------------------------------------')
     print('')
 
-    return(nc_file)
+    return([fpath])

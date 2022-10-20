@@ -9,46 +9,20 @@ Created on Wed Sep 21 10:21:48 2022
 from version import __version__
 import os, warnings, glob
 from helper_functions import processing_chain
-
-from scc_converter.readers.parse_args import call_parser as parse_cnv
-from processor.readers.parse_args import call_parser as parse_prs
+from helper_functions import parse_intercomparison_args
+from helper_functions import read_intercomparison_config
+from helper_functions.parse_master_args import call_parser as parse_mst
+from helper_functions.parse_master_args import check_parser as check_mst
 from visualizer.readers.parse_cmp_args import call_parser as parse_cmp
-from visualizer.readers.parse_ray_args import call_parser as parse_ray
-# from visualizer.readers.parse_cmp_args import call_parser as parse_cmp
 
 warnings.filterwarnings('ignore')
 
-channels_1 = ['xpar0355', 'xpat0532', 'xppr0355', 'xppt0532']
-# channels_2 = ['nppr0355', 'nppr0532', 'npar0355', 'npar0532']
-channels_2 = ['npar0355', 'npar0532', 'nppr0355', 'nppr0532']
-# channels_2 = ['xpar0355', 'xpar0532', 'xppr0355', 'xppr0532']
+mst_args = parse_mst()
+mst_args = check_mst(mst_args)
 
-input_folder_1 = '/mnt/DATA/Big_data/Databases/CARS/Systems/POLIS/220930/03/out/atlas_preprocessor'
-# input_folder_2 = '/mnt/DATA/Big_data/Databases/CARS/Systems/ALPHA/220924/01/out/atlas_preprocessor'
-input_folder_2 = '/mnt/DATA/Big_data/Databases/CARS/Systems/ALPHA/220930/02/out/atlas_preprocessor'
+mst_cfg = read_intercomparison_config.config(mst_args['settings_file'])
 
-output_folder_com = '/mnt/DATA/Big_data/Databases/CARS/Intercomparisons/POLIS_ALPHA_EMORAL/220930/'
-
-# Intercomparison arguments
-cmp_args = parse_cmp()
-
-cmp_args['channels_1'] = channels_1
-cmp_args['channels_2'] = channels_2
-
-cmp_args['use_molecular'] = False
-
-cmp_args['x_lims'] = [0., 2.5]
-cmp_args['x_tick'] = 0.1
-cmp_args['y_lims'] = [8E-7, 1E-5]
-cmp_args['dpi'] = 600
-cmp_args['normalization_height'] = 2
-cmp_args['half_normalization_window'] = 200.
-
-cmp_args['smooth'] = True 
-cmp_args['smoothing_range'] = [1., 20.]
-cmp_args['half_window'] = [5., 500.]
-
-cmp_args['output_folder'] = output_folder_com
+cmp_args = cmp_args.copy()   
 
 # Call Intercomparison sequence
 processing_chain.intercomparison(input_folder_1 = input_folder_1,
@@ -56,3 +30,59 @@ processing_chain.intercomparison(input_folder_1 = input_folder_1,
                                  vis_args = cmp_args, 
                                  reprocess = True,
                                  skip = False)
+
+def intercomparison(cmp_args, prs_files, reprocess = True):
+    
+    cmp_args = cmp_args.copy()   
+    
+    cmp_args['input_file'] = prs_files['ray'][0]   
+    
+    cmp_args = check_ray(cmp_args)
+    
+    cmp_out = cmp_args['output_folder']
+    os.makedirs(cmp_out, exist_ok = True)
+    
+    if reprocess == True:
+        for file in glob.glob(os.path.join(cmp_out, '*_cmp_*_ATLAS_*.nc')):
+            os.remove(file)
+
+    # Preprocessed files - shoulde be zero if reprocess is True
+    cmp_file = glob.glob(os.path.join(cmp_out, '*_cmp_*_ATLAS_*.nc'))
+
+    if len(cmp_file) > 1:
+        raise Exception(f'More than one rayleigh fit files detected in folder {cmp_out}. Please make sure that only one rayleigh file exists in that folder ')
+   
+    # Excecute ATLAS visualizer
+    if len(cmp_file) == 0:
+        view_ray(cmp_args)
+        __intercomparison__(cmp_args, __version__)
+
+    return()
+
+(input_folder_1, input_folder_2, vis_args, reprocess = True, skip = False):
+
+    files = glob.glob(os.path.join(vis_args['output_folder'], 'cmp_*.png'))
+
+    ATLAS_files_1 = \
+        glob.glob(os.path.join(input_folder_1, 'ray_*_ATLAS_*.nc'))
+        
+    if len(ATLAS_files_1) > 1:
+        raise Exception(f'Too many input rayleigh files ({ATLAS_files_1}) for the intercomparison for lidar_1. Please make sure there is only one rayleigh file in the folder ')
+
+    ATLAS_files_2 = \
+        glob.glob(os.path.join(input_folder_2, 'ray_*_ATLAS_*.nc'))
+
+    if len(ATLAS_files_2) > 1:
+        raise Exception(f'Too many input rayleigh files ({ATLAS_files_2}) for the intercomparison for lidar_2. Please make sure there is only one rayleigh file in the folder ')
+        
+    # Excecute ATLAS visualizer
+    if (len(files) == 0 or reprocess == True) and skip == False:
+                    
+        # cleaner.files(vis_args['output_folder'], pattern = 'cmp_*', 
+        #               extension = 'png')
+        if len(ATLAS_files_1) != 0 and len(ATLAS_files_2) != 0:
+            os.makedirs(vis_args['output_folder'], exist_ok = True)
+            vis_args['input_files'] = [ATLAS_files_1[0], ATLAS_files_2[0]]
+            cmp(vis_args)
+    
+    return

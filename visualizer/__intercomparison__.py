@@ -6,7 +6,7 @@ Created on Thu Sep  1 12:02:25 2022
 @author: nick
 """
 
-import warnings, os, glob
+import warnings, os, glob, sys
 import xarray as xr
 import numpy as np
 import netCDF4 as nc
@@ -20,7 +20,7 @@ from .tools import normalize
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
-def main(args):
+def main(args, __version__):
     # Check the command line argument information
     args = check_parser(args)
     
@@ -160,7 +160,7 @@ def main(args):
         y_llim, y_ulim, y_label = \
             make_axis.intercomparison_y(sig1 = coef1 * y1_vals_sm[slice(x_lbin,x_ubin+1)],
                                         sig2 = coef2 * y2_vals_sm[slice(x_lbin,x_ubin+1)] , 
-                                        y_lims = args['y_lims'] , 
+                                        y_lims = args['y_lims'], 
                                         use_lin = args['use_lin_scale'])    
                 
         # Make title
@@ -178,7 +178,7 @@ def main(args):
                                        elv = data2.Altitude_meter_asl)
     
         # Make filename
-        fname = f'cmp_{data1.Measurement_ID}_{data2.Measurement_ID}_{channels1[j]}_{channels2[j]}.png'
+        fname = f'{data1.Measurement_ID}_{data2.Measurement_ID}_{data1.Lidar_Name}_{data2.Lidar_Name}_cmp_{channels1[j]}_{channels2[j]}_ATLAS_{__version__}.png'
 
         # Make the plot
         fpath = make_plot.intercomparison(dir_out = args['output_folder'], 
@@ -208,11 +208,16 @@ def main(args):
     return()
 
 if __name__ == '__main__':
+    
+    sys.path.append('../')
+    
+    from version import __version__
+    
     # Get the command line argument information
     args = call_parser()
     
     # Call main
-    main(args)
+    main(args, __version__)
     
     # sys.exit()
     # # Add metadata to the quicklook plot

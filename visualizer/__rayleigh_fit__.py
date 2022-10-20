@@ -19,7 +19,7 @@ from .tools import normalize
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
-def main(args):
+def main(args, __version__):
     # Check the command line argument information
     args = check_parser(args)
 
@@ -29,12 +29,7 @@ def main(args):
     
     # Read the quicklook file
     data = xr.open_dataset(args['input_file'])
-    
-    # Delete all existing png files within
-    pngs = glob.glob(os.path.join(args['output_folder'],'*.png'))
-    for file in pngs:
-        os.remove(file)
-    
+
     # Extract signal
     sig = data.Range_Corrected_Signals
     sig = sig.copy().where(sig != nc.default_fillvals['f8'])
@@ -45,6 +40,23 @@ def main(args):
     # Extract signal time, channels, and bins
     time = sig.time.values
     bins = sig.bins.values
+    
+    # Extract IFF info
+    dwl = data.Detected_Wavelength
+    ewl = data.Emitted_Wavelength
+    bdw = data.Channel_Bandwidth
+            
+    mol_method = data.Molecular_atmosphere_method
+    if 'Sounding_Station_Name' in data.attrs:
+        st_name = data.Sounding_Station_Name
+    else: st_name = ''
+    if 'WMO_Station_Number' in data.attrs:
+        wmo_id = data.WMO_Station_Number
+    else: wmo_id = ''
+    if 'WBAN_Station_Number' in data.attrs:
+        wban_id = data.WBAN_Station_Number
+    else: wban_id = ''
+        
     
     # Check if the parsed channels exist
     channels = \
@@ -62,7 +74,10 @@ def main(args):
         ch_d = dict(channel = ch)
         sig_ch = sig.loc[ch_d].values
         atb_ch = atb.loc[ch_d].values
-    
+        dwl_ch = dwl.copy().loc[ch_d].values
+        ewl_ch = ewl.copy().loc[ch_d].values
+        bdw_ch = bdw.copy().loc[ch_d].values
+        
         # Create the y axis (height/range)
         x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label = \
             make_axis.rayleigh_x(heights = data.Height_levels.loc[ch_d].values, 
@@ -82,20 +97,23 @@ def main(args):
         else:
             y_vals_sm = sig_ch.copy()
             y_errs = np.nan * y_vals_sm
-    
+        
         # Normalization of the signals
-        coef = normalize.to_a_point(sig = y_vals_sm, 
-                                    sig_b = atb_ch.copy(), 
-                                    x_vals = x_vals,
-                                    norm = args['reference_height'],
-                                    hwin = args['half_reference_window'],
-                                    axis = 0)
-            
+        coef, n_bin = normalize.to_a_point(sig = y_vals_sm, 
+                                           sig_b = atb_ch.copy(), 
+                                           x_vals = x_vals,
+                                           norm = args['reference_height'],
+                                           hwin = args['half_reference_window'],
+                                           axis = 0)
+        
+        rsem = 1. - coef[0] * y_errs[n_bin] / atb_ch[n_bin]
+        
         # Create the y axis (signal)
         y_llim, y_ulim, y_label = \
-            make_axis.rayleigh_y(sig = coef * y_vals_sm[slice(x_lbin,x_ubin+1)], 
-                                 atb = atb_ch.copy(), 
-                                 y_lims = args['y_lims'] , 
+            make_axis.rayleigh_y(sig = coef[0] * y_vals_sm[slice(x_lbin,x_ubin+1)], 
+                                 atb = atb_ch.copy()[slice(x_lbin,x_ubin+1)], 
+                                 y_lims = args['y_lims'],
+                                 wave = dwl_ch,
                                  use_lin = args['use_lin_scale'])
         
         # Make title
@@ -105,12 +123,20 @@ def main(args):
                                     lidar = data.Lidar_Name, 
                                     channel = ch, 
                                     zan = data.Laser_Pointing_Angle,
-                                    lat = data.Latitude_degrees_north, 
-                                    lon = data.Longitude_degrees_east, 
-                                    elv = data.Altitude_meter_asl)
+                                    loc = data.Lidar_Location,
+                                    dwl = dwl_ch,
+                                    ewl = ewl_ch,
+                                    bdw = bdw_ch,
+                                    sm_lims = args['smoothing_range'],
+                                    sm_hwin = args['half_window'],
+                                    sm_expo = args['smooth_exponential'],
+                                    mol_method = mol_method,
+                                    st_name = st_name,
+                                    wmo_id = wmo_id,
+                                    wban_id = wban_id)
     
         # Make filename
-        fname = f'ray_{data.Measurement_ID}_{ch}.png'
+        fname = f'{data.Measurement_ID}_{data.Lidar_Name}_ray_{ch}_ATLAS_{__version__}.png'
     
         # Make the plot
         fpath = make_plot.rayleigh(dir_out = args['output_folder'], 
@@ -121,9 +147,10 @@ def main(args):
                                    refr_hwin = args['half_reference_window'],
                                    x_vals = x_vals, 
                                    y1_vals = y_vals_sm,
-                                   y2_vals = atb_ch.copy(),
+                                   y2_vals = atb_ch,
                                    y1_errs = y_errs,
-                                   coef = coef,
+                                   coef = coef[0],
+                                   rsem = rsem,
                                    x_lbin = x_lbin, x_ubin = x_ubin,
                                    x_llim = x_llim, x_ulim = x_ulim, 
                                    y_llim = y_llim, y_ulim = y_ulim, 

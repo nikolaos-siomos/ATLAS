@@ -33,7 +33,7 @@ def call_parser():
                         help = 'If called then the input file will be DELETED after processing in order to save space. Use with care! ')
 
     parser.add_argument('--dpi', metavar = 'dpi',
-                        type = int, nargs = '?', default = 100, 
+                        type = int, nargs = '?', default = 300, 
                         help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 100 ')
 
     parser.add_argument('--use_lin_scale', metavar = 'use_lin_scale',
@@ -111,26 +111,18 @@ def check_parser(args):
         if not args[mandatory_args[i]]:
             raise Exception(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')            
         
-    print(" ")
-    print("-- Intercomparison arguments!")
-    print("-------------------------------------------------------------------")
-    for key in args.keys():
-        print(f"{key} = {args[key]}")
-    print("-------------------------------------------------------------------")
-    print("")
-
     if not os.path.exists(args['input_files'][0]):
         raise Exception(f"-- Error: The path to the first input file does not exists. Please provide a valid input file path. Current Path: {args['input_file'][0]}")  
 
     if not os.path.exists(args['input_files'][1]):
         raise Exception(f"-- Error: The path to the second input file does not exists. Please provide a valid input file path. Current Path: {args['input_file'][1]}")  
         
-    if os.path.basename(args['input_files'][0])[:3] != 'ray' or \
-        os.path.basename(args['input_files'][1])[:3] != 'ray':
+    if '_ray_' not in os.path.basename(args['input_files'][0]) or \
+        '_ray_' not in os.path.basename(args['input_files'][1]):
         raise Exception('---- Error: Measurement filename not understood! Please start the filename with ray (rayleigh fit)')
     
     if args['output_folder'] == None:
-        out_path = os.path.join(os.path.dirname(args['input_file']),'..','atlas_visualizer', 'cmp')
+        out_path = os.path.join(os.path.dirname(args['input_file']),'..','..', 'plots')
         args['output_folder'] = out_path
         os.makedirs(args['output_folder'], exist_ok = True)
     elif not os.path.exists(args['output_folder'] ):
@@ -143,3 +135,15 @@ def check_parser(args):
         raise Exception("-- Error: The number of channels provided in channels_1 is diffirent than the number of channels provided in channels_2. Please provide pair of channels that are going to be intercompared")          
 
     return(args)
+
+def view_parser(args):
+    
+    print(" ")
+    print("-- Intercomparison arguments!")
+    print("-------------------------------------------------------------------")
+    for key in args.keys():
+        print(f"{key} = {args[key]}")
+    print("-------------------------------------------------------------------")
+    print("")
+    
+    return()
