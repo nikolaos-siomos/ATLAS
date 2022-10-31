@@ -89,6 +89,10 @@ def call_parser():
 
 def check_parser(args):
 
+    if args['parent_folder'] != None:
+        if not os.path.exists(args['parent_folder']) == True:
+            raise Exception("The provided parent_folder {args['parent_folder']} does not exists. Please provide a valid path ")   
+
     if args['config_file'] == None:
         if args['parent_folder'] != None:
             args['settings_file'] = os.path.join(args['parent_folder'],'settings_file.ini')  
@@ -98,16 +102,37 @@ def check_parser(args):
     if not os.path.exists(args['settings_file']):
         raise Exception("The path to the settings file does not exist. Please provide a valid path. ")
 
-    if args['converter_out'] == None:
-        args['converter_out'] = os.path.join(args['parent_folder'], 'netcdf', 'converter')
-
-    if args['preprocessor_out'] == None:
-        args['preprocessor_out'] = os.path.join(args['parent_folder'], 'netcdf', 'preprocessor')
-        
-    if args['visualizer_out'] == None:
-        args['visualizer_out'] = os.path.join(args['parent_folder'], 'plots')
-            
+    cnv_path = args['converter_out']
+    prs_path = args['preprocessor_out']
+    vis_path = args['visualizer_out']
     
+    if cnv_path== None:
+        cnv_path = os.path.join(args['parent_folder'], 'netcdf', 'converter')
+        args['converter_out'] = cnv_path
+        os.makedirs(cnv_path, exist_ok = True)
+    elif os.path.isdir(os.path.split(os.path.abspath(cnv_path))[0]) or \
+        os.path.isdir(os.path.split(os.path.split(os.path.abspath(cnv_path))[0])[0]) or \
+            os.path.isdir(os.path.split(os.path.split(os.path.split(os.path.abspath(cnv_path))[0])[0])[0]):
+        os.makedirs(cnv_path, exist_ok = True)        
+
+    if prs_path== None:
+        prs_path = os.path.join(args['parent_folder'], 'netcdf', 'preprocessor')
+        args['preprocessor_out'] = prs_path
+        os.makedirs(prs_path, exist_ok = True)
+    elif os.path.isdir(os.path.split(os.path.abspath(prs_path))[0]) or \
+        os.path.isdir(os.path.split(os.path.split(os.path.abspath(prs_path))[0])[0]) or \
+            os.path.isdir(os.path.split(os.path.split(os.path.split(os.path.abspath(prs_path))[0])[0])[0]):
+        os.makedirs(prs_path, exist_ok = True)          
+
+    if vis_path== None:
+        vis_path = os.path.join(args['parent_folder'], 'plots')
+        args['visualizer_out'] = vis_path
+        os.makedirs(vis_path, exist_ok = True)
+    elif os.path.isdir(os.path.split(os.path.abspath(vis_path))[0]) or \
+        os.path.isdir(os.path.split(os.path.split(os.path.abspath(vis_path))[0])[0]) or \
+            os.path.isdir(os.path.split(os.path.split(os.path.split(os.path.abspath(vis_path))[0])[0])[0]):
+        os.makedirs(vis_path, exist_ok = True)       
+
     return(args)
 
 def substitute(org, rpl):

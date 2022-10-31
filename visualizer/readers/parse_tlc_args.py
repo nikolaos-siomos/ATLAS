@@ -46,6 +46,11 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If set to True, the non range corrected signals will be used for the telecover test ')
 
+    parser.add_argument('--use_last', metavar = 'use_last',
+                        type = bool, default = False, 
+                        action = argparse.BooleanOptionalAction,
+                        help = 'If set to False, difference between the first and the last (extra) sector (e.g. N2 - N1) will not be ploted ')
+
     parser.add_argument('-c', '--channels', metavar = 'channels',
                         type = str, nargs = '+', default = None, 
                         help = 'Type one or more channel names (e.g. xpar0355) here in order to open the figures in interactive mode ')

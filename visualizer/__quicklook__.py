@@ -92,6 +92,7 @@ def main(args, __version__, meas_type):
                                     channel = ch, 
                                     zan = data.Laser_Pointing_Angle,
                                     loc = data.Lidar_Location,
+                                    smooth = args['smooth'],
                                     sm_lims = args['smoothing_range'],
                                     sm_hwin = args['half_window'],
                                     sm_expo = args['smooth_exponential'])

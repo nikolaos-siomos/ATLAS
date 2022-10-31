@@ -43,17 +43,18 @@ def main(args, __version__):
         sig_s = sig_s.copy().where(sig_s != nc.default_fillvals['f8'])
         sig_w = sig_w.copy().where(sig_w != nc.default_fillvals['f8'])
         
-        if args['use_non_rangecor'] == True:
-            sig_n = sig_n.copy() / (ranges.copy() ** 2.)
-            sig_e = sig_e.copy() / (ranges.copy() ** 2.)
-            sig_s = sig_s.copy() / (ranges.copy() ** 2.)
-            sig_w = sig_w.copy() / (ranges.copy() ** 2.)
-    
+        sampling_sec = np.min([np.min((data.Raw_Data_Stop_Time_North_Sector-data.Raw_Data_Start_Time_North_Sector).values),
+                               np.min((data.Raw_Data_Stop_Time_East_Sector-data.Raw_Data_Start_Time_East_Sector).values),
+                               np.min((data.Raw_Data_Stop_Time_South_Sector-data.Raw_Data_Start_Time_South_Sector).values),
+                               np.min((data.Raw_Data_Stop_Time_West_Sector-data.Raw_Data_Start_Time_West_Sector).values)])
+
+                    
     else:
         sig_n = []
         sig_e = []
         sig_s = []
         sig_w = []
+        sample_sec = np.nan
         
     if 'Range_Corrected_Signals_Outer_Ring' in data.keys():
         sig_o = data['Range_Corrected_Signals_Outer_Ring']  
@@ -62,13 +63,13 @@ def main(args, __version__):
         sig_o = sig_o.copy().where(sig_o != nc.default_fillvals['f8'])
         sig_i = sig_i.copy().where(sig_i != nc.default_fillvals['f8'])
         
-        if args['use_non_rangecor'] == True:
-            sig_o = sig_o.copy() / (ranges.copy() ** 2.)
-            sig_i = sig_i.copy() / (ranges.copy() ** 2.)    
-    
+        sampling_rin = np.min([np.min((data.Raw_Data_Stop_Time_Outer_Ring-data.Raw_Data_Start_Time_Outer_Ring).values),
+                               np.min((data.Raw_Data_Stop_Time_Inner_Ring-data.Raw_Data_Start_Time_Inner_Ring).values)])
+
     else:
         sig_o = []
         sig_i = []
+        sampling_rin = np.nan
     
     # Check if the parsed channels exist
     channels = \
@@ -84,6 +85,8 @@ def main(args, __version__):
         print(f"-- channel: {ch}")
         
         ch_d = dict(channel = ch)
+        
+        ranges_ch = ranges.copy().loc[ch_d].values
         
         # Create the y axis (height/range)
         x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label = \
@@ -128,7 +131,17 @@ def main(args, __version__):
             y_m_n = np.nanmean(y_n[:iters,:], axis = 0) 
             y_m_e = np.nanmean(y_e[:iters,:], axis = 0) 
             y_m_s = np.nanmean(y_s[:iters,:], axis = 0) 
-            y_m_w = np.nanmean(y_w[:iters,:], axis = 0)     
+            y_m_w = np.nanmean(y_w[:iters,:], axis = 0)    
+            
+            y_l_n = np.nanmin(y_n[:iters,:], axis = 0)
+            y_l_e = np.nanmin(y_e[:iters,:], axis = 0)
+            y_l_s = np.nanmin(y_s[:iters,:], axis = 0)
+            y_l_w = np.nanmin(y_w[:iters,:], axis = 0)
+
+            y_u_n = np.nanmax(y_n[:iters,:], axis = 0)
+            y_u_e = np.nanmax(y_e[:iters,:], axis = 0)
+            y_u_s = np.nanmax(y_s[:iters,:], axis = 0)
+            y_u_w = np.nanmax(y_w[:iters,:], axis = 0)
     
             # Smoothing
             if args['smooth']:
@@ -315,6 +328,9 @@ def main(args, __version__):
                                         channel = ch, 
                                         zan = data.Laser_Pointing_Angle,
                                         loc = data.Lidar_Location,
+                                        iters = iters,
+                                        sampling = sampling_sec,
+                                        smooth = args['smooth'],
                                         sm_lims = args['smoothing_range'],
                                         sm_hwin = args['half_window'],
                                         sm_expo = args['smooth_exponential'])
@@ -330,7 +346,20 @@ def main(args, __version__):
                                         dpi_val = args['dpi'],
                                         x_refr = args['normalization_height'],
                                         refr_hwin = args['half_normalization_window'],
+                                        use_nonrc = args['use_non_rangecor'],
                                         x_vals = x_vals, 
+                                        y1_raw = y_m_n, 
+                                        y2_raw = y_m_e, 
+                                        y3_raw = y_m_s, 
+                                        y4_raw = y_m_w,  
+                                        y1_lraw = y_l_n, 
+                                        y2_lraw = y_l_e, 
+                                        y3_lraw = y_l_s, 
+                                        y4_lraw = y_l_w,  
+                                        y1_uraw = y_u_n, 
+                                        y2_uraw = y_u_e, 
+                                        y3_uraw = y_u_s, 
+                                        y4_uraw = y_u_w,  
                                         y1_vals = y_m_sm_n, 
                                         y2_vals = y_m_sm_e, 
                                         y3_vals = y_m_sm_s, 
@@ -351,13 +380,15 @@ def main(args, __version__):
                                         coef_2 = e_coef, 
                                         coef_3 = s_coef, 
                                         coef_4 = w_coef,
+                                        ranges = ranges_ch,
                                         x_lbin = x_lbin, x_ubin = x_ubin,
                                         x_llim = x_llim, x_ulim = x_ulim, 
                                         y_llim = y_llim, y_ulim = y_ulim, 
                                         y_llim_nr = y_llim_nr, 
                                         y_ulim_nr = y_ulim_nr, 
                                         x_label = x_label,
-                                        x_tick = args['x_tick'])  
+                                        x_tick = args['x_tick'],
+                                        use_last = args['use_last'])  
     
         if isinstance(sig_o,list) == False:
             iters = np.min([sig_o.time_o.size,
@@ -368,7 +399,13 @@ def main(args, __version__):
                 
             # Averaging sector signals
             y_m_o = np.nanmean(y_o[:iters,:], axis = 0) 
-            y_m_i = np.nanmean(y_i[:iters,:], axis = 0) 
+            y_m_i = np.nanmean(y_i[:iters,:], axis = 0)
+            
+            y_l_o = np.nanmin(y_o[:iters,:], axis = 0)
+            y_l_i = np.nanmin(y_o[:iters,:], axis = 0)
+    
+            y_u_o = np.nanmax(y_sm_n[:iters,:], axis = 0)
+            y_u_i = np.nanmax(y_sm_e[:iters,:], axis = 0)
     
             # Smoothing
             if args['smooth']:
@@ -448,6 +485,9 @@ def main(args, __version__):
                                          channel = ch, 
                                          zan = data.Laser_Pointing_Angle,
                                          loc = data.Lidar_Location,
+                                         iters = iters,
+                                         sampling = sampling_rin,
+                                         smooth = args['smooth'],
                                          sm_lims = args['smoothing_range'],
                                          sm_hwin = args['half_window'],
                                          sm_expo = args['smooth_exponential'])
@@ -457,12 +497,19 @@ def main(args, __version__):
         
             # Make the plot
             fpath = \
-                make_plot.telecover_sec(dir_out = args['output_folder'], 
+                make_plot.telecover_rin(dir_out = args['output_folder'], 
                                         fname = fname, title = title,
                                         dpi_val = args['dpi'],
                                         x_refr = args['normalization_height'],
                                         refr_hwin = args['half_normalization_window'],
+                                        use_nonrc = args['use_non_rangecor'],
                                         x_vals = x_vals, 
+                                        y1_raw = y_m_o, 
+                                        y2_raw = y_m_i, 
+                                        y1_lraw = y_l_o, 
+                                        y2_lraw = y_l_i, 
+                                        y1_uraw = y_u_o, 
+                                        y2_uraw = y_u_i, 
                                         y1_vals = y_m_sm_o, 
                                         y2_vals = y_m_sm_i, 
                                         y1_lvar = y_l_sm_o, 
@@ -471,6 +518,7 @@ def main(args, __version__):
                                         y2_uvar = y_u_sm_i, 
                                         coef_1 = o_coef, 
                                         coef_2 = i_coef, 
+                                        ranges = ranges_ch,
                                         x_lbin = x_lbin, x_ubin = x_ubin,
                                         x_llim = x_llim, x_ulim = x_ulim, 
                                         y_llim = y_llim, y_ulim = y_ulim, 

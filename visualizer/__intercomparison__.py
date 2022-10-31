@@ -142,19 +142,19 @@ def main(args, __version__):
             y2_errs = np.nan * y2_vals_sm
     
         # Normalization of the signals        
-        coef1 = normalize.to_a_point(sig = y1_vals_sm, 
-                                     sig_b = atb1_ch, 
-                                     x_vals = x_vals,
-                                     norm = args['normalization_height'],
-                                     hwin = args['half_normalization_window'],
-                                     axis = 0)
+        coef1, _ = normalize.to_a_point(sig = y1_vals_sm, 
+                                        sig_b = atb1_ch, 
+                                        x_vals = x_vals,
+                                        norm = args['normalization_height'],
+                                        hwin = args['half_normalization_window'],
+                                        axis = 0)
         
-        coef2 = normalize.to_a_point(sig = y2_vals_sm, 
-                                     sig_b = atb2_ch, 
-                                     x_vals = x_vals,
-                                     norm = args['normalization_height'],
-                                     hwin = args['half_normalization_window'],
-                                     axis = 0)        
+        coef2, _ = normalize.to_a_point(sig = y2_vals_sm, 
+                                        sig_b = atb2_ch, 
+                                        x_vals = x_vals,
+                                        norm = args['normalization_height'],
+                                        hwin = args['half_normalization_window'],
+                                        axis = 0)        
     
         # Create the y axis (signal)
         y_llim, y_ulim, y_label = \

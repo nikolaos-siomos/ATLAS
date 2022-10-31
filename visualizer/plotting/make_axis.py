@@ -227,7 +227,7 @@ def rayleigh_y(sig, atb, y_lims, wave, use_lin):
                 y_llim =  y_lims[0]
     
     # Get the y axis labels
-    y_label = 'Attenuated Backscatter [$m^{-1} sr^{-1}$]'
+    y_label = 'Attn. Bsc. rel. to fit range [$m^{-1} sr^{-1}$]'
     
     return(y_llim, y_ulim, y_label)
 

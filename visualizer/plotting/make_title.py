@@ -9,7 +9,7 @@ Created on Wed Aug 31 22:34:11 2022
 import numpy as np
 
 def quicklook(start_date, start_time, end_time, lidar, channel, 
-              zan, loc, sm_lims, sm_hwin, sm_expo):
+              zan, loc, smooth, sm_lims, sm_hwin, sm_expo):
     
     zan = np.round(float(zan), decimals = 1)
     
@@ -36,18 +36,22 @@ def quicklook(start_date, start_time, end_time, lidar, channel,
     start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
 
     end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
-        
-    if sm_lhwin == sm_uhwin:
-        title = f'{lidar} {loc} {channel} - Quicklook - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
-                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
+    
+    if smooth == True:
+        if sm_lhwin == sm_uhwin:
+            title = f'{lidar} {loc} {channel} - Quicklook - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
+                        f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
+        else:
+            title = f'{lidar} {loc} {channel} - Quicklook - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
+                        f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
     else:
-        title = f'{lidar} {loc} {channel} - Quicklook - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
-                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
-        
+        title = f'{lidar} {loc} {channel} - Quicklook - No Smoothing'+'\n'+\
+                f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
+                        
     return(title)
 
 def rayleigh(start_date, start_time, end_time, lidar, channel, 
-             zan, loc, ewl, dwl, bdw, sm_lims, sm_hwin, sm_expo,
+             zan, loc, ewl, dwl, bdw, smooth, sm_lims, sm_hwin, sm_expo,
              mol_method, st_name, wmo_id, wban_id):
     
     zan = np.round(float(zan), decimals = 1)
@@ -89,20 +93,26 @@ def rayleigh(start_date, start_time, end_time, lidar, channel,
     start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
 
     end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
-        
-    if sm_lhwin == sm_uhwin:
-        title = f'{lidar} {loc} {channel} - Rayleigh Fit - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
-                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
-                        f'{mol_method} {st_name} {wmo_id} {wban_id} - Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'
+    
+    if smooth == True:
+        if sm_lhwin == sm_uhwin:
+            title = f'{lidar} {loc} {channel} - Rayleigh Fit - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
+                        f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
+                            f'{mol_method} {st_name} {wmo_id} {wban_id} - Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'
+        else:
+            title = f'{lidar} {loc} {channel} - Rayleigh Fit - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
+                        f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
+                            f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'     
     else:
-        title = f'{lidar} {loc} {channel} - Rayleigh Fit - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
+        title = f'{lidar} {loc} {channel} - Rayleigh Fit - No Smoothing'+'\n'+\
                     f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
-                        f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'     
+                        f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'   
+                     
     
     return(title)
 
 def telecover(start_date, start_time, end_time, lidar, channel, 
-              zan, loc, sm_lims, sm_hwin, sm_expo):
+              zan, loc, iters, sampling, smooth, sm_lims, sm_hwin, sm_expo):
     
     zan = np.round(float(zan), decimals = 1)
     
@@ -130,20 +140,26 @@ def telecover(start_date, start_time, end_time, lidar, channel,
 
     end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
         
-    if sm_lhwin == sm_uhwin:
-        title = f'{lidar} {loc} {channel} - Telecover Test - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
-                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
-    else:
-        title = f'{lidar} {loc} {channel} - Telecover Test - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
-                    f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith'
     
+    if smooth == True:
+        if sm_lhwin == sm_uhwin:
+            sm_text = f' - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m'
+
+        else:
+            sm_text = f' - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m, {change}: {sm_type}'
+
+    else:
+        sm_text = ''
         
+    title = f'{lidar} {loc} {channel} - Telecover Test{sm_text}\n'+\
+                f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith' + f' - Iterations: {iters}, Sampl. Time: {sampling}s, Total Avg. Time: {iters*sampling}s'
+                
     return(title)
 
 def polarization_calibration(start_date_cal, start_time_cal, end_time_cal,
                              start_date_ray, start_time_ray, end_time_ray,  
                              lidar, channel_r, channel_t, zan, loc, 
-                             ewl, dwl, bdw, sm_lims, sm_hwin, sm_expo,
+                             ewl, dwl, bdw, smooth, sm_lims, sm_hwin, sm_expo,
                              mol_method, st_name, wmo_id, wban_id):
     
     zan = np.round(float(zan), decimals = 1)
@@ -189,21 +205,29 @@ def polarization_calibration(start_date_cal, start_time_cal, end_time_cal,
     #                 r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ f'\n'+\
     #                     f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
     #                         r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'
-    if sm_lhwin == sm_uhwin:
-        title = f'{lidar} {loc} {channel_r} to {channel_t} - Pol. Calibration - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
-                    f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\
-                        r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ '\n'+\
-                            f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
-                                r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
-                                    f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'   
+    if smooth == True:
+        if sm_lhwin == sm_uhwin:
+            title = f'{lidar} {loc} {channel_r} to {channel_t} - Pol. Calibration - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_uhwin}m\n'+\
+                        f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\
+                            r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ '\n'+\
+                                f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
+                                    r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
+                                        f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'   
+        else:
+            title = f'{lidar} {loc} {channel_r} to {channel_t} - Pol. Calibration - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
+                        f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\
+                            r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ '\n'+\
+                                f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
+                                    r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
+                                        f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'   
     else:
-        title = f'{lidar} {loc} {channel_r} to {channel_t} - Pol. Calibration - Smoothing: {sm_llim} to {sm_ulim} Km, Half Win.: {sm_lhwin}m to {sm_uhwin}m, {change}: {sm_type}\n'+\
+        title = f'{lidar} {loc} {channel_r} to {channel_t} - Pol. Calibration - No Smoothing'+'\n'+\
                     f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\
                         r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+ '\n'+\
                             f'Rayleigh on {date_ray} from {start_ray} to {end_ray} UTC, '+\
                                 r'$\nearrow$' + f' {zan}' + r'$^{o}$ off-zenith'+f' - {mol_method} {st_name} {wmo_id} {wban_id}'+'\n'+\
-                                    f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'   
-    
+                                    f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'  
+
     return(title)
 
 def intercomparison(start_date, start_time, end_time, lidar_1, lidar_2, 

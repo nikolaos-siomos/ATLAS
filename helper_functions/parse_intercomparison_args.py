@@ -28,7 +28,7 @@ def call_parser():
     
 
     parser.add_argument('-i', '--input_files', metavar='input_files', 
-                        type=str, nargs='?',  default = None,
+                        type=str, nargs=2,  default = None,
                         help='The paths to the files that will be compared')
 
     parser.add_argument('-o', '--output_folder', metavar='scc_converter', 
@@ -53,8 +53,8 @@ def check_parser(args):
         if not args[mandatory_args[i]]:
             raise Exception(f'-- Error: The mandatory argument {mandatory_args[i]} is not provided! Please provide it with: {mandatory_args_abr[i]} <path>')            
     
-    for path in args['input_file']:
-        if not os.path.exists(args['input_files']):
+    for path in args['input_files']:
+        if not os.path.exists(path):
             raise Exception(f"-- Error: The path to one of the input files does not exists. Please provide a valid input file path. Current Path: {args['input_file']}")  
         if '_ray_' not in os.path.basename(path):
             raise Exception('---- Error: Measurement filename not understood! The filename should contain the _ray_ field (rayleigh fit)')
@@ -66,6 +66,7 @@ def check_parser(args):
             raise Exception(f"-- Error: The path to settings_file does not exists. Please provide a valid path. Current Path: {args['settings_file']}")  
 
     return(args)
+
 
 def substitute(org, rpl):
     

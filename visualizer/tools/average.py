@@ -24,10 +24,14 @@ def region(sig, x_vals, calibr, hwin, axis, squeeze = False):
 
     if squeeze:
         avg = np.nanmean(sig_sel, axis = axis)
+        std = np.nanstd(sig_sel, axis = axis)
+        sem = std/np.sqrt(sig_sel.size)
     else:
         avg = np.nanmean(sig_sel, axis = axis, keepdims = True)
+        std = np.nanstd(sig_sel, axis = axis, keepdims = True)
+        sem = std/np.sqrt(sig_sel.size)
         
-    return(avg)
+    return(avg, std, sem)
 
 def get_calibr_bin(x_vals, calibr):
 

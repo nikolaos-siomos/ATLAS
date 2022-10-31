@@ -107,23 +107,23 @@ def call_parser():
                         type = float, nargs = 2, default = [100., 100.], 
                         help = 'Half smoothing window in the first and last bin of the smoothing region, in m. The widow progressively changes between from the first to the last value. Use the same value twice to apply a constant window ')
 
-    parser.add_argument('-K', "--K", metavar = 'K',
+    parser.add_argument("--K", metavar = 'K',
                         type = float, nargs = '+', default = None, 
                         help = 'The K value for each channel pair. Defaults to 1 for all channels ')
 
-    parser.add_argument('-G_R', "--G_R", metavar = 'G_R',
+    parser.add_argument("--G_R", metavar = 'G_R',
                         type = float, nargs = '+', default = None, 
                         help = 'The G value for the reflected channel of the pair. Defaults to 1 for all channels (no receiver optics + emitted pcb. state correction) ')
 
-    parser.add_argument('-G_T', "--G_T", metavar = 'G_T',
+    parser.add_argument("--G_T", metavar = 'G_T',
                         type = float, nargs = '+', default = None, 
                         help = 'The G value for the transmitted channel of the pair. Defaults to 1 for all channels (no receiver optics + emitted pcb. state correction) ')
 
-    parser.add_argument('-H_R', "--H_R", metavar = 'H_R',
+    parser.add_argument("--H_R", metavar = 'H_R',
                         type = float, nargs = '+', default = None, 
                         help = 'The H value for the reflected channel of the pair. Defaults to 1 or -1 for all co-polar (p) and cross-polar (c) reflected channels, respectively (no receiver optics + emitted pcb. state correction) ')
 
-    parser.add_argument('-H_T', "--H_T", metavar = 'H_T',
+    parser.add_argument("--H_T", metavar = 'H_T',
                         type = float, nargs = '+', default = None, 
                         help = 'The H value for the transmitted channel of the pair. Defaults to 1 or -1 for all co-polar (p) and cross-polar (c) transmitted channels, respectively (no receiver optics + emitted pcb. state correction) ')
 

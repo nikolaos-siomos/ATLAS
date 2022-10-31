@@ -50,7 +50,7 @@ if 'process_qck' in mst_cfg.gen.keys():
     process_qck = mst_cfg.gen['process_qck']
     if 'ray' in process_qck: quicklook['ray'] = True
     if 'tlc' in process_qck: quicklook['tlc'] = True
-    if 'pcb' in process_qck: quicklook['plc'] = True
+    if 'pcb' in process_qck: quicklook['pcb'] = True
 
 if newdata == False:
     reprocess = {'converter' : False,

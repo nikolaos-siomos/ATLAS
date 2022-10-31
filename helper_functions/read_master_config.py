@@ -13,6 +13,7 @@ class config():
         """Reads the config file at the given path"""
         
         parser = configparser.ConfigParser()
+        parser.optionxform = str
         parser.read(path)
 
 # General
@@ -105,7 +106,7 @@ def assume_type(arr):
             arr[i] = True
         elif arr[i] == 'False':
             arr[i] = False
-        elif '.' in arr[i] and arr[i].replace('.', '', 1).isdigit() == True:
+        elif '.' in arr[i] and arr[i].replace('.', '', 1).replace('-', '', 1).isdigit() == True:
             arr[i] = float(arr[i])
         elif arr[i].isdigit():
             arr[i] = int(arr[i])        

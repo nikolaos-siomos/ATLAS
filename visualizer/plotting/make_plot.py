@@ -137,10 +137,10 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax.grid(which = 'both')
     ax.legend(loc = 'lower left')
 
-    x_refr_bin = np.where(X >= x_refr)[0][0]
+    x_refr_bin = np.where(x_vals >= x_refr)[0][0]
     refr_hbin = int(1E-3 * refr_hwin / (x_vals[1] - x_vals[0]))
 
-    ax.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
+    ax.axvspan(x_vals[x_refr_bin - refr_hbin], x_vals[x_refr_bin + refr_hbin + 1],
                alpha = 0.2, facecolor = 'tab:grey')
 
     n_llim = np.round(x_refr - refr_hwin * 1e-3, decimals = 2)
@@ -149,7 +149,7 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     if use_lin == False:
 
         ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
-                f'norm: {n_llim} - {n_ulim}m',
+                f'norm: {n_llim} - {n_ulim} Km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
 
         ax.text(0.55 * x_ulim, 0.30 * y_ulim, 
@@ -157,7 +157,7 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
                  bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
     else:
         ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
-                f'norm: {n_llim} - {n_ulim}m',
+                f'norm: {n_llim} - {n_ulim} Km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
 
         ax.text(0.55 * x_ulim, 0.82 * y_ulim, 
@@ -186,12 +186,12 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     y_ticks = np.round(np.arange(-0.40, 0.40 + 0.10, 0.10), decimals = 2)
     ax2.set_yticks(y_ticks, labels = ["%.2f" % tick for tick in y_ticks])
     ax2.set_ylim([y_ticks[0], y_ticks[-1]])
-    ax2.set_ylabel('Relative Attenuated Bck. Diff. ')
+    ax2.set_ylabel('Relative Attenuated Bsc. Diff. ')
     
     ax2.grid(which = 'both')
     ax2.legend(loc = 'lower left')
     
-    ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
+    ax2.axvspan(x_vals[x_refr_bin - refr_hbin], x_vals[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
     
     fpath = os.path.join(dir_out, fname)
@@ -204,33 +204,61 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     
     return(fpath)
 
-def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals, 
+def telecover_sec(dir_out, fname, title, dpi_val, 
+                  x_refr, refr_hwin, use_nonrc,x_vals, 
+                  y1_raw, y2_raw, y3_raw, y4_raw,
+                  y1_lraw, y2_lraw, y3_lraw, y4_lraw,
+                  y1_uraw, y2_uraw, y3_uraw, y4_uraw,
                   y1_vals, y2_vals, y3_vals, y4_vals,
                   y1_extr, y2_extr, y3_extr, y4_extr,
                   y1_lvar, y2_lvar, y3_lvar, y4_lvar, 
                   y1_uvar, y2_uvar, y3_uvar, y4_uvar, 
-                  coef_1, coef_2, coef_3, coef_4,
+                  coef_1, coef_2, coef_3, coef_4, ranges,
                   x_lbin, x_ubin, x_llim, x_ulim, 
                   y_llim, y_ulim, y_llim_nr, y_ulim_nr, 
-                  x_label, x_tick):
+                  x_label, x_tick, use_last):
         
     # Create the variables to be plotted X, Y
     X = x_vals[slice(x_lbin, x_ubin)]
-
-    Y1 = y1_vals[slice(x_lbin, x_ubin)]
-    Y2 = y2_vals[slice(x_lbin, x_ubin)]
-    Y3 = y3_vals[slice(x_lbin, x_ubin)]
-    Y4 = y4_vals[slice(x_lbin, x_ubin)]
-
-    Y1_L = y1_lvar[slice(x_lbin, x_ubin)]
-    Y2_L = y2_lvar[slice(x_lbin, x_ubin)]
-    Y3_L = y3_lvar[slice(x_lbin, x_ubin)]
-    Y4_L = y4_lvar[slice(x_lbin, x_ubin)]
     
-    Y1_U = y1_uvar[slice(x_lbin, x_ubin)]
-    Y2_U = y2_uvar[slice(x_lbin, x_ubin)]
-    Y3_U = y3_uvar[slice(x_lbin, x_ubin)]
-    Y4_U = y4_uvar[slice(x_lbin, x_ubin)]
+    if use_nonrc == True:
+        R = ranges[slice(x_lbin, x_ubin)]
+    
+        Y1 = y1_raw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y2 = y2_raw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y3 = y3_raw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y4 = y4_raw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+    
+        Y1_L = y1_lraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y2_L = y2_lraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y3_L = y3_lraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y4_L = y4_lraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        
+        Y1_U = y1_uraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y2_U = y2_uraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y3_U = y3_uraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y4_U = y4_uraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        
+        y_label_1 = 'Non RC Signals - Raw Units'
+    
+    else:    
+        Y1 = y1_raw[slice(x_lbin, x_ubin)]
+        Y2 = y2_raw[slice(x_lbin, x_ubin)]
+        Y3 = y3_raw[slice(x_lbin, x_ubin)]
+        Y4 = y4_raw[slice(x_lbin, x_ubin)]
+    
+        Y1_L = y1_lraw[slice(x_lbin, x_ubin)]
+        Y2_L = y2_lraw[slice(x_lbin, x_ubin)]
+        Y3_L = y3_lraw[slice(x_lbin, x_ubin)]
+        Y4_L = y4_lraw[slice(x_lbin, x_ubin)]
+        
+        Y1_U = y1_uraw[slice(x_lbin, x_ubin)]
+        Y2_U = y2_uraw[slice(x_lbin, x_ubin)]
+        Y3_U = y3_uraw[slice(x_lbin, x_ubin)]
+        Y4_U = y4_uraw[slice(x_lbin, x_ubin)]
+        
+        y_label_1 = 'RC Signals [A.U.]'
+
     
     Y1_N = coef_1 * y1_vals[slice(x_lbin, x_ubin)]
     Y2_N = coef_2 * y2_vals[slice(x_lbin, x_ubin)]
@@ -257,17 +285,17 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     Y_O = np.nan * Y_NM
 
     if len(y1_extr) > 0:
-        Y_E = y1_extr[slice(x_lbin, x_ubin)]
-        Y_O = Y1
+        Y_E = coef_1 * y1_extr[slice(x_lbin, x_ubin)]
+        Y_O = Y1_N
     if len(y2_extr) > 0:
-        Y_E = y2_extr[slice(x_lbin, x_ubin)]
-        Y_O = Y2
+        Y_E = coef_2 * y2_extr[slice(x_lbin, x_ubin)]
+        Y_O = Y2_N
     if len(y3_extr) > 0:
-        Y_E = y3_extr[slice(x_lbin, x_ubin)]
-        Y_O = Y3
+        Y_E = coef_3 * y3_extr[slice(x_lbin, x_ubin)]
+        Y_O = Y3_N
     if len(y4_extr) > 0:
-        Y_E = y4_extr[slice(x_lbin, x_ubin)]
-        Y_O = Y4
+        Y_E = coef_4 * y4_extr[slice(x_lbin, x_ubin)]
+        Y_O = Y4_N
 
     Y_DIFF = 2. * (Y_E - Y_O) / (Y_E + Y_O)
     
@@ -287,7 +315,7 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     
     x_ticks = np.round(x_ticks, decimals = 2)
 
-    x_refr_bin = np.where(X >= x_refr)[0][0]
+    x_refr_bin = np.where(x_vals >= x_refr)[0][0]
     refr_hbin = int(1E-3 * refr_hwin / (x_vals[1] - x_vals[0]))
     
 
@@ -299,7 +327,7 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     fig.suptitle(title)
 
     # Subplot: Raw Signals
-    ax = fig.add_axes([0.07,0.13,0.23,0.7])
+    ax = fig.add_axes([0.07,0.13,0.26,0.7])
     
     # ax2.set_title(title, pad = 15)
     
@@ -319,14 +347,13 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     ax.set_xlim([x_llim, x_ulim])
     ax.set_xlabel(x_label)
     
-    ax.set_ylim([y_llim, y_ulim])
-    ax.set_ylabel('RC Signals [A.U.]')
+    ax.set_ylabel(y_label_1)
     ax.ticklabel_format(axis = 'y', useMathText = True)
     
     ax.grid(which = 'both')
 
     # Subplot: Normalized Signals
-    ax2 = fig.add_axes([0.37,0.13,0.23,0.7])
+    ax2 = fig.add_axes([0.39,0.13,0.26,0.7])
         
     ax2.plot(X, Y1_N, color = 'tab:blue')
     ax2.plot(X, Y2_N, color = 'tab:orange')
@@ -343,31 +370,32 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     ax2.set_xlabel(x_label)
 
     ax2.set_ylim([y_llim_nr, y_ulim_nr])
-    ax2.set_ylabel('Normalized RC Signals')
+    ax2.set_ylabel('Normalized RC Signals [A.U.]')
 
     ax2.grid(which = 'both')
 
-    ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
+    ax2.axvspan(x_vals[x_refr_bin - refr_hbin], x_vals[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
 
     n_llim = np.round(x_refr - refr_hwin * 1e-3, decimals = 2)
     n_ulim = np.round(x_refr + refr_hwin * 1e-3, decimals = 2)
     
     ax2.text(0.55 * x_ulim, 0.9 * y_ulim_nr, 
-             f'norm: {n_llim} - {n_ulim}',
+             f'norm: {n_llim} - {n_ulim} Km',
              bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 9))
 
     # Subplot: Normalized Deviations
-    ax3 = fig.add_axes([0.67,0.13,0.23,0.7])
+    ax3 = fig.add_axes([0.72,0.13,0.26,0.7])
     
     ax3.plot(X, (Y1_N - Y_NM) / Y_NM, color = 'tab:blue', label='_nolegend_')
     ax3.plot(X, (Y2_N - Y_NM) / Y_NM, color = 'tab:orange', label='_nolegend_')
     ax3.plot(X, (Y3_N - Y_NM) / Y_NM, color = 'tab:green', label='_nolegend_')
     ax3.plot(X, (Y4_N - Y_NM) / Y_NM, color = 'tab:red', label='_nolegend_')
     ax3.plot(X, Y_RMSE, color = 'yellow', label = 'Sector RMS')
-    ax3.plot(X, Y_DIFF, color = 'black', label = 'Atm. Dif.')
+    if use_last == True:
+        ax3.plot(X, Y_DIFF, color = 'black', label = 'Atm. Dif.')
     
-    ax3.legend(['all_dev', 'atm_dif'])
+    ax3.legend()
 
     ax3.fill_between(X, (Y1_NL - Y_NM) / Y_NM, (Y1_NU - Y_NM) / Y_NM, 
                      color = 'tab:blue', alpha = 0.3)
@@ -408,25 +436,47 @@ def telecover_sec(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     
     return(fpath)
 
-def telecover_rin(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals, 
+def telecover_rin(dir_out, fname, title, dpi_val, 
+                  x_refr, refr_hwin, x_vals, use_nonrc, 
+                  y1_raw, y2_raw, 
+                  y1_lraw, y2_lraw, 
+                  y1_uraw, y2_uraw, 
                   y1_vals, y2_vals, 
                   y1_lvar, y2_lvar, y1_uvar, y2_uvar,
-                  coef_1, coef_2, 
+                  coef_1, coef_2, ranges,
                   x_lbin, x_ubin, x_llim, x_ulim, 
                   y_llim, y_ulim, y_llim_nr, y_ulim_nr, 
                   x_label, x_tick):
         
     # Create the variables to be plotted X, Y
     X = x_vals[slice(x_lbin, x_ubin)]
-
-    Y1 = y1_vals[slice(x_lbin, x_ubin)]
-    Y2 = y2_vals[slice(x_lbin, x_ubin)]
-
-    Y1_L = Y1 * y1_lvar[slice(x_lbin, x_ubin)]
-    Y2_L = Y2 * y2_lvar[slice(x_lbin, x_ubin)]
     
-    Y1_U = Y1 * y1_uvar[slice(x_lbin, x_ubin)]
-    Y2_U = Y2 * y2_uvar[slice(x_lbin, x_ubin)]
+    if use_nonrc == True:
+        R = ranges[slice(x_lbin, x_ubin)]
+    
+        Y1 = y1_raw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y2 = y2_raw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+    
+        Y1_L = Y1 * y1_lraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y2_L = Y2 * y2_lraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        
+        Y1_U = Y1 * y1_uraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        Y2_U = Y2 * y2_uraw[slice(x_lbin, x_ubin)] / np.power(R, 2)
+        
+        y_label_1 = 'Non RC Signals - Raw Units'
+    
+    else:
+        Y1 = y1_raw[slice(x_lbin, x_ubin)] 
+        Y2 = y2_raw[slice(x_lbin, x_ubin)] 
+    
+        Y1_L = Y1 * y1_lraw[slice(x_lbin, x_ubin)]
+        Y2_L = Y2 * y2_lraw[slice(x_lbin, x_ubin)]
+        
+        Y1_U = Y1 * y1_uraw[slice(x_lbin, x_ubin)]
+        Y2_U = Y2 * y2_uraw[slice(x_lbin, x_ubin)]
+        
+        y_label_1 = 'RC Signals [A.U.]'
+
     
     Y1_N = coef_1 * y1_vals[slice(x_lbin, x_ubin)]
     Y2_N = coef_2 * y2_vals[slice(x_lbin, x_ubin)]
@@ -456,7 +506,7 @@ def telecover_rin(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     else:
         x_ticks = np.hstack((x_ticks, x_ulim))
     
-    x_refr_bin = np.where(X >= x_refr)[0][0]
+    x_refr_bin = np.where(x_vals >= x_refr)[0][0]
     refr_hbin = int(1E-3 * refr_hwin / (x_vals[1] - x_vals[0]))
     
     plt.rc('font', size = 14) 
@@ -466,7 +516,7 @@ def telecover_rin(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     fig.suptitle(title)
 
     # Subplot: Raw Signals
-    ax = fig.add_axes([0.07,0.13,0.23,0.7])
+    ax = fig.add_axes([0.07,0.13,0.26,0.7])
     
     # ax2.set_title(title, pad = 15)
     
@@ -482,12 +532,11 @@ def telecover_rin(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
     ax.set_xlim([x_llim, x_ulim])
     ax.set_xlabel(x_label)
     
-    ax.set_ylim([y_llim, y_ulim])
-    ax.set_ylabel('RC Signals [A.U.]')
+    ax.set_ylabel(y_label_1)
     
     ax.grid(which = 'both')
 
-    ax2 = fig.add_axes([0.37,0.13,0.23,0.7])
+    ax2 = fig.add_axes([0.39,0.13,0.26,0.7])
         
     ax2.plot(X, Y1_N, color = 'tab:purple')
     ax2.plot(X, Y2_N, color = 'tab:cyan')
@@ -506,18 +555,18 @@ def telecover_rin(dir_out, fname, title, dpi_val, x_refr, refr_hwin, x_vals,
 
     ax2.grid(which = 'both')
     
-    ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
+    ax2.axvspan(x_vals[x_refr_bin - refr_hbin], x_vals[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
 
     n_llim = np.round(x_refr - refr_hwin * 1e-3, decimals = 2)
     n_ulim = np.round(x_refr + refr_hwin * 1e-3, decimals = 2)
     
     ax2.text(0.55 * x_ulim, 0.9 * y_ulim_nr, 
-             f'norm: {n_llim} - {n_ulim}',
+             f'norm: {n_llim} - {n_ulim} Km',
              bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 9))
     
     # Subplot: Normalized Deviations
-    ax3 = fig.add_axes([0.67,0.13,0.23,0.7])
+    ax3 = fig.add_axes([0.72,0.13,0.26,0.7])
     
     ax3.plot(X, (Y1_N - Y_NM) / Y_NM, color = 'tab:purple')
     ax3.plot(X, (Y2_N - Y_NM) / Y_NM, color = 'tab:cyan')
@@ -622,10 +671,10 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax.fill_between(X, Y1 - Y1E, Y1 + Y1E, color = 'tab:blue', alpha = 0.3)
     ax.fill_between(X, Y2 - Y2E, Y2 + Y2E, color = 'tab:red', alpha = 0.3)
     
-    x_refr_bin = np.where(X >= x_refr)[0][0]
+    x_refr_bin = np.where(x_vals >= x_refr)[0][0]
     refr_hbin = int(1E-3 * refr_hwin / (x_vals[1] - x_vals[0]))
 
-    ax.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
+    ax.axvspan(x_vals[x_refr_bin - refr_hbin], x_vals[x_refr_bin + refr_hbin + 1],
                alpha = 0.2, facecolor = 'tab:grey')
 
     n_llim = np.round(x_refr - refr_hwin * 1e-3, decimals = 2)
@@ -633,11 +682,11 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     
     if use_lin == False:
         ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
-                f'norm: {n_llim} - {n_ulim}',
+                f'norm: {n_llim} - {n_ulim} Km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
     else:
         ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
-                f'norm: {n_llim} - {n_ulim}',
+                f'norm: {n_llim} - {n_ulim} Km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
         
     ax2 = fig.add_axes([0.65,0.13,0.30,0.7])
@@ -678,7 +727,7 @@ def intercomparison(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     
     ax2.axhline(c = 'k')
 
-    ax2.axvspan(X[x_refr_bin - refr_hbin], X[x_refr_bin + refr_hbin + 1],
+    ax2.axvspan(x_vals[x_refr_bin - refr_hbin], x_vals[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
     
         
@@ -698,6 +747,8 @@ def polarization_calibration(dir_out, fname, title, dpi_val,
                              y1_vals, y2_vals, y3_vals, y4_vals, y5_vals, y6_vals,
                              eta, eta_f_s, eta_s,
                              delta_m, delta_c, delta, epsilon,
+                             eta_err, eta_f_s_err, eta_s_err,
+                             delta_c_err, delta_err, epsilon_err,
                              x_lbin_cal, x_ubin_cal, 
                              x_llim_cal, x_ulim_cal, 
                              y_llim_cal, y_ulim_cal, 
@@ -765,29 +816,32 @@ def polarization_calibration(dir_out, fname, title, dpi_val,
     ax.grid(which = 'both')
     ax.legend(loc = 'upper right')
 
-    cal_bin = np.where(XB >= x_cal)[0][0]
+    cal_bin = np.where(x_vals_cal >= x_cal)[0][0]
     cal_hwin_bins = int(1E-3 * cal_hwin / (x_vals_cal[1] - x_vals_cal[0]))
 
-    ax.axvspan(XA[cal_bin - cal_hwin_bins], XA[cal_bin + cal_hwin_bins + 1],
+    ax.axvspan(x_vals_cal[cal_bin - cal_hwin_bins], x_vals_cal[cal_bin + cal_hwin_bins + 1],
                alpha = 0.2, facecolor = 'tab:grey')
 
-    c_llim = np.round(XA[cal_bin] - cal_hwin * 1e-3, decimals = 2)
-    c_ulim = np.round(XA[cal_bin] + cal_hwin * 1e-3, decimals = 2)
+    c_llim = np.round(x_vals_cal[cal_bin] - cal_hwin * 1e-3, decimals = 2)
+    c_ulim = np.round(x_vals_cal[cal_bin] + cal_hwin * 1e-3, decimals = 2)
         
-    ax.text(0.55 * x_ulim_cal, 0.95 * y_ulim_cal, 
-            f'cal.: {c_llim} - {c_ulim}',
+    ax.text(0.45 * x_ulim_cal, 0.95 * y_ulim_cal, 
+            f'cal.: {c_llim} - {c_ulim} Km',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))  
-    ax.text(0.55 * x_ulim_cal, 0.87 * y_ulim_cal, 
-            f'ε: {round_it(epsilon,2)}'+'${}^o$, ' + f'K: {round_it(K, 3)}',
+    # ax.text(0.55 * x_ulim_cal, 0.87 * y_ulim_cal, 
+    #         f'ε: {round_it(epsilon,2)}'+'${}^o \pm$ '+f'{round_it(epsilon_err,2)}'+'${}^o$,',
+    #         bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+    ax.text(0.45 * x_ulim_cal, 0.87 * y_ulim_cal, 
+            f'ε: {round_it(epsilon,2)}'+'${}^o$'+ f', K: {round_it(K, 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax.text(0.55 * x_ulim_cal, 0.79 * y_ulim_cal, 
-            r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 3)}',
+    ax.text(0.45 * x_ulim_cal, 0.79 * y_ulim_cal, 
+            r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 2)}' + ' $\pm$ ' + f'{round_it(eta_f_s_err, 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax.text(0.55 * x_ulim_cal, 0.71 * y_ulim_cal, 
-            r'$η^{\star}$'+f': {round_it(eta_s, 3)}',
+    ax.text(0.45 * x_ulim_cal, 0.71 * y_ulim_cal, 
+            r'$η^{\star}$'+f': {round_it(eta_s, 2)}' + ' $\pm$ ' + f'{round_it(eta_s_err, 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax.text(0.55 * x_ulim_cal, 0.63 * y_ulim_cal, 
-            f'η: {round_it(eta, 3)}',
+    ax.text(0.45 * x_ulim_cal, 0.63 * y_ulim_cal, 
+            f'η: {round_it(eta, 3)}' + ' $\pm$ ' + f'{round_it(eta_err, 2)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
 
     ax2 = fig.add_axes([0.55,0.13,0.40,0.65])
@@ -825,32 +879,32 @@ def polarization_calibration(dir_out, fname, title, dpi_val,
     ax2.grid(which = 'both')
     ax2.legend(loc = 'upper right')
 
-    vdr_bin = np.where(XB >= x_vdr)[0][0]
+    vdr_bin = np.where(x_vals_vdr >= x_vdr)[0][0]
     vdr_hwin_bins = int(1E-3 * vdr_hwin / (x_vals_vdr[1] - x_vals_vdr[0]))
 
-    ax2.axvspan(XB[vdr_bin - vdr_hwin_bins], XB[vdr_bin + vdr_hwin_bins + 1],
+    ax2.axvspan(x_vals_vdr[vdr_bin - vdr_hwin_bins], x_vals_vdr[vdr_bin + vdr_hwin_bins + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
     
-    m_llim = np.round(XB[vdr_bin] - vdr_hwin * 1e-3, decimals = 2)
-    m_ulim = np.round(XB[vdr_bin] + vdr_hwin * 1e-3, decimals = 2)
+    m_llim = np.round(x_vals_vdr[vdr_bin] - vdr_hwin * 1e-3, decimals = 2)
+    m_ulim = np.round(x_vals_vdr[vdr_bin] + vdr_hwin * 1e-3, decimals = 2)
         
-    ax2.text(0.50 * x_ulim_vdr, 0.93 * y_ulim_vdr, 
+    ax2.text(0.40 * x_ulim_vdr, 0.93 * y_ulim_vdr, 
              f'mol.: {m_llim} - {m_ulim}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))  
-    ax2.text(0.50 * x_ulim_vdr, 0.83 * y_ulim_vdr, 
-            r'$δ^{\star}$'+f': {round_it(delta_c,3)}',
+    ax2.text(0.40 * x_ulim_vdr, 0.83 * y_ulim_vdr, 
+            r'$δ^{\star}$'+f': {round_it(delta_c,3)}' + ' $\pm$ ' + f'{round_it(delta_c_err,2)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax2.text(0.50 * x_ulim_vdr, 0.73 * y_ulim_vdr, 
-            r'$δ_{c}$'+f': {round_it(delta,3)}',
+    ax2.text(0.40 * x_ulim_vdr, 0.73 * y_ulim_vdr, 
+            r'$δ_{c}$'+f': {round_it(delta,3)}' + ' $\pm$ ' + f'{round_it(delta_err,2)}', 
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax2.text(0.50 * x_ulim_vdr, 0.63 * y_ulim_vdr, 
+    ax2.text(0.40 * x_ulim_vdr, 0.63 * y_ulim_vdr, 
             r'$δ_m$: '+f'{round_it(delta_m,3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax2.text(0.50 * x_ulim_vdr, 0.53 * y_ulim_vdr, 
-            r'$G_R$: '+f'{round_it(G_R,3)}, $G_T$: '+f'{round_it(G_T,3)}',
+    ax2.text(0.40 * x_ulim_vdr, 0.53 * y_ulim_vdr, 
+            r'$G_R$: '+f'{round_it(G_R,4)}, $G_T$: '+f'{round_it(G_T,4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax2.text(0.50 * x_ulim_vdr, 0.43 * y_ulim_vdr, 
-            r'$H_R$: '+f'{round_it(H_R,3)}, $H_T$: '+f'{round_it(H_T,3)}',
+    ax2.text(0.40 * x_ulim_vdr, 0.43 * y_ulim_vdr, 
+            r'$H_R$: '+f'{round_it(H_R,4)}, $H_T$: '+f'{round_it(H_T,4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
 
     fpath = os.path.join(dir_out, fname)

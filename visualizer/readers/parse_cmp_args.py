@@ -27,19 +27,14 @@ def call_parser():
                         type = str, nargs = '?', 
                         help = 'The path to the output folder where the results and plots subfolders will be placed ')
 
-    parser.add_argument('-d', '--delete', metavar = 'delete',
-                        type = bool, default = False, 
-                        action = argparse.BooleanOptionalAction,
-                        help = 'If called then the input file will be DELETED after processing in order to save space. Use with care! ')
-
     parser.add_argument('--dpi', metavar = 'dpi',
                         type = int, nargs = '?', default = 300, 
-                        help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 100 ')
+                        help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 300 ')
 
     parser.add_argument('--use_lin_scale', metavar = 'use_lin_scale',
                         type = bool, default = False, 
                         action = argparse.BooleanOptionalAction,
-                        help = 'If called, a linear scale will be used for the z axis (signal) ')
+                        help = 'If called, a linear scale will be used for the y axis (signal) ')
 
     parser.add_argument('--use_distance', metavar = 'use_distance',
                         type = bool, default = True, 

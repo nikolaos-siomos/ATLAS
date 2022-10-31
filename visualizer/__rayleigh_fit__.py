@@ -14,7 +14,7 @@ from .readers.parse_ray_args import call_parser, check_parser
 from .readers.check import check_channels
 from .plotting import make_axis, make_title, make_plot
 from .tools.smoothing import sliding_average_1D
-from .tools import normalize
+from .tools import normalize, average
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
@@ -106,7 +106,14 @@ def main(args, __version__):
                                            hwin = args['half_reference_window'],
                                            axis = 0)
         
-        rsem = 1. - coef[0] * y_errs[n_bin] / atb_ch[n_bin]
+        _, _, sem = average.region(sig = sig_ch.copy(), 
+                                   x_vals = x_vals, 
+                                   calibr = args['reference_height'], 
+                                   hwin =  args['half_reference_window'], 
+                                   axis = 0, 
+                                   squeeze = True)
+        
+        rsem = coef[0] * sem / atb_ch[n_bin]
         
         # Create the y axis (signal)
         y_llim, y_ulim, y_label = \
@@ -127,6 +134,7 @@ def main(args, __version__):
                                     dwl = dwl_ch,
                                     ewl = ewl_ch,
                                     bdw = bdw_ch,
+                                    smooth = args['smooth'],
                                     sm_lims = args['smoothing_range'],
                                     sm_hwin = args['half_window'],
                                     sm_expo = args['smooth_exponential'],

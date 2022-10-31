@@ -22,12 +22,14 @@ from visualizer.readers.parse_qck_args import check_parser as check_qck
 from visualizer.readers.parse_ray_args import check_parser as check_ray
 from visualizer.readers.parse_tlc_args import check_parser as check_tlc
 from visualizer.readers.parse_pcb_args import check_parser as check_pcb
+from visualizer.readers.parse_cmp_args import check_parser as check_cmp
 from scc_converter.readers.parse_args import view_parser as view_cnv
 from processor.readers.parse_args import view_parser as view_prs
 from visualizer.readers.parse_qck_args import view_parser as view_qck
 from visualizer.readers.parse_ray_args import view_parser as view_ray
 from visualizer.readers.parse_tlc_args import view_parser as view_tlc
 from visualizer.readers.parse_pcb_args import view_parser as view_pcb
+from visualizer.readers.parse_cmp_args import view_parser as view_cmp
 
 # from visualizer.readers.parse_cmp_args import call_parser as parse_cmp
 
@@ -333,6 +335,23 @@ def ray_test(ray_args, prs_files, ray_out, processing, reprocess = True):
         # Excecute ATLAS visualizer
         view_ray(ray_args)
         __rayleigh_fit__(ray_args, __version__)
+
+    return()
+
+def intercomparison(cmp_args, input_files, cmp_out):
+    
+    cmp_args['input_files'] = input_files 
+    cmp_args['output_folder'] = cmp_out
+        
+    os.makedirs(cmp_out, exist_ok = True)
+    
+    cmp_args = cmp_args.copy()   
+    
+    cmp_args = check_cmp(cmp_args)
+
+    # Excecute ATLAS visualizer
+    view_cmp(cmp_args)
+    __intercomparison__(cmp_args, __version__)
 
     return()
 

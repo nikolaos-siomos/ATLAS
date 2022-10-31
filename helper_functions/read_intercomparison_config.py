@@ -15,15 +15,6 @@ class config():
         parser = configparser.ConfigParser()
         parser.read(path)
 
-# General
-        if parser.has_section('general'):
-
-            self.gen = read_section(parser['general'], dtype = object, squeeze = True)
-
-        else:
-            
-            raise Exception("-- Error: No 'general' section is provided in the configuration files. Please include a section with at least the mandatory fields!")
-
 # Intercomparison
         if parser.has_section('intercomparison'):
 

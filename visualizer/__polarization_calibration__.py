@@ -221,54 +221,61 @@ def main(args, __version__):
                                x_sm_hwin = args['half_window'],
                                expo = args['smooth_exponential'])      
         
-        avg_r_m45 = average.region(sig = sig_r_m45_ch, 
-                                   x_vals = x_vals_cal, 
-                                   calibr = args['calibration_height'], 
-                                   hwin = args['half_calibration_window'], 
-                                   axis = 0,
-                                   squeeze = True)
+        avg_r_m45, _, sem_r_m45 = \
+            average.region(sig = sig_r_m45_ch, 
+                           x_vals = x_vals_cal, 
+                           calibr = args['calibration_height'], 
+                           hwin = args['half_calibration_window'], 
+                           axis = 0,
+                           squeeze = True)
         
-        avg_t_m45 = average.region(sig = sig_t_m45_ch, 
-                                   x_vals = x_vals_cal, 
-                                   calibr = args['calibration_height'], 
-                                   hwin = args['half_calibration_window'], 
-                                   axis = 0,
-                                   squeeze = True)
+        avg_t_m45, _, sem_t_m45 = \
+            average.region(sig = sig_t_m45_ch, 
+                           x_vals = x_vals_cal, 
+                           calibr = args['calibration_height'], 
+                           hwin = args['half_calibration_window'], 
+                           axis = 0,
+                           squeeze = True)
         
-        avg_r_p45 = average.region(sig = sig_r_p45_ch, 
-                                   x_vals = x_vals_cal, 
-                                   calibr = args['calibration_height'], 
-                                   hwin = args['half_calibration_window'], 
-                                   axis = 0,
-                                   squeeze = True)
+        avg_r_p45, _, sem_r_p45 = \
+            average.region(sig = sig_r_p45_ch, 
+                           x_vals = x_vals_cal, 
+                           calibr = args['calibration_height'], 
+                           hwin = args['half_calibration_window'], 
+                           axis = 0,
+                           squeeze = True)
         
-        avg_t_p45 = average.region(sig = sig_t_p45_ch, 
-                                   x_vals = x_vals_cal, 
-                                   calibr = args['calibration_height'], 
-                                   hwin = args['half_calibration_window'], 
-                                   axis = 0,
-                                   squeeze = True)
+        avg_t_p45, _, sem_t_p45 = \
+            average.region(sig = sig_t_p45_ch, 
+                           x_vals = x_vals_cal, 
+                           calibr = args['calibration_height'], 
+                           hwin = args['half_calibration_window'], 
+                           axis = 0,
+                           squeeze = True)
         
-        avg_r_ray = average.region(sig = sig_r_rax_ch, 
-                                   x_vals = x_vals_ray, 
-                                   calibr = args['rayleigh_height'], 
-                                   hwin = args['half_rayleigh_window'], 
-                                   axis = 0,
-                                   squeeze = True)
+        avg_r_ray, _, sem_r_ray = \
+            average.region(sig = sig_r_rax_ch, 
+                           x_vals = x_vals_ray, 
+                           calibr = args['rayleigh_height'], 
+                           hwin = args['half_rayleigh_window'], 
+                           axis = 0,
+                           squeeze = True)
         
-        avg_t_ray = average.region(sig = sig_t_rax_ch, 
-                                   x_vals = x_vals_ray, 
-                                   calibr = args['rayleigh_height'], 
-                                   hwin = args['half_rayleigh_window'], 
-                                   axis = 0,
-                                   squeeze = True)
+        avg_t_ray, _, sem_t_ray = \
+            average.region(sig = sig_t_rax_ch, 
+                           x_vals = x_vals_ray, 
+                           calibr = args['rayleigh_height'], 
+                           hwin = args['half_rayleigh_window'], 
+                           axis = 0,
+                           squeeze = True)
 
-        avg_a_m_ch = average.region(sig = a_m_ch, 
-                                    x_vals = x_vals_ray, 
-                                    calibr = args['rayleigh_height'], 
-                                    hwin = args['half_rayleigh_window'], 
-                                    axis = 0,
-                                    squeeze = True) 
+        avg_a_m_ch, _, _ = \
+            average.region(sig = a_m_ch, 
+                           x_vals = x_vals_ray, 
+                           calibr = args['rayleigh_height'], 
+                           hwin = args['half_rayleigh_window'], 
+                           axis = 0,
+                           squeeze = True) 
                 
         eta_m45_prf = (y_r_m45_sm / y_t_m45_sm) 
     
@@ -276,9 +283,20 @@ def main(args, __version__):
         
         eta_prf = np.sqrt(eta_m45_prf * eta_p45_prf)
         
-        eta_f_s_m45 = (avg_r_m45 / avg_t_m45)
-    
-        eta_f_s_p45 = (avg_r_p45 / avg_t_p45)
+        avg_r_m45_i = np.random.normal(loc = avg_r_m45, scale = sem_r_m45, size = 200)
+        avg_t_m45_i = np.random.normal(loc = avg_t_m45, scale = sem_t_m45, size = 200)
+        avg_r_p45_i = np.random.normal(loc = avg_r_p45, scale = sem_r_p45, size = 200)
+        avg_t_p45_i = np.random.normal(loc = avg_t_p45, scale = sem_t_p45, size = 200)
+        avg_r_ray_i = np.random.normal(loc = avg_r_ray, scale = sem_r_ray, size = 200)
+        avg_t_ray_i = np.random.normal(loc = avg_t_p45, scale = sem_t_p45, size = 200)
+
+        eta_f_s_m45 = (avg_r_m45_i / avg_t_m45_i)
+        
+        eta_f_s_m45[0] = (avg_r_m45 / avg_t_m45)
+        
+        eta_f_s_p45 = (avg_r_p45_i / avg_t_p45_i)
+
+        eta_f_s_p45[0] = (avg_r_p45 / avg_t_p45)
         
         eta_f_s = np.sqrt(eta_f_s_p45 * eta_f_s_m45)
         
@@ -286,12 +304,13 @@ def main(args, __version__):
 
         eta = eta_s / K_ch
         
-        delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta
+        delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta[0]
 
-        delta_s = (avg_r_ray / avg_t_ray) / eta
+        delta_s = (avg_r_ray_i / avg_t_ray_i) / eta
+        delta_s[0] = (avg_r_ray / avg_t_ray) / eta[0]
 
-        delta_c_prf = (delta_s_prf * (G_T_ch + H_T_ch) - (G_R_ch + H_R_ch)) /\
-            ((G_R_ch - H_R_ch) - delta_s_prf * (G_T_ch - H_T_ch))
+        delta_c_prf = (delta_s_prf * (G_T_def_ch + H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
+            ((G_R_def_ch - H_R_def_ch) - delta_s_prf * (G_T_def_ch - H_T_def_ch))
         
         delta_c = (delta_s * (G_T_def_ch+ H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
             ((G_R_def_ch - H_R_def_ch) - delta_s * (G_T_def_ch - H_T_def_ch))
@@ -314,16 +333,16 @@ def main(args, __version__):
         # kappa = np.tan(0.5 * np.arcsin(psi)) / np.sin(2. * np.deg2rad(epsilon)) 
     
             
-        # Create the x axis (calibration)
+        # Create the y axis (calibration)
         y_llim_cal, y_ulim_cal, y_label_cal = \
             make_axis.polarization_calibration_cal_y(
-                ratio_m = eta_f_s_m45, ratio_p = eta_f_s_p45,
+                ratio_m = eta_f_s_m45[0], ratio_p = eta_f_s_p45[0],
                 y_lims_cal = args['y_lims_calibration'])
             
-        # Create the x axis (rayleigh)
+        # Create the y axis (rayleigh)
         y_llim_ray, y_ulim_ray, y_label_ray = \
             make_axis.polarization_calibration_ray_y(
-                ratio = delta, y_lims_ray = args['y_lims_rayleigh'])
+                ratio = delta_c[0], y_lims_ray = args['y_lims_rayleigh'])
         
                 
         # Make title
@@ -342,6 +361,7 @@ def main(args, __version__):
                 dwl = dwl_ch,
                 ewl = ewl_ch,
                 bdw = bdw_ch,
+                smooth = args['smooth'],
                 sm_lims = args['smoothing_range'],
                 sm_hwin = args['half_window'],
                 sm_expo = args['smooth_exponential'],
@@ -370,12 +390,19 @@ def main(args, __version__):
                                                y4_vals = delta_c_prf,
                                                y5_vals = delta_prf,
                                                y6_vals = delta_m_prf,
-                                               eta = eta, eta_f_s = eta_f_s, 
-                                               eta_s = eta_s, 
+                                               eta = eta[0], 
+                                               eta_f_s = eta_f_s[0], 
+                                               eta_s = eta_s[0], 
                                                delta_m = delta_m,
-                                               delta_c = delta_c,
-                                               delta = delta,
-                                               epsilon = epsilon,
+                                               delta_c = delta_c[0],
+                                               delta = delta[0],
+                                               epsilon = epsilon[0],
+                                               eta_err = np.std(eta[1:]), 
+                                               eta_f_s_err = np.std(eta_f_s[1:]), 
+                                               eta_s_err = np.std(eta_s[1:]), 
+                                               delta_c_err = np.std(delta_c[1:]),
+                                               delta_err = np.std(delta[1:]),
+                                               epsilon_err = np.std(epsilon[0]),
                                                x_lbin_cal = x_lbin_cal,
                                                x_ubin_cal = x_ubin_cal, 
                                                x_llim_cal = x_llim_cal,
