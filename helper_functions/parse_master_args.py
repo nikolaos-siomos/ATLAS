@@ -49,15 +49,15 @@ def call_parser():
         
     parser.add_argument('--pcb_cal_p45_folder', metavar='pcb_cal_p45_folder', 
                         type=str, nargs='?', default = None,
-                        help='The path to the polarization calibration +45 folder. Defaults to a pcl/+45 folder inside the parent folder')
+                        help='The path to the polarization calibration +45 folder. Defaults to a pcb/+45 folder inside the parent folder')
 
     parser.add_argument('--pcb_cal_m45_folder', metavar='pcb_cal_m45_folder', 
                         type=str, nargs='?', default = None,
-                        help='The path to the polarization calibration -45 folder. Defaults to a pcl/-45 folder inside the parent folder')
+                        help='The path to the polarization calibration -45 folder. Defaults to a pcb/-45 folder inside the parent folder')
 
     parser.add_argument('--pcb_cal_stc_folder', metavar='pcb_cal_stc_folder', 
                         type=str, nargs='?', default = None,
-                        help='The path to the polarization calibration folder for a calibration with a single calibrator position. Defaults to a pcl/stc folder inside the parent folder')
+                        help='The path to the polarization calibration folder for a calibration with a single calibrator position. Defaults to a pcb/stc folder inside the parent folder')
 
     parser.add_argument('--radiosonde_folder', metavar='radiosonde_folder', 
                         type=str, nargs='?', default = None,

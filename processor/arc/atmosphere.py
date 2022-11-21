@@ -214,7 +214,7 @@ def short_molec(heights, ranges, meas_info, channel_info,
             atb = bcf_tot * trn_fth * trn_bck
         if ch_type.loc[ch] in ['p', 'o']:
             atb = bcf_tot * trn_fth * trn_bck / (1. + mdr) 
-        if ch_type.loc[ch] in ['s', 'x']:
+        if ch_type.loc[ch] in ['c', 'x']:
             atb = bcf_tot * mdr * trn_fth * trn_bck / (1. + mdr) 
                             
         # Pack into a single xarray object

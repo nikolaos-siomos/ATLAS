@@ -838,10 +838,10 @@ def polarization_calibration(dir_out, fname, title, dpi_val,
             r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 2)}' + ' $\pm$ ' + f'{round_it(eta_f_s_err, 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax.text(0.45 * x_ulim_cal, 0.71 * y_ulim_cal, 
-            r'$η^{\star}$'+f': {round_it(eta_s, 2)}' + ' $\pm$ ' + f'{round_it(eta_s_err, 3)}',
+            r'$η^{\star}$'+f': {round_it(eta_s, 3)}' + ' $\pm$ ' + f'{round_it(eta_s_err, 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax.text(0.45 * x_ulim_cal, 0.63 * y_ulim_cal, 
-            f'η: {round_it(eta, 3)}' + ' $\pm$ ' + f'{round_it(eta_err, 2)}',
+            f'η: {round_it(eta, 3)}' + ' $\pm$ ' + f'{round_it(eta_err, 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
 
     ax2 = fig.add_axes([0.55,0.13,0.40,0.65])

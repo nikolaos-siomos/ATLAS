@@ -303,7 +303,7 @@ def main(args, __version__):
         eta_s = eta_f_s / TR_to_TT_ch
 
         eta = eta_s / K_ch
-        
+
         delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta[0]
 
         delta_s = (avg_r_ray_i / avg_t_ray_i) / eta
