@@ -34,17 +34,17 @@ newdata = mst_cfg.gen['newdata']
 if 'process' in  mst_cfg.gen.keys(): process = mst_cfg.gen['process']
 else: process = ['ray', 'tlc', 'pcb']
 
-processing = {'ray' : True,
-              'tlc' : True,
-              'pcb' : True}
+processing = {'ray' : False,
+              'tlc' : False,
+              'pcb' : False}
 
 quicklook = {'ray' : False,
              'tlc' : False,
              'pcb' : False}
 
-if 'ray' not in process: processing['ray'] = False
-if 'tlc' not in process: processing['tlc'] = False
-if 'pcb' not in process: processing['pcb'] = False
+if 'ray' in process: processing['ray'] = True
+if 'tlc' in process: processing['tlc'] = True
+if 'pcb' in process: processing['pcb'] = True
 
 if 'process_qck' in mst_cfg.gen.keys():
     process_qck = mst_cfg.gen['process_qck']

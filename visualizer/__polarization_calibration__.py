@@ -17,6 +17,7 @@ from .tools import normalize
 from .plotting import make_axis, make_title, make_plot
 from .tools.smoothing import sliding_average_1D
 from .tools import average
+from .writters import make_header, export_ascii 
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
@@ -43,6 +44,11 @@ def main(args, __version__):
     sig_p45 = data.Range_Corrected_Signals_plus_45
     sig_p45 = sig_p45.copy().where(sig_p45 != nc.default_fillvals['f8'])\
         .mean(dim = 'time_p45')
+    
+    sampling_cal = (data.Raw_Data_Stop_Time_minus_45 - data.Raw_Data_Start_Time_minus_45).values[0] +\
+        (data.Raw_Data_Stop_Time_plus_45 - data.Raw_Data_Start_Time_plus_45).values[0]
+
+    sampling_ray = (data.Raw_Data_Stop_Time_Rayleigh - data.Raw_Data_Start_Time_Rayleigh).values
     
     # Extract signal time, channels, and bins
     channels = data.channel.values
@@ -88,10 +94,20 @@ def main(args, __version__):
     H_T_def = len(channels_r) * [1.]
 
     for i in range(len(channels_r)):
-        if channels_r[i][5] == 'c':
+        if channels_r[i][5] == 'c' and channels_t[i][5] == 'p':
             H_R_def[i] = -1.
-        if channels_t[i][5] == 'c':
+        if channels_r[i][5] == 'p' and channels_t[i][5] == 'c':
             H_T_def[i] = -1.
+        if channels_r[i][5] == 't' and channels_t[i][5] == 'p':
+            H_R_def[i] =  0.
+        if channels_r[i][5] == 'p' and channels_t[i][5] == 't':
+            H_T_def[i] =  0.
+        if channels_r[i][5] == 't' and channels_t[i][5] == 'c':
+            H_R_def[i] =  0.
+            H_T_def[i] = -1.
+        if channels_r[i][5] == 'c' and channels_t[i][5] == 't':
+            H_R_def[i] = -1.
+            H_T_def[i] =  0.
 
     # Extract pair values
     if args['K'] == None:
@@ -126,8 +142,7 @@ def main(args, __version__):
 
     # Extract Molecular Depolarization Ratio and Calucalte the Atm. Parameter alpha
     mldr = data.Molecular_Linear_Depolarization_Ratio
-    a_m = (1. - mldr) / (1. + mldr)
-    
+        
     # Iterate over the channels
     for i in range(len(channels_r)):
                 
@@ -157,11 +172,11 @@ def main(args, __version__):
         sig_t_p45_ch = sig_p45.copy().loc[ch_t_d].values
         sig_r_m45_ch = sig_m45.copy().loc[ch_r_d].values
         sig_t_m45_ch = sig_m45.copy().loc[ch_t_d].values
-        sig_r_rax_ch = sig_ray.copy().loc[ch_r_d].values
-        sig_t_rax_ch = sig_ray.copy().loc[ch_t_d].values
+        sig_r_ray_ch = sig_ray.copy().loc[ch_r_d].values
+        sig_t_ray_ch = sig_ray.copy().loc[ch_t_d].values
         
-        a_m_ch = a_m.loc[ch_r_d].values
-    
+        delta_m_prf = mldr.loc[ch_r_d].values
+
         # Create the y axis (height/range)
         x_lbin_cal, x_ubin_cal, x_llim_cal, x_ulim_cal, x_vals_cal, x_label_cal = \
             make_axis.polarization_calibration_x(
@@ -208,14 +223,14 @@ def main(args, __version__):
                                expo = args['smooth_exponential'])
 
         y_r_rax_sm, _ = \
-            sliding_average_1D(y_vals = sig_r_rax_ch, 
+            sliding_average_1D(y_vals = sig_r_ray_ch, 
                                x_vals = x_vals_ray,
                                x_sm_lims = args['smoothing_range'],
                                x_sm_hwin = args['half_window'],
                                expo = args['smooth_exponential'])    
             
         y_t_rax_sm, _ = \
-            sliding_average_1D(y_vals = sig_t_rax_ch, 
+            sliding_average_1D(y_vals = sig_t_ray_ch, 
                                x_vals = x_vals_ray,
                                x_sm_lims = args['smoothing_range'],
                                x_sm_hwin = args['half_window'],
@@ -254,7 +269,7 @@ def main(args, __version__):
                            squeeze = True)
         
         avg_r_ray, _, sem_r_ray = \
-            average.region(sig = sig_r_rax_ch, 
+            average.region(sig = sig_r_ray_ch, 
                            x_vals = x_vals_ray, 
                            calibr = args['rayleigh_height'], 
                            hwin = args['half_rayleigh_window'], 
@@ -262,15 +277,15 @@ def main(args, __version__):
                            squeeze = True)
         
         avg_t_ray, _, sem_t_ray = \
-            average.region(sig = sig_t_rax_ch, 
+            average.region(sig = sig_t_ray_ch, 
                            x_vals = x_vals_ray, 
                            calibr = args['rayleigh_height'], 
                            hwin = args['half_rayleigh_window'], 
                            axis = 0,
                            squeeze = True)
 
-        avg_a_m_ch, _, _ = \
-            average.region(sig = a_m_ch, 
+        delta_m, _, _ = \
+            average.region(sig = delta_m_prf, 
                            x_vals = x_vals_ray, 
                            calibr = args['rayleigh_height'], 
                            hwin = args['half_rayleigh_window'], 
@@ -305,9 +320,12 @@ def main(args, __version__):
         eta = eta_s / K_ch
 
         delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta[0]
+        delta_fit_prf = (y_r_rax_sm / y_t_rax_sm) / eta_s[0]
 
         delta_s = (avg_r_ray_i / avg_t_ray_i) / eta
         delta_s[0] = (avg_r_ray / avg_t_ray) / eta[0]
+
+        delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta[0]
 
         delta_c_prf = (delta_s_prf * (G_T_def_ch + H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
             ((G_R_def_ch - H_R_def_ch) - delta_s_prf * (G_T_def_ch - H_T_def_ch))
@@ -320,11 +338,7 @@ def main(args, __version__):
 
         delta = (delta_s * (G_T_ch + H_T_ch) - (G_R_ch + H_R_ch)) /\
             ((G_R_ch - H_R_ch) - delta_s * (G_T_ch - H_T_ch))
-        
-        delta_m_prf = (1. - a_m_ch) / (1. + a_m_ch)
-        
-        delta_m = (1. - avg_a_m_ch) / (1. + avg_a_m_ch)
-            
+                    
         psi = (eta_f_s_p45 - eta_f_s_m45) / (eta_f_s_p45 + eta_f_s_m45)
         
         kappa = 1.
@@ -353,11 +367,11 @@ def main(args, __version__):
                 start_date_ray = data.RawData_Start_Date_Rayleigh,
                 start_time_ray = data.RawData_Start_Time_UT_Rayleigh, 
                 end_time_ray = data.RawData_Stop_Time_UT_Rayleigh,
-                lidar = data.Lidar_Name_Calibration, 
+                lidar = data.Lidar_Name, 
                 channel_r = ch_r, 
                 channel_t = ch_t, 
                 zan = data.Laser_Pointing_Angle_Calibration,
-                loc = data.Lidar_Location_Rayleigh,
+                loc = data.Lidar_Location,
                 dwl = dwl_ch,
                 ewl = ewl_ch,
                 bdw = bdw_ch,
@@ -372,7 +386,7 @@ def main(args, __version__):
         
        
         # Make filename
-        fname = f'{data.Measurement_ID_Calibration}_{data.Lidar_Name_Calibration}_pcb_{ch_r}_to_{ch_t}_ATLAS_{__version__}.png'
+        fname = f'{data.Measurement_ID_Calibration}_{data.Lidar_Name}_pcb_{ch_r}_to_{ch_t}_ATLAS_{__version__}.png'
 
         fpath = \
             make_plot.polarization_calibration(dir_out = args['output_folder'], 
@@ -426,7 +440,49 @@ def main(args, __version__):
                                                y_label_vdr = y_label_ray, 
                                                x_label_vdr = x_label_ray, 
                                                x_tick_vdr = args['x_tick_rayleigh'])  
-            
+    
+        # pack = np.vstack((x_vals_ray, delta_fit_prf, delta_prf)).T
+    
+        # ascii_name = f'{data.Measurement_ID_Calibration}_{data.Lidar_Name_Calibration}_pcb_{ch_r}_to_{ch_t}_ATLAS_{__version__}.txt'
+        # np.savetxt(os.path.join(args['output_folder'],'ascii',ascii_name), pack, 
+        #             delimiter = ',', header = 'alt, delta_eta_s, delta')
+
+        # Make ascii file header
+        header = \
+            make_header.polarisation_calibration(cal_start_date = data.RawData_Start_Date_Calibration,
+                                                 cal_start_time = data.RawData_Start_Time_UT_Calibration, 
+                                                 cal_duration = sampling_cal,
+                                                 ray_start_date = data.RawData_Start_Date_Rayleigh,
+                                                 ray_start_time = data.RawData_Start_Time_UT_Rayleigh, 
+                                                 ray_duration = sampling_ray,
+                                                 K = K_ch,
+                                                 G_R = G_R_ch,
+                                                 G_T = G_T_ch,
+                                                 H_R = H_R_ch,
+                                                 H_T = H_T_ch,   
+                                                 wave = dwl_ch, 
+                                                 lidar = data.Lidar_Name, 
+                                                 loc = data.Lidar_Location, 
+                                                 meas_id = data.Measurement_ID_Calibration, 
+                                                 channel_r = ch_r,
+                                                 channel_t = ch_t)
+        
+        # Make the ascii filename
+        ascii_name = f'{data.Measurement_ID_Calibration}_{data.Lidar_Name}_pcb_{ch_r}_to_{ch_t}_ATLAS_{__version__}.txt'
+
+        # Export to ascii (Volker's format)        
+        export_ascii.polarisation_calibration(dir_out = args['output_folder'], 
+                                              fname = ascii_name, 
+                                              alt_cal = x_vals_cal,                                              
+                                              alt_ray = x_vals_ray,
+                                              r_p45 = sig_r_p45_ch,
+                                              t_p45 = sig_t_p45_ch,
+                                              r_m45 = sig_r_m45_ch,
+                                              t_m45 = sig_t_m45_ch,   
+                                              ray_r = sig_r_ray_ch,
+                                              ray_t = sig_t_ray_ch,
+                                              header = header)
+        
     print('-----------------------------------------')
     print(' ')
     

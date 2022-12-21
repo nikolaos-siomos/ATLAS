@@ -194,13 +194,13 @@ def short_molec(heights, ranges, meas_info, channel_info,
         ecf_bck = N * exs_bck
         ecf_fth = N * exs_fth
 
-        if pol.loc[ch] == 1 and ch_type.loc[ch] in ['p', 'c']:
+        if pol.loc[ch] == 1 and ch_type.loc[ch] in ['p', 'c', 't']:
             mdr = mdr_f(bins)
-        elif pol.loc[ch] == 3 and ch_type.loc[ch] in ['o', 'x']:
+        elif pol.loc[ch] == 3 and ch_type.loc[ch] in ['o', 'x', 't']:
             mdr = 2. * mdr_f(bins) / (1. - mdr_f(bins))
-        elif (pol.loc[ch] == 3 and ch_type.loc[ch] in ['p', 'c']) or \
-            (pol.loc[ch] == 1 and ch_type.loc[ch] in ['o', 'x']) or \
-                (ch_type.loc[ch] not in ['p', 'c', 'o', 'x']):
+        elif (pol.loc[ch] == 3 and ch_type.loc[ch] in ['p', 'c', 't']) or \
+            (pol.loc[ch] == 1 and ch_type.loc[ch] in ['o', 'x', 't']) or \
+                (ch_type.loc[ch] not in ['p', 'c', 'o', 'x', 't']):
             mdr = np.ones(bins.size)
         else:
             print(f'-- Warning: Elliptical polarization not supported. Molecular calculation will assume unpolarized backscater radiation for channel {ch}')

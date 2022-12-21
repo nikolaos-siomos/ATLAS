@@ -329,9 +329,11 @@ def ray_test(ray_args, prs_files, ray_out, processing, reprocess = True):
         os.makedirs(ray_out, exist_ok = True)
         
         if reprocess == True:
-            for file in glob.glob(os.path.join(ray_out, '*_ray_*_ATLAS_*.png')):
+            for file in glob.glob(os.path.join(ray_out, 'plots', '*_ray_*_ATLAS_*.png')):
                 os.remove(file)
-    
+            for file in glob.glob(os.path.join(ray_out, 'ascii', '*_ray_*_ATLAS_*.txt')):
+                os.remove(file)    
+                
         # Excecute ATLAS visualizer
         view_ray(ray_args)
         __rayleigh_fit__(ray_args, __version__)
@@ -369,8 +371,10 @@ def tlc_test(tlc_args, prs_files, tlc_out, processing, reprocess = True):
         os.makedirs(tlc_out, exist_ok = True)
         
         if reprocess == True:
-            for file in glob.glob(os.path.join(tlc_out, '*_tlc_*_ATLAS_*.png')):
+            for file in glob.glob(os.path.join(tlc_out, 'plots', '*_tlc_*_ATLAS_*.png')):
                 os.remove(file)
+            for file in glob.glob(os.path.join(tlc_out, 'ascii', '*_tlc_*_ATLAS_*.txt')):
+                os.remove(file)    
        
         # Excecute ATLAS visualizer
         view_tlc(tlc_args)
@@ -392,8 +396,10 @@ def pcb_test(pcb_args, prs_files, pcb_out, processing, reprocess = True):
         os.makedirs(pcb_out, exist_ok = True)
         
         if reprocess == True:
-            for file in glob.glob(os.path.join(pcb_out, '*_pcb_*_ATLAS_*.png')):
+            for file in glob.glob(os.path.join(pcb_out, 'plots', '*_pcb_*_ATLAS_*.png')):
                 os.remove(file)
+            for file in glob.glob(os.path.join(pcb_out, 'ascii', '*_pcb_*_ATLAS_*.txt')):
+                os.remove(file)    
     
         # Excecute ATLAS visualizer
         view_pcb(pcb_args)
@@ -415,8 +421,9 @@ def quicklook(qck_args, prs_files, qck_out, quicklook, reprocess = True):
         os.makedirs(qck_out, exist_ok = True)
         
         if reprocess == True:
-            for file in glob.glob(os.path.join(qck_out, '*_ray_qck_*_ATLAS_*.png')):
+            for file in glob.glob(os.path.join(qck_out, 'plots', '*_ray_qck_*_ATLAS_*.png')):
                 os.remove(file)
+    
     
         # Excecute ATLAS visualizer
         view_qck(qck_ray_args)
@@ -438,7 +445,7 @@ def quicklook(qck_args, prs_files, qck_out, quicklook, reprocess = True):
         os.makedirs(qck_out, exist_ok = True)
     
         if reprocess == True:
-            for file in glob.glob(os.path.join(qck_out, '*_tlc_qck_*_ATLAS_*.nc')):
+            for file in glob.glob(os.path.join(qck_out, 'plots', '*_tlc_qck_*_ATLAS_*.nc')):
                 os.remove(file)
         
         # Excecute ATLAS visualizer
@@ -461,7 +468,7 @@ def quicklook(qck_args, prs_files, qck_out, quicklook, reprocess = True):
         os.makedirs(qck_out, exist_ok = True)
         
         if reprocess == True:
-            for file in glob.glob(os.path.join(qck_out, '*_pcb_qck_*_ATLAS_*.nc')):
+            for file in glob.glob(os.path.join(qck_out, 'plots', '*_pcb_qck_*_ATLAS_*.nc')):
                 os.remove(file)
             
         # Excecute ATLAS visualizer

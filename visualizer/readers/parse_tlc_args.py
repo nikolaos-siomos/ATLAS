@@ -130,9 +130,10 @@ def check_parser(args):
         raise Exception('---- Error: Measurement filename not understood! The filename should contain the _tlc_ field (telecover)')
     
     if args['output_folder'] == None:
-        out_path = os.path.join(os.path.dirname(args['input_file']),'..','..', 'plots')
+        out_path = os.path.join(os.path.dirname(args['input_file']),'..','..')
         args['output_folder'] = out_path
-        os.makedirs(args['output_folder'], exist_ok = True)
+        os.makedirs(os.path.join(args['output_folder'], 'plots'), exist_ok = True)
+        os.makedirs(os.path.join(args['output_folder'], 'ascii'), exist_ok = True)
     elif not os.path.exists(args['output_folder'] ):
         raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
 

@@ -6,13 +6,14 @@ Created on Thu Sep  1 12:02:25 2022
 @author: nick
 """
 
-import warnings, os, sys, glob
+import warnings
 import xarray as xr
 import numpy as np
 import netCDF4 as nc
 from .readers.parse_ray_args import call_parser, check_parser
 from .readers.check import check_channels
 from .plotting import make_axis, make_title, make_plot
+from .writters import make_header, export_ascii
 from .tools.smoothing import sliding_average_1D
 from .tools import normalize, average
 
@@ -37,10 +38,6 @@ def main(args, __version__):
     # Extract Attenuated Backscatter
     atb = data.Attenuated_Backscatter
     
-    # Extract signal time, channels, and bins
-    time = sig.time.values
-    bins = sig.bins.values
-    
     # Extract IFF info
     dwl = data.Detected_Wavelength
     ewl = data.Emitted_Wavelength
@@ -50,6 +47,12 @@ def main(args, __version__):
     if 'Sounding_Station_Name' in data.attrs:
         st_name = data.Sounding_Station_Name
     else: st_name = ''
+    if 'Sounding_Start_Date' in data.attrs:
+        rs_start_date = data.Sounding_Start_Date
+    else: rs_start_date = ''
+    if 'Sounding_Start_Time_UT' in data.attrs:
+        rs_start_time = data.Sounding_Start_Time_UT
+    else: rs_start_time = ''
     if 'WMO_Station_Number' in data.attrs:
         wmo_id = data.WMO_Station_Number
     else: wmo_id = ''
@@ -140,13 +143,15 @@ def main(args, __version__):
                                     sm_expo = args['smooth_exponential'],
                                     mol_method = mol_method,
                                     st_name = st_name,
+                                    rs_start_date = rs_start_date,
+                                    rs_start_time = rs_start_time, 
                                     wmo_id = wmo_id,
                                     wban_id = wban_id)
     
-        # Make filename
+        # Make plot filename
         fname = f'{data.Measurement_ID}_{data.Lidar_Name}_ray_{ch}_ATLAS_{__version__}.png'
     
-        # Make the plot
+        # Make the png file
         fpath = make_plot.rayleigh(dir_out = args['output_folder'], 
                                    fname = fname, title = title,
                                    dpi_val = args['dpi'],
@@ -164,6 +169,37 @@ def main(args, __version__):
                                    y_llim = y_llim, y_ulim = y_ulim, 
                                    x_label = x_label, y_label = y_label,
                                    x_tick = args['x_tick']) 
+        
+        # Make ascii file header
+        header = \
+            make_header.rayleigh(start_date = data.RawData_Start_Date, 
+                                 start_time = data.RawData_Start_Time_UT, 
+                                 start_time_sec = data.Raw_Data_Start_Time.values,
+                                 stop_time_sec = data.Raw_Data_Stop_Time.values, 
+                                 wave = dwl_ch, 
+                                 lidar = data.Lidar_Name, 
+                                 loc = data.Lidar_Location, 
+                                 meas_id = data.Measurement_ID, 
+                                 channel = ch, 
+                                 calibr = args['reference_height'], 
+                                 hwin = args['half_reference_window'],
+                                 st_name = st_name, 
+                                 rs_start_date = rs_start_date,
+                                 rs_start_time = rs_start_time, 
+                                 wmo_id = wmo_id, 
+                                 wban_id = wban_id)
+        
+        # Make the ascii filename
+        ascii_name = f'{data.Measurement_ID}_{data.Lidar_Name}_ray_{ch}_ATLAS_{__version__}.txt'
+
+        # Export to ascii (Volker's format)        
+        export_ascii.rayleigh(dir_out = args['output_folder'], 
+                              fname = ascii_name, 
+                              alt = x_vals, 
+                              atb = atb_ch, 
+                              rcs = sig_ch, 
+                              header = header)
+
         
     print('-----------------------------------------')
     print(' ')

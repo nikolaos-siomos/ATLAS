@@ -247,7 +247,6 @@ def channel_metadata(file):
             'Dead_Time_Correction_Type',
             'Detected_Wavelength',
             'Emitted_Wavelength',
-            'Full_Overlap_Range',
             'Laser_Polarization',
             'Laser_Repetition_Rate',
             'PMT_High_Voltage',

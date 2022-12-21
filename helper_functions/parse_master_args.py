@@ -29,7 +29,7 @@ def call_parser():
 
     parser.add_argument('-f', '--parent_folder', metavar='parent_folder', 
                         type=str, nargs='?',  default = None,
-                        help='The path to the parent folder that contains the normal folder and all other optional input folders (dark, atmosphere, overlap). If no results folder is provided, it will be exported here by default')
+                        help='The path to the parent folder that contains the normal folder and all other optional input folders (dark, atmosphere, overlap). If no results folder is provided, it will be created here by default')
 
     parser.add_argument('--dark_folder', metavar='dark_folder', 
                         type=str, nargs='?', default = None,
@@ -73,6 +73,10 @@ def call_parser():
 
     parser.add_argument('--visualizer_out', metavar='visualizer_out', 
                         type=str, nargs='?', default = None,
+                        help='The path to the folder where the final plots and ascii files will be placed inside the ./visualizer_out/plots and ./visualizer_out/ascii folders. This optional argument can be used if the folder must be placed out of the parent_folder. Defaults to parent_folder')
+
+    parser.add_argument('--ascii_folder', metavar='ascii_folder', 
+                        type=str, nargs='?', default = None,
                         help='The path to the folder where the plots will be placed. This optional argument can be used if the folder must be placed out of the parent_folder. Defaults to parent_folder/plots')
 
     parser.add_argument('-c', '--config_file', metavar='config_file', 
@@ -82,6 +86,11 @@ def call_parser():
     parser.add_argument('-s', '--settings_file', metavar='settings_file', 
                         type=str, nargs='?', default = None,
                         help='The absolute path to the settings file that contains options to run ATLAS. ')            
+
+    # parser.add_argument('-e', '--export_legacy', metavar = 'export_legacy',
+    #                     type = bool, default = False, 
+    #                     action = argparse.BooleanOptionalAction,
+    #                     help = 'If called then data will be exported to the legacy QA file format of EARLINET. Defaults to False ')
 
     args = vars(parser.parse_args())
     
@@ -125,7 +134,7 @@ def check_parser(args):
         os.makedirs(prs_path, exist_ok = True)          
 
     if vis_path== None:
-        vis_path = os.path.join(args['parent_folder'], 'plots')
+        vis_path = os.path.join(args['parent_folder'])
         args['visualizer_out'] = vis_path
         os.makedirs(vis_path, exist_ok = True)
     elif os.path.isdir(os.path.split(os.path.abspath(vis_path))[0]) or \

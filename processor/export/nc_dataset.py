@@ -247,6 +247,16 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
     print('Start exporting to a Calibration ATLAS file...')
     print('-----------------------------------------')
     
+    
+    pcb_group = ['Lidar_Name', 'Lidar_Location',
+                 'Lidar_ID', 'Altitude_meter_asl', 'Latitude_degrees_north',
+                 'Longitude_degrees_east', 'Measurement_type', 'Rayleigh_File_Name']
+    
+    com_group = ['Measurement_ID',
+                 'RawBck_Start_Date', 'RawBck_Start_Time_UT', 'RawBck_Stop_Time_UT', 
+                 'RawData_Start_Date', 'RawData_Start_Time_UT', 'RawData_Stop_Time_UT',
+                 'Laser_Pointing_Angle', 'Laser_Pointing_Azimuth_Angle']
+  
     pos = time_info.calibrator_position.astype(int)
     time = sig.time.values
     
@@ -256,8 +266,23 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
     nc_file = xr.Dataset(coords = {'time_m45' : time[idx_m45],
                                    'time_p45' : time[idx_p45],
                                    'channel' : sig.channel.values, 
-                                   'bins': sig.bins.values})
+                                   'bins': sig.bins.values, 
+                                   'bins_r': sig_ray.bins.values})
+        
+    for idx in meas_info.index.values:
+        if idx in pcb_group:
+            nc_file.attrs[f'{idx}'] = meas_info[idx]
+        if idx in com_group:
+            nc_file.attrs[f'{idx}_Calibration'] = meas_info[idx]
+            nc_file.attrs[f'{idx}_Rayleigh'] = meas_info_ray[idx]    
 
+    nc_file['Height_levels_Calibration'] = heights   
+    nc_file['Range_levels_Calibration'] = ranges
+
+    nc_file['Height_levels_Rayleigh'] = (['channel','bins_r'], heights.values)
+    nc_file['Range_levels_Rayleigh'] = (['channel','bins_r'], ranges.values)
+    
+    
     nc_file['Range_Corrected_Signals_minus_45'] = \
         (['time_m45','channel','bins'], sig[dict(time = idx_m45)]\
          .fillna(netCDF4.default_fillvals['f8']).values)
@@ -266,12 +291,17 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
         (['time_p45','channel','bins'], sig[dict(time = idx_p45)]\
          .fillna(netCDF4.default_fillvals['f8']).values)
         
-    for idx in meas_info.index.values:
-        nc_file.attrs[f'{idx}_Calibration'] = meas_info[idx]
+    nc_file['Range_Corrected_Signals_Rayleigh'] = (['channel','bins_r'], 
+                                                   sig_ray[dict(time = 0)].values)
     
     for clm in channel_info.columns.values:
         nc_file[f'{clm}_Calibration'] = (['channel'], channel_info.loc[:,clm]\
                                          .fillna(netCDF4.default_fillvals['f8']))
+
+    for clm in channel_info_ray.columns.values:
+        nc_file[f'{clm}_Rayleigh'] = (['channel'], channel_info_ray.loc[:,clm]\
+                                      .fillna(netCDF4.default_fillvals['f8']))
+    
     
     for clm in time_info.columns.values:
         if clm not in ['calibrator_position']:
@@ -281,40 +311,21 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
             nc_file[f'{clm}_plus_45'] = (['time_p45'], time_info.loc[:,clm]\
                                          .iloc[idx_p45])
             
-    nc_file['Height_levels_Calibration'] = heights   
-
-    nc_file['Range_levels_Calibration'] = ranges
-    
-    nc_file.attrs['bins_r'] = sig_ray.bins.values
-    
-    nc_file['Range_Corrected_Signals_Rayleigh'] = (['channel','bins_r'], 
-                                                   sig_ray[dict(time = 0)].values)
-
-    for idx in meas_info_ray.index.values:
-        nc_file.attrs[f'{idx}_Rayleigh'] = meas_info_ray[idx]
-    
-    for clm in channel_info_ray.columns.values:
-        nc_file[f'{clm}_Rayleigh'] = (['channel'], channel_info_ray.loc[:,clm]\
-                                      .fillna(netCDF4.default_fillvals['f8']))
-    
     for clm in time_info_ray.columns.values:
         nc_file[f'{clm}_Rayleigh'] = time_info_ray.loc[:,clm].iloc[0]
             
-    nc_file['Height_levels_Rayleigh'] = (['channel','bins_r'], heights.values)
 
-    nc_file['Range_levels_Rayleigh'] = (['channel','bins_r'], ranges.values)
-    
     for prop in meteo.properties.values:
         nc_file[prop] = (['channel', 'bins'], 
                          meteo.loc[dict(properties = prop)].values)
 
     for prop in molec.properties.values:
         nc_file[prop] = (['channel', 'bins'], 
-                         molec.loc[dict(properties = prop)].values)
+                         molec.loc[dict(properties = prop)].values) 
 
     for key in molec_info.index.values:
-        nc_file.attrs[key] = molec_info.loc[key]    
-
+        nc_file.attrs[key] = molec_info.loc[key]   
+        
     nc_file.attrs['version'] = version
 
     nc_file.attrs['processing_software'] = 'ATLAS'

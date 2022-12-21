@@ -76,7 +76,7 @@ def quicklook(dir_out, fname, title, dpi_val, use_log,
         x_ticks = np.arange(x_lbin, x_ubin + x_tick, x_tick).astype(int)
         ax1.set_xticks(x_ticks, labels = x_ticks)
         
-    fpath = os.path.join(dir_out, fname)
+    fpath = os.path.join(dir_out, 'plots', fname)
     
     fig.savefig(fpath, dpi = dpi_val)
     
@@ -194,7 +194,7 @@ def rayleigh(dir_out, fname, title, dpi_val, use_lin, x_refr, refr_hwin,
     ax2.axvspan(x_vals[x_refr_bin - refr_hbin], x_vals[x_refr_bin + refr_hbin + 1],
                 alpha = 0.2, facecolor = 'tab:grey')
     
-    fpath = os.path.join(dir_out, fname)
+    fpath = os.path.join(dir_out, 'plots', fname)
     
     fig.savefig(fpath, dpi = dpi_val)
     
@@ -424,7 +424,7 @@ def telecover_sec(dir_out, fname, title, dpi_val,
 
     ax3.grid(which = 'both')
 
-    fpath = os.path.join(dir_out, fname)
+    fpath = os.path.join(dir_out, 'plots', fname)
     
     fig.savefig(fpath, dpi = dpi_val)
     
@@ -594,7 +594,7 @@ def telecover_rin(dir_out, fname, title, dpi_val,
     
     ax3.grid(which = 'both')
     
-    fpath = os.path.join(dir_out, fname)
+    fpath = os.path.join(dir_out, 'plots', fname)
     
     fig.savefig(fpath, dpi = dpi_val)
     
@@ -907,7 +907,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val,
             r'$H_R$: '+f'{round_it(H_R,4)}, $H_T$: '+f'{round_it(H_T,4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
 
-    fpath = os.path.join(dir_out, fname)
+    fpath = os.path.join(dir_out, 'plots', fname)
     
     fig.savefig(fpath, dpi = dpi_val)
     
@@ -923,4 +923,9 @@ def round_it(x, sig):
         x = -999.
         sig = 3
         
-    return np.round(x, sig-int(np.floor(np.log10(abs(x))))-1)
+    if x != 0.:
+        x_out = np.round(x, sig-int(np.floor(np.log10(abs(x))))-1)
+    else:
+        x_out = 0.
+        
+    return x_out

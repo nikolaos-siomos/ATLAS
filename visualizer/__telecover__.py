@@ -13,6 +13,7 @@ import netCDF4 as nc
 from .readers.parse_tlc_args import call_parser, check_parser
 from .readers.check import check_channels
 from .plotting import make_axis, make_title, make_plot
+from .writters import make_header, export_ascii 
 from .tools.smoothing import sliding_average_2D, sliding_average_1D
 from .tools import normalize
 
@@ -30,6 +31,8 @@ def main(args, __version__):
     # Read the quicklook file
     data = xr.open_dataset(args['input_file'])
     ranges = data.Range_levels
+
+    dwl = data.Detected_Wavelength
     
     # Extract signal
     if 'Range_Corrected_Signals_North_Sector' in data.keys():
@@ -88,6 +91,8 @@ def main(args, __version__):
         
         ranges_ch = ranges.copy().loc[ch_d].values
         
+        dwl_ch = dwl.loc[ch_d].values
+        
         # Create the y axis (height/range)
         x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label = \
             make_axis.rayleigh_x(heights = data.Height_levels.loc[ch_d].values, 
@@ -106,24 +111,33 @@ def main(args, __version__):
             y_s = sig_s.loc[ch_d].values
             y_w = sig_w.loc[ch_d].values
     
+            extra_sec = {'N' : False,
+                         'E' : False,
+                         'S' : False,
+                         'W' : False}
+
             # Store the extra iteration if it exists 
             if y_n.shape[0] == iters + 1:
                 y_n2 = y_n[iters,:]
+                extra_sec['N'] = True
             else:
                 y_n2 = []
     
             if y_e.shape[0] == iters + 1:
                 y_e2 = y_e[iters,:]
+                extra_sec['E'] = True
             else:
                 y_e2 = []
             
             if y_s.shape[0] == iters + 1:
                 y_s2 = y_s[iters,:]
+                extra_sec['S'] = True
             else:
                 y_s2 = []
                 
             if y_w.shape[0] == iters + 1:
                 y_w2 = y_w[iters,:]
+                extra_sec['W'] = True
             else:
                 y_w2 = []
                 
@@ -266,7 +280,6 @@ def main(args, __version__):
                 y_sm_e = y_e.T
                 y_sm_s = y_s.T
                 y_sm_w = y_w.T
-                
     
             y_l_sm_n = np.nanmin(y_sm_n[:,:iters], axis = 1)
             y_l_sm_e = np.nanmin(y_sm_e[:,:iters], axis = 1)
@@ -338,7 +351,7 @@ def main(args, __version__):
         
             # Make filename
             fname = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_sectors_{ch}_ATLAS_{__version__}.png'
-        
+
             # Make the plot
             fpath = \
                 make_plot.telecover_sec(dir_out = args['output_folder'], 
@@ -388,7 +401,42 @@ def main(args, __version__):
                                         y_ulim_nr = y_ulim_nr, 
                                         x_label = x_label,
                                         x_tick = args['x_tick'],
-                                        use_last = args['use_last'])  
+                                        use_last = args['use_last'])
+                
+            sectors = {'N' : y_m_n,
+                       'E' : y_m_e,
+                       'S' : y_m_s,
+                       'W' : y_m_w}
+            
+            sectors_e = {'N' : y_n2,
+                         'E' : y_e2,
+                         'S' : y_s2,
+                         'W' : y_w2}
+            
+            # Make ascii file header
+            header = \
+                make_header.telecover(start_date = data.RawData_Start_Date, 
+                                      start_time = data.RawData_Start_Time_UT, 
+                                      sampling_sec = iters * sampling_sec, 
+                                      wave = dwl_ch, 
+                                      lidar = data.Lidar_Name, 
+                                      loc = data.Lidar_Location, 
+                                      meas_id = data.Measurement_ID, 
+                                      channel = ch,
+                                      iters = 1,
+                                      extra_sec = extra_sec)
+            
+            # Make the ascii filename
+            ascii_name = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_sectors_{ch}_ATLAS_{__version__}.txt'
+    
+            # Export to ascii (Volker's format)        
+            export_ascii.telecover(dir_out = args['output_folder'], 
+                                   fname = ascii_name, 
+                                   header = header,
+                                   iters = 1, 
+                                   alt = x_vals, 
+                                   sectors = sectors, 
+                                   sectors_e = sectors_e)
     
         if isinstance(sig_o,list) == False:
             iters = np.min([sig_o.time_o.size,
@@ -526,6 +574,36 @@ def main(args, __version__):
                                         y_ulim_nr = y_ulim_nr, 
                                         x_label = x_label,
                                         x_tick = args['x_tick']) 
+            sectors = {'I' : y_m_i,
+                       'O' : y_m_o}
+                
+            sectors_e = {'I' : [],
+                         'O' : []}
+
+            # Make ascii file header
+            header = \
+                make_header.telecover(start_date = data.RawData_Start_Date, 
+                                      start_time = data.RawData_Start_Time_UT, 
+                                      sampling_sec = iters * sampling_sec, 
+                                      wave = dwl_ch, 
+                                      lidar = data.Lidar_Name, 
+                                      loc = data.Lidar_Location, 
+                                      meas_id = data.Measurement_ID, 
+                                      channel = ch,
+                                      iters = 1,
+                                      extra_sec = extra_sec)
+            
+            # Make the ascii filename
+            ascii_name = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_rings_{ch}_ATLAS_{__version__}.txt'
+    
+            # Export to ascii (Volker's format)        
+            export_ascii.telecover(dir_out = args['output_folder'], 
+                                   fname = ascii_name, 
+                                   header = header,
+                                   iters = 1, 
+                                   alt = x_vals, 
+                                   sectors = sectors, 
+                                   sectors_e = sectors_e)
     
     print('-----------------------------------------')
     print(' ')
