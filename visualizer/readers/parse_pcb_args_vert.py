@@ -95,7 +95,7 @@ def call_parser():
                         help = 'The half window in meters used for the molecular caluclations. Defaults to 500 m ')
 
     parser.add_argument('--smooth', metavar = 'smooth',
-                        type = bool, default = False, 
+                        type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, a sliding average smoothing will be applied on the signals for better visualization ')
 

@@ -681,7 +681,7 @@ def trim_vertically(sig, ground_alt, zenith_angle, alt_lim, resol):
        
     sig_out = np.nan * sig.copy()
 
-    rng_lim = (alt_lim - ground_alt)/np.cos(zenith_angle)
+    rng_lim = (float(alt_lim) - float(ground_alt))/np.cos(float(zenith_angle))
     
     bin_lim = np.int(rng_lim / np.min(resol))
     
@@ -692,6 +692,9 @@ def trim_vertically(sig, ground_alt, zenith_angle, alt_lim, resol):
     if bin_lim < np.max(bins):
         
         sig_out = sig.loc[bin_d]
+    
+    else:
+        sig_out = sig.copy()
   
     return(sig_out)
 

@@ -87,6 +87,10 @@ def call_parser():
                         type=str, nargs='?', default = None,
                         help='The absolute path to the settings file that contains options to run ATLAS. ')            
 
+    parser.add_argument('--file_format', metavar='file_format', 
+                        type=str, nargs='?', default = None,
+                        help='The format of the raw lidar files. Currently licel and polly_xt are supported')            
+
     # parser.add_argument('-e', '--export_legacy', metavar = 'export_legacy',
     #                     type = bool, default = False, 
     #                     action = argparse.BooleanOptionalAction,
@@ -98,6 +102,11 @@ def call_parser():
 
 def check_parser(args):
 
+    if args['file_format'] == None:
+        raise Exception("The mandatory argument file_format was not provided. Please add it with the --file_format option ")   
+    elif args['file_format'] not in ['licel','polly_xt']:
+        raise Exception(f"The provided file_format: {args['file_format']} is not supported. Please choose among: licel, polly_xt")   
+        
     if args['parent_folder'] != None:
         if not os.path.exists(args['parent_folder']) == True:
             raise Exception("The provided parent_folder {args['parent_folder']} does not exists. Please provide a valid path ")   

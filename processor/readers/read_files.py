@@ -10,7 +10,7 @@ import xarray as xr
 import netCDF4 as nc
 
 # Read measurement
-def short_reader(fpath, exclude_field_type, exclude_scattering_type, 
+def short_reader(fpath, exclude_field_type, exclude_channel_type, 
                  exclude_detection_mode, exclude_channel_subtype, 
                  use_channels):
     
@@ -26,12 +26,12 @@ def short_reader(fpath, exclude_field_type, exclude_scattering_type,
             Channel with a field type (1rd letter of the ID) in
             exclude_field_type will be excluded 
                     
-        exclude_scattering_type:
-            Channel with a scattering type (2rd letter of the ID) in
-            exclude_scattering will be excluded 
+        exclude_channel_type:
+            Channel with a channel type (2rd letter of the ID) in
+            exclude_channel will be excluded 
                     
         exclude_detection_mode:
-            Channel with a scattering type (3rd letter of the ID) in
+            Channel with a channel type (3rd letter of the ID) in
             exclude_mode will be excluded 
             
         exclude_channel_subtype:
@@ -106,13 +106,13 @@ def short_reader(fpath, exclude_field_type, exclude_scattering_type,
         use_channels = channels
     
     mask = np.array([ch[4] not in exclude_field_type and
-                     ch[5] not  in exclude_scattering_type and
+                     ch[5] not  in exclude_channel_type and
                      ch[6] not  in exclude_detection_mode and
                      ch[7] not  in exclude_channel_subtype and
                      ch in use_channels for ch in channels])
     
     if all(~mask):
-        raise Exception('-- Error: The provided channel filtering arguments are too strict and exclude all channels. Please revide the following arguments: exclude_field_type, exclude_scattering_type, exclude_detection_mode, exclude_channel_subtype, channels')
+        raise Exception('-- Error: The provided channel filtering arguments are too strict and exclude all channels. Please revide the following arguments: exclude_field_type, exclude_channel_type, exclude_detection_mode, exclude_channel_subtype, channels')
     
     valid_channels = channels[mask]
 
@@ -238,8 +238,8 @@ def channel_metadata(file):
                          for i in range(file.channel_label.size)])
 
     keys = ['ADC_resolution',
-            'Background_Low',
-            'Background_High',
+            'Background_Low_Bin',
+            'Background_High_Bin',
             'Channel_Bandwidth',
             'channel_ID',
             'DAQ_Range',
@@ -265,7 +265,7 @@ def channel_metadata(file):
         channel_info[channel_info.values == nc.default_fillvals['f8']] = np.nan
     if (channel_info.values == nc.default_fillvals['i4']).any():
         channel_info[channel_info.values == nc.default_fillvals['i4']] = np.nan
-    
+
     return(channel_info)
 
 def time_metadata(file, meas_info):

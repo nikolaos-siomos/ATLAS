@@ -42,7 +42,7 @@ def main(args, __version__, meas_type):
         check_channels(sel_channels = args['channels'], 
                        all_channels = data.channel.values,
                        exclude_field_type = args['exclude_field_type'], 
-                       exclude_scattering_type = args['exclude_scattering_type'], 
+                       exclude_channel_type = args['exclude_channel_type'], 
                        exclude_detection_mode = args['exclude_detection_mode'], 
                        exclude_channel_subtype = args['exclude_channel_subtype'])
     

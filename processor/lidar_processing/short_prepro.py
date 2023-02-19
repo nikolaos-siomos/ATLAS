@@ -69,8 +69,8 @@ def standard(sig_raw, shots, meas_info, channel_info,
     # iflt = external_info['signal_smoothing']
     
     alt_lim = external_info['vertical_limit']
-    bg_low = channel_info.Background_Low
-    bg_high = channel_info.Background_High
+    bg_low = channel_info.Background_Low_Bin
+    bg_high = channel_info.Background_High_Bin
     daq_range = channel_info.DAQ_Range
     dead_time = channel_info.Dead_Time
     dead_time_cor_type = channel_info.Dead_Time_Correction_Type
@@ -95,6 +95,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
                                          shots = shots.copy(), 
                                          resol = resol)
     
+
     if external_info['debug']: pack_out['sig_puc'] = sig.copy()
     
     print('-- Unit conversion from raw counts to MHz for the pc channels complete!')
@@ -332,8 +333,8 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
     itrv = external_info['vertical_trimming']
     
     alt_lim = external_info['vertical_limit']
-    bg_low = channel_info.Background_Low
-    bg_high = channel_info.Background_High
+    bg_low = channel_info.Background_Low_Bin
+    bg_high = channel_info.Background_High_Bin
     daq_range = channel_info.DAQ_Range
     dead_time = channel_info.Dead_Time
     dead_time_cor_type = channel_info.Dead_Time_Correction_Type

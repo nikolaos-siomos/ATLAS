@@ -63,7 +63,7 @@ def call_parser():
                         type = str, nargs = '+', default = [], 
                         help = 'Provide all the channel detection mode types that you want to EXCLUDE (None: None, a: analogue, p: photon). Nothing is excluded by default in ATLAS preprocessor ')
 
-    parser.add_argument('--exclude_scattering_type', metavar = 'exclude_scattering_type',
+    parser.add_argument('--exclude_channel_type', metavar = 'exclude_channel_type',
                         type = str, nargs = '+', default = [], 
                         help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, p: co-polar linear analyzer, c: cross-polar linear analyzer, t: total (no depol), o: co-polar circular analyzer, x: cross-polar circular analyzer, v: vibrational Raman, r: rotational Raman, a: Cabannes, f: fluorescence). Nothing is excluded by default in ATLAS preprocessor ')
 
@@ -76,11 +76,11 @@ def call_parser():
                         help = 'The y axis limits (lower and upper) of the normalized RC signal. Defaults to 0 (lower) 1.2 (upper) when use_lin_scale is True. If use_lin_scale is true then the lower limit becomes 1E-5 ')
 
     parser.add_argument('--x_lims', metavar = 'x_lims',
-                        type = float, nargs = 2, default = [0., 2.], 
+                        type = float, nargs = 2, default = [0., 2.4], 
                         help = 'The x axis limits in km (lower and upper). If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
 
     parser.add_argument('--x_tick', metavar = 'x_tick',
-                        type = int, nargs = '?', default = 0.20, 
+                        type = int, nargs = '?', default = 0.2, 
                         help = 'The x axis finest tick in km. Defaults to 1km ')
 
     parser.add_argument('--normalization_height', metavar = 'normalization_height',
@@ -102,7 +102,7 @@ def call_parser():
                         help = 'If called, an exponentially increasing wind (base 2) will be applied. Defaut to a linearly increasing window ')
 
     parser.add_argument('--smoothing_range', metavar = 'smoothing_range',
-                        type = float, nargs = 2, default = [0.2, 14.], 
+                        type = float, nargs = 2, default = [0.2, 2.4], 
                         help = 'First and last altitude/distance boundaries (depending on the selection of use_distance) where smoothing will be applied, in km. Defines the signal region to be smoothed. If they exceed the current signal boundaries the existing boundaries will be used instead ')
 
     parser.add_argument('--half_window', metavar = 'half_window',

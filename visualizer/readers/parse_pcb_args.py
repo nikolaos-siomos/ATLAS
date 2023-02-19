@@ -74,7 +74,7 @@ def call_parser():
                         help = 'Type one or more channel names (e.g. xpat0355) here that correspond to the transmitted channels used for the polarization calibration calculation. The number of transmitted channels must be the same as the number of the respective reflected channels ')
 
     parser.add_argument('--calibration_height', metavar = 'calibration_height',
-                        type = float, nargs = '?', default = 5., 
+                        type = float, nargs = '?', default = 3., 
                         help = 'The calibration height/distance where the signals will be normalized for the Rayleigh fit. If use_distance is called, the limits correspond to distance. Defaults to 5 km ')
 
     parser.add_argument('--half_calibration_window', metavar = 'half_calibration_window',
@@ -87,10 +87,10 @@ def call_parser():
 
     parser.add_argument('--half_rayleigh_window', metavar = 'half_rayleigh_window',
                         type = float, nargs = '?', default = 500., 
-                        help = 'The half window in meters used for the molecular caluclations. Defaults to 500 m ')
+                        help = 'The half window in meters used for the molecular caluclations. Defaults to 100 m ')
 
     parser.add_argument('--smooth', metavar = 'smooth',
-                        type = bool, default = False, 
+                        type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, a sliding average smoothing will be applied on the signals for better visualization ')
 

@@ -29,22 +29,36 @@ mst_args = check_mst(mst_args)
 
 mst_cfg = read_master_config.config(mst_args['settings_file'])
 
-isday = mst_cfg.gen['isday']
-newdata = mst_cfg.gen['newdata']
+if 'isday' in  mst_cfg.gen.keys(): isday = mst_cfg.gen['isday']
+else: isday = False
+
+if 'newdata' in  mst_cfg.gen.keys(): newdata = mst_cfg.gen['newdata']
+else: newdata = True
+
+if 'visualize' in  mst_cfg.gen.keys(): newdata = mst_cfg.gen['visualize']
+else: visualize = True
+
 if 'process' in  mst_cfg.gen.keys(): process = mst_cfg.gen['process']
 else: process = ['ray', 'tlc', 'pcb']
 
-processing = {'ray' : False,
-              'tlc' : False,
-              'pcb' : False}
+if visualize == False:
+    processing = {'ray' : False,
+                  'tlc' : False,
+                  'pcb' : False}
 
-quicklook = {'ray' : False,
+else:
+    processing = {'ray' : True,
+                  'tlc' : True,
+                  'pcb' : True}
+    
+quicklook = {'ray' : True,
              'tlc' : False,
              'pcb' : False}
+    
 
-if 'ray' in process: processing['ray'] = True
-if 'tlc' in process: processing['tlc'] = True
-if 'pcb' in process: processing['pcb'] = True
+if 'ray' not in process: processing['ray'] = False
+if 'tlc' not in process: processing['tlc'] = False
+if 'pcb' not in process: processing['pcb'] = False
 
 if 'process_qck' in mst_cfg.gen.keys():
     process_qck = mst_cfg.gen['process_qck']
@@ -82,11 +96,11 @@ prs_args = parse_prs()
 prs_args = parse_master_args.substitute(org = prs_args, rpl = mst_cfg.prs)
 
 if isday == True:
-    if prs_args['exclude_scattering_type'] == None:
-        prs_args['exclude_scattering_type'] = ['v', 'f']
+    if prs_args['exclude_channel_type'] == None:
+        prs_args['exclude_channel_type'] = ['v', 'f']
     else:
         prs_args['exclude_scattering_type'] = \
-            prs_args['exclude_scattering_type'] + ['v', 'f']
+            prs_args['exclude_channel_type'] + ['v', 'f']
 
 # Call preprocessor sequence
 prs_files = processing_chain.preprocessor(prs_args = prs_args, 

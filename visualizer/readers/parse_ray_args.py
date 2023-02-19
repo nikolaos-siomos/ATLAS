@@ -58,7 +58,7 @@ def call_parser():
                         type = str, nargs = '+', default = [], 
                         help = 'Provide all the channel detection mode types that you want to EXCLUDE (None: None, a: analogue, p: photon). Nothing is excluded by default in ATLAS preprocessor ')
 
-    parser.add_argument('--exclude_scattering_type', metavar = 'exclude_scattering_type',
+    parser.add_argument('--exclude_channel_type', metavar = 'exclude_channel_type',
                         type = str, nargs = '+', default = [], 
                         help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, p: co-polar linear analyzer, c: cross-polar linear analyzer, t: total (no depol), o: co-polar circular analyzer, x: cross-polar circular analyzer, v: vibrational Raman, r: rotational Raman, a: Cabannes, f: fluorescence). Nothing is excluded by default in ATLAS preprocessor ')
 
@@ -87,7 +87,7 @@ def call_parser():
                         help = 'The half window in meters used for the normalization. Defaults to 100 m ')
 
     parser.add_argument('--smooth', metavar = 'smooth',
-                        type = bool, default = False, 
+                        type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, a sliding average smoothing will be applied on the signals for better visualization ')
 

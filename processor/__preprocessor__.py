@@ -33,7 +33,7 @@ def main(args, __version__):
             read_files.short_reader(
                 args['input_file'],
                 exclude_field_type = args['exclude_field_type'], 
-                exclude_scattering_type = args['exclude_scattering_type'], 
+                exclude_channel_type = args['exclude_channel_type'], 
                 exclude_detection_mode = args['exclude_detection_mode'], 
                 exclude_channel_subtype = args['exclude_channel_subtype'], 
                 use_channels = args['channels'])
@@ -57,7 +57,7 @@ def main(args, __version__):
                 read_files.short_reader(
                     ray_path,
                     exclude_field_type = args['exclude_field_type'], 
-                    exclude_scattering_type = args['exclude_scattering_type'], 
+                    exclude_channel_type = args['exclude_channel_type'], 
                     exclude_detection_mode = args['exclude_detection_mode'], 
                     exclude_channel_subtype = args['exclude_channel_subtype'], 
                     use_channels = args['channels'])
