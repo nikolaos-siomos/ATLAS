@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "atlas"
+version = "0.1.0"
+description = ""
+authors = ["nsiomos <nikolaos.siomos@lmu.de>"]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.12"
+numpy = "^1.24.2"
+pandas = "^1.5.3"
+xarray = "^2023.2.0"
+netCDF4 = "^1.6.3"
+scipy = "^1.10.1"
+matplotlib = "^3.7.1"
+h5netcdf = "^1.1.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
