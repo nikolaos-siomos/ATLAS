@@ -361,24 +361,24 @@ def polarization_calibration_cal_y(ratio_m, ratio_p, y_lims_cal):
     y_min_cal = np.nanmin([ratio_m, ratio_p])
 
     # Get the eta upper limit
-    if y_max_cal == y_max_cal:
-        if y_lims_cal[-1] == None:
-            y_ulim_cal = y_max_cal * 2.
+    if y_max_cal == y_max_cal and y_lims_cal[-1] == None:
+        y_ulim_cal = y_max_cal * 2.
             
-        else:
-           y_ulim_cal = y_lims_cal[-1]
+    elif y_max_cal == y_max_cal and y_lims_cal[-1] != None:
+        y_ulim_cal = y_lims_cal[-1]
+        
     else:
         y_ulim_cal = 1.
     
     # Get the vertical lower limit
-    if y_min_cal == y_min_cal:
-        if y_lims_cal[0] == None:
-            y_llim_cal = y_min_cal / 1.5
+    if y_min_cal == y_min_cal and y_lims_cal[0] == None:
+        y_llim_cal = y_min_cal / 1.5
             
-        else:
+    elif y_min_cal == y_min_cal and y_lims_cal[0] != None:
            y_llim_cal = y_lims_cal[0]
+    
     else:
-        y_llim_cal = 1.
+        y_llim_cal = 0.
           
     y_label_cal = r'Gain ratio $η^{\star}_{f}$'
         
@@ -391,11 +391,14 @@ def polarization_calibration_ray_y(ratio, y_lims_ray):
     y_max_ray = ratio
     
     # Get the delta upper limit
-    if y_lims_ray[-1] == None:
+    if y_max_ray == y_max_ray and y_lims_ray[-1] == None:
         y_ulim_ray = y_max_ray * 2.5
-        
+    
+    elif y_max_ray == y_max_ray and y_lims_ray[-1] != None:
+        y_ulim_ray = y_lims_ray[-1]
+            
     else:
-       y_ulim_ray = y_lims_ray[-1]
+        y_ulim_ray = 0.1
     
     # Get the vertical lower limit
     if y_lims_ray[0] == None:
