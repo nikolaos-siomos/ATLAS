@@ -277,10 +277,10 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     Y4_NU = coef_4 * y4_uvar
     
     Y_NM = np.mean([Y1_N, Y2_N, Y3_N, Y4_N], axis = 0)
-    Y_RMSE = np.sqrt(np.power((Y1_N - Y_NM) / Y_NM, 2) +\
-                     np.power((Y2_N - Y_NM) / Y_NM, 2) +\
-                     np.power((Y3_N - Y_NM) / Y_NM, 2) +\
-                     np.power((Y4_N - Y_NM) / Y_NM, 2)) / 4
+    Y_RMSE = np.sqrt((np.power((Y1_N - Y_NM) / Y_NM, 2) +\
+                      np.power((Y2_N - Y_NM) / Y_NM, 2) +\
+                      np.power((Y3_N - Y_NM) / Y_NM, 2) +\
+                      np.power((Y4_N - Y_NM) / Y_NM, 2)) / 4)
 
     Y_E = np.nan * Y_NM
     Y_O = np.nan * Y_NM
@@ -430,7 +430,7 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     n_ulim = np.round(norm_region[1], decimals = 2)
     
     ax3.text(0.2 * x_ulim, 0.15 * y_ulim_nr, 
-             f'region: {n_llim} - {n_ulim} km',
+             f'norm. region: {n_llim} - {n_ulim} km',
              bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 9))
 
     # Subplot: Normalized Signals - Far Range
@@ -462,7 +462,7 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     ax5.plot(X, (Y2_N - Y_NM) / Y_NM, color = 'tab:orange', label='_nolegend_')
     ax5.plot(X, (Y3_N - Y_NM) / Y_NM, color = 'tab:green', label='_nolegend_')
     ax5.plot(X, (Y4_N - Y_NM) / Y_NM, color = 'tab:red', label='_nolegend_')
-    ax5.plot(X, Y_RMSE, color = 'yellow', label = 'Sector RMS')
+    ax5.plot(X, Y_RMSE, color = 'yellow', label = 'RMS Sector Diff.')
     
     if use_last == True or iters == 1:
         ax5.plot(X, Y_DIFF, color = 'tab:purple', label = 'Atm. Dif.')
@@ -1046,7 +1046,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     m_ulim = np.round(vdr_region[1], decimals = 2)
 
     ax2.text(0.05 * x_ulim_vdr, 0.65 * y_ulim_vdr, 
-             f'norm. region: {m_llim} - {m_ulim} km',
+             f'mol. cal. region: {m_llim} - {m_ulim} km',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))  
     ax2.text(0.05 * x_ulim_vdr, 0.55 * y_ulim_vdr, 
             r'$δ_m$: '+f'{np.round(delta_m,4)}',
