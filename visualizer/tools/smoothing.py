@@ -122,7 +122,6 @@ def sliding_average_1D_fast(y_vals, x_vals, x_sm_lims, x_sm_win, expo = None, er
     y_avg[s_buf:e_buf] = np.convolve(y_avg[s_bin:e_bin], np.ones(win), 'valid') / win
     y_sqr[s_buf:e_buf] = np.convolve(y_sqr[s_bin:e_bin], np.ones(win), 'valid') / win
     
-    
     if err_type == 'sem':
         y_err[s_buf:e_buf] = np.sqrt(y_sqr[s_buf:e_buf] - np.power(y_avg[s_buf:e_buf], 2)) / np.sqrt(win)
     elif err_type == 'std':
@@ -132,6 +131,44 @@ def sliding_average_1D_fast(y_vals, x_vals, x_sm_lims, x_sm_win, expo = None, er
 
     del y_sqr
     
+    for i in range(s_bin, s_buf):
+        
+        if buf > i:
+            ihwin = i
+
+        else:
+            ihwin = buf
+
+        if ihwin > 0 and not np.isnan(ihwin):
+            y_avg[i] = np.nanmean(y_avg[i-int(ihwin):i+int(ihwin)+1])
+            
+            if err_type == 'sem':
+                y_err[i] = np.nanstd(y_avg[i-int(ihwin):i+int(ihwin)+1]) /\
+                    np.sqrt(y_avg[i-int(ihwin):i+int(ihwin)+1].size)
+            elif err_type == 'std':
+                y_err[i] = np.nanstd(y_avg[i-int(ihwin):i+int(ihwin)+1])
+            else:
+                raise Exception('Error type provided is not understoud. Please select one of: sem, std')
+
+    for i in range(e_buf, e_bin):
+        
+        if buf > x_vals.size - e_bin :
+            ihwin = x_vals.size - i
+
+        else:
+            ihwin = buf
+
+        if ihwin > 0 and not np.isnan(ihwin):
+            y_avg[i] = np.nanmean(y_avg[i-int(ihwin):i+int(ihwin)+1])
+            
+            if err_type == 'sem':
+                y_err[i] = np.nanstd(y_avg[i-int(ihwin):i+int(ihwin)+1]) /\
+                    np.sqrt(y_avg[i-int(ihwin):i+int(ihwin)+1].size)
+            elif err_type == 'std':
+                y_err[i] = np.nanstd(y_avg[i-int(ihwin):i+int(ihwin)+1])
+            else:
+                raise Exception('Error type provided is not understoud. Please select one of: sem, std')
+
     return(y_avg, y_err)
 
 def sliding_average_2D_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None):

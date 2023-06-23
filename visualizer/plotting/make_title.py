@@ -50,7 +50,7 @@ def rayleigh(start_date, start_time, end_time, lidar, channel,
 
     title = f'{lidar} {loc} {channel} - Rayleigh Fit' + sm_part + '\n'+\
                 f'On {date} from {start} to {end} UTC, '+r'$\nearrow$'+f'{zan}'+r'$^{o}$ off-zenith' + mol_part + '\n'+\
-                    f'{mol_method} {st_name} {wmo_id} {wban_id} - Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'
+                    f'Emitted WL: {ewl}nm, Received WL: {dwl}nm, Bandwidth: {bdw}nm'
     
     
     return(title)
@@ -182,7 +182,7 @@ def mol_text(mol_method, st_name, wmo_id, wban_id, rs_start_date, rs_start_time)
     rs_start = f'{rs_start_time[:2]}:{rs_start_time[2:4]}'    
     
     if mol_method == 'Radiosonde': 
-        mol_part = f' - {mol_method} {st_name} {wmo_id} {wban_id} {rs_date} {rs_start}UT'
+        mol_part = f' - {mol_method} {st_name} {rs_date} {rs_start}UT {wmo_id} {wban_id} '
     else: mol_part = f' - {mol_method}'
     
     return(mol_part)

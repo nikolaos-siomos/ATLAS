@@ -70,18 +70,20 @@ def converter(mst_args, mst_cfg, cnv_out, processing, reprocess = True):
                 os.remove(file)
                 
         # QA files
-        cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
-        if len(cnv_ray_file) > 1:
-            raise Exception(f'More than one rayleigh fit files detected in folder {cnv_out}. Please make sure that only one rayleigh file exists in that folder ')
-       
-        # Ececute scc_converter
-        if len(cnv_ray_file) == 0 and processing['ray'] == True:
-            view_cnv(cnv_ray_args)
-            files = __scc_converter__(cnv_ray_args, __version__ = __version__)
-            if files['rayleigh'] != None:
-                cnv_ray_file = [files['rayleigh']]
-            else:
-                cnv_ray_file = []
+        if os.path.exists(cnv_ray_args['rayleigh_folder']):
+                    
+            cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
+            if len(cnv_ray_file) > 1:
+                raise Exception(f'More than one rayleigh fit files detected in folder {cnv_out}. Please make sure that only one rayleigh file exists in that folder ')
+           
+            # Ececute scc_converter
+            if len(cnv_ray_file) == 0 and processing['ray'] == True:
+                view_cnv(cnv_ray_args)
+                files = __scc_converter__(cnv_ray_args, __version__ = __version__)
+                if files['rayleigh'] != None:
+                    cnv_ray_file = [files['rayleigh']]
+                else:
+                    cnv_ray_file = []
     else:
         # QA files
         cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
@@ -101,19 +103,22 @@ def converter(mst_args, mst_cfg, cnv_out, processing, reprocess = True):
             for file in glob.glob(os.path.join(cnv_out, '*_tlc_ATLAS_*.nc')):
                 os.remove(file)
                 
-        # QA files          
-        cnv_tlc_file = glob.glob(os.path.join(cnv_out, '*_tlc_ATLAS_*.nc'))
-        if len(cnv_tlc_file) > 1:
-            raise Exception(f'More than one telecover files detected in folder {cnv_out}. Please make sure that only one telecover file exists in that folder ')
-        
-        # Ececute scc_converter
-        if len(cnv_tlc_file) == 0 and processing['tlc'] == True:
-            view_cnv(cnv_tlc_args)
-            files = __scc_converter__(cnv_tlc_args, __version__ = __version__)
-            if files['telecover'] != None:
-                cnv_tlc_file = [files['telecover']]                
-            else:
-                cnv_ray_file = []
+        # QA files  
+        if os.path.exists(cnv_tlc_args['telecover_sectors_folder']) or \
+                os.path.exists(cnv_tlc_args['telecover_rings_folder']):
+                    
+            cnv_tlc_file = glob.glob(os.path.join(cnv_out, '*_tlc_ATLAS_*.nc'))
+            if len(cnv_tlc_file) > 1:
+                raise Exception(f'More than one telecover files detected in folder {cnv_out}. Please make sure that only one telecover file exists in that folder ')
+            
+            # Ececute scc_converter
+            if len(cnv_tlc_file) == 0 and processing['tlc'] == True:
+                view_cnv(cnv_tlc_args)
+                files = __scc_converter__(cnv_tlc_args, __version__ = __version__)
+                if files['telecover'] != None:
+                    cnv_tlc_file = [files['telecover']]                
+                else:
+                    cnv_ray_file = []
         
     else:
         # QA files          
@@ -135,30 +140,34 @@ def converter(mst_args, mst_cfg, cnv_out, processing, reprocess = True):
             for file in glob.glob(os.path.join(cnv_out, '*_pcb_ATLAS_*.nc')):
                 os.remove(file)
                 
-        # QA files          
-        cnv_pcb_file = glob.glob(os.path.join(cnv_out, '*_pcb_ATLAS_*.nc'))        
-        if len(cnv_pcb_file) > 1:
-            raise Exception(f'More than one polarization calibration files detected in folder {cnv_out}. Please make sure that only one polarization calibration file exists in that folder ')         
-
-        cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
-        if len(cnv_ray_file) > 1:
-            raise Exception(f'More than one rayleigh fit files detected in folder {cnv_out}. Please make sure that only one polarization calibration file exists in that folder ')         
+        # QA files   
+        if (os.path.exists(cnv_pcb_args['pcb_cal_p45_folder']) and \
+            os.path.exists(cnv_pcb_args['pcb_cal_m45_folder'])) or \
+                os.path.exists(cnv_pcb_args['pcb_cal_stc_folder']):
+                    
+            cnv_pcb_file = glob.glob(os.path.join(cnv_out, '*_pcb_ATLAS_*.nc'))        
+            if len(cnv_pcb_file) > 1:
+                raise Exception(f'More than one polarization calibration files detected in folder {cnv_out}. Please make sure that only one polarization calibration file exists in that folder ')         
     
-        if cnv_pcb_args['rayleigh_filename'] == None and len(cnv_ray_file) == 1:
-            cnv_pcb_args['rayleigh_filename'] = os.path.basename(cnv_ray_file[0])
-        else:
-            raise Exception(f'Rayleigh file not found inside {cnv_out}. A Rayleigh measurement is mandatory for the pol. calibration test. Include the Rayleigh files if not already included and reprocess. If the files are already there consider setting newdata = True ')
-    
-        # Ececute scc_converter
-        if len(cnv_pcb_file) == 0 and processing['pcb'] == True:
-            view_cnv(cnv_pcb_args)
-            files = __scc_converter__(cnv_pcb_args, __version__ = __version__)
-            if files['polarization_calibration'] != None:
-                cnv_pcb_file = [files['polarization_calibration']]
+            cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
+            if len(cnv_ray_file) > 1:
+                raise Exception(f'More than one rayleigh fit files detected in folder {cnv_out}. Please make sure that only one polarization calibration file exists in that folder ')         
+        
+            if cnv_pcb_args['rayleigh_filename'] == None and len(cnv_ray_file) == 1:
+                cnv_pcb_args['rayleigh_filename'] = os.path.basename(cnv_ray_file[0])
             else:
-                cnv_pcb_file = []
+                raise Exception(f'Rayleigh file not found inside {cnv_out}. A Rayleigh measurement is mandatory for the pol. calibration test. Consider reprocessing with --quick_run deactivated ')
+        
+            # Ececute scc_converter
+            if len(cnv_pcb_file) == 0 and processing['pcb'] == True:
+                view_cnv(cnv_pcb_args)
+                files = __scc_converter__(cnv_pcb_args, __version__ = __version__)
+                if files['polarization_calibration'] != None:
+                    cnv_pcb_file = [files['polarization_calibration']]
+                else:
+                    cnv_pcb_file = []
     else:
-        # QA files          
+        # QA files         
         cnv_pcb_file = glob.glob(os.path.join(cnv_out, '*_pcb_ATLAS_*.nc'))        
         if len(cnv_pcb_file) > 1:
             raise Exception(f'More than one polarization calibration files detected in folder {cnv_out}. Please make sure that only one polarization calibration file exists in that folder ')         
@@ -476,7 +485,7 @@ def quicklook(mst_cfg, prs_files, qck_out, quicklook, reprocess = True):
         __quicklook__(qck_ray_args, __version__, meas_type = 'ray')
     
     elif quicklook['ray'] == True and len(prs_files['ray_qck']) == 0:
-        print('-- Warning: Rayleight quicklook visualization was enabled but no file from the preprocessing stage was found. Please make sure that the quicklook option is enable in the preprocessor. If not, the measurement might need to be reprocessed (set newdata to True)')
+        print('-- Warning: Rayleight quicklook visualization was enabled but no file from the preprocessing stage was found. Please make sure that --process_qck ray is at least provided. You might also need to deactivate --quick_run')
         
     if quicklook['tlc'] == True and len(prs_files['tlc_qck']) == 1:
         
@@ -499,7 +508,7 @@ def quicklook(mst_cfg, prs_files, qck_out, quicklook, reprocess = True):
         __quicklook__(qck_tlc_args, __version__, meas_type = 'tlc')
 
     elif quicklook['tlc'] == True and len(prs_files['tlc_qck']) == 0:
-        print('-- Warning: Telecover quicklook visualization was enabled but no file from the preprocessing stage was found. Please make sure that the quicklook option is enable in the preprocessor. If not, the measurement might need to be reprocessed (set newdata to True)')
+        print('-- Warning: Telecover quicklook visualization was enabled but no file from the preprocessing stage was found. Please make sure that --process_qck tlc is at least provided. You might also need to deactivate --quick_run')
         
     if quicklook['pcb'] == True and len(prs_files['pcb_qck']) == 1:
         
@@ -522,6 +531,6 @@ def quicklook(mst_cfg, prs_files, qck_out, quicklook, reprocess = True):
         __quicklook__(qck_pcb_args, __version__, meas_type = 'pcb')
 
     elif quicklook['pcb'] == True and len(prs_files['pcb_qck']) == 0:
-        print('-- Warning: Polarization calibration quicklook visualization was enabled but no file from the preprocessing stage was found. Please make sure that the quicklook option is enable in the preprocessor. If not, the measurement might need to be reprocessed (set newdata to True)')
+        print('-- Warning: Polarization calibration quicklook visualization was enabled but no file from the preprocessing stage was found. Please make sure that --process_qck tlc is at least provided. You might also need to deactivate --quick_run')
                     
     return()

@@ -690,7 +690,7 @@ def dark_file(meas_info, channel_info, time_info_d, nc_path,
     return()
 
 def radiosonde_file(nc_path, st_name, wmo_id, wban_id, 
-                    date, time, geodata, atmo):
+                    date, time, ground, lat, lon, atmo):
 
     print('-----------------------------------------')
     print('Start exporting to a radiosonde QA file...')
@@ -708,11 +708,13 @@ def radiosonde_file(nc_path, st_name, wmo_id, wban_id,
     ds.createDimension('points', n_points)
         
 # Adding Global Parameters    
-    ds.Altitude_meter_asl = geodata[2];
+    ds.Altitude_meter_asl = ground;
 
-    ds.Latitude_degrees_north = geodata[0];
+    if lat != None:
+        ds.Latitude_degrees_north = lat;
 
-    ds.Longitude_degrees_east = geodata[1];
+    if lon != None:
+        ds.Longitude_degrees_east = lon;
 
     ds.Measurement_type = 'rs';
 

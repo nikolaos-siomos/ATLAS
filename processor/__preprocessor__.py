@@ -85,7 +85,7 @@ def main(args, __version__):
                               channel_info = channel_info, 
                               time_info = time_info_d,
                               external_info = args)
-        sig_drk = drk_pack['sig_flt']
+        sig_drk = drk_pack['sig_bgc']
     else:
         sig_drk = []
     
@@ -97,7 +97,7 @@ def main(args, __version__):
                               channel_info = channel_info_r, 
                               time_info = time_info_dr,
                               external_info = args)
-        sig_drk_r = drk_pack_r['sig_flt']
+        sig_drk_r = drk_pack_r['sig_bgc']
     else:
         sig_drk_r = []
             

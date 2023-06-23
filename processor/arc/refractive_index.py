@@ -378,22 +378,32 @@ def n_N2(wavelength, temperature=293.15, pressure=1013.25, method='combined', ex
 
     """
 
+    gas = "N2"
     if method == 'griesmann_burnett':
         wv_llim = 145.
         wv_ulim = 270.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = griesmann_and_burnett_N2_isotropic_polarizability(wavelength)
 
     elif method == 'boerzsoenyi':
         wv_llim = 400.
         wv_ulim = 1000.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = boerzsoenyi_N2_isotropic_polarizability(wavelength)
 
     elif method == 'peck_khanna':
         wv_llim = 468.
         wv_ulim = 2058.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = peck_and_khanna_N2_isotropic_polarizability(wavelength)
 
     elif method == 'combined':
@@ -402,6 +412,9 @@ def n_N2(wavelength, temperature=293.15, pressure=1013.25, method='combined', ex
         wv_change_2 = 1000.
         wv_ulim = 2058.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a_griesmann_and_burnett = griesmann_and_burnett_N2_isotropic_polarizability(wavelength)
         a_boerzsoenyi = boerzsoenyi_N2_isotropic_polarizability(wavelength)
         a_peck_and_khanna = peck_and_khanna_N2_isotropic_polarizability(wavelength)
@@ -507,16 +520,24 @@ def n_O2(wavelength, temperature=293.15, pressure=1013.25, method='combined', ex
        Gas number density of O2 in m-3
     """
 
+    gas = 'O2'
+    
     if method == 'smith':
         wv_llim = 185.
         wv_ulim = 288.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = smith_O2_isotropic_polarizability(wavelength)
 
     elif method == 'zhang':
         wv_llim = 400.
         wv_ulim = 1800.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = zhang_O2_isotropic_polarizability(wavelength)
 
     elif method == 'combined':
@@ -524,6 +545,9 @@ def n_O2(wavelength, temperature=293.15, pressure=1013.25, method='combined', ex
         wv_change = 288.
         wv_ulim = 1800.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a_smith = smith_O2_isotropic_polarizability(wavelength)
         a_zhang = zhang_O2_isotropic_polarizability(wavelength)
 
@@ -639,22 +663,33 @@ def n_Ar(wavelength, temperature=293.15, pressure=1013.25, method='combined', ex
 
     """
 
+    gas = 'Ar'
+    
     if method == 'bideau_mehu_larsen':
         wv_llim = 141.
         wv_ulim = 567.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = bideau_mehu_larsen_Ar_isotropic_polarizability(wavelength)
 
     elif method == 'boerzsoenyi':
         wv_llim = 400.
         wv_ulim = 1000.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = boerzsoenyi_Ar_isotropic_polarizability(wavelength)
 
     elif method == 'peck_fisher':
         wv_llim = 468.
         wv_ulim = 2058.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = peck_and_fisher_Ar_isotropic_polarizability(wavelength)
 
     elif method == 'combined':
@@ -663,6 +698,9 @@ def n_Ar(wavelength, temperature=293.15, pressure=1013.25, method='combined', ex
         wv_change_2 = 1000.
         wv_ulim = 2058.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a_bideau_mehu_larsen = bideau_mehu_larsen_Ar_isotropic_polarizability(wavelength)
         a_boerzsoenyi = boerzsoenyi_Ar_isotropic_polarizability(wavelength)
         a_peck_and_fisher = peck_and_fisher_Ar_isotropic_polarizability(wavelength)
@@ -763,16 +801,24 @@ def n_CO2(wavelength, temperature=293.15, pressure=1013.25, method='combined', e
 
     """
 
+    gas = 'CO2'
+    
     if method == 'bideau_mehu':
         wv_llim = 181.
         wv_ulim = 1694.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = bideau_mehu_CO2_isotropic_polarizability(wavelength)
 
     elif method == 'old':
         wv_llim = 481.
         wv_ulim = 1817.
-
+       
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = old_CO2_isotropic_polarizability(wavelength)
 
     elif method == 'combined':
@@ -780,6 +826,9 @@ def n_CO2(wavelength, temperature=293.15, pressure=1013.25, method='combined', e
         wv_change_1 = 1694.
         wv_ulim = 1817.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a_bideau_mehu = bideau_mehu_CO2_isotropic_polarizability(wavelength)
         a_old = old_CO2_isotropic_polarizability(wavelength)
 
@@ -866,10 +915,15 @@ def n_H2O(wavelength, temperature=293.15, pressure=1013.25, method='combined', e
 
     """
 
+    gas = 'H2O'
+    
     if method == 'cidor':
         wv_llim = 350.
         wv_ulim = 1200.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = cidor_wv_isotropic_polarizability(wavelength)
 
     elif method == 'combined':
@@ -877,6 +931,9 @@ def n_H2O(wavelength, temperature=293.15, pressure=1013.25, method='combined', e
         # wv_change_1 = 1200.
         wv_ulim = 1200.
 
+        if wavelength < wv_llim or wavelength > wv_ulim:
+            raise Exception(f'The selected wavelength ({wavelength}nm) is out of the {method} method limits for {gas}: {wv_llim} to {wv_ulim}nm')
+       
         a = cidor_wv_isotropic_polarizability(wavelength)
 
         # a = np.hstack((a_bideau_mehu[wavelength <= wv_change_1],

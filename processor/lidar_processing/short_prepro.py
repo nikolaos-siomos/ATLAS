@@ -223,7 +223,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
                                         resol = resol,
                                         ground_alt = ground_alt,
                                         zenith_angle = zenith_angle)
-    
+
     pack_out['heights'] = heights.copy()
 
         
@@ -345,7 +345,6 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
     
     sig = sig_raw.copy()
     
-    
     pack_out = dict()
 
     # --------------------------------------------------
@@ -399,7 +398,7 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
     
     print(f'-- Temporal averaging complete! [..{sig.time.size} averaged timeframe(s)]')            
    
-  
+# ------------
     # --------------------------------------------------
     # Solar backsground signal calculation
     # --------------------------------------------------
@@ -411,7 +410,6 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
 
     print('-- Solar background succesfully calculated!')
     
-    
     # --------------------------------------------------
     # Remove the pre-triggering region (or correct triger delays)
     # --------------------------------------------------
@@ -421,6 +419,18 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
     if external_info['debug']: pack_out['sig_trc'] = sig.copy()
 
     print('-- Triggering correction complete!')
+    
+    # --------------------------------------------------
+    # Smoothing
+    # --------------------------------------------------
+    sig = signal.smoothing(sig = sig.copy(), 
+                            smoothing_window = 500,
+                            smoothing_sbin = 750,
+                            smoothing_ebin = -1)
+        
+    if external_info['debug']: pack_out['sig_flt'] = sig.copy()
+    
+    print('-- Signal smoothing complete!')
 
     # --------------------------------------------------
     # Trim signal up to an upper altitude limit
@@ -429,7 +439,7 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
         sig = signal.trim_vertically(sig = sig.copy(), 
                                      ground_alt = ground_alt,
                                      zenith_angle = zenith_angle, 
-                                     alt_lim =  1E3 * alt_lim,
+                                     alt_lim = 1E3 * alt_lim,
                                      resol = resol)
     
         if external_info['debug']: pack_out['sig_trm'] = sig.copy()
@@ -447,43 +457,28 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
         
     print('-- Ranges calculated per signal bin and channel!')
 
-
     # --------------------------------------------------
     # Calculation of the signals heights
     # --------------------------------------------------
     heights = signal.height_calculation(bins = sig.copy().bins.values, 
+                                        resol = resol,
                                         ground_alt = ground_alt,
-                                        zenith_angle = zenith_angle,                                       
-                                        resol = resol)
+                                        zenith_angle = zenith_angle)
     
     pack_out['heights'] = heights.copy()
+
         
-    print('-- Heights calculated per signal bin and channel!')
-
-
+    print('-- Height calculated per signal bin and channel!')
+    
     # --------------------------------------------------
     # Solar backsground signal calculation
     # --------------------------------------------------
     sig = signal.background_correction(sig = sig.copy(), bgr = bgr.copy())
     
-    if external_info['debug']: pack_out['sig_bgc'] = sig.copy()
+    pack_out['sig_bgc'] = sig.copy()
     
     print('-- Solar background subtraction complete!')
-
-
-    # --------------------------------------------------
-    # Smoothing
-    # --------------------------------------------------
-    sig = signal.smoothing(sig = sig, 
-                           smoothing_window = 500,
-                           smoothing_sbin = 750,
-                           smoothing_ebin = -1)
-        
-    pack_out['sig_flt'] = sig.copy()
     
-    print('-- Signal smoothing complete!')
-        
-
     # --------------------------------------------------
     # Range correction
     # --------------------------------------------------

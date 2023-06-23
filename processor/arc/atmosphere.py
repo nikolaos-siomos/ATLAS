@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 from scipy.integrate import cumtrapz
-from ..arc.raman_scattering import GaussianFilter
+from ..arc.raman_scattering import GaussianFilter, SquareFilter
 from ..arc.raman_scattering import RotationalRaman
 from ..arc import make_gas, rayleigh_scattering 
 from ..arc.utilities import number_density_at_pt
@@ -96,7 +96,10 @@ def short_molec(heights, ranges, meas_info, channel_info,
         sl_d = dict(channel = ch, bins = sel_bins)
             
         # Defining a gaussian filter for the IFF
-        gaussian_iff = GaussianFilter(dwl.loc[ch],bdw.loc[ch])    
+        if ch_type.loc[ch] == 'r':
+            filter_trans = SquareFilter(dwl.loc[ch],bdw.loc[ch]) 
+        else:
+            filter_trans = GaussianFilter(dwl.loc[ch],bdw.loc[ch])    
 
         # Extracting molecular parameters in specific range bins
         N = meteo.loc[ch_d].loc[dict(properties  = 'Number_Density')] .values
@@ -142,7 +145,7 @@ def short_molec(heights, ranges, meas_info, channel_info,
             rrb = RotationalRaman(wavelength = swl_ch, 
                                   max_J = 51, 
                                   temperature = T[i], 
-                                  optical_filter = gaussian_iff,
+                                  optical_filter = filter_trans,
                                   N2_parameters = N2, 
                                   O2_parameters = O2, 
                                   Ar_parameters = Ar, 
@@ -173,10 +176,10 @@ def short_molec(heights, ranges, meas_info, channel_info,
                                       istotal = True) 
                 
             
-            bxs_tot_i[i], _, _ = rrb.quantum_mechanic_rayleigh_cross_section()
-            exs_fth_i[i], _, _ = rre.quantum_mechanic_rayleigh_cross_section()
+            bxs_tot_i[i], _, _ = rrb.rayleigh_cross_section()
+            exs_fth_i[i], _, _ = rre.rayleigh_cross_section()
             if ch_type.loc[ch] == 'v':
-                exs_bck_i[i], _, _ = rrv.quantum_mechanic_rayleigh_cross_section()
+                exs_bck_i[i], _, _ = rrv.rayleigh_cross_section()
             else:
                 exs_bck_i[i] = exs_fth_i[i]   
             mdr_i[i] = rrb.delta_mol_rayleigh(method = 'line_summation')

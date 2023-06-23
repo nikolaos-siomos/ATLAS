@@ -124,6 +124,13 @@ def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_regi
                         x_tick * (np.floor(x_ulim / x_tick) + 1.), 
                         x_tick)
     
+    if x_tick >= x_ulim - x_llim:
+        raise Exception(f"The x_tick ({x_tick}) must be smaller than the width of the normalization_region ({norm_region}) for the Rayleigh fit test. Please revise the settings_file.ini ")
+    
+    if x_llim > norm_region[1] or x_ulim < norm_region[0]:
+        raise Exception(f"The normalization_region ({norm_region}) for the Rayleigh fit is out of the provided x_lims ([{x_llim}, {x_ulim}]). Please revise the settings_file.ini ")
+    
+    
     if np.abs(x_llim - x_ticks[0]) < x_tick * 0.25:
         x_ticks[0] = x_llim
     else:
@@ -157,7 +164,7 @@ def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_regi
     if use_lin == False:
 
         ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
-                f'region: {n_llim} - {n_ulim} km',
+                f'norm. region: {n_llim} - {n_ulim} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
 
         ax.text(0.55 * x_ulim, 0.30 * y_ulim, 
@@ -165,7 +172,7 @@ def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_regi
                  bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
     else:
         ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
-                f'region: {n_llim} - {n_ulim} km',
+                f'norm. region: {n_llim} - {n_ulim} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
 
         ax.text(0.55 * x_ulim, 0.82 * y_ulim, 
@@ -277,7 +284,9 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
 
     Y_E = np.nan * Y_NM
     Y_O = np.nan * Y_NM
-
+    
+    Y_E_N = np.nan * Y_NM
+    
     if len(y1_extr) > 0:
         Y_E = y1_extr_raw
         Y_E_N = coef_1 * y1_extr
@@ -305,6 +314,12 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
                         x_tick * (np.floor(x_ulim / x_tick) + 1.), 
                         x_tick)
         
+    if x_tick >= x_ulim - x_llim:
+        raise Exception(f"The x_tick ({x_tick}) must be smaller than the width of the normalization_region ({norm_region}) for the telecover test. Please revise the settings_file.ini ")
+    
+    if x_llim > norm_region[1] or x_ulim < norm_region[0]:
+        raise Exception(f"The normalization_region ({norm_region}) for the telecover fit is out of the provided x_lims ([{x_llim}, {x_ulim}]). Please revise the settings_file.ini ")
+    
     if np.abs(x_llim - x_ticks[0]) < x_tick * 0.25:
         x_ticks[0] = x_llim
     else:
@@ -336,7 +351,7 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     ax.plot(X, Y3, color = 'tab:green', label = 'south', alpha = 0.7)
     ax.plot(X, Y4, color = 'tab:red', label = 'west', alpha = 0.7)
 
-    if use_last == True or iters == 1:
+    if use_last == True:
         ax.plot(X, Y_E, color = 'tab:purple', label = extra_label, alpha = 0.7)
         
     ax.legend()
@@ -558,6 +573,12 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
                         x_tick * (np.floor(x_ulim / x_tick) + 1.), 
                         x_tick)
         
+    if x_tick >= x_ulim - x_llim:
+        raise Exception(f"The x_tick ({x_tick}) must be smaller than the width of the normalization_region ({norm_region}) for the telecover test. Please revise the settings_file.ini ")
+    
+    if x_llim > norm_region[1] or x_ulim < norm_region[0]:
+        raise Exception(f"The normalization_region ({norm_region}) for the telecover fit is out of the provided x_lims ([{x_llim}, {x_ulim}]). Please revise the settings_file.ini ")
+    
     if np.abs(x_llim - x_ticks[0]) < x_tick * 0.25:
         x_ticks[0] = x_llim
     else:
@@ -658,7 +679,7 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     n_ulim = np.round(norm_region[1], decimals = 2)
     
     ax3.text(0.2 * x_ulim, 0.15 * y_ulim_nr, 
-             f'region: {n_llim} - {n_ulim} km',
+             f'norm. region: {n_llim} - {n_ulim} km',
              bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 9))
 
     # Subplot: Normalized Signals - Far Range
@@ -805,11 +826,11 @@ def intercomparison(dir_out, fname, title, dpi_val, color_reduction,
     
     if use_lin == False:
         ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
-                f'region: {n_llim} - {n_ulim} km',
+                f'norm. region: {n_llim} - {n_ulim} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
     else:
         ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
-                f'region: {n_llim} - {n_ulim} km',
+                f'norm. region: {n_llim} - {n_ulim} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
         
     ax2 = fig.add_axes([0.65,0.13,0.30,0.7])
@@ -920,6 +941,12 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     ax.fill_between(XA, Y2 - Y2E, Y2 + Y2E, color = 'tab:red', alpha = 0.3)
     ax.fill_between(XA, Y3 - Y3E, Y3 + Y3E, color = 'tab:cyan', alpha = 0.3)
     
+    if x_tick_cal >= x_ulim_cal - x_llim_cal:
+        raise Exception(f"The x_tick_calibration ({x_tick_cal}) must be smaller than the width of the calibration_region ({cal_region}) for the polarization calibration test. Please revise the settings_file.ini ")
+    
+    if x_llim_cal > cal_region[1] or x_ulim_cal < cal_region[0]:
+        raise Exception(f"The calibration_region ({cal_region}) is out of the provided x_lims_calibration ([{x_llim_cal}, {x_ulim_cal}]) for the polarization calibration test. Please revise the settings_file.ini ")
+
     x_ticks_cal = np.arange(x_tick_cal * np.ceil(x_llim_cal / x_tick_cal), 
                             x_tick_cal * (np.floor(x_ulim_cal / x_tick_cal) + 1.), 
                             x_tick_cal)
@@ -953,7 +980,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     c_ulim = np.round(cal_region[1], decimals = 2)
     
     ax.text(0.05 * x_ulim_cal, 0.95 * y_ulim_cal, 
-            f'region: {c_llim} - {c_ulim} km',
+            f'cal. region: {c_llim} - {c_ulim} km',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))  
     # ax.text(0.55 * x_ulim_cal, 0.87 * y_ulim_cal, 
     #         f'ε: {round_it(epsilon,2)}'+'${}^o \pm$ '+f'{round_it(epsilon_err,2)}'+'${}^o$,',
@@ -983,6 +1010,12 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     x_ticks_vdr = np.arange(x_tick_vdr * np.ceil(x_llim_vdr / x_tick_vdr), 
                             x_tick_vdr * (np.floor(x_ulim_vdr / x_tick_vdr) + 1.), 
                             x_tick_vdr)
+
+    if x_tick_vdr >= x_ulim_vdr - x_llim_vdr:
+        raise Exception(f"The x_tick_rayleigh ({x_tick_vdr}) must be smaller than the width of the rayleigh_region ({vdr_region}). Please revise the settings_file.ini ")
+    
+    if x_llim_vdr > vdr_region[1] or x_ulim_vdr < vdr_region[0]:
+        raise Exception(f"The rayleigh_region ({vdr_region}) is out of the provided x_lims_rayleigh ([{x_llim_vdr}, {x_ulim_vdr}]). Please revise the settings_file.ini ")
         
     if np.abs(x_llim_vdr - x_ticks_vdr[0]) < x_tick_vdr * 0.25:
         x_ticks_vdr[0] = x_llim_vdr
@@ -1013,7 +1046,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     m_ulim = np.round(vdr_region[1], decimals = 2)
 
     ax2.text(0.05 * x_ulim_vdr, 0.65 * y_ulim_vdr, 
-             f'region: {m_llim} - {m_ulim} km',
+             f'norm. region: {m_llim} - {m_ulim} km',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))  
     ax2.text(0.05 * x_ulim_vdr, 0.55 * y_ulim_vdr, 
             r'$δ_m$: '+f'{np.round(delta_m,4)}',

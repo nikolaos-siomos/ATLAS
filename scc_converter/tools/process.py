@@ -439,7 +439,6 @@ def radiosonde(args, time, version, lidar, lr_id):
     skip_footer = args['rsonde_skip_footer']
     usecols = args['rsonde_column_index']
     units = args['rsonde_column_units']
-    geodata = args['rsonde_geodata']
     
     mtime = np.datetime64(time[0] + (time[-1] - time[0]) / 2., 'us').item()
     
@@ -450,13 +449,19 @@ def radiosonde(args, time, version, lidar, lr_id):
                                                  usecols = usecols,
                                                  units = units,
                                                  mtime = mtime,
-                                                 ground = geodata[-1])
+                                                 ground = args['rsonde_altitude'])
     except:
         raise Exception('Error detecting when reading the radiosonde file. Please revise the radiosonde parsing options in the settings_file (converter section)')
     
-    # Reading radiosonde geodata with the lidar station values if a geodata argument is not provided  
-    if any([geodata_i == None for geodata_i in geodata]):
-        raise Exception("-- Error: The rsonde_geodata field is mandatory when processing a radiosonde file (mode = A and the radiosonde folder exists). Please provide 3 floats that correspond to the radiosonde station latitude, longitude, and altitude eg: --rsonde_geodata 40.5 22.9 60.0")
+    if args['rsonde_altitude'] == None:
+       
+        print('-- Warning: The rsonde_altitude field was not provided in the settings file. Substituting the empty value with the first atlitude bin of the radiosonde file')
+    
+        args['rsonde_altitude'] = atmo.height.values[0]
+        
+    # # Reading radiosonde geodata with the lidar station values if a geodata argument is not provided  
+    # if any([geodata_i == None for geodata_i in geodata]):
+    #     raise Exception("-- Error: The rsonde_geodata field is mandatory when processing a radiosonde file (mode = A and the radiosonde folder exists). Please provide 3 floats that correspond to the radiosonde station latitude, longitude, and altitude eg: --rsonde_geodata 40.5 22.9 60.0")
 
     # Creating the radiosonde ID
     rsonde_ID = f"{date}{lr_id}{time[:4]}"
@@ -465,7 +470,14 @@ def radiosonde(args, time, version, lidar, lr_id):
     nc_path = make.rs_path(output_folder = args['output_folder'], meas_ID = rsonde_ID)
     
     # Making the raw SCC file
-    make.radiosonde_file(nc_path = nc_path, date = date, time = time, geodata = geodata, st_name = args['rsonde_station_name'], wmo_id = args['rsonde_wmo_number'], wban_id = args['rsonde_wban_number'], atmo = atmo)
+    make.radiosonde_file(nc_path = nc_path, date = date, time = time, 
+                         ground = args['rsonde_altitude'], 
+                         lat = args['rsonde_latitude'], 
+                         lon = args['rsonde_longitude'], 
+                         st_name = args['rsonde_station_name'], 
+                         wmo_id = args['rsonde_wmo_number'], 
+                         wban_id = args['rsonde_wban_number'], 
+                         atmo = atmo)
     
     print('Succesfully generated a radiosonde file!')
     print('')

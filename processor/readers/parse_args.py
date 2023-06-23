@@ -82,11 +82,11 @@ def call_parser():
     parser.add_argument('--vertical_trimming', metavar = 'vertical_trimming', 
                         type = bool,  default = True, 
                         action = argparse.BooleanOptionalAction,
-                        help = 'If called then bins above a certain altitude (20km by default) will be removed. ')
+                        help = 'If called then bins above a certain distance from the laser (20km by default) will be removed. ')
 
     parser.add_argument('--vertical_limit', metavar = 'vertical_limit', 
-                        type = float, nargs = '?', default = 20.,
-                        help = "The maximum altitude in km above which no calculations will be performed. Solar background calculations are performed prior to vertical signal trimming to enable background calculations up to the maximum signal altitude. Defaults to 20km ")                                                                                                        
+                        type = float, nargs = '?', default = 21.,
+                        help = "The maximum distance from the laser in km above which no calculations will be performed. Solar background calculations are performed prior to vertical signal trimming to enable background calculations up to the maximum signal altitude. Defaults to 20km ")                                                                                                        
     
     args = vars(parser.parse_args())
 

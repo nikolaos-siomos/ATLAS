@@ -121,8 +121,8 @@ def call_parser():
                         help="The column number of Height, Pressure, Temperature, and Relative Humidity (optional) columns in the radiosonde file. For example: --rsonde_columns 1 3 2 6 means height: 1st column, temperature: 3rd column, pressure: 2nd column, relative humidity: 6th column. The relative humidity column is OPTIONAL and can be omitted! Defaults to 1 2 3")   
 
     parser.add_argument('--rsonde_column_units', metavar='rsonde_column_units', 
-                        type=str, nargs='+', default = ['m', 'hPa', 'K', 'percent'], 
-                        help="The units of Height, Pressure, Temperature, and Relative Humidity (optional) columns in the radiosonde file. Supported units for height: m (default), Km | for pressure: Pa, hPa (default) | for temperature: C, K (default) | for relative humidity: fraction, percent (default). For example: --rsonde_column_units Km Pa C fraction ")   
+                        type=str, nargs='+', default = ['m_asl', 'hPa', 'K', 'percent'], 
+                        help="The units of Height, Pressure, Temperature, and Relative Humidity (optional) columns in the radiosonde file. Supported units for height: m_asl (default), km_asl, m_agl, km_agl | for pressure: Pa, hPa (default) | for temperature: C, K (default) | for relative humidity: fraction, percent (default). For example: --rsonde_column_units km_agl Pa C fraction ")   
                             
     parser.add_argument('--rsonde_station_name', metavar='rsonde_station_name', 
                         type=str, nargs='?', default = None, 
@@ -136,9 +136,17 @@ def call_parser():
                         type=str, nargs='?', default = None, 
                         help="The WBAN number of the radiosounding station. Defaults to None ")   
                                                                                                                                               
-    parser.add_argument('--rsonde_geodata', metavar='rsonde_geodata', 
-                        type=float, nargs=3, default = [None, None, None], 
-                        help="The radiosonde station latitude, longitude, and altitude. Mandatory if the mode is set to S. For example: --rsonde_geodata 40.5 22.9 60.0 ")   
+    parser.add_argument('--rsonde_latitude', metavar='rsonde_latitude', 
+                        type=float, nargs='?', default = None, 
+                        help="The radiosonde station latitude. For example: --rsonde_latitude 40.5 ")   
+
+    parser.add_argument('--rsonde_longitude', metavar='rsonde_longitude', 
+                        type=float, nargs='?', default = None, 
+                        help="The radiosonde station longitude. For example: --rsonde_longitude 22.9 ")   
+
+    parser.add_argument('--rsonde_altitude', metavar='rsonde_altitude', 
+                        type=float, nargs='?', default = None, 
+                        help="The radiosonde station altitude. For example: --rsonde_altitude 60.0 ")   
 
     parser.add_argument('--trim_overflows', metavar='trim_overflows', 
                         type=int, nargs='?', default = 0, 
@@ -188,14 +196,14 @@ def check_parser(args):
 
     if args['file_format'] == None:
         raise Exception("The mandatory argument file_format was not provided. Please add it with the --file_format option ")   
-    elif args['file_format'] not in ['licel','polly_xt']:
+    elif args['file_format'] not in ['licel','polly_xt','licel_matlab']:
         raise Exception(f"The provided file_format: {args['file_format']} is not supported. Please choose among: licel, polly_xt")   
         
     fld = ['dark_folder', 'rayleigh_folder', 'telecover_sectors_folder', 
            'telecover_rings_folder', 'pcb_cal_p45_folder', 
            'pcb_cal_m45_folder', 'pcb_cal_stc_folder']
     
-    if args['file_format'] == 'licel':
+    if args['file_format'] == 'licel' or  args['file_format'] == 'licel_matlab':
         default_loc = ['drk', 'nrm', 'tlc', 
                        'tlc_rin', os.path.join('pcb','+45'),
                        os.path.join('pcb','-45'), os.path.join('pcb','stc')]
@@ -214,7 +222,7 @@ def check_parser(args):
         raise Exception("The radiosonde argument is mandatory! Please provide it. ")
         
     if not os.path.exists(args['config_file']):
-        raise Exception(f"-- Error: Path to the configuration file does not exists (defaults to <parent_folder>/config_file.ini). Path: {args['config_file']}!")  
+        raise Exception(f"-- Error: Path to the configuration file {args['config_file']} does not exists (defaults to <parent_folder>/config_file.ini).")  
 
     if args['debug'] not in [True, False]:
         raise Exception(f"-- Error: debug field should be boolean. Please use one of {[True, False]} with: -d <debug>")
@@ -231,18 +239,25 @@ def check_parser(args):
     if len(args['rsonde_column_units']) != 4:
         raise Exception("-- Error: rsonde_column_unit field has less or more elements than expected. Please provide 3 or 4 strings eg: --rsonde_column_units Km Pa C ")
 
-    if args['rsonde_column_units'][0] not in ['m_asl', 'km_asl', 'm_agl', 'km_agl', 'm_geo', 'Km_geo', 'm'] or \
-        args['rsonde_column_units'][1] not in ['Pa', 'hPa', 'atm'] or \
-            args['rsonde_column_units'][2] not in ['C', 'Cx10', 'K'] or \
-                args['rsonde_column_units'][3] not in ['fraction', 'percent', None] :
-                    raise Exception(f"-- Error: rsonde_column_unit field values were not recognized ({args['rsonde_column_units']}). Please provide on of [m, Km] for height, [Pa, hPa] for pressure, [C, K] for temperature, and [fraction, percent] for relative humidity (optional)")
-
-    if len(args['rsonde_geodata']) != 3:
-        raise Exception("-- Error: rsonde_geodata field has less or more elements than expected. Please provide 3 floats that correspond to the radiosonde station latitude, longitude, and altitude eg: --rsonde_geodata 40.5 22.9 60.0")
-            
-    if any([not geodata_i for geodata_i in args['rsonde_geodata']]) and args['mode'] == 'S':
-        raise Exception("-- Error: The rsonde_geodata field is mandatory when processing a radiosonde file (mode = S). Please provide 3 floats that correspond to the radiosonde station latitude, longitude, and altitude eg: --rsonde_geodata 40.5 22.9 60.0")
+    # Change units if they are not the default ones (m, hPa, K, %)
+    alt_units = ['km_asl', 'm_asl', 'm_agl', 'km_agl']
+    prs_units = ['hPa', 'Pa', 'atm']
+    tmp_units = ['K', 'C', 'Cx10']    
+    hum_units = ['fraction', 'percent']
     
+    if args['rsonde_column_units'][0] not in alt_units:
+        raise Exception(f"-- Error: The value of the rsonde_column_units corresponding to the altitude array of the radiosonde file ({args['rsonde_column_units'][0]}) is not recognized! Please select one of: {alt_units}")
+
+    if args['rsonde_column_units'][1] not in prs_units:
+        raise Exception(f"-- Error: The value of the rsonde_column_units corresponding to the pressure array of the radiosonde file ({args['rsonde_column_units'][1]}) is not recognized! Please select one of: {prs_units}")
+        
+    if args['rsonde_column_units'][2] not in tmp_units:
+        raise Exception(f"-- Error: The value of the rsonde_column_units corresponding to the temperature array of the radiosonde file ({args['rsonde_column_units'][2]}) is not recognized! Please select one of: {tmp_units}")
+        
+    if args['rsonde_column_units'][3] not in hum_units:
+        raise Exception(f"-- Error: The value of the rsonde_column_units corresponding to the humidity array of the radiosonde file ({args['rsonde_column_units'][3]}) is not recognized! Please select one of: {hum_units}")
+               
+ 
     return(args)
 
 def view_parser(args):

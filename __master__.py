@@ -8,6 +8,7 @@ Created on Wed Sep 21 10:21:48 2022
 
 from version import __version__
 import os, warnings, glob, sys
+from helper_functions import running_options
 from helper_functions import processing_chain
 from helper_functions import read_master_config
 from helper_functions.parse_master_args import call_parser as parse_mst
@@ -30,41 +31,11 @@ process_qck = mst_args['process_qck']
 
 if not np.isin(np.array(process_qck),np.hstack((process,"off"))).all():
     raise Exception(f"-- Error: The provided process_qck option {process_qck} is not a subset of the provided process option {process}. Please revise the general section of the settings file or use the default values")
-    
-processing = {'ray' : True,
-              'tlc' : True,
-              'pcb' : True}
-    
-quicklook = {'ray' : True,
-             'tlc' : True,
-             'pcb' : True}
-    
-
-if 'ray' not in process: processing['ray'] = False
-if 'tlc' not in process: processing['tlc'] = False
-if 'pcb' not in process: processing['pcb'] = False
-if 'off' in process: 
-    processing['ray'] = False
-    processing['tlc'] = False
-    processing['pcb'] = False
-
-
-if 'ray' not in process_qck: quicklook['ray'] = False
-if 'tlc' not in process_qck: quicklook['tlc'] = False
-if 'pcb' not in process_qck: quicklook['pcb'] = False
-if 'off' in process_qck: 
-    quicklook['ray'] = False
-    quicklook['tlc'] = False
-    quicklook['pcb'] = False
-
-if quick_run == True:
-    reprocess = {'converter' : False,
-                 'preprocessor' : False,
-                 'visualizer' : True}
-else:
-    reprocess = {'converter' : True,
-                 'preprocessor' : True,
-                 'visualizer' : True}
+ 
+# Automatically set the processing options for all modules to call
+processing = running_options.auto_set_process(process)
+reprocess = running_options.auto_set_reprocess(processing, quick_run = quick_run)
+quicklook = running_options.auto_set_quicklook(process_qck)
 
 # Reset argument list
 sys.argv = [sys.argv[0]]   

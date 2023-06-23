@@ -5,6 +5,7 @@ import glob
 from datetime import datetime as dt
 from datetime import timedelta
 import xarray as xr
+from scipy.io import loadmat
 
 # Read measurement
 def dtfs(dir_meas):
@@ -29,20 +30,19 @@ def dtfs(dir_meas):
     
     else:
         
-        mfiles = glob.glob(os.path.join(dir_meas,'*.*'))
-        
-        mfiles = [file for file in mfiles if os.path.basename(file) != 'temp.dat']
-        
+        mfiles = glob.glob(os.path.join(dir_meas,'*.mat'))
+                
         # for existing directory and files inside it, starts the reading of files     
         if len(mfiles) > 0:
             print(f'-- Folder contains {len(mfiles)} file(s)!')
             
-            buffer = read_buffer(mfiles[0])
-            sep = find_sep(buffer, mfiles[0])
+            data = loadmat(mfiles[0])
+            keys = [key for key in data.keys()]
             
             # Reading the licel file metadatas (header) - only for the first file
-            meas_info = read_meas(buffer = buffer, sep = sep)
-            channel_info = read_channels(buffer = buffer, sep = sep)
+            meas_info = read_meas(buffer = data[keys[5]])
+
+            channel_info = read_channels(buffer = data[keys[4]])
             
             channels = channel_info.index.values
             bins_arr = np.arange(1., channel_info.bins.max() + 1.)
@@ -61,19 +61,19 @@ def dtfs(dir_meas):
             for k in range(len(mfiles)):
                 
                 filename[k] = os.path.basename(mfiles[k])
-
-                buffer = read_buffer(mfiles[k])
-
-                sep = find_sep(buffer, filename[k])
                 
-                stime, etime = read_time(buffer = buffer, sep = sep)
-
-                shots_arr[k,:] = read_shots(buffer = buffer, sep = sep)
+                data = loadmat(mfiles[k])
                 
-                sig = read_body(channel_info, buffer = buffer, sep = sep)
+                keys = [key for key in data.keys()]
+                
+                stime, etime = read_time(buffer = data[keys[5]])
+
+                shots_arr[k,:] = read_shots(buffer = data[keys[5]])
+                
+                body = np.array([data[keys[6+i]] for i in range(len(data)-6)])
 
                 # Store signal, start and end time
-                sig_arr[k, :, :] = sig
+                sig_arr[k, :, :] = body[:,0,:]
 
                 start_time_arr[k] = stime
                 
@@ -116,51 +116,7 @@ def dtfs(dir_meas):
     return(meas_info, channel_info, time_info, sig_raw, shots)
 
 
-def read_body(channel_info, buffer, sep):
-    
-    """ Reads the information from the raw licel files below the header.
-    Blocks are separated by #"""
-
-    data = buffer[sep+4:]
-
-    max_bins = int(channel_info.bins.max())
-
-    n_channels = len(channel_info.index)
-    
-    # Parse data into dataframe    
-    sig_raw_arr = []
-
-    nbin_s = 0
-    sig_raw_arr = np.nan*np.zeros((n_channels, max_bins))
-
-    for j in range(n_channels):
-        nbins = int(channel_info.bins.iloc[j])
-        nbin_e = nbin_s + 4*nbins
-        icount = 0
-        for i in range(nbin_s, nbin_e, 4):
-            sig_raw_arr[j,icount] = int.from_bytes(data[i:i+4], 
-                                                   byteorder = 'little')
-            icount = icount + 1
-
-        nbin_s = nbin_e + 2
-    
-    return(sig_raw_arr)
-
-def find_sep(buffer, fname):
-    
-    """ Identifies the location of the header separator field: \r\n\r\n"""
-    
-    search_sequence = bytearray("\r\n\r\n", encoding="utf-8")
-    i = 0
-    while buffer[i:i+4] != search_sequence:
-        i = i + 1
-        if i >= len(buffer):
-            raise Exception(f"Could not find header/data separator. Is {fname} a licel file?")
-    sep = i     
-    
-    return(sep)
-
-def read_meas(buffer, sep):
+def read_meas(buffer):
 
     """ Retrieves location and geometry relevant information from 
     the licel header [location, altitude, latitude, longitude, 
@@ -169,13 +125,7 @@ def read_meas(buffer, sep):
     laser C repetion rate if it exists]"""
     meas_info = pd.Series()
      
-    # Now i points to the start of search_sequence, AKA end of header
-    header_bytes = buffer[0:sep-1]
-    
-    # Convert header to text, parse metadata
-    header = str(header_bytes, encoding="utf-8").split("\r\n")
-
-    metadata = header[1].split()
+    metadata = buffer[2][0][0].split()
 
     meas_info['location'] = metadata[0]
 
@@ -189,36 +139,24 @@ def read_meas(buffer, sep):
     if len(metadata) > 9:
         meas_info['azimuth_angle'] = float(metadata[9])
 
-    # Now i points to the start of search_sequence, AKA end of header
-    header_bytes = buffer[0:sep-1]
-    
-    # Convert header to text, parse metadata
-    header = str(header_bytes, encoding="utf-8").split("\r\n")
+    metadata = buffer[3][0][0].split()
 
-    metadata = header[2].split()
+    meas_info['laser_A_repetition_rate'] = float(metadata[2])
 
-    meas_info['laser_A_repetition_rate'] = float(metadata[1])
-
-    if len(metadata) > 2:
-        meas_info['laser_B_repetition_rate'] = float(metadata[3])
+    # if len(metadata) > 2:
+    #     meas_info['laser_B_repetition_rate'] = float(metadata[5])
         
-    if len(metadata) > 5:
-        meas_info['laser_C_repetition_rate'] = float(metadata[6])
+    # if len(metadata) > 5:
+    #     meas_info['laser_C_repetition_rate'] = float(metadata[8])
         
     return(meas_info)
 
-def read_time(buffer, sep):
+def read_time(buffer):
     
     """ Retrieves temporal information from 
     the licel header [start time, stop time]"""
 
-    # Now i points to the start of search_sequence, AKA end of header
-    header_bytes = buffer[0:sep-1]
-    
-    # Convert header to text, parse metadata
-    header = str(header_bytes, encoding="utf-8").split("\r\n")
-
-    metadata = header[1].split()
+    metadata = buffer[2][0][0].split()
 
     start_date = metadata[1]
     start_time = metadata[2]
@@ -230,7 +168,7 @@ def read_time(buffer, sep):
         
     return(stime, etime)
 
-def read_channels(buffer, sep):
+def read_channels(buffer):
     
     """ Collects channel specific information from the licel header
     [analog/photon mode (0/1), laser number (A,B,C), number of range bins,
@@ -240,23 +178,31 @@ def read_channels(buffer, sep):
 
     channel_info = pd.DataFrame()
        
-    cols = ['active', 'acquisition_mode', 'laser', 'bins', 
-            'laser_polarization', 'pmt_high_voltage', 'range_resolution', 
-            'wave_pol', 'unk1', 'unk2', 'unk3', 'unk4', 
-            'analog_to_digital_resolution', 'shots', 'data_acquisition_range',
-            'channel_id']
-
-    # Now i points to the start of search_sequence, AKA end of header
-    header_bytes = buffer[0:sep-1]
+    cols = ['active', 
+            'acquisition_mode', 
+            'unk1', 
+            'bins', 
+            'pmt_high_voltage', 
+            'range_resolution', 
+            'wave_pol', 
+            'analog_to_digital_resolution', 
+            'data_acquisition_range',
+            'channel_id',
+            'unk2',
+            'unk3',
+            'unk4']
     
     # Convert header to text, parse metadata
-    header = str(header_bytes, encoding="utf-8").split("\r\n")
+    header = np.array([buffer[i][0][0] for i in range(len(buffer))])
 
     # Header rows
-    header = np.array([line[1:].split()[:len(cols)] for line in header[3:]], 
+    header = np.array([line.split()[:len(cols)] for line in header], 
                       dtype = object)
 
     arr_head = pd.DataFrame(header, columns = cols, dtype = object)
+    
+    arr_head['laser'] = 1
+    arr_head['laser_polarization'] = 1
 
     # Produce thelen(set(a)) < len(a) channel ID from the licel channel ID and the laser polarization    
     channel_ID = []
@@ -281,7 +227,7 @@ def read_channels(buffer, sep):
 
     wave = np.array(list(np.char.split(arr_head.wave_pol.values.astype('str'),
                                        sep='.')))[:,0].astype(float)
-    
+
     channel_info.loc[:,'detected_wavelength'] = wave
     
     # Fill in default values that depend on the raw file metadata
@@ -303,33 +249,17 @@ def read_channels(buffer, sep):
 
     return(channel_info)
 
-def read_shots(buffer, sep):
-    
-    """ Gets the number of shots for each channel and file"""
+def read_shots(buffer):
 
+    """ Retrieves the laser shot information"""
+     
+    metadata = buffer[3][0][0].split()
 
-    cols = ['active', 'acquisition_mode', 'laser', 'bins', 
-            'laser_polarization', 'pmt_high_voltage', 'range_resolution', 
-            'wave_pol', 'unk1', 'unk2', 'unk3', 'unk4', 
-            'analog_to_digital_resolution', 'shots', 'data_acquisition_range',
-            'channel_id']
+    shots = float(metadata[1])
+    
+    if shots == 0:
+        shots = np.nan
 
-    # Now i points to the start of search_sequence, AKA end of header
-    header_bytes = buffer[0:sep-1]
-    
-    # Convert header to text, parse metadata
-    header = str(header_bytes, encoding="utf-8").split("\r\n")
-
-    # Header rows
-    header = np.array([line[1:].split()[:len(cols)] for line in header[3:]], 
-                      dtype = object)
-    
-    ind_shots = np.where(np.array(cols) == 'shots')[0][0]
-    
-    shots = header[:,ind_shots].astype(float)
-    
-    shots[shots == 0] = np.nan
-    
     return(shots)
 
 def read_buffer(fname):

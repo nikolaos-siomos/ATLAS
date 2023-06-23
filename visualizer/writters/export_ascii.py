@@ -18,8 +18,9 @@ def rayleigh(dir_out, fname, header, alt, atb, rcs):
     body = body[~mask,:]
     
     fpath = os.path.join(dir_out, 'ascii', fname)
-    
-    np.savetxt(fpath, body, header = header, comments = '')
+
+    np.savetxt(fpath, body, header = header, comments = '', 
+               delimiter = ',', fmt = '%.6e')
     
     return()
 
@@ -42,7 +43,8 @@ def telecover(dir_out, fname, header, iters,
  
     fpath = os.path.join(dir_out, 'ascii', fname)
     
-    np.savetxt(fpath, body, header = header, comments = '')
+    np.savetxt(fpath, body, header = header, comments = '', 
+               delimiter = ',', fmt = '%.6e')
     
     return()
 
@@ -59,6 +61,7 @@ def polarisation_calibration(dir_out, fname, alt_cal, alt_ray,
     
     fpath = os.path.join(dir_out, 'ascii', fname)
     
-    np.savetxt(fpath, body, header = header, comments = '')
+    np.savetxt(fpath, body, header = header, comments = '', 
+               delimiter = ',', fmt = '%.6e')
     
     return()

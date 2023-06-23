@@ -114,7 +114,7 @@ def call_parser():
                         help = 'If set to True, a sliding average smoothing filter will be applied on the signals across y axis for better visualization. The smoothing_exponential, smoothing_exponential, and smoothing_window will be ignored if smooth is set to False. Defaults to: False')
 
     parser.add_argument('--smoothing_range', metavar = 'smoothing_range',
-                        type = float, nargs = 2, default = [0.05, 14.], 
+                        type = float, nargs = 2, default = [0., 14.], 
                         help = 'Set the first and last altitude/distance boundaries in km where smoothing should be applied. If they exceed the actual signal boundaries the actual boundaries will be used instead. Defaults to: 0.05, 14.')
 
     parser.add_argument('--smoothing_window', metavar = 'smoothing_window',

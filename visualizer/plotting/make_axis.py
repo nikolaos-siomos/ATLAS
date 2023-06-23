@@ -71,32 +71,49 @@ def quicklook_y(heights, ranges, y_lims, use_dis):
         y_vals = 1E-3 * heights       
         y_label = 'Altitude [km]'
 
-    # Get the altitude/distance lower limit and bin
-    if y_lims[0] == None or y_lims[0] < y_vals[0]:
-        y_lbin = 0
-        y_llim = np.round(y_vals[y_lbin], decimals = 2)
+    # # Get the altitude/distance lower limit and bin
+    # if y_lims[0] == None or y_lims[0] < y_vals[0]:
+    #     y_lbin = 0
+    #     y_llim = np.round(y_vals[y_lbin], decimals = 2)
 
-    else:
-        y_lbin = np.where(y_vals >= y_lims[0])[0][0]
+    # else:
+    #     y_lbin = np.where(y_vals >= y_lims[0])[0][0]
         
-        if y_lbin > 0:
-            y_lbin = y_lbin - 1
+    #     if y_lbin > 0:
+    #         y_lbin = y_lbin - 1
         
-        y_llim = y_lims[0]
+    #     y_llim = y_lims[0]
+
+
+    # # Get the altitude/distance upper limit and bin
+    # if y_lims[-1] == None or y_lims[-1] > y_vals[-1]:
+    #     y_ubin = y_vals.size - 1
+    #     y_ulim = np.round(y_vals[y_ubin], decimals = 2)
+
+    # else:
+    #     y_ubin = np.where(y_vals <= y_lims[-1])[0][-1] 
+        
+    #     if y_ubin < y_vals.size:
+    #         y_ubin = y_ubin + 1
+
+    #     y_ulim = y_lims[-1]
+        
+    # Get the altitude/distance lower limit and bin
+    y_lbin = np.where(y_vals >= y_lims[0])[0][0]
+    
+    if y_lbin > 0:
+        y_lbin = y_lbin - 1
+    
+    y_llim = y_lims[0]
 
 
     # Get the altitude/distance upper limit and bin
-    if y_lims[-1] == None or y_lims[-1] > y_vals[-1]:
-        y_ubin = y_vals.size - 1
-        y_ulim = np.round(y_vals[y_ubin], decimals = 2)
+    y_ubin = np.where(y_vals <= y_lims[-1])[0][-1] 
+    
+    if y_ubin < y_vals.size:
+        y_ubin = y_ubin + 1
 
-    else:
-        y_ubin = np.where(y_vals <= y_lims[-1])[0][-1] 
-        
-        if y_ubin < y_vals.size:
-            y_ubin = y_ubin + 1
-
-        y_ulim = y_lims[-1]
+    y_ulim = y_lims[-1]
 
     return(y_lbin, y_ubin, y_llim, y_ulim, y_vals, y_label)
 
@@ -147,31 +164,47 @@ def rayleigh_x(heights, ranges, x_lims, use_dis):
         x_vals = 1E-3 * heights       
         x_label = 'Altitude [km]'
 
-    # Get the altitude/distance lower limit and bin
-    if x_lims[0] == None or x_lims[0] < x_vals[0]:
-        x_lbin = 0
-        x_llim = np.round(x_vals[x_lbin], decimals = 2)
+    # # Get the altitude/distance lower limit and bin
+    # if x_lims[0] == None or x_lims[0] < x_vals[0]:
+    #     x_lbin = 0
+    #     x_llim = np.round(x_vals[x_lbin], decimals = 2)
 
-    else:
-        x_lbin = np.where(x_vals >= x_lims[0])[0][0]
+    # else:
+    #     x_lbin = np.where(x_vals >= x_lims[0])[0][0]
         
-        if x_lbin > 0:
-            x_lbin = x_lbin - 1
+    #     if x_lbin > 0:
+    #         x_lbin = x_lbin - 1
         
-        x_llim = x_lims[0]
+    #     x_llim = x_lims[0]
+
+    # # Get the altitude/distance upper limit and bin
+    # if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
+    #     x_ubin = x_vals.size - 1
+    #     x_ulim = np.round(x_vals[x_ubin], decimals = 2)
+
+    # else:
+    #     x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
+        
+    #     if x_ubin < x_vals.size:
+    #         x_ubin = x_ubin + 1
+
+    #     x_ulim = x_lims[-1]
+    
+    # Get the altitude/distance lower limit and bin
+    x_lbin = np.where(x_vals >= x_lims[0])[0][0]
+    
+    if x_lbin > 0:
+        x_lbin = x_lbin - 1
+    
+    x_llim = x_lims[0]
 
     # Get the altitude/distance upper limit and bin
-    if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
-        x_ubin = x_vals.size - 1
-        x_ulim = np.round(x_vals[x_ubin], decimals = 2)
+    x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
+    
+    if x_ubin < x_vals.size:
+        x_ubin = x_ubin + 1
 
-    else:
-        x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
-        
-        if x_ubin < x_vals.size:
-            x_ubin = x_ubin + 1
-
-        x_ulim = x_lims[-1]
+    x_ulim = x_lims[-1]
 
     return(x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label)
 
@@ -240,34 +273,49 @@ def telecover_x(heights, ranges, x_lims, use_dis):
         x_vals = 1E-3 * heights       
         x_label = 'Altitude [km]'
 
-    # Get the altitude/distance lower limit and bin
-    if x_lims[0] == None or x_lims[0] < x_vals[0]:
-        x_lbin = 0
-        x_llim = x_vals[x_lbin]
-        x_llim = np.round(x_vals[x_lbin], decimals = 2)
+    # # Get the altitude/distance lower limit and bin
+    # if x_lims[0] == None or x_lims[0] < x_vals[0]:
+    #     x_lbin = 0
+    #     x_llim = x_vals[x_lbin]
+    #     x_llim = np.round(x_vals[x_lbin], decimals = 2)
 
-    else:
-        x_lbin = np.where(x_vals >= x_lims[0])[0][0]
+    # else:
+    #     x_lbin = np.where(x_vals >= x_lims[0])[0][0]
         
-        if x_lbin > 0:
-            x_lbin = x_lbin - 1
+    #     if x_lbin > 0:
+    #         x_lbin = x_lbin - 1
         
-        x_llim = x_lims[0]
+    #     x_llim = x_lims[0]
+
+    # # Get the altitude/distance upper limit and bin
+    # if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
+    #     x_ubin = x_vals.size - 1
+    #     x_ulim = np.round(x_vals[x_ubin], decimals = 2)
+
+    # else:
+    #     x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
+        
+    #     if x_ubin < x_vals.size:
+    #         x_ubin = x_ubin + 1
+
+    #     x_ulim = x_lims[-1]
+    
+    # Get the altitude/distance lower limit and bin
+    x_lbin = np.where(x_vals >= x_lims[0])[0][0]
+    
+    if x_lbin > 0:
+        x_lbin = x_lbin - 1
+    
+    x_llim = x_lims[0]
 
     # Get the altitude/distance upper limit and bin
-    if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
-        x_ubin = x_vals.size - 1
-        x_ulim = np.round(x_vals[x_ubin], decimals = 2)
+    x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
+    
+    if x_ubin < x_vals.size:
+        x_ubin = x_ubin + 1
 
-    else:
-        x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
-        
-        if x_ubin < x_vals.size:
-            x_ubin = x_ubin + 1
-
-        x_ulim = x_lims[-1]
-        
-
+    x_ulim = x_lims[-1]
+    
     return(x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label)
 
 def telecover_y(sig, sig_nr, y_lims):
@@ -374,32 +422,49 @@ def polarization_calibration_x(heights, ranges, x_lims, use_dis):
         x_vals = 1E-3 * heights       
         x_label = 'Altitude [km]'
 
-    # Get the altitude/distance lower limit and bin
-    if x_lims[0] == None or x_lims[0] < x_vals[0]:
-        x_lbin = 0
-        x_llim = np.round(x_vals[x_lbin], decimals = 2)
+    # # Get the altitude/distance lower limit and bin
+    # if x_lims[0] == None or x_lims[0] < x_vals[0]:
+    #     x_lbin = 0
+    #     x_llim = np.round(x_vals[x_lbin], decimals = 2)
 
-    else:
-        x_lbin = np.where(x_vals >= x_lims[0])[0][0]
+    # else:
+    #     x_lbin = np.where(x_vals >= x_lims[0])[0][0]
         
-        if x_lbin > 0:
-            x_lbin = x_lbin - 1
+    #     if x_lbin > 0:
+    #         x_lbin = x_lbin - 1
         
-        x_llim = x_lims[0]
+    #     x_llim = x_lims[0]
+
+
+    # # Get the altitude/distance upper limit and bin
+    # if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
+    #     x_ubin = x_vals.size - 1
+    #     x_ulim = np.round(x_vals[x_ubin], decimals = 2)
+
+    # else:
+    #     x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
+        
+    #     if x_ubin < x_vals.size:
+    #         x_ubin = x_ubin + 1
+
+    #     x_ulim = x_lims[-1]
+
+    # Get the altitude/distance lower limit and bin
+    x_lbin = np.where(x_vals >= x_lims[0])[0][0]
+    
+    if x_lbin > 0:
+        x_lbin = x_lbin - 1
+    
+    x_llim = x_lims[0]
 
 
     # Get the altitude/distance upper limit and bin
-    if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
-        x_ubin = x_vals.size - 1
-        x_ulim = np.round(x_vals[x_ubin], decimals = 2)
+    x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
+    
+    if x_ubin < x_vals.size:
+        x_ubin = x_ubin + 1
 
-    else:
-        x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
-        
-        if x_ubin < x_vals.size:
-            x_ubin = x_ubin + 1
-
-        x_ulim = x_lims[-1]
+    x_ulim = x_lims[-1]
         
 
     return(x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label)
@@ -417,33 +482,50 @@ def intercomparison_x(heights, ranges, x_lims, use_dis):
         x_vals = 1E-3 * heights       
         x_label = 'Altitude [km]'
 
-    # Get the altitude/distance lower limit and bin
-    if x_lims[0] == None or x_lims[0] < x_vals[0]:
-        x_lbin = 0
-        x_llim = np.round(x_vals[x_lbin], decimals = 2)
+    # # Get the altitude/distance lower limit and bin
+    # if x_lims[0] == None or x_lims[0] < x_vals[0]:
+    #     x_lbin = 0
+    #     x_llim = np.round(x_vals[x_lbin], decimals = 2)
 
-    else:
-        x_lbin = np.where(x_vals >= x_lims[0])[0][0]
+    # else:
+    #     x_lbin = np.where(x_vals >= x_lims[0])[0][0]
         
-        if x_lbin > 0:
-            x_lbin = x_lbin - 1
+    #     if x_lbin > 0:
+    #         x_lbin = x_lbin - 1
         
-        x_llim = x_lims[0]
+    #     x_llim = x_lims[0]
+
+
+    # # Get the altitude/distance upper limit and bin
+    # if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
+    #     x_ubin = x_vals.size - 1
+    #     x_ulim = np.round(x_vals[x_ubin], decimals = 2)
+
+    # else:
+    #     x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
+        
+    #     if x_ubin < x_vals.size:
+    #         x_ubin = x_ubin + 1
+
+    #     x_ulim = x_lims[-1]
+
+    # Get the altitude/distance lower limit and bin
+    x_lbin = np.where(x_vals >= x_lims[0])[0][0]
+    
+    if x_lbin > 0:
+        x_lbin = x_lbin - 1
+    
+    x_llim = x_lims[0]
 
 
     # Get the altitude/distance upper limit and bin
-    if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
-        x_ubin = x_vals.size - 1
-        x_ulim = np.round(x_vals[x_ubin], decimals = 2)
+    x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
+    
+    if x_ubin < x_vals.size:
+        x_ubin = x_ubin + 1
 
-    else:
-        x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
-        
-        if x_ubin < x_vals.size:
-            x_ubin = x_ubin + 1
-
-        x_ulim = x_lims[-1]
-        
+    x_ulim = x_lims[-1]
+                
 
     return(x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label)
 

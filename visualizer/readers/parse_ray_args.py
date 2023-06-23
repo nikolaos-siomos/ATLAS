@@ -77,12 +77,12 @@ def call_parser():
                         help = 'The y axis limits (lower and upper) of the normalized RC signal. Defaults to 0 (lower) 1.2 (upper) when use_lin_scale is True. If use_lin_scale is true then the lower limit becomes 1E-5 ')
 
     parser.add_argument('--x_lims', metavar = 'x_lims',
-                        type = float, nargs = 2, default = [0., 14.], 
-                        help = 'The x axis limits in km (lower and upper). If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
+                        type = float, nargs = 2, default = [0., 20.], 
+                        help = 'The x axis limits in km (lower and upper). If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 20 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
 
     parser.add_argument('--x_tick', metavar = 'x_tick',
-                        type = int, nargs = '?', default = 1, 
-                        help = 'The x axis finest tick in km. Defaults to 1km ')
+                        type = int, nargs = '?', default = 2, 
+                        help = 'The x axis finest tick in km. Defaults to 2km ')
 
     parser.add_argument('--normalization_region', metavar = 'normalization_region',
                         type = float, nargs = 2, default = [8.5, 9.5],
@@ -94,11 +94,11 @@ def call_parser():
                         help = 'Refer to the smooth option in the quicklook section. Defaults to: True')
 
     parser.add_argument('--smoothing_range', metavar = 'smoothing_range',
-                        type = float, nargs = 2, default = [0.050, 15.], 
+                        type = float, nargs = 2, default = [0., 20.], 
                         help = 'Refer to the smooth option in the quicklook section Defaults to: 0.05, 14.')
 
     parser.add_argument('--smoothing_window', metavar = 'smoothing_window',
-                        type = float, nargs = "?", default = 100., 
+                        type = float, nargs = "?", default = 500., 
                         help = 'The full smoothing window in the first and last bin of the smoothing region, in m. The widow progressively changes between from the first to the last value. Use the only one value twice to apply a constant window. Defaults to: smoothing_window = 100.')
 
     parser.add_argument('--smooth_exponential', metavar = 'smooth',

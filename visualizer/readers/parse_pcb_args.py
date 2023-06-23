@@ -93,11 +93,11 @@ def call_parser():
                         help = 'Refer to the smooth option in the quicklook section. Defaults to: True')
 
     parser.add_argument('--smoothing_range', metavar = 'smoothing_range',
-                        type = float, nargs = 2, default = [0.050, 15.], 
+                        type = float, nargs = 2, default = [0., 15.], 
                         help = 'Refer to the smooth option in the quicklook section Defaults to: 0.05, 14.')
 
     parser.add_argument('--smoothing_window', metavar = 'smoothing_window',
-                        type = float, nargs = "?", default = 100., 
+                        type = float, nargs = "?", default = 500., 
                         help = 'The full smoothing window in the first and last bin of the smoothing region, in m. The widow progressively changes between from the first to the last value. Use the only one value twice to apply a constant window. Defaults to: smoothing_window = 100.')
 
     parser.add_argument('--smooth_exponential', metavar = 'smooth',

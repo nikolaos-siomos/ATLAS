@@ -413,7 +413,7 @@ def dead_time_correction(sig, dead_time, dead_time_cor_type):
             if (sig.loc[ch_d].values > 1000./dead_time[ch]).any():
                 print(f"-- Warning: Channel {ch} - A countrate value above the maximum allowed value was detected! Consider revising the input file ")
 
-            if dead_time_cor_type[ch] == 0: # Non-paralyzable
+            if dead_time_cor_type[ch] in [0,1]: # Change after including non-paralyzable correction
                 sig_out.loc[ch_d] = sig.loc[ch_d] / \
                     (1. - sig.loc[ch_d] * dead_time.loc[ch] * 1e-3)
 
@@ -680,15 +680,17 @@ def trim_vertically(sig, ground_alt, zenith_angle, alt_lim, resol):
     """
        
     sig_out = np.nan * sig.copy()
+    
+    zenith_angle_rad = np.deg2rad(zenith_angle)
 
-    rng_lim = (float(alt_lim) - float(ground_alt))/np.cos(float(zenith_angle))
+    rng_lim = (float(alt_lim) - float(ground_alt))/np.cos(zenith_angle_rad)
     
     bin_lim = (rng_lim / np.min(resol)).astype(int)
     
     bins = sig.bins.values
     
     bin_d = dict(bins = slice(bins[0], bin_lim))
-    
+
     if bin_lim < np.max(bins):
         
         sig_out = sig.loc[bin_d]

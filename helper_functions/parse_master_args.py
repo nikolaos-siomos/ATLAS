@@ -120,23 +120,38 @@ def call_parser():
 
 def check_parser(args):
 
+    raw_fmts = ['licel','polly_xt','licel_matlab']
     if args['file_format'] == None:
         raise Exception("The mandatory argument file_format was not provided. Please add it with the --file_format option ")   
-    elif args['file_format'] not in ['licel','polly_xt']:
-        raise Exception(f"The provided file_format: {args['file_format']} is not supported. Please choose among: licel, polly_xt")   
+    elif args['file_format'] not in raw_fmts:
+        raise Exception(f"The provided file_format: {args['file_format']} is not supported. Please choose among: {raw_fmts}")   
         
     if args['parent_folder'] != None:
-        if not os.path.exists(args['parent_folder']) == True:
-            raise Exception("The provided parent_folder {args['parent_folder']} does not exists. Please provide a valid path ")   
+        if not os.path.exists(args['parent_folder']):
+            raise Exception(f"The provided parent_folder {args['parent_folder']} does not exists. Please provide a valid path ")   
 
-    if args['config_file'] == None:
-        if args['parent_folder'] != None:
+    if args['settings_file'] == None:
+        if os.path.exists(args['parent_folder']):
             args['settings_file'] = os.path.join(args['parent_folder'],'settings_file.ini')  
+            if not os.path.exists(args['settings_file']):
+                print('-----------------------------------------')
+                print(f"-- Warning: The default path for the settings file inside the parent_folder {args['settings_file']} does not exist. Default settings will be applied! Please make sure this is what you want, otherwise provide a settings_file.ini ")
+                print('-----------------------------------------')
         else:
-            raise Exception("Neither the parent folder nor the path to the settings file where provided. Please provide at least one of the two. The settings file path, unless specified defaults to ./<parent_folder>/settings_file.ini ")
+            raise Exception("Neither the parent folder nor the path to the settings file where provided. Default settings will be applied! Please make sure this is what you want, otherwise provide the settings_file.ini path explicitely ")
+    else:
+        if not os.path.exists(args['settings_file']):
+            raise Exception(f"The provided path to the settings file {args['settings_file']} does not exist. Please provide a valid path or skip it entirely to assume default settings ")
+        
+    # if args['settings_file'] == None:
+    #     if args['parent_folder'] != None:
+    #         args['settings_file'] = os.path.join(args['parent_folder'],'settings_file.ini')  
+    #     else:
+    #         raise Exception("Neither the parent folder nor the path to the settings file where provided. Please provide at least one of the two. The settings file path, unless specified defaults to ./<parent_folder>/settings_file.ini ")
 
-    if not os.path.exists(args['settings_file']):
-        raise Exception("The path to the settings file does not exist. Please provide a valid path. ")
+    # if not os.path.exists(args['config_file']):
+    #     raise Exception(f"The path to the config file {args['config_file']} does not exist. Please provide a valid path. ")
+
 
     cnv_path = args['converter_out']
     prs_path = args['preprocessor_out']
