@@ -53,8 +53,8 @@ prs_files = processing_chain.preprocessor(mst_args = mst_args,
                                           cnv_files = cnv_files,
                                           prs_out = mst_args['preprocessor_out'],
                                           quicklook = quicklook,
-                                          processing = processing,
                                           reprocess = reprocess['preprocessor'],
+                                          processing = processing,
                                           isday = isday)
 
 # Call Rayleigh Fit sequence

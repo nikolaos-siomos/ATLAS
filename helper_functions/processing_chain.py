@@ -70,8 +70,7 @@ def converter(mst_args, mst_cfg, cnv_out, processing, reprocess = True):
                 os.remove(file)
                 
         # QA files
-        if os.path.exists(cnv_ray_args['rayleigh_folder']):
-                    
+        if os.path.exists(cnv_ray_args['rayleigh_folder']):                    
             cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
             if len(cnv_ray_file) > 1:
                 raise Exception(f'More than one rayleigh fit files detected in folder {cnv_out}. Please make sure that only one rayleigh file exists in that folder ')
@@ -84,6 +83,8 @@ def converter(mst_args, mst_cfg, cnv_out, processing, reprocess = True):
                     cnv_ray_file = [files['rayleigh']]
                 else:
                     cnv_ray_file = []
+        else:
+            print(f"-- Warning: The {cnv_ray_args['rayleigh_folder']} folder does not exist. Please make sure to provide it if you want to process a Rayleigh fit test")
     else:
         # QA files
         cnv_ray_file = glob.glob(os.path.join(cnv_out, '*_ray_ATLAS_*.nc'))
@@ -119,6 +120,8 @@ def converter(mst_args, mst_cfg, cnv_out, processing, reprocess = True):
                     cnv_tlc_file = [files['telecover']]                
                 else:
                     cnv_ray_file = []
+        else:
+            print(f"-- Warning: Neither the {cnv_ray_args['telecover_sectors_folder']} nor the {cnv_ray_args['telecover_rings_folder']} folder does not exist. Please make sure to provide at least one of them if you want to process a telecover test")
         
     else:
         # QA files          
@@ -166,6 +169,9 @@ def converter(mst_args, mst_cfg, cnv_out, processing, reprocess = True):
                     cnv_pcb_file = [files['polarization_calibration']]
                 else:
                     cnv_pcb_file = []
+        else:
+            print(f"-- Warning: None of the {cnv_ray_args['pcb_cal_p45_folder']}, {cnv_ray_args['pcb_cal_m45_folder']}, or {cnv_ray_args['pcb_cal_stc_folder']} was provided. Please make sure to provide at least the p45 and m45 or just the sta folder if you want to process a polarization calibration test")
+            
     else:
         # QA files         
         cnv_pcb_file = glob.glob(os.path.join(cnv_out, '*_pcb_ATLAS_*.nc'))        

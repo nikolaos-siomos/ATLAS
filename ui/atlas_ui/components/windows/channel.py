@@ -78,19 +78,24 @@ class ChannelWindow (wx.ScrolledWindow):
         self.smallhbox = wx.BoxSizer (wx.HORIZONTAL)
         
         self.telescope_type = AtlasUIInputField.FromSetting ( self._settings.telescope_type, parent = self.panel, label = "Telescope type" )
-        self.smallhbox.Add ( self.telescope_type, 1, flag = wx.EXPAND )
+        self.smallhbox.Add ( self.telescope_type, 0, flag = wx.EXPAND )
+        self.smallhbox.AddSpacer (5)
+
+        self.channel_type = AtlasUIInputField.FromSetting ( self._settings.channel_type, parent = self.panel, label = "Channel type" )
+        # self.sizer.Add ( self.channel_type, pos = wx.GBPosition(0, 1), flag = wx.EXPAND )
+        self.smallhbox.Add ( self.channel_type, 0, flag = wx.EXPAND )
+        self.smallhbox.AddSpacer (5)
         
         self.acquisition_mode = AtlasUIInputField.FromSetting ( self._settings.acquisition_mode, parent = self.panel, label = "Acquisition mode" )
         # self.optional_box_sizer.Add ( self.acquisition_mode, flag = wx.EXPAND )
-        self.smallhbox.Add ( self.acquisition_mode, 1, flag = wx.EXPAND )
-        
-        self.sizer.Add (self.smallhbox, pos = wx.GBPosition(0, 0), flag = wx.EXPAND)
-
-        self.channel_type = AtlasUIInputField.FromSetting ( self._settings.channel_type, parent = self.panel, label = "Channel type" )
-        self.sizer.Add ( self.channel_type, pos = wx.GBPosition(0, 1), flag = wx.EXPAND )
+        self.smallhbox.Add ( self.acquisition_mode, 0, flag = wx.EXPAND )
+        self.smallhbox.AddSpacer (5)
         
         self.channel_subtype = AtlasUIInputField.FromSetting ( self._settings.channel_subtype, parent = self.panel, label = "Channel subtype" )
-        self.sizer.Add ( self.channel_subtype, pos = wx.GBPosition(0, 2), flag = wx.EXPAND )
+        # self.sizer.Add ( self.channel_subtype, pos = wx.GBPosition(0, 2), flag = wx.EXPAND )
+        self.smallhbox.Add ( self.channel_subtype, 1, flag = wx.EXPAND )
+        
+        self.sizer.Add (self.smallhbox, pos = wx.GBPosition(0, 0), span = wx.GBSpan(1, 3), flag = wx.EXPAND)
         
         self.dead_time = AtlasUIInputField.FromSetting ( self._settings.dead_time, parent = self.panel, label = "Dead time [ns]" )
         self.sizer.Add ( self.dead_time, pos = wx.GBPosition(1, 0), flag = wx.EXPAND )
@@ -123,34 +128,39 @@ class ChannelWindow (wx.ScrolledWindow):
         self.sizer.Add ( self.background_range, pos = wx.GBPosition(4, 2), flag = wx.EXPAND )
         
         self.optional_box = wx.StaticBox (self.panel, label = "Optional Settings")
-        self.optional_box_sizer = wx.GridSizer( cols = 2, hgap = 10, vgap = 10 )
+        self.optional_box_sizer = wx.GridBagSizer( hgap = 10, vgap = 10 )
         
-        self.optional_box_sizer.AddStretchSpacer ()
-        self.optional_box_sizer.AddStretchSpacer ()
+        # self.optional_box_sizer.AddSpacer (10)
         
         self.total_bins = AtlasUIInputField.FromSetting ( self._settings.bins, parent = self.optional_box, label = "Total bins" )
-        self.optional_box_sizer.Add ( self.total_bins, flag = wx.EXPAND )
+        self.optional_box_sizer.Add ( self.total_bins, flag = wx.EXPAND | wx.TOP, border = 25, pos = wx.GBPosition(0, 0) )
 
         self.laser_polarization = AtlasUIInputField.FromSetting ( self._settings.laser_polarization, parent = self.optional_box, label = "Laser polarization" )
-        self.optional_box_sizer.Add ( self.laser_polarization, flag = wx.EXPAND )
+        self.optional_box_sizer.Add ( self.laser_polarization, flag = wx.EXPAND | wx.TOP, border = 25, pos = wx.GBPosition(0, 1) )
         
         self.laser_shots = AtlasUIInputField.FromSetting ( self._settings.laser_shots, parent = self.optional_box, label = "Laser shots" )
-        self.optional_box_sizer.Add ( self.laser_shots, flag = wx.EXPAND )
+        self.optional_box_sizer.Add ( self.laser_shots, flag = wx.EXPAND, pos = wx.GBPosition(1, 0) )
         
         self.daq_range = AtlasUIInputField.FromSetting ( self._settings.data_acquisition_range, parent = self.optional_box, label = "DAQ range [mV]" )
-        self.optional_box_sizer.Add ( self.daq_range, flag = wx.EXPAND )
+        self.optional_box_sizer.Add ( self.daq_range, flag = wx.EXPAND, pos = wx.GBPosition(1, 1) )
         
         self.adc_resolution = AtlasUIInputField.FromSetting ( self._settings.analog_to_digital_resolution, parent = self.optional_box, label = "ADC resolution [bits]" )
-        self.optional_box_sizer.Add ( self.adc_resolution, flag = wx.EXPAND )
+        self.optional_box_sizer.Add ( self.adc_resolution, flag = wx.EXPAND, pos = wx.GBPosition(2, 0) )
         
         self.range_resolution = AtlasUIInputField.FromSetting ( self._settings.range_resolution, parent = self.optional_box, label = "Range resolution [m]" )
-        self.optional_box_sizer.Add ( self.range_resolution, flag = wx.EXPAND )
+        self.optional_box_sizer.Add ( self.range_resolution, flag = wx.EXPAND, pos = wx.GBPosition(2, 1) )
+        
+        bottom_border = 30 if wx.GetOsVersion()[0] & wx.OS_UNIX else 10
         
         self.pmt_high_voltage = AtlasUIInputField.FromSetting ( self._settings.pmt_high_voltage, parent = self.optional_box, label = "PMT voltage [V]" )
-        self.optional_box_sizer.Add ( self.pmt_high_voltage, flag = wx.EXPAND )
+        self.optional_box_sizer.Add ( self.pmt_high_voltage, flag = wx.EXPAND | wx.BOTTOM, border = bottom_border, pos = wx.GBPosition(3, 0) )
         
         self.laser_repetition_rate = AtlasUIInputField.FromSetting ( self._settings.laser_repetition_rate, parent = self.optional_box, label = "Laser repetition rate [Hz]" )
-        self.optional_box_sizer.Add ( self.laser_repetition_rate, flag = wx.EXPAND )
+        self.optional_box_sizer.Add ( self.laser_repetition_rate, flag = wx.EXPAND | wx.BOTTOM, border = bottom_border, pos = wx.GBPosition(3, 1) )
+        
+        # self.optional_box_sizer.AddSpacer(50)
+        self.optional_box_sizer.AddGrowableCol(idx = 0, proportion = 1)
+        self.optional_box_sizer.AddGrowableCol(idx = 1, proportion = 1)
         
         self.optional_box.SetSizer ( self.optional_box_sizer )
         self.sizer.Add ( self.optional_box, pos = wx.GBPosition (5, 0), span = wx.GBSpan ( 4, 3 ), flag = wx.EXPAND )

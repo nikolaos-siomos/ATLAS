@@ -325,38 +325,54 @@ class PolarizationCalibrationSettingsWindow (SettingsWindow):
         self.dpi = AtlasUIInputField.FromSetting ( self._settings.dpi, parent = self, label = "Image DPI")
         self.sizer.Add ( self.dpi, pos = wx.GBPosition (5, 1), flag = wx.EXPAND )
         
-        self.smoothing_sizer_calibration = wx.StaticBoxSizer ( parent = self, orient = wx.HORIZONTAL, label = "Smoothing (Calibration)" )
+        # self.smoothing_sizer_calibration = wx.StaticBoxSizer ( parent = self, orient = wx.HORIZONTAL, label = "Smoothing (Calibration)" )
         
-        self.smooth_calibration = AtlasUIInputField.FromSetting ( self._settings.smooth_calibration, parent = self.smoothing_sizer_calibration.GetStaticBox(), label = "Smoothing enabled?")
-        self.smoothing_exponential_calibration = AtlasUIInputField.FromSetting ( self._settings.smoothing_exponential_calibration, parent = self.smoothing_sizer_calibration.GetStaticBox(), label = "Exponential smoothing?")
-        self.smoothing_range_calibration = AtlasUIInputField.FromSetting ( self._settings.smoothing_range_calibration, parent = self.smoothing_sizer_calibration.GetStaticBox(), label = "Smoothing range [km]")
-        self.smoothing_window_calibration = AtlasUIInputField.FromSetting ( self._settings.smoothing_window_calibration, parent = self.smoothing_sizer_calibration.GetStaticBox(), label = "Smoothing window [m]")
+        # self.smooth_calibration = AtlasUIInputField.FromSetting ( self._settings.smooth_calibration, parent = self.smoothing_sizer_calibration.GetStaticBox(), label = "Smoothing enabled?")
+        # self.smoothing_exponential_calibration = AtlasUIInputField.FromSetting ( self._settings.smoothing_exponential_calibration, parent = self.smoothing_sizer_calibration.GetStaticBox(), label = "Exponential smoothing?")
+        # self.smoothing_range_calibration = AtlasUIInputField.FromSetting ( self._settings.smoothing_range_calibration, parent = self.smoothing_sizer_calibration.GetStaticBox(), label = "Smoothing range [km]")
+        # self.smoothing_window_calibration = AtlasUIInputField.FromSetting ( self._settings.smoothing_window_calibration, parent = self.smoothing_sizer_calibration.GetStaticBox(), label = "Smoothing window [m]")
         
-        v_box_sizer_calibration = wx.BoxSizer (wx.VERTICAL)
-        v_box_sizer_calibration.Add ( self.smooth_calibration )
-        v_box_sizer_calibration.Add ( self.smoothing_exponential_calibration )
+        # v_box_sizer_calibration = wx.BoxSizer (wx.VERTICAL)
+        # v_box_sizer_calibration.Add ( self.smooth_calibration )
+        # v_box_sizer_calibration.Add ( self.smoothing_exponential_calibration )
         
-        self.smoothing_sizer_calibration.Add ( v_box_sizer_calibration, 0, wx.ALIGN_CENTER_VERTICAL )
-        self.smoothing_sizer_calibration.Add ( self.smoothing_range_calibration, 1 )
-        self.smoothing_sizer_calibration.Add ( self.smoothing_window_calibration, 1 )
+        # self.smoothing_sizer_calibration.Add ( v_box_sizer_calibration, 0, wx.ALIGN_CENTER_VERTICAL )
+        # self.smoothing_sizer_calibration.Add ( self.smoothing_range_calibration, 1 )
+        # self.smoothing_sizer_calibration.Add ( self.smoothing_window_calibration, 1 )
         
-        self.smoothing_sizer_rayleigh = wx.StaticBoxSizer ( parent = self, orient = wx.HORIZONTAL, label = "Smoothing (Rayleigh)" )
+        # self.smoothing_sizer_rayleigh = wx.StaticBoxSizer ( parent = self, orient = wx.HORIZONTAL, label = "Smoothing (Rayleigh)" )
         
-        self.smooth_rayleigh = AtlasUIInputField.FromSetting ( self._settings.smooth_rayleigh, parent = self.smoothing_sizer_rayleigh.GetStaticBox(), label = "Smoothing enabled?")
-        self.smoothing_exponential_rayleigh = AtlasUIInputField.FromSetting ( self._settings.smoothing_exponential_rayleigh, parent = self.smoothing_sizer_rayleigh.GetStaticBox(), label = "Exponential smoothing?")
-        self.smoothing_range_rayleigh = AtlasUIInputField.FromSetting ( self._settings.smoothing_range_rayleigh, parent = self.smoothing_sizer_rayleigh.GetStaticBox(), label = "Smoothing range [km]")
-        self.smoothing_window_rayleigh = AtlasUIInputField.FromSetting ( self._settings.smoothing_window_rayleigh, parent = self.smoothing_sizer_rayleigh.GetStaticBox(), label = "Smoothing window [m]")
+        # self.smooth_rayleigh = AtlasUIInputField.FromSetting ( self._settings.smooth_rayleigh, parent = self.smoothing_sizer_rayleigh.GetStaticBox(), label = "Smoothing enabled?")
+        # self.smoothing_exponential_rayleigh = AtlasUIInputField.FromSetting ( self._settings.smoothing_exponential_rayleigh, parent = self.smoothing_sizer_rayleigh.GetStaticBox(), label = "Exponential smoothing?")
+        # self.smoothing_range_rayleigh = AtlasUIInputField.FromSetting ( self._settings.smoothing_range_rayleigh, parent = self.smoothing_sizer_rayleigh.GetStaticBox(), label = "Smoothing range [km]")
+        # self.smoothing_window_rayleigh = AtlasUIInputField.FromSetting ( self._settings.smoothing_window_rayleigh, parent = self.smoothing_sizer_rayleigh.GetStaticBox(), label = "Smoothing window [m]")
         
-        v_box_sizer_rayleigh = wx.BoxSizer (wx.VERTICAL)
-        v_box_sizer_rayleigh.Add ( self.smooth_rayleigh )
-        v_box_sizer_rayleigh.Add ( self.smoothing_exponential_rayleigh )
+        # v_box_sizer_rayleigh = wx.BoxSizer (wx.VERTICAL)
+        # v_box_sizer_rayleigh.Add ( self.smooth_rayleigh )
+        # v_box_sizer_rayleigh.Add ( self.smoothing_exponential_rayleigh )
         
-        self.smoothing_sizer_rayleigh.Add ( v_box_sizer_rayleigh, 0, wx.ALIGN_CENTER_VERTICAL )
-        self.smoothing_sizer_rayleigh.Add ( self.smoothing_range_rayleigh, 1 )
-        self.smoothing_sizer_rayleigh.Add ( self.smoothing_window_rayleigh, 1 )
+        # self.smoothing_sizer_rayleigh.Add ( v_box_sizer_rayleigh, 0, wx.ALIGN_CENTER_VERTICAL )
+        # self.smoothing_sizer_rayleigh.Add ( self.smoothing_range_rayleigh, 1 )
+        # self.smoothing_sizer_rayleigh.Add ( self.smoothing_window_rayleigh, 1 )
         
-        self.sizer.Add ( self.smoothing_sizer_calibration, pos = wx.GBPosition (6, 0), span = wx.GBSpan(1, 2), flag = wx.EXPAND )
-        self.sizer.Add ( self.smoothing_sizer_rayleigh, pos = wx.GBPosition (7, 0), span = wx.GBSpan(1, 2), flag = wx.EXPAND )
+        self.smoothing_sizer = wx.StaticBoxSizer ( parent = self, orient = wx.HORIZONTAL, label = "Smoothing" )
+        
+        self.smooth = AtlasUIInputField.FromSetting ( self._settings.smooth, parent = self.smoothing_sizer.GetStaticBox(), label = "Smoothing enabled?")
+        self.smoothing_exponential = AtlasUIInputField.FromSetting ( self._settings.smoothing_exponential, parent = self.smoothing_sizer.GetStaticBox(), label = "Exponential smoothing?")
+        self.smoothing_range = AtlasUIInputField.FromSetting ( self._settings.smoothing_range, parent = self.smoothing_sizer.GetStaticBox(), label = "Smoothing range [km]")
+        self.smoothing_window = AtlasUIInputField.FromSetting ( self._settings.smoothing_window, parent = self.smoothing_sizer.GetStaticBox(), label = "Smoothing window [m]")
+        
+        v_box_sizer = wx.BoxSizer (wx.VERTICAL)
+        v_box_sizer.Add ( self.smooth )
+        v_box_sizer.Add ( self.smoothing_exponential )
+        
+        self.smoothing_sizer.Add ( v_box_sizer, 0, wx.ALIGN_CENTER_VERTICAL )
+        self.smoothing_sizer.Add ( self.smoothing_range, 1 )
+        self.smoothing_sizer.Add ( self.smoothing_window, 1 )
+        
+        # self.sizer.Add ( self.smoothing_sizer_calibration, pos = wx.GBPosition (6, 0), span = wx.GBSpan(1, 2), flag = wx.EXPAND )
+        # self.sizer.Add ( self.smoothing_sizer_rayleigh, pos = wx.GBPosition (7, 0), span = wx.GBSpan(1, 2), flag = wx.EXPAND )
+        self.sizer.Add ( self.smoothing_sizer, pos = wx.GBPosition (6, 0), span = wx.GBSpan(1, 2), flag = wx.EXPAND )
         
         self.sizer.SetFlexibleDirection(wx.VERTICAL)
         self.sizer.AddGrowableCol (idx = 0, proportion = 1)

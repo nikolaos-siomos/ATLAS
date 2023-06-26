@@ -292,14 +292,14 @@ def read_channels(buffer, sep):
     for i in range(channel_info.loc[:,'detected_wavelength'].size):
         if channel_info.loc[:,'detected_wavelength'][i] >= 340. and \
             channel_info.loc[:,'detected_wavelength'][i] < 520.:
-                channel_info.loc[:,'emitted_wavelength'][i] = 355.
+                channel_info.loc[:,'emitted_wavelength'][i] = 354.717
                 
         if channel_info.loc[:,'detected_wavelength'][i] >= 520. and \
             channel_info.loc[:,'detected_wavelength'][i] < 1000.:
-                channel_info.loc[:,'emitted_wavelength'][i] = 532.
+                channel_info.loc[:,'emitted_wavelength'][i] = 532.075
                 
         if channel_info.loc[:,'detected_wavelength'][i] >= 1000.:
-            channel_info.loc[:,'emitted_wavelength'][i] = 1064.
+            channel_info.loc[:,'emitted_wavelength'][i] = 1064.150
 
     return(channel_info)
 

@@ -733,15 +733,20 @@ class ATLASPolarizationCalibrationSettings(BaseSettings):
         
         self.use_distance = ATLASSelectOption ( default = True )
         
-        self.smooth_calibration =  ATLASSelectOption ( default = True )
-        self.smoothing_range_calibration =  ATLASDoubleRangeOption ( default = (1., 15) )
-        self.smoothing_window_calibration =  ATLASDoubleRangeOption ( default = (100., 100.) )
-        self.smoothing_exponential_calibration =  ATLASSelectOption ( default = False )
+        # self.smooth_calibration =  ATLASSelectOption ( default = True )
+        # self.smoothing_range_calibration =  ATLASDoubleRangeOption ( default = (1., 15) )
+        # self.smoothing_window_calibration =  ATLASDoubleRangeOption ( default = (100., 100.) )
+        # self.smoothing_exponential_calibration =  ATLASSelectOption ( default = False )
         
-        self.smooth_rayleigh =  ATLASSelectOption ( default = True )
-        self.smoothing_range_rayleigh =  ATLASDoubleRangeOption ( default = (1, 14) )
-        self.smoothing_window_rayleigh =  ATLASDoubleRangeOption ( default = (100., 100.) )
-        self.smoothing_exponential_rayleigh =  ATLASSelectOption ( default = False )
+        # self.smooth_rayleigh =  ATLASSelectOption ( default = True )
+        # self.smoothing_range_rayleigh =  ATLASDoubleRangeOption ( default = (1, 14) )
+        # self.smoothing_window_rayleigh =  ATLASDoubleRangeOption ( default = (100., 100.) )
+        # self.smoothing_exponential_rayleigh =  ATLASSelectOption ( default = False )
+        
+        self.smooth =  ATLASSelectOption ( default = True )
+        self.smoothing_range =  ATLASDoubleRangeOption ( default = (1, 14) )
+        self.smoothing_window =  ATLASDoubleRangeOption ( default = (100., 100.) )
+        self.smoothing_exponential =  ATLASSelectOption ( default = False )
         
         self.dpi =  ATLASIntegerOption ( default = 300, min = 100, max = 500 )
         self.color_reduction =  ATLASSelectOption ( default = True )
@@ -812,7 +817,7 @@ class ATLASSettings:
                 with open ( os.path.realpath ( path ), 'w' ) as output_file:
                     output_file.write ( result )
         except Exception as e:
-            
+            print (e)
             return False
             
         return True

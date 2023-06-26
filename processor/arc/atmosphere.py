@@ -123,6 +123,7 @@ def short_molec(heights, ranges, meas_info, channel_info,
         exs_fth_i = np.nan * np.zeros(sel_bins.size)
         exs_bck_i = np.nan * np.zeros(sel_bins.size)
 
+        print(ch, ewl.loc[ch], ch_type.loc[ch])
         # Automatically calculate the Raman vibrational shift from the emitted wavelength
         if ch_type.loc[ch] != 'v':
             swl_ch = ewl.loc[ch]
