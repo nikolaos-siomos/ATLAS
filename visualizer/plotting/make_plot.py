@@ -292,23 +292,27 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
         Y_E_N = coef_1 * y1_extr
         Y_O = Y1_N
         extra_label = f'north{iters+1}'
+        extra_label_short = f'N{iters+1}'
     if len(y2_extr) > 0:
         Y_E = y2_extr_raw
         Y_E_N = coef_2 * y2_extr
         Y_O = Y2_N
         extra_label = f'east{iters+1}'
+        extra_label_short = f'E{iters+1}'
     if len(y3_extr) > 0:
         Y_E = y3_extr_raw
         Y_E_N = coef_3 * y3_extr
         Y_O = Y3_N
         extra_label = f'south{iters+1}'
+        extra_label_short = f'S{iters+1}'
     if len(y4_extr) > 0:
         Y_E = y4_extr_raw
         Y_E_N = coef_4 * y4_extr
         Y_O = Y4_N
         extra_label = f'west{iters+1}'
+        extra_label_short = f'W{iters+1}'
 
-    Y_DIFF = 2. * (Y_E_N - Y_O) / (Y_E_N + Y_O)
+    Y_DIFF = Y_E_N - Y_O
     
     x_ticks = np.arange(x_tick * np.ceil(x_llim / x_tick), 
                         x_tick * (np.floor(x_ulim / x_tick) + 1.), 
@@ -383,7 +387,7 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     ax2.plot(X, Y3, color = 'tab:green', alpha = 0.7)
     ax2.plot(X, Y4, color = 'tab:red', alpha = 0.7)
 
-    if use_last == True or iters == 1:
+    if use_last == True:
         ax2.plot(X, Y_E, color = 'tab:purple', alpha = 0.7)
                 
     ax2.set_xlim([x_ulim, 20.])
@@ -406,8 +410,8 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     ax3.plot(X, Y3_N, color = 'tab:green')
     ax3.plot(X, Y4_N, color = 'tab:red')
     
-    # if use_last == True or iters == 1:
-    #     ax3.plot(X, Y_E_N, color = 'black')
+    if use_last == True:
+        ax3.plot(X, Y_E_N, color = 'purple')
         
     ax3.fill_between(X, Y1_NL, Y1_NU, color = 'tab:blue', alpha = 0.3)
     ax3.fill_between(X, Y2_NL, Y2_NU, color = 'tab:orange', alpha = 0.3)
@@ -440,8 +444,8 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     ax4.plot(X, Y3_N, color = 'tab:green')
     ax4.plot(X, Y4_N, color = 'tab:red')
 
-    # if use_last == True or iters == 1:
-    #     ax4.plot(X, Y_E_N, color = 'black')
+    if use_last == True:
+        ax4.plot(X, Y_E_N, color = 'purple')
         
     ax4.fill_between(X, Y1_NL, Y1_NU, color = 'tab:blue', alpha = 0.3)
     ax4.fill_between(X, Y2_NL, Y2_NU, color = 'tab:orange', alpha = 0.3)
@@ -464,8 +468,8 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     ax5.plot(X, (Y4_N - Y_NM) / Y_NM, color = 'tab:red', label='_nolegend_')
     ax5.plot(X, Y_RMSE, color = 'yellow', label = 'RMS Sector Diff.')
     
-    if use_last == True or iters == 1:
-        ax5.plot(X, Y_DIFF, color = 'tab:purple', label = 'Atm. Dif.')
+    if use_last == True:
+        ax5.plot(X, Y_DIFF, color = 'tab:purple', label = f'{extra_label_short} - {extra_label_short[0]}')
     
     ax5.legend()
 
@@ -560,14 +564,18 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
 
     if len(y1_extr) > 0:
         Y_E = y1_extr_raw
+        Y_E_N = coef_1 * y1_extr
         Y_O = Y1_N
         extra_label = f'outer{iters+1}'
+        extra_label_short = f'O{iters+1}'
     if len(y2_extr) > 0:
         Y_E = y2_extr_raw
+        Y_E_N = coef_2 * y2_extr
         Y_O = Y2_N
         extra_label = f'inner{iters+1}'
+        extra_label_short = f'I{iters+1}'
 
-    Y_DIFF = 2. * (Y_E - Y_O) / (Y_E + Y_O)
+    Y_DIFF = Y_E_N - Y_O
     
     x_ticks = np.arange(x_tick * np.ceil(x_llim / x_tick), 
                         x_tick * (np.floor(x_ulim / x_tick) + 1.), 
@@ -608,7 +616,7 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax.plot(X, Y1, color = 'tab:blue', label = 'outer', alpha = 0.7)
     ax.plot(X, Y2, color = 'tab:cyan', label = 'inner', alpha = 0.7)
 
-    if use_last == True or iters == 1:
+    if use_last == True:
         ax.plot(X, Y_E, color = 'tab:purple', label = extra_label, alpha = 0.7)
         
     ax.legend()
@@ -636,7 +644,7 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax2.plot(X, Y1, color = 'tab:blue', alpha = 0.7)
     ax2.plot(X, Y2, color = 'tab:cyan', alpha = 0.7)
 
-    if use_last == True or iters == 1:
+    if use_last == True:
         ax2.plot(X, Y_E, color = 'tab:purple', alpha = 0.7)
                 
     ax2.set_xlim([x_ulim, 20.])
@@ -657,8 +665,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax3.plot(X, Y1_N, color = 'tab:blue')
     ax3.plot(X, Y2_N, color = 'tab:cyan')
     
-    # if use_last == True or iters == 1:
-    #     ax3.plot(X, Y_E_N, color = 'black')
+    if use_last == True:
+        ax3.plot(X, Y_E_N, color = 'purple')
         
     ax3.fill_between(X, Y1_NL, Y1_NU, color = 'tab:blue', alpha = 0.3)
     ax3.fill_between(X, Y2_NL, Y2_NU, color = 'tab:cyan', alpha = 0.3)
@@ -687,8 +695,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax4.plot(X, Y1_N, color = 'tab:blue')
     ax4.plot(X, Y2_N, color = 'tab:cyan')
 
-    # if use_last == True or iters == 1:
-    #     ax4.plot(X, Y_E_N, color = 'black')
+    if use_last == True:
+        ax4.plot(X, Y_E_N, color = 'purple')
         
     ax4.fill_between(X, Y1_NL, Y1_NU, color = 'tab:blue', alpha = 0.3)
     ax4.fill_between(X, Y2_NL, Y2_NU, color = 'tab:cyan', alpha = 0.3)
@@ -706,8 +714,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax5.plot(X, (Y1_N - Y_NM) / Y_NM, color = 'tab:blue', label='_nolegend_')
     ax5.plot(X, (Y2_N - Y_NM) / Y_NM, color = 'tab:orange', label='_nolegend_')
 
-    if use_last == True or iters == 1:
-        ax5.plot(X, Y_DIFF, color = 'tab:purple', label = 'Atm. Dif.')
+    if use_last == True:
+        ax5.plot(X, Y_DIFF, color = 'tab:purple', label = f'{extra_label_short}-{extra_label_short[0]}')
     
     ax5.legend()
 

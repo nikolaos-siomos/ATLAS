@@ -53,9 +53,9 @@ def call_parser():
                         help = 'If set to True, the non range corrected signals will be used for the telecover test ')
 
     parser.add_argument('--use_last', metavar = 'use_last',
-                        type = bool, default = False, 
+                        type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
-                        help = 'If set to True an additional black line with the difference between the first and the last sector is added in the 4th subplot (deviations) of an interleaved telecover test e.g. N2 – N1. If the telecover is not interleaved the difference line will be visible even if use_last is set to False.')
+                        help = 'If set to True an additional black line with the difference between the normalized signals of the first and last sector is added in the 4th subplot (deviations) of an interleaved telecover test e.g. N2 – N1.')
 
     parser.add_argument('-c', '--channels', metavar = 'channels',
                         type = str, nargs = '+', default = None, 
