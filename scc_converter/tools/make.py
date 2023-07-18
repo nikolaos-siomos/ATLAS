@@ -29,7 +29,7 @@ def rayleigh_file(meas_info, channel_info, time_info, time_info_d, nc_path,
     n_nb_of_time_scales = 1
     n_scan_angles = 1
         
-    channel_label = channel_info.telescope_type.values + \
+    atlas_channel_label = channel_info.telescope_type.values + \
         channel_info.channel_type.values + \
             channel_info.acquisition_type.values + \
                 channel_info.channel_subtype.values + \
@@ -123,9 +123,9 @@ def rayleigh_file(meas_info, channel_info, time_info, time_info_d, nc_path,
     if not isinstance(sig_d,list):
         make_nc_var(ds, name = 'Background_Profile', value = sig_d.values, dtype = 'float', dims = ('time_bck', 'channels', 'points',))
 
-    make_nc_var(ds, name = 'channel_ID', value = channel_info.scc_id.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'channel_ID', value = channel_info.scc_channel_id.values, dtype = 'int', dims = ('channels',))
 
-    make_nc_str(ds, name = 'channel_label', value = channel_label, dims = ('channels','nchar_channel'), length = 4)    
+    make_nc_str(ds, name = 'atlas_channel_label', value = atlas_channel_label, dims = ('channels','nchar_channel'), length = 4)    
     
     make_nc_var(ds, name = 'DAQ_Range', value = channel_info.data_acquisition_range.values, dtype = 'float', dims = ('channels',))
     
@@ -215,7 +215,7 @@ def telecover_file(meas_info, channel_info, time_info, time_info_d, nc_path,
     n_nb_of_time_scales = 1
     n_scan_angles = 1
     
-    channel_label = channel_info.telescope_type.values + \
+    atlas_channel_label = channel_info.telescope_type.values + \
         channel_info.channel_type.values + \
             channel_info.acquisition_type.values + \
                 channel_info.channel_subtype.values + \
@@ -305,9 +305,9 @@ def telecover_file(meas_info, channel_info, time_info, time_info_d, nc_path,
     if not isinstance(sig_d,list):
         make_nc_var(ds, name = 'Background_Profile', value = sig_d.values, dtype = 'float', dims = ('time_bck', 'channels', 'points',))
 
-    make_nc_var(ds, name = 'channel_ID', value = channel_info.scc_id.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'channel_ID', value = channel_info.scc_channel_id.values, dtype = 'int', dims = ('channels',))
 
-    make_nc_str(ds, name = 'channel_label', value = channel_label, dims = ('channels','nchar_channel'), length = 4)    
+    make_nc_str(ds, name = 'atlas_channel_label', value = atlas_channel_label, dims = ('channels','nchar_channel'), length = 4)    
     
     make_nc_var(ds, name = 'DAQ_Range', value = channel_info.data_acquisition_range.values, dtype = 'float', dims = ('channels',))
     
@@ -389,7 +389,7 @@ def polarization_calibration_file(
     n_nb_of_time_scales = 1
     n_scan_angles = 1
 
-    channel_label = channel_info.telescope_type.values + channel_info.channel_type.values + channel_info.acquisition_type.values + channel_info.channel_subtype.values
+    atlas_channel_label = channel_info.telescope_type.values + channel_info.channel_type.values + channel_info.acquisition_type.values + channel_info.channel_subtype.values
     
     start_time = [np.datetime64(t,'us').item() for t in time_info['start_time']]
     end_time = [np.datetime64(t,'us').item() for t in time_info['end_time']]
@@ -478,9 +478,9 @@ def polarization_calibration_file(
     if not isinstance(sig_d,list):
         make_nc_var(ds, name = 'Background_Profile', value = sig_d.values, dtype = 'float', dims = ('time_bck', 'channels', 'points',))
 
-    make_nc_var(ds, name = 'channel_ID', value = channel_info.scc_id.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'channel_ID', value = channel_info.scc_channel_id.values, dtype = 'int', dims = ('channels',))
 
-    make_nc_str(ds, name = 'channel_label', value = channel_label, dims = ('channels','nchar_channel'), length = 4)    
+    make_nc_str(ds, name = 'atlas_channel_label', value = atlas_channel_label, dims = ('channels','nchar_channel'), length = 4)    
     
     make_nc_var(ds, name = 'DAQ_Range', value = channel_info.data_acquisition_range.values, dtype = 'float', dims = ('channels',))
     
@@ -575,7 +575,7 @@ def dark_file(meas_info, channel_info, time_info_d, nc_path,
     n_nb_of_time_scales = 1
     n_scan_angles = 1
     
-    channel_label = channel_info.telescope_type.values + \
+    atlas_channel_label = channel_info.telescope_type.values + \
         channel_info.channel_type.values + \
             channel_info.acquisition_type.values + \
                 channel_info.channel_subtype.values + \
@@ -641,9 +641,9 @@ def dark_file(meas_info, channel_info, time_info_d, nc_path,
         
     make_nc_var(ds, name = 'Background_Profile', value = sig_d.values, dtype = 'float', dims = ('time_bck', 'channels', 'points',))
 
-    make_nc_var(ds, name = 'channel_ID', value = channel_info.scc_id.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'channel_ID', value = channel_info.scc_channel_id.values, dtype = 'int', dims = ('channels',))
 
-    make_nc_str(ds, name = 'channel_label', value = channel_label, dims = ('channels','nchar_channel'), length = 4)    
+    make_nc_str(ds, name = 'atlas_channel_label', value = atlas_channel_label, dims = ('channels','nchar_channel'), length = 4)    
     
     make_nc_var(ds, name = 'DAQ_Range', value = channel_info.data_acquisition_range.values, dtype = 'float', dims = ('channels',))
     

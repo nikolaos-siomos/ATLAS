@@ -31,7 +31,7 @@ zenith_angle = ${lidar.zenith_angle.pretty}
 azimuth_angle = ${lidar.azimuth_angle.pretty}
 
 [Channels]
-# All variables provided for this section should include exactly as many channels as the channel_id variable. 
+# All variables provided for this section should include exactly as many channels as the recorder_channel_id variable. 
 # If a variable is not relevant for a specific channel (e.g. dead_time for analog channels) fill with "_". 
 #-------------------------------------------------------------------------------------------------------------
 #Mandatory Variables
@@ -80,17 +80,17 @@ trigger_delay_bins = ${print_channels_field(channels, 'trigger_delay_bins')}
 #-------------------------------------------------------------------------------------------------------------
 #Mandatory Variables for Licel
 #-------------------------------------------------------------------------------------------------------------
-#channel_id: IDs of each channel according to the raw file header. For licel provide the licel id per channel that is going to be include. Currently only BT and BC channels are supported. For PollyXT systems all channels are included by default. Provide only if you want to process specific channels
-channel_id = ${print_channels_field(channels, 'channel_id')}
+#recorder_channel_id: IDs of each channel according to the raw file header. For licel provide the licel id per channel that is going to be include. Currently only BT and BC channels are supported. For PollyXT systems all channels are included by default. Provide only if you want to process specific channels
+recorder_channel_id = ${print_channels_field(channels, 'recorder_channel_id')}
 
-#laser: The ascending laser number according to the licel manual. Use to link with the licel file. The channel_id is not a unique identifier for licel channels. A single channel can synchronize with more than one lasers. This variable is ignored when processing PollYXT files
+#laser: The ascending laser number according to the licel manual. Use to link with the licel file. The recorder_channel_id is not a unique identifier for licel channels. A single channel can synchronize with more than one lasers. This variable is ignored when processing PollYXT files
 laser = ${print_channels_field(channels, 'laser')}
 
 #-------------------------------------------------------------------------------------------------------------
 #Mandatory Variables in the Future
 #-------------------------------------------------------------------------------------------------------------
-#scc_id: IDs of each channel according to the SCC configuration. In the future, linking with the HOI will be done through the scc_id (currently optional). 
-scc_id = ${print_channels_field(channels, 'scc_id')}
+#scc_channel_id: IDs of each channel according to the SCC configuration. In the future, linking with the HOI will be done through the scc_channel_id (currently optional). 
+scc_channel_id = ${print_channels_field(channels, 'scc_channel_id')}
 
 #-------------------------------------------------------------------------------------------------------------
 #Partly Optional Variables

@@ -234,8 +234,8 @@ def channel_metadata(file):
 
     channels = np.array([np.round(file.Detected_Wavelength.values,decimals=0)\
                          .astype('int').astype(str)[i].zfill(4) +\
-                         file.channel_label.values.astype(str)[i] \
-                         for i in range(file.channel_label.size)])
+                         file.atlas_channel_label.values.astype(str)[i] \
+                         for i in range(file.atlas_channel_label.size)])
 
     keys = ['ADC_resolution',
             'Background_Low_Bin',

@@ -244,7 +244,7 @@ def read_channels(buffer, sep):
             'laser_polarization', 'pmt_high_voltage', 'range_resolution', 
             'wave_pol', 'unk1', 'unk2', 'unk3', 'unk4', 
             'analog_to_digital_resolution', 'shots', 'data_acquisition_range',
-            'channel_id']
+            'recorder_channel_id']
 
     # Now i points to the start of search_sequence, AKA end of header
     header_bytes = buffer[0:sep-1]
@@ -258,21 +258,21 @@ def read_channels(buffer, sep):
 
     arr_head = pd.DataFrame(header, columns = cols, dtype = object)
 
-    # Produce thelen(set(a)) < len(a) channel ID from the licel channel ID and the laser polarization    
-    channel_ID = []
+    # Combine from the recorder channel ID and the laser polarization    
+    recorder_channel_id = []
     for i in range(len(header[:,-1])):
-        channel_ID.append(f'{arr_head.channel_id.iloc[i]}_L{str(int(arr_head.laser.iloc[i]))}')  
+        recorder_channel_id.append(f'{arr_head.recorder_channel_id.iloc[i]}_L{str(int(arr_head.laser.iloc[i]))}')  
     # Check if the defined channels are unique (unique sets of licel id and laser number)   
-        if len(set(channel_ID)) < len(channel_ID):
+        if len(set(recorder_channel_id)) < len(recorder_channel_id):
             raise Exception('-- Error: At least two of the licel channels have both the same id and laser number. Please correct this in the recorder settings')
 
-    channel_info.index = channel_ID
+    channel_info.index = recorder_channel_id
 
     info_columns = ['acquisition_mode', 'laser', 'bins', 'laser_polarization', 
                     'pmt_high_voltage', 'range_resolution', 
                     'data_acquisition_range', 'analog_to_digital_resolution']
     
-    channel_info.loc[:, 'channel_id'] = arr_head.loc[:, 'channel_id'].copy().values
+    channel_info.loc[:, 'recorder_channel_id'] = arr_head.loc[:, 'recorder_channel_id'].copy().values
     channel_info.loc[:, info_columns] = arr_head.loc[:, info_columns].copy().values.astype(float)
 
     mask_an = channel_info.loc[:,'acquisition_mode'].values == 0
@@ -312,7 +312,7 @@ def read_shots(buffer, sep):
             'laser_polarization', 'pmt_high_voltage', 'range_resolution', 
             'wave_pol', 'unk1', 'unk2', 'unk3', 'unk4', 
             'analog_to_digital_resolution', 'shots', 'data_acquisition_range',
-            'channel_id']
+            'recorder_channel_id']
 
     # Now i points to the start of search_sequence, AKA end of header
     header_bytes = buffer[0:sep-1]

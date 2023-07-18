@@ -898,9 +898,9 @@ class ATLASChannelSettings(BaseSettings):
         
         self.dead_time = ATLASDoubleOption ( default = 0, increment = .001, mandatory = True )
         self.trigger_delay_bins = ATLASIntegerOption ( default = 0, min = -4000, max = 4000, mandatory = True )
-        self.channel_id = ATLASTextOption ( default = '' )
+        self.recorder_channel_id = ATLASTextOption ( default = '' )
         self.laser = ATLASIntegerOption ( default = 1, min = 1, increment = 1 )
-        self.scc_id = ATLASIntegerOption ( default = 0 )
+        self.scc_channel_id = ATLASIntegerOption ( default = 0 )
         
         # Partly optional variables
         self.dead_time_correction_type = ATLASChoiceOption (

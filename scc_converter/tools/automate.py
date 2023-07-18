@@ -144,9 +144,6 @@ def detect_overflows(sig, shots, channel_info, time_info, meas_type, method = 0)
             A pandas Dataframe with exactly one index entry per lidar channel.
             the following columns must be included:
                 
-            channel_id: 
-                The channel_id per channel 
-                
             acquisition_mode: 
                 The acquision_mode values per channel 
                 (0 for analog, 1 for photon)

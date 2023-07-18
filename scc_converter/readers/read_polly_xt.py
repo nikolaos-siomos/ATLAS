@@ -177,7 +177,7 @@ def read_meas(raw_data):
     return(meas_info)
 
 def read_channels(raw_data):
-    channel_info = pd.DataFrame(index = raw_data.channel)
+    channel_info = pd.DataFrame(index = (raw_data.channel.values + 1).astype(str))
     
     channel_info.loc[:,'acquisition_mode'] = 1 # only photon channels
     channel_info.loc[:,'laser'] = 1 # only 1 laser
@@ -195,17 +195,17 @@ def read_channels(raw_data):
     channel_info.loc[:,'background_high_bin'] = channel_info.loc[:,'bins'] - 100
     channel_info.loc[:,'emitted_wavelength'] = np.nan * channel_info.loc[:,'detected_wavelength'] 
     
-    for i in range(channel_info.loc[:,'detected_wavelength'] .size):
-        if channel_info.loc[i,'detected_wavelength'] >= 340. and \
-            channel_info.loc[i,'detected_wavelength'] < 520.:
-                channel_info.loc[i,'emitted_wavelength'] = 355.
+    for ch in channel_info.index:
+        if channel_info.loc[ch,'detected_wavelength'] >= 340. and \
+            channel_info.loc[ch,'detected_wavelength'] < 520.:
+                channel_info.loc[ch,'emitted_wavelength'] = 355.
                 
-        if channel_info.loc[i,'detected_wavelength'] >= 520. and \
-            channel_info.loc[i,'detected_wavelength'] < 1000.:
-                channel_info.loc[i,'emitted_wavelength'] = 532.
+        if channel_info.loc[ch,'detected_wavelength'] >= 520. and \
+            channel_info.loc[ch,'detected_wavelength'] < 1000.:
+                channel_info.loc[ch,'emitted_wavelength'] = 532.
                 
-        if channel_info.loc[i,'detected_wavelength'] >= 1000.:
-            channel_info.loc[i,'emitted_wavelength'] = 1064.
+        if channel_info.loc[ch,'detected_wavelength'] >= 1000.:
+            channel_info.loc[ch,'emitted_wavelength'] = 1064.
                 
     return(channel_info)
 

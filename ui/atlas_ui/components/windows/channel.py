@@ -39,9 +39,9 @@ class ChannelData:
         channel_subtype,
         dead_time,
         trigger_delay_bins,
-        channel_id,
+        recorder_channel_id,
         laser,
-        scc_id,
+        scc_channel_id,
         dead_time_correction_type,
         emitted_wavelength,
         detected_wavelength,
@@ -103,14 +103,14 @@ class ChannelWindow (wx.ScrolledWindow):
         self.trigger_delay_bins = AtlasUIInputField.FromSetting ( self._settings.trigger_delay_bins, parent = self.panel, label = "Trigger delay [bins]" )
         self.sizer.Add ( self.trigger_delay_bins, pos = wx.GBPosition(1, 1), flag = wx.EXPAND )
         
-        self.channel_id = AtlasUIInputField.FromSetting ( self._settings.channel_id, parent = self.panel, label = "Channel ID" )
-        self.sizer.Add ( self.channel_id, pos = wx.GBPosition(2, 0), flag = wx.EXPAND )
+        self.recorder_channel_id = AtlasUIInputField.FromSetting ( self._settings.recorder_channel_id, parent = self.panel, label = "Channel ID" )
+        self.sizer.Add ( self.recorder_channel_id, pos = wx.GBPosition(2, 0), flag = wx.EXPAND )
         
         self.laser = AtlasUIInputField.FromSetting ( self._settings.laser, parent = self.panel, label = "Laser" )
         self.sizer.Add ( self.laser, pos = wx.GBPosition(2, 1), flag = wx.EXPAND )
         
-        self.scc_id = AtlasUIInputField.FromSetting ( self._settings.scc_id, parent = self.panel, label = "SCC ID" )
-        self.sizer.Add ( self.scc_id, pos = wx.GBPosition(2, 2), flag = wx.EXPAND )
+        self.scc_channel_id = AtlasUIInputField.FromSetting ( self._settings.scc_channel_id, parent = self.panel, label = "SCC ID" )
+        self.sizer.Add ( self.scc_channel_id, pos = wx.GBPosition(2, 2), flag = wx.EXPAND )
         
         self.dead_time_correction_type = AtlasUIInputField.FromSetting ( self._settings.dead_time_correction_type, parent = self.panel, label = "Dead time correction type" )
         self.sizer.Add ( self.dead_time_correction_type, pos = wx.GBPosition(3, 0), flag = wx.EXPAND )

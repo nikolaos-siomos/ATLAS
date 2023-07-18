@@ -35,10 +35,13 @@ class config():
             check_channels(channel_info = channel_section, 
                            file_format = file_format)
             
-            if 'channel_id' in channel_section.columns.values:
-                channels = [f'{channel_section.channel_id[i]}_L{str(int(channel_section.laser[i]))}'
-                            for i in range(channel_section.index.size)]
-            
+            if 'recorder_channel_id' in channel_section.columns.values:
+                if file_format == 'licel' or file_format == 'liel_matlab':
+                    channels = [f'{channel_section.recorder_channel_id[i]}_L{str(int(channel_section.laser[i]))}'
+                                for i in range(channel_section.index.size)]
+                elif file_format == 'polly_xt':
+                    channels = channel_section.recorder_channel_id.values
+
                 channel_section.index = channels 
             
             self.channels = channel_section
@@ -109,26 +112,26 @@ def comma_split(var, dtype):
 
 def check_channels(channel_info, file_format):
 
-    if file_format == 'licel':
+    if file_format == 'licel' or  file_format == 'licel_matlab':
             
-        # Channel_id check
-        if 'channel_id' not in channel_info.columns.values:
+        # recorder_channel_id check
+        if 'recorder_channel_id' not in channel_info.columns.values:
             
-            raise Exception("-- Error: The channel_id field is mandatory for licel systems! Please provide it in the configuration file. If this is not a licel system, please provide the correct file_format in the settings_file.")
+            raise Exception("-- Error: The recorder_channel_id field is mandatory for licel systems! Please provide it in the configuration file. If this is not a licel system, please provide the correct file_format in the settings_file.")
 
         else:
             
-            for channel_id in channel_info.channel_id:
+            for recorder_channel_id in channel_info.recorder_channel_id:
                 
-                if isinstance(channel_id,str):
+                if isinstance(recorder_channel_id,str):
                     
-                    if not (channel_id[:2] == 'BT' or channel_id[:2] == 'BC'):
+                    if not (recorder_channel_id[:2] == 'BT' or recorder_channel_id[:2] == 'BC'):
                 
-                        raise Exception("-- Error: Provided channel_id not recognized. The first two letters must be either BT or BC. Please do not provide S2A ot S2P channels (currently not supported)!")
+                        raise Exception("-- Error: Provided recorder_channel_id not recognized. The first two letters must be either BT or BC. Please do not provide S2A ot S2P channels (currently not supported)!")
             
                 else:
                     
-                    raise Exception("-- Error: The channel_id provided in the configuration file must be a string. Please correct!")
+                    raise Exception("-- Error: The recorder_channel_id provided in the configuration file must be a string. Please correct!")
 
         # Laser number check
         if 'laser' not in channel_info.columns.values:
@@ -143,6 +146,25 @@ def check_channels(channel_info, file_format):
             
                     raise Exception("-- Error: Provided laser number not recognized. Licel uses a laser number between 1 and 4!")
 
+    if file_format == 'polly_xt':
+            
+        # recorder_channel_id check
+        if 'recorder_channel_id' not in channel_info.columns.values:
+            
+            raise Exception("-- Error: Since version 0.4 the recorder_channel_id field is mandatory also for Polly XT systems! Please provide it in the configuration file. For Polly XTs use ascending integers starting from 1 and to the last channel following the order of channel from the raw netcdf files. ")
+
+        else:
+            
+            for recorder_channel_id in channel_info.recorder_channel_id:
+                
+                if recorder_channel_id.isdigit() == False:
+                    print(recorder_channel_id)
+                    raise Exception("-- Error: The recorder_channel_id must be an intereger for PollyXT systems. Please revise the configuration file!")
+            
+                elif recorder_channel_id == 0:
+                    
+                    raise Exception("-- Error: The recorder_channel_id cnnot be zero. It must be an integer between 1 and up to the maximum number of available channels in the raw files. Please revise the configuration file!")
+
 
     mandatory = ['dead_time', 'trigger_delay_bins', 'telescope_type', 
                  'channel_type', 'channel_subtype']
@@ -154,9 +176,10 @@ def check_channels(channel_info, file_format):
             raise Exception(f"-- Error: The mandatory field {mnd} was not provided. Please include it in the configuration file!")
 
     # SCC ID check
-    if 'scc_id' not in channel_info.columns.values:
-        channel_info.loc[:,'scc_id'] = np.arange(0,channel_info.index.values.size,1)
-            
+    if 'scc_channel_id' not in channel_info.columns.values:
+        channel_info.loc[:,'scc_channel_id'] = np.arange(0,channel_info.index.values.size,1)
+        print('-- Warning: The scc_channel_id field is mandatory for the submission of the QA tests to CARS! Please make sure to include it if you plan to submit this set ') 
+        
     # Dead time correction type check
     if 'dead_time_correction_type' not in channel_info.columns.values:
         

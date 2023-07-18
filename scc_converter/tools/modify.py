@@ -12,7 +12,7 @@ import sys
 def trim_channels(cfg, sig, shots, channel_info, meas_type):
     
     """Channels are selected based on the channel_id variable in the configuration
-    file. All IDs in the config_file must be correspondent to the Licel IDs in
+    file. All IDs in the config_file must be correspondent to the IDs in
     the raw files. If an unkown ID is included in the config_file then an error
     is raised. For polarization calibration measurements, channels that are 
     neither co- nor cross- polar will be automatically removed"""
@@ -31,7 +31,7 @@ def trim_channels(cfg, sig, shots, channel_info, meas_type):
     
     if any(channel_ind_cfg_i not in channel_ind_raw 
            for channel_ind_cfg_i in channel_ind_cfg):
-        print("-- Warning: Some of the licel IDs defined in the configuration file do not match with the licel IDs from the licel header. These channels will be skipped! ")
+        print("-- Warning: Some of the recorder channel IDs defined in the configuration file do not match with the respective IDs in the raw files. These channels will be skipped! ")
     
     channel_ind_com = [channel_ind_cfg_i for channel_ind_cfg_i in channel_ind_cfg 
                        if channel_ind_cfg_i in channel_ind_raw]
