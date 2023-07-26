@@ -11,7 +11,7 @@ import os
 import numpy as np
 import xarray as xr
 
-def rayleigh(sig, molec, meteo, meas_info, channel_info, time_info, 
+def rayleigh(sig, molec, meteo, system_info, channel_info, time_info, 
              molec_info,  heights, ranges, version, dir_out):
 
     print('-----------------------------------------')
@@ -22,8 +22,8 @@ def rayleigh(sig, molec, meteo, meas_info, channel_info, time_info,
         .to_dataset(name = 'Range_Corrected_Signals')\
             .fillna(netCDF4.default_fillvals['f8'])
         
-    for idx in meas_info.index.values:
-        nc_file.attrs[idx] = meas_info[idx]
+    for idx in system_info.index.values:
+        nc_file.attrs[idx] = system_info[idx]
     
     for clm in channel_info.columns.values:
         nc_file[clm] = (['channel'], channel_info.loc[:,clm]\
@@ -51,7 +51,7 @@ def rayleigh(sig, molec, meteo, meas_info, channel_info, time_info,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
     
-    fname = f'{meas_info.Measurement_ID}_{meas_info.Lidar_Name}_ray_ATLAS_{version}_prepro.nc'
+    fname = f'{system_info.Measurement_ID}_{system_info.Lidar_Name}_ray_ATLAS_{version}_prepro.nc'
     
     fpath = os.path.join(dir_out, fname)
     
@@ -63,7 +63,7 @@ def rayleigh(sig, molec, meteo, meas_info, channel_info, time_info,
 
     return([fpath])
 
-def telecover(sig, meas_info, channel_info, time_info, 
+def telecover(sig, system_info, channel_info, time_info, 
               heights, ranges, version, dir_out):
 
     print('-----------------------------------------')
@@ -210,8 +210,8 @@ def telecover(sig, meas_info, channel_info, time_info,
                 nc_file[f'{clm}_Outer_Ring'] = \
                     (['time_o'], time_info.loc[:,clm].iloc[idx_outer].values)
         
-    for idx in meas_info.index.values:
-        nc_file.attrs[idx] = meas_info[idx]
+    for idx in system_info.index.values:
+        nc_file.attrs[idx] = system_info[idx]
     
     for clm in channel_info.columns.values:
         nc_file[clm] = (['channel'], channel_info.loc[:,clm]\
@@ -226,7 +226,7 @@ def telecover(sig, meas_info, channel_info, time_info,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
     
-    fname = f'{meas_info.Measurement_ID}_{meas_info.Lidar_Name}_tlc_ATLAS_{version}_prepro.nc'
+    fname = f'{system_info.Measurement_ID}_{system_info.Lidar_Name}_tlc_ATLAS_{version}_prepro.nc'
     
     fpath = os.path.join(dir_out, fname)
     
@@ -238,7 +238,7 @@ def telecover(sig, meas_info, channel_info, time_info,
 
     return([fpath])
 
-def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray, 
+def calibration(sig, sig_ray, meteo, molec, system_info, system_info_ray, 
                 channel_info, channel_info_ray, time_info, time_info_ray, 
                 molec_info, heights, ranges, ranges_ray, heights_ray, 
                 version, dir_out):
@@ -248,8 +248,8 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
     print('-----------------------------------------')
     
     
-    pcb_group = ['Lidar_Name', 'Lidar_Location',
-                 'Lidar_ID', 'Altitude_meter_asl', 'Latitude_degrees_north',
+    pcb_group = ['Lidar_Name', 'Station_Name',
+                 'Station_ID', 'Altitude_meter_asl', 'Latitude_degrees_north',
                  'Longitude_degrees_east', 'Measurement_type', 'Rayleigh_File_Name']
     
     com_group = ['Measurement_ID',
@@ -269,12 +269,12 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
                                    'bins': sig.bins.values, 
                                    'bins_r': sig_ray.bins.values})
         
-    for idx in meas_info.index.values:
+    for idx in system_info.index.values:
         if idx in pcb_group:
-            nc_file.attrs[f'{idx}'] = meas_info[idx]
+            nc_file.attrs[f'{idx}'] = system_info[idx]
         if idx in com_group:
-            nc_file.attrs[f'{idx}_Calibration'] = meas_info[idx]
-            nc_file.attrs[f'{idx}_Rayleigh'] = meas_info_ray[idx]    
+            nc_file.attrs[f'{idx}_Calibration'] = system_info[idx]
+            nc_file.attrs[f'{idx}_Rayleigh'] = system_info_ray[idx]    
 
     nc_file['Height_levels_Calibration'] = heights   
     nc_file['Range_levels_Calibration'] = ranges
@@ -330,7 +330,7 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
     
-    fname = f'{meas_info.Measurement_ID}_{meas_info.Lidar_Name}_pcb_ATLAS_{version}_prepro.nc'
+    fname = f'{system_info.Measurement_ID}_{system_info.Lidar_Name}_pcb_ATLAS_{version}_prepro.nc'
 
     fpath = os.path.join(dir_out, fname)
     
@@ -342,7 +342,7 @@ def calibration(sig, sig_ray, meteo, molec, meas_info, meas_info_ray,
 
     return([fpath])
 
-def quicklook(sig, meas_info, channel_info, time_info, 
+def quicklook(sig, system_info, channel_info, time_info, 
               heights, ranges, version, meas_type, dir_out):
 
     print('-----------------------------------------')
@@ -352,8 +352,8 @@ def quicklook(sig, meas_info, channel_info, time_info,
     nc_file = sig.to_dataset(name = 'Range_Corrected_Signals')\
         .fillna(netCDF4.default_fillvals['f8'])
         
-    for idx in meas_info.index.values:
-        nc_file.attrs[idx] = meas_info[idx]
+    for idx in system_info.index.values:
+        nc_file.attrs[idx] = system_info[idx]
     
     for clm in channel_info.columns.values:
         nc_file[clm] = (['channel'], channel_info.loc[:,clm]\
@@ -371,7 +371,7 @@ def quicklook(sig, meas_info, channel_info, time_info,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
 
-    fname = f'{meas_info.Measurement_ID}_{meas_info.Lidar_Name}_{meas_type}_qck_ATLAS_{version}_prepro.nc'
+    fname = f'{system_info.Measurement_ID}_{system_info.Lidar_Name}_{meas_type}_qck_ATLAS_{version}_prepro.nc'
     
     fpath = os.path.join(dir_out, fname)
     nc_file.to_netcdf(path = fpath, mode = 'w')

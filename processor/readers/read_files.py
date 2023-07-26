@@ -44,8 +44,8 @@ def short_reader(fpath, exclude_telescope_type, exclude_channel_type,
             
     Returns:
         
-        meas_info: 
-            A pandas series with all the necessary lidar metadata fetched 
+        system_info: 
+            A pandas series with all the necessary system metadata fetched 
             from the QA file
             
         channel_info : 
@@ -117,12 +117,12 @@ def short_reader(fpath, exclude_telescope_type, exclude_channel_type,
     valid_channels = channels[mask]
 
     # Read lidar metadata
-    meas_info = lidar_metadata(file)
+    system_info = lidar_metadata(file)
     
     # Read time 
-    time_info = time_metadata(file, meas_info)
+    time_info = time_metadata(file, system_info)
     if 'Background_Profile' in file.data_vars: 
-        time_info_d = time_metadata_d(file, meas_info)
+        time_info_d = time_metadata_d(file, system_info)
 
     # Reading the licel signals
     signal = signals(file, time_info = time_info, channel_info = channel_info)
@@ -143,7 +143,7 @@ def short_reader(fpath, exclude_telescope_type, exclude_channel_type,
 
     channel_info = channel_info.loc[valid_channels,:]
     
-    return(meas_info, channel_info, time_info, time_info_d,
+    return(system_info, channel_info, time_info, time_info_d,
            signal, signal_d, shots, shots_d)
 
 def lidar_metadata(file):
@@ -158,7 +158,7 @@ def lidar_metadata(file):
             
     Returns:
         
-        meas_info: 
+        system_info: 
             A pandas series with all the necessary lidar metadata fetched 
             from the QA file
           
@@ -167,8 +167,13 @@ def lidar_metadata(file):
     keys_attrs = ['Sounding_File_Name',
                   'Rayleigh_File_Name',
                   'Lidar_Name',
-                  'Lidar_Location',
                   'Lidar_ID',
+                  'Station_Name',
+                  'Station_ID',
+                  'Version_Name',
+                  'Version_ID',
+                  'Configuration_Name',
+                  'Configuration_ID',
                   'Altitude_meter_asl',
                   'Latitude_degrees_north',
                   'Longitude_degrees_east',
@@ -210,9 +215,9 @@ def lidar_metadata(file):
     keys.extend(keys_vars)
     keys.extend(keys_extras)
     
-    meas_info = pd.Series(data = data, index = keys, dtype = object)
+    system_info = pd.Series(data = data, index = keys, dtype = object)
     
-    return(meas_info)
+    return(system_info)
 
 def channel_metadata(file):
     
@@ -247,12 +252,10 @@ def channel_metadata(file):
             'Dead_Time_Correction_Type',
             'Detected_Wavelength',
             'Emitted_Wavelength',
-            'Laser_Polarization',
             'Laser_Repetition_Rate',
             'PMT_High_Voltage',
             'Raw_Data_Range_Resolution',
-            'Trigger_Delay',
-            'Trigger_Delay_Bins']
+            'DAQ_Trigger_Offset']
     
     data = [file.variables[key].values for key in keys if key in file.variables]
     keys = [key for key in keys if key in file.variables]
@@ -268,7 +271,7 @@ def channel_metadata(file):
 
     return(channel_info)
 
-def time_metadata(file, meas_info):
+def time_metadata(file, system_info):
     
     """
     General:
@@ -278,7 +281,7 @@ def time_metadata(file, meas_info):
         file: 
             An xarray dataset with all the QA file information
 
-        meas_info: 
+        system_info: 
             A pandas series with all the necessary lidar metadata fetched 
             from the QA file
             
@@ -319,9 +322,9 @@ def time_metadata(file, meas_info):
     data = np.array(data, dtype = object)    
     keys = np.array(keys, dtype = object) 
     
-    sdate = meas_info['RawData_Start_Date']
+    sdate = system_info['RawData_Start_Date']
 
-    stime = meas_info['RawData_Start_Time_UT']
+    stime = system_info['RawData_Start_Time_UT']
 
     start_t = file['Raw_Data_Start_Time'].values[:,0].astype(float)
 
@@ -333,7 +336,7 @@ def time_metadata(file, meas_info):
     
     return(time_info)
 
-def time_metadata_d(file, meas_info):
+def time_metadata_d(file, system_info):
     
     """
     General:
@@ -344,7 +347,7 @@ def time_metadata_d(file, meas_info):
         file: 
             An xarray dataset with all the QA file information
 
-        meas_info: 
+        system_info: 
             A pandas series with all the necessary lidar metadata fetched 
             from the QA file
             
@@ -383,9 +386,9 @@ def time_metadata_d(file, meas_info):
     data = np.array(data, dtype = object)    
     keys = np.array(keys, dtype = object)  
 
-    sdate = meas_info['RawBck_Start_Date']
+    sdate = system_info['RawBck_Start_Date']
 
-    stime = meas_info['RawBck_Start_Time_UT']
+    stime = system_info['RawBck_Start_Time_UT']
 
     start_t = file['Bck_Data_Start_Time'].values[:,0].astype(float)
 

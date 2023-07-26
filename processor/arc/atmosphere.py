@@ -18,16 +18,16 @@ from ..arc.raman_scattering import RotationalRaman
 from ..arc import make_gas, rayleigh_scattering 
 from ..arc.utilities import number_density_at_pt
 
-def short_molec(heights, ranges, meas_info, channel_info, 
+def short_molec(heights, ranges, system_info, channel_info, 
                 time_info, external_info):
 
     print('-----------------------------------------')
     print('Start making molecular calculations...')
     print('-----------------------------------------')
         
-    if 'Sounding_File_Name' in meas_info.keys() :
+    if 'Sounding_File_Name' in system_info.keys() :
         rsonde_path = os.path.join(os.path.dirname(external_info['input_file']),  
-                                   meas_info['Sounding_File_Name'])
+                                   system_info['Sounding_File_Name'])
         
         meteo, molec_info = from_rsonde(path = rsonde_path, 
                                         heights = heights)
@@ -35,14 +35,14 @@ def short_molec(heights, ranges, meas_info, channel_info,
         print('-- Radiosond file succesfully parsed!')
 
         
-    elif 'Pressure_at_Lidar_Station' in meas_info.keys() and \
-        'Temperature_at_Lidar_Station' in meas_info.keys():
+    elif 'Pressure_at_Lidar_Station' in system_info.keys() and \
+        'Temperature_at_Lidar_Station' in system_info.keys():
                         
         meteo, molec_info = \
             from_us_std(heights = heights,
-                        pressure = meas_info.Pressure_at_Lidar_Station, 
-                        temperature = meas_info.Temperature_at_Lidar_Station,
-                        elevation = meas_info.Altitude_meter_asl)
+                        pressure = system_info.Pressure_at_Lidar_Station, 
+                        temperature = system_info.Temperature_at_Lidar_Station,
+                        elevation = system_info.Altitude_meter_asl)
 
         print('-- US Standard Atmosphere succesfully constructed!')
     
@@ -57,8 +57,6 @@ def short_molec(heights, ranges, meas_info, channel_info,
     
     bdw = channel_info.Channel_Bandwidth
     
-    pol = channel_info.Laser_Polarization
-
     ch_type = pd.Series([ch[5] for ch in channel_info.index], index = channels)
 
     ch_stype = pd.Series([ch[7] for ch in channel_info.index], index = channels)
@@ -123,7 +121,6 @@ def short_molec(heights, ranges, meas_info, channel_info,
         exs_fth_i = np.nan * np.zeros(sel_bins.size)
         exs_bck_i = np.nan * np.zeros(sel_bins.size)
 
-        print(ch, ewl.loc[ch], ch_type.loc[ch])
         # Automatically calculate the Raman vibrational shift from the emitted wavelength
         if ch_type.loc[ch] != 'v':
             swl_ch = ewl.loc[ch]
@@ -198,17 +195,17 @@ def short_molec(heights, ranges, meas_info, channel_info,
         ecf_bck = N * exs_bck
         ecf_fth = N * exs_fth
 
-        if pol.loc[ch] == 1 and ch_type.loc[ch] in ['p', 'c', 't']:
+        if ch_type.loc[ch] in ['p', 'c', 't']:
             mdr = mdr_f(bins)
-        elif pol.loc[ch] == 3 and ch_type.loc[ch] in ['o', 'x', 't']:
-            mdr = 2. * mdr_f(bins) / (1. - mdr_f(bins))
-        elif (pol.loc[ch] == 3 and ch_type.loc[ch] in ['p', 'c', 't']) or \
-            (pol.loc[ch] == 1 and ch_type.loc[ch] in ['o', 'x', 't']) or \
-                (ch_type.loc[ch] not in ['p', 'c', 'o', 'x', 't']):
-            mdr = np.ones(bins.size)
-        else:
-            print(f'-- Warning: Elliptical polarization not supported. Molecular calculation will assume unpolarized backscater radiation for channel {ch}')
-            mdr = np.ones(bins.size)
+        # elif pol.loc[ch] == 3 and ch_type.loc[ch] in ['o', 'x', 't']:
+        #     mdr = 2. * mdr_f(bins) / (1. - mdr_f(bins))
+        # elif (pol.loc[ch] == 3 and ch_type.loc[ch] in ['p', 'c', 't']) or \
+        #     (pol.loc[ch] == 1 and ch_type.loc[ch] in ['o', 'x', 't']) or \
+        #         (ch_type.loc[ch] not in ['p', 'c', 'o', 'x', 't']):
+        #     mdr = np.ones(bins.size)
+        # else:
+        #     print(f'-- Warning: Elliptical polarization not supported. Molecular calculation will assume unpolarized backscater radiation for channel {ch}')
+        #     mdr = np.ones(bins.size)
 
         rng = ranges.loc[ch_d].values
         trn_bck = transmittance(x_range = rng, extinction = ecf_bck)

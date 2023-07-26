@@ -19,7 +19,7 @@ def dtfs(dir_meas):
     end_time_arr = []
     filename = []
     
-    meas_info = []
+    system_info = []
     channel_info = []
     time_info = []
     
@@ -41,7 +41,7 @@ def dtfs(dir_meas):
             sep = find_sep(buffer, mfiles[0])
             
             # Reading the licel file metadatas (header) - only for the first file
-            meas_info = read_meas(buffer = buffer, sep = sep)
+            system_info = read_meas(buffer = buffer, sep = sep)
             channel_info = read_channels(buffer = buffer, sep = sep)
             
             channels = channel_info.index.values
@@ -113,7 +113,7 @@ def dtfs(dir_meas):
             print('---- Warning! Folder empty \n'+\
                   f'---> !! Skip reading measurement files from folder {dir_meas}')  
 
-    return(meas_info, channel_info, time_info, sig_raw, shots)
+    return(system_info, channel_info, time_info, sig_raw, shots)
 
 
 def read_body(channel_info, buffer, sep):
@@ -163,11 +163,11 @@ def find_sep(buffer, fname):
 def read_meas(buffer, sep):
 
     """ Retrieves location and geometry relevant information from 
-    the licel header [location, altitude, latitude, longitude, 
+    the licel header [altitude, latitude, longitude, 
     zenith angle, azimuth angle] and laser relevant information from 
     the licel header [laser A repetion rate, laser B repetion rate if it exists
     laser C repetion rate if it exists]"""
-    meas_info = pd.Series()
+    system_info = pd.Series()
      
     # Now i points to the start of search_sequence, AKA end of header
     header_bytes = buffer[0:sep-1]
@@ -177,17 +177,15 @@ def read_meas(buffer, sep):
 
     metadata = header[1].split()
 
-    meas_info['location'] = metadata[0]
-
-    meas_info['altitude'] = float(metadata[5])    
-    meas_info['latitude'] = np.round(float(metadata[6]), 4)
-    meas_info['longitude'] = np.round(float(metadata[7]), 4)
+    system_info['altitude'] = float(metadata[5])    
+    system_info['latitude'] = np.round(float(metadata[6]), 4)
+    system_info['longitude'] = np.round(float(metadata[7]), 4)
     
     if len(metadata) > 8:
-        meas_info['zenith_angle'] = float(metadata[8])
+        system_info['zenith_angle'] = float(metadata[8])
 
     if len(metadata) > 9:
-        meas_info['azimuth_angle'] = float(metadata[9])
+        system_info['azimuth_angle'] = float(metadata[9])
 
     # Now i points to the start of search_sequence, AKA end of header
     header_bytes = buffer[0:sep-1]
@@ -197,15 +195,15 @@ def read_meas(buffer, sep):
 
     metadata = header[2].split()
 
-    meas_info['laser_A_repetition_rate'] = float(metadata[1])
+    system_info['laser_A_repetition_rate'] = float(metadata[1])
 
     if len(metadata) > 2:
-        meas_info['laser_B_repetition_rate'] = float(metadata[3])
+        system_info['laser_B_repetition_rate'] = float(metadata[3])
         
     if len(metadata) > 5:
-        meas_info['laser_C_repetition_rate'] = float(metadata[6])
+        system_info['laser_C_repetition_rate'] = float(metadata[6])
         
-    return(meas_info)
+    return(system_info)
 
 def read_time(buffer, sep):
     
@@ -268,7 +266,7 @@ def read_channels(buffer, sep):
 
     channel_info.index = recorder_channel_id
 
-    info_columns = ['acquisition_mode', 'laser', 'bins', 'laser_polarization', 
+    info_columns = ['acquisition_mode', 'laser', 'bins', 
                     'pmt_high_voltage', 'range_resolution', 
                     'data_acquisition_range', 'analog_to_digital_resolution']
     
@@ -283,23 +281,6 @@ def read_channels(buffer, sep):
                                        sep='.')))[:,0].astype(float)
     
     channel_info.loc[:,'detected_wavelength'] = wave
-    
-    # Fill in default values that depend on the raw file metadata
-    channel_info.loc[:,'background_low_bin'] = channel_info.loc[:,'bins'] - 600
-    channel_info.loc[:,'background_high_bin'] = channel_info.loc[:,'bins'] - 100
-    channel_info.loc[:,'emitted_wavelength'] = np.nan * channel_info.loc[:,'detected_wavelength'] 
-    
-    for i in range(channel_info.loc[:,'detected_wavelength'].size):
-        if channel_info.loc[:,'detected_wavelength'][i] >= 340. and \
-            channel_info.loc[:,'detected_wavelength'][i] < 520.:
-                channel_info.loc[:,'emitted_wavelength'][i] = 354.717
-                
-        if channel_info.loc[:,'detected_wavelength'][i] >= 520. and \
-            channel_info.loc[:,'detected_wavelength'][i] < 1000.:
-                channel_info.loc[:,'emitted_wavelength'][i] = 532.075
-                
-        if channel_info.loc[:,'detected_wavelength'][i] >= 1000.:
-            channel_info.loc[:,'emitted_wavelength'][i] = 1064.150
 
     return(channel_info)
 

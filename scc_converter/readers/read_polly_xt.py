@@ -17,7 +17,7 @@ def dtfs(dir_meas, meas_type):
     shots = []
     time_info = []
     
-    meas_info = []
+    system_info = []
     channel_info = []
     
     list_sig = []
@@ -40,7 +40,7 @@ def dtfs(dir_meas, meas_type):
             raw_data = xr.open_dataset(mfiles[0])
             
             # Reading the polly_xt file metadatas (header) - only for the first file            
-            meas_info = read_meas(raw_data = raw_data)            
+            system_info = read_meas(raw_data = raw_data)            
             channel_info = read_channels(raw_data = raw_data)
             
             channels = channel_info.index.values
@@ -138,7 +138,7 @@ def dtfs(dir_meas, meas_type):
                   f'---> !! Skip reading measurement files from folder {dir_meas}')  
 
 
-    return(meas_info, channel_info, time_info, sig_raw, shots)
+    return(system_info, channel_info, time_info, sig_raw, shots)
 
 def convert_time_to_npdatetime(time):
     # meas_time: 2d array : [times, 2], 2: [yyyymmdd, second of day]
@@ -156,33 +156,30 @@ def convert_time_to_npdatetime(time):
 def read_meas(raw_data):
 
     """ Retrieves location and geometry relevant information from 
-    the polly_xt metadata [location, altitude, latitude, longitude, 
+    the polly_xt metadata [altitude, latitude, longitude, 
     zenith angle, azimuth angle] and laser relevant information from 
     the licel header [laser A repetion rate, laser B repetion rate if it exists
     laser C repetion rate if it exists]"""
     
-    meas_info = pd.Series()
+    system_info = pd.Series()
+    
+    system_info['altitude'] = raw_data.location_height.values   
+    system_info['latitude'] = np.round(raw_data.location_coordinates.values[0], 4)
+    system_info['longitude'] = np.round(raw_data.location_coordinates.values[1], 4)
+    
+    system_info['zenith_angle'] = raw_data.zenithangle.values
+    system_info['azimuth_angle'] = 0.
+    
+    system_info['laser_A_repetition_rate'] = raw_data.laser_rep_rate.values
 
-    meas_info['location'] = raw_data.location
-    
-    meas_info['altitude'] = raw_data.location_height.values   
-    meas_info['latitude'] = np.round(raw_data.location_coordinates.values[0], 4)
-    meas_info['longitude'] = np.round(raw_data.location_coordinates.values[1], 4)
-    
-    meas_info['zenith_angle'] = raw_data.zenithangle.values
-    meas_info['azimuth_angle'] = 0.
-    
-    meas_info['laser_A_repetition_rate'] = raw_data.laser_rep_rate.values
-
-    return(meas_info)
+    return(system_info)
 
 def read_channels(raw_data):
     channel_info = pd.DataFrame(index = (raw_data.channel.values + 1).astype(str))
     
     channel_info.loc[:,'acquisition_mode'] = 1 # only photon channels
     channel_info.loc[:,'laser'] = 1 # only 1 laser
-    channel_info.loc[:,'bins'] = raw_data.height[-1] + 1
-    channel_info.loc[:,'laser_polarization'] = 1 # only linear polarization
+    channel_info.loc[:,'bins'] = raw_data.height[-1].values + 1
     channel_info.loc[:,'pmt_high_voltage'] = raw_data.pm_voltage.values
     channel_info.loc[:,'range_resolution'] = raw_data.measurement_height_resolution.values * 0.15 # nanosecond to meters
     channel_info.loc[:,'data_acquisition_range'] = np.nan # analog channels only
@@ -190,23 +187,6 @@ def read_channels(raw_data):
     channel_info.loc[:,'detected_wavelength'] = raw_data.if_center.values
     channel_info.loc[:,'channel_bandwidth'] = raw_data.if_fwhm.values
     
-    # Fill in default values that depend on the raw file metadata
-    channel_info.loc[:,'background_low_bin'] = channel_info.loc[:,'bins'] - 600
-    channel_info.loc[:,'background_high_bin'] = channel_info.loc[:,'bins'] - 100
-    channel_info.loc[:,'emitted_wavelength'] = np.nan * channel_info.loc[:,'detected_wavelength'] 
-    
-    for ch in channel_info.index:
-        if channel_info.loc[ch,'detected_wavelength'] >= 340. and \
-            channel_info.loc[ch,'detected_wavelength'] < 520.:
-                channel_info.loc[ch,'emitted_wavelength'] = 355.
-                
-        if channel_info.loc[ch,'detected_wavelength'] >= 520. and \
-            channel_info.loc[ch,'detected_wavelength'] < 1000.:
-                channel_info.loc[ch,'emitted_wavelength'] = 532.
-                
-        if channel_info.loc[ch,'detected_wavelength'] >= 1000.:
-            channel_info.loc[ch,'emitted_wavelength'] = 1064.
-                
     return(channel_info)
 
 

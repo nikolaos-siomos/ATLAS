@@ -18,7 +18,7 @@ Fucntions
  -- range calculation: Calculates the range values per bin and channel
  -- range_correction: Performs the range correction on signals
  -- smoothing: Smooths the signals (sliding average)
- -- trigger_delay: Perform the trigger correction per channel
+ -- trigger_correction: Perform the trigger correction per channel
  -- trim_vertically: Trim channels up to a maximum altitude
  -- unit_conv_counts_to_MHz: Converts raw counts to MHz for the photon channels
 
@@ -568,7 +568,7 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
         
     return(sig_out)
 
-# def trim_clouds(sig, trigger_delay_bins):
+# def trim_clouds(sig, daq_trigger_offset):
 
 #     time = sig.time.values
 #     bins = sig.bins.values    
@@ -588,7 +588,7 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
         
 #         ch_d = dict(channel = ch)
         
-#         zero_bins = trigger_delay_bins.loc[ch]
+#         zero_bins = daq_trigger_offset.loc[ch]
         
 #         start = dict(bins = slice(zero_bins + skip_bin ,bins.size - ))
         
@@ -603,7 +603,7 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
                          
 #     return(sig)
 
-def trigger_delay(sig, trigger_delay_bins):
+def trigger_correction(sig, daq_trigger_offset):
 
     """
     General:
@@ -616,7 +616,7 @@ def trigger_delay(sig, trigger_delay_bins):
             A 3D xarray with the lidar signals, it should include the 
             following dimensions: (time, channel, bins). 
             
-        trigger_delay_bins: 
+        daq_trigger_offset: 
             A pandas series with the trigger delay bins per channel. 
             Negative values correspond to pretriggering --> shift to the left
             The index should correspond to the channel dimension of sig            
@@ -637,7 +637,7 @@ def trigger_delay(sig, trigger_delay_bins):
         
         ch_d = dict(channel = ch)
         
-        shift_bins = trigger_delay_bins.loc[ch]
+        shift_bins = daq_trigger_offset.loc[ch]
         
         sig_out.loc[ch_d] = sig.loc[ch_d].shift(bins = shift_bins).values
         

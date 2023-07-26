@@ -22,21 +22,23 @@ def rayleigh(args, version):
     path_cfg = args['config_file']
     
     file_format = args['file_format']
+    operation_mode = args['operation_mode']
     
     # Reading of the configuration file    
-    cfg = config(path = path_cfg, file_format = file_format) 
+    cfg = config(path = path_cfg, file_format = file_format, 
+                 operation_mode = operation_mode) 
     
     print('-----------------------------------------')
-    print(f'Lidar: {cfg.meas.lidar_name}')
+    print(f'Lidar: {cfg.system.lidar_name}')
     print('-----------------------------------------')
     print(' ')
 
     # Read the files in the dark folder
-    sig_raw_d, shots_d, meas_info_d, channel_info_d, time_info_d  = \
+    sig_raw_d, shots_d, system_info_d, channel_info_d, time_info_d  = \
         read_files.dark(finput_drk = path_drk, file_format = file_format)
     
     # Read the files in the rayleigh folder
-    sig_raw, shots, meas_info, channel_info, time_info = \
+    sig_raw, shots, system_info, channel_info, time_info = \
         read_files.rayleigh(finput_ray = path_ray, file_format = file_format)
 
     if not isinstance(sig_raw,list):
@@ -50,8 +52,8 @@ def rayleigh(args, version):
 
         # Add the information from the raw file headers to the configuration object
         if not isinstance(sig_raw_d,list):
-            cfg = modify.merge_config(cfg = cfg, meas_info = meas_info_d, channel_info = channel_info_d)
-        cfg = modify.merge_config(cfg = cfg, meas_info = meas_info, channel_info = channel_info)
+            cfg = modify.merge_config(cfg = cfg, system_info = system_info_d, channel_info = channel_info_d)
+        cfg = modify.merge_config(cfg = cfg, system_info = system_info, channel_info = channel_info)
     
         # Add default values to the configuration object when the respective variables are not provided in the configuration file
         cfg = modify.fill_defaults(cfg)
@@ -88,21 +90,21 @@ def rayleigh(args, version):
                                  meas_type = 'drk')    
                 
         # Creating the measurement ID
-        meas_ID = make.meas_id(lr_id = cfg.meas['lidar_id'], time = sig_raw.time)
+        meas_ID = make.meas_id(lr_id = cfg.system['station_id'], time = sig_raw.time)
               
         # Creating the paths and folders
-        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.meas['lidar_name'], meas_type = 'ray', version = version)
+        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.system['lidar_name'], meas_type = 'ray', version = version)
         
         # Checking for radiosonde data
         if os.path.isdir(args['radiosonde']):
-            nc_path_rs = radiosonde(args, time = sig_raw.time.values, version = version, lidar = cfg.meas['lidar_name'], lr_id = cfg.meas['lidar_id'])
+            nc_path_rs = radiosonde(args, time = sig_raw.time.values, version = version, lidar = cfg.system['lidar_name'], lr_id = cfg.system['station_id'])
         else: 
             nc_path_rs = os.path.join(args['output_folder'], os.path.basename(args['radiosonde']))
             shutil.copy(args['radiosonde'], nc_path_rs)
         args['radiosonde'] = os.path.basename(nc_path_rs)
             
         # Making the raw SCC file
-        make.rayleigh_file(meas_info = cfg.meas.copy(), 
+        make.rayleigh_file(system_info = cfg.system.copy(), 
                            channel_info = cfg.channels.copy(), 
                            time_info = time_info, time_info_d = time_info_d,
                            nc_path = nc_path, meas_ID = meas_ID,  
@@ -114,7 +116,7 @@ def rayleigh(args, version):
     
         # Creating debugging files from the configuration and licel input
         if args['debug']:
-            make.debug_file(path = args['output_folder'], data = cfg.meas, meas_type = 'ray', label = 'config_lidar', meas_ID = meas_ID, show_index = True, header = False)
+            make.debug_file(path = args['output_folder'], data = cfg.system, meas_type = 'ray', label = 'config_lidar', meas_ID = meas_ID, show_index = True, header = False)
             make.debug_file(path = args['output_folder'], data = cfg.channels, meas_type = 'ray', label = 'config_channels', meas_ID = meas_ID)
             make.debug_file(path = args['output_folder'], data = time_info, meas_type = 'ray', label = 'time_info', meas_ID = meas_ID)
             if not isinstance(sig_raw_d,list):
@@ -138,6 +140,7 @@ def telecover(args, version):
     path_cfg = args['config_file']
 
     file_format = args['file_format']
+    operation_mode = args['operation_mode']
     
     files_per_sector = args['files_per_sector']
     files_per_ring = args['files_per_ring']
@@ -147,19 +150,20 @@ def telecover(args, version):
     check_telecover_rin(path_rin, files_per_ring = files_per_ring)
     
     # Reading of the configuration file    
-    cfg = config(path = path_cfg, file_format = file_format) 
+    cfg = config(path = path_cfg, file_format = file_format, 
+                 operation_mode = operation_mode)  
     
     print('-----------------------------------------')
-    print(f'Lidar: {cfg.meas.lidar_name}')
+    print(f'Lidar: {cfg.system.lidar_name}')
     print('-----------------------------------------')
     print(' ')
 
     # Read the files in the dark folder
-    sig_raw_d, shots_d, meas_info_d, channel_info_d, time_info_d  = \
+    sig_raw_d, shots_d, system_info_d, channel_info_d, time_info_d  = \
         read_files.dark(finput_drk = path_drk, file_format = file_format)
 
     # Read the files in the telecover folder
-    sig_raw, shots, meas_info, channel_info, time_info = \
+    sig_raw, shots, system_info, channel_info, time_info = \
         read_files.telecover(finput_sec = path_sec, finput_rin = path_rin, file_format = file_format, files_per_sector = files_per_sector, files_per_ring = files_per_ring)
 
     if not isinstance(sig_raw,list):
@@ -173,8 +177,8 @@ def telecover(args, version):
       
         # Add the information from the raw file headers to the configuration object
         if not isinstance(sig_raw_d,list):
-            cfg = modify.merge_config(cfg = cfg, meas_info = meas_info_d, channel_info = channel_info_d)
-        cfg = modify.merge_config(cfg = cfg, meas_info = meas_info, channel_info = channel_info)
+            cfg = modify.merge_config(cfg = cfg, system_info = system_info_d, channel_info = channel_info_d)
+        cfg = modify.merge_config(cfg = cfg, system_info = system_info, channel_info = channel_info)
     
         # Add default values to the configuration object when the respective variables are not provided in the configuration file
         cfg = modify.fill_defaults(cfg)
@@ -210,13 +214,13 @@ def telecover(args, version):
                                  method = args['trim_overflows'],
                                  meas_type = 'drk')    
         # Creating the measurement ID
-        meas_ID = make.meas_id(lr_id = cfg.meas['lidar_id'], time = sig_raw.time)
+        meas_ID = make.meas_id(lr_id = cfg.system['station_id'], time = sig_raw.time)
               
         # Creating the paths and folders
-        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.meas['lidar_name'], meas_type = 'tlc', version = version)
+        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.system['lidar_name'], meas_type = 'tlc', version = version)
         
         # Making the raw SCC file
-        make.telecover_file(meas_info = cfg.meas.copy(), 
+        make.telecover_file(system_info = cfg.system.copy(), 
                             channel_info = cfg.channels.copy(),
                             time_info = time_info, time_info_d = time_info_d,
                             nc_path = nc_path, meas_ID = meas_ID, 
@@ -225,7 +229,7 @@ def telecover(args, version):
     
         # Creating debugging files from the configuration and licel input
         if args['debug']:
-            make.debug_file(path = args['output_folder'], data = cfg.meas, meas_type = 'tlc', label = 'config_lidar', meas_ID = meas_ID, show_index = True, header = False)
+            make.debug_file(path = args['output_folder'], data = cfg.system, meas_type = 'tlc', label = 'config_lidar', meas_ID = meas_ID, show_index = True, header = False)
             make.debug_file(path = args['output_folder'], data = cfg.channels, meas_type = 'tlc', label = 'config_channels', meas_ID = meas_ID)
             make.debug_file(path = args['output_folder'], data = time_info, meas_type = 'tlc', label = 'time_info', meas_ID = meas_ID)
             if not isinstance(sig_raw_d,list):
@@ -250,12 +254,14 @@ def polarization_calibration(args, version):
     path_cfg = args['config_file']
 
     file_format = args['file_format']
+    operation_mode = args['operation_mode']
     
     # Reading of the configuration file    
-    cfg = config(path = path_cfg, file_format = file_format) 
+    cfg = config(path = path_cfg, file_format = file_format, 
+                 operation_mode = operation_mode) 
     
     print('-----------------------------------------')
-    print(f'Lidar: {cfg.meas.lidar_name}')
+    print(f'Lidar: {cfg.system.lidar_name}')
     print('-----------------------------------------')
     print(' ')
 
@@ -264,11 +270,11 @@ def polarization_calibration(args, version):
         raise Exception("-- Error: A polarization calibration measurement is being processed but the rayleigh filename was not provided in the arguments! Please prepare the rayleigh file fist and included it with: -l <rayleigh_filename>'")
         
     # Read the files in the dark folder
-    sig_raw_d, shots_d, meas_info_d, channel_info_d, time_info_d  = \
+    sig_raw_d, shots_d, system_info_d, channel_info_d, time_info_d  = \
         read_files.dark(finput_drk = path_drk, file_format = file_format)
 
     # Read the files in the calibration folder
-    sig_raw, shots, meas_info, channel_info, time_info = \
+    sig_raw, shots, system_info, channel_info, time_info = \
         read_files.polarization_calibration(finput_ray = path_ray, finput_p45 = path_p45, finput_m45 = path_m45, finput_stc = path_stc, file_format = file_format)
 
     if not isinstance(sig_raw,list):
@@ -282,8 +288,8 @@ def polarization_calibration(args, version):
 
         # Add the information from the raw file headers to the configuration object
         if not isinstance(sig_raw_d,list):
-            cfg = modify.merge_config(cfg = cfg, meas_info = meas_info_d, channel_info = channel_info_d)
-        cfg = modify.merge_config(cfg = cfg, meas_info = meas_info, channel_info = channel_info)
+            cfg = modify.merge_config(cfg = cfg, system_info = system_info_d, channel_info = channel_info_d)
+        cfg = modify.merge_config(cfg = cfg, system_info = system_info, channel_info = channel_info)
     
         # Add default values to the configuration object when the respective variables are not provided in the configuration file
         cfg = modify.fill_defaults(cfg)
@@ -319,13 +325,13 @@ def polarization_calibration(args, version):
                                  meas_type = 'drk')
                 
         # Creating the measurement ID
-        meas_ID = make.meas_id(lr_id = cfg.meas['lidar_id'], time = sig_raw.time)
+        meas_ID = make.meas_id(lr_id = cfg.system['station_id'], time = sig_raw.time)
               
         # Creating the paths and folders
-        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.meas['lidar_name'], meas_type = 'pcb', version = version)
+        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.system['lidar_name'], meas_type = 'pcb', version = version)
         
         # Making the raw SCC file
-        make.polarization_calibration_file(meas_info = cfg.meas.copy(), 
+        make.polarization_calibration_file(system_info = cfg.system.copy(), 
                                            channel_info = cfg.channels.copy(), 
                                            time_info = time_info, time_info_d = time_info_d,
                                            nc_path = nc_path, meas_ID = meas_ID, 
@@ -338,7 +344,7 @@ def polarization_calibration(args, version):
     
         # Creating debugging files from the configuration and licel input
         if args['debug']:
-            make.debug_file(path = args['output_folder'], data = cfg.meas, meas_type = 'pcb', label = 'config_lidar', meas_ID = meas_ID, show_index = True, header = False)
+            make.debug_file(path = args['output_folder'], data = cfg.system, meas_type = 'pcb', label = 'config_lidar', meas_ID = meas_ID, show_index = True, header = False)
             make.debug_file(path = args['output_folder'], data = cfg.channels, meas_type = 'pcb', label = 'config_channels', meas_ID = meas_ID)
             make.debug_file(path = args['output_folder'], data = time_info, meas_type = 'pcb', label = 'time_info', meas_ID = meas_ID)
             if not isinstance(sig_raw_d,list):
@@ -360,19 +366,18 @@ def dark(args, version):
     path_cfg = args['config_file']
 
     file_format = args['file_format']
+    operation_mode = args['operation_mode']
 
-    cfg = config(path = path_cfg, file_format = file_format) 
-
-    # Reading of the configuration file    
-    cfg = config(path = args['config_file'])   
+    cfg = config(path = path_cfg, file_format = file_format, 
+                 operation_mode = operation_mode) 
     
     print('-----------------------------------------')
-    print(f'Lidar: {cfg.meas.lidar_name}')
+    print(f'Lidar: {cfg.system.lidar_name}')
     print('-----------------------------------------')
     print(' ')
 
     # Read the files in the dark folder
-    sig_raw_d, shots_d, meas_info_d, channel_info_d, time_info_d  = \
+    sig_raw_d, shots_d, system_info_d, channel_info_d, time_info_d  = \
         read_files.dark(finput_drk = path_drk, file_format = file_format)
 
     if not isinstance(sig_raw_d,list):
@@ -382,7 +387,7 @@ def dark(args, version):
         
     
         # Add the information from the raw file headers to the configuration object
-        cfg = modify.merge_config(cfg = cfg, meas_info = meas_info_d, channel_info = channel_info_d)
+        cfg = modify.merge_config(cfg = cfg, system_info = system_info_d, channel_info = channel_info_d)
     
         # Add default values to the configuration object when the respective variables are not provided in the configuration file
         cfg = modify.fill_defaults(cfg)
@@ -403,13 +408,13 @@ def dark(args, version):
                              meas_type = 'drk')
         
         # Creating the measurement ID
-        meas_ID = make.meas_id(lr_id = cfg.meas['lidar_id'], time = sig_raw_d.time)
+        meas_ID = make.meas_id(lr_id = cfg.system['station_id'], time = sig_raw_d.time)
               
         # Creating the paths and folders
-        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.meas['lidar_name'], meas_type = 'drk', version = version)
+        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.system['lidar_name'], meas_type = 'drk', version = version)
         
         # Making the raw SCC file
-        make.dark_file(meas_info = cfg.meas.copy(), 
+        make.dark_file(system_info = cfg.system.copy(), 
                        channel_info = cfg.channels.copy(),
                        time_info_d = time_info_d,
                        nc_path = nc_path, meas_ID = meas_ID, 
@@ -417,7 +422,7 @@ def dark(args, version):
     
         # Creating debugging files from the configuration and licel input
         if args['debug']:
-            make.debug_file(path = args['output_folder'], data = cfg.meas, meas_type = 'drk', label = 'config_lidar', meas_ID = meas_ID, show_index = True, header = False)
+            make.debug_file(path = args['output_folder'], data = cfg.system, meas_type = 'drk', label = 'config_lidar', meas_ID = meas_ID, show_index = True, header = False)
             make.debug_file(path = args['output_folder'], data = cfg.channels, meas_type = 'drk', label = 'config_channels', meas_ID = meas_ID)
             make.debug_file(path = args['output_folder'], data = time_info_d, meas_type = 'drk', label = 'time_info_d', meas_ID = meas_ID)
                 

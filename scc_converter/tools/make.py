@@ -10,7 +10,7 @@ import os, sys
 import netCDF4 as nc
 import numpy as np
 
-def rayleigh_file(meas_info, channel_info, time_info, time_info_d, nc_path,
+def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
                   meas_ID, sig, sig_d, shots, shots_d, 
                   P = None, T = None, radiosonde_file = None):
 
@@ -48,6 +48,12 @@ def rayleigh_file(meas_info, channel_info, time_info, time_info_d, nc_path,
     Raw_Start_Time[:,0] = start_t
     Raw_Stop_Time[:,0] = end_t
     
+    mask_delay = channel_info.daq_trigger_offset.values >= 0.
+    Trigger_Delay = channel_info.daq_trigger_offset.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
+    First_Signal_Bin = - channel_info.daq_trigger_offset.values.astype(int)
+    Trigger_Delay[~mask_delay] = 0.
+    First_Signal_Bin[mask_delay] = 0
+    
     if not isinstance(sig_d,list):
         n_time_bck = sig_d.time.size
         start_time_d = [np.datetime64(t,'us').item() for t in time_info_d['start_time']] 
@@ -73,17 +79,32 @@ def rayleigh_file(meas_info, channel_info, time_info, time_info_d, nc_path,
         ds.createDimension('time_bck', n_time_bck)
     
 # Adding Global Parameters
-    ds.Altitude_meter_asl = float(meas_info.altitude);
+    ds.Altitude_meter_asl = float(system_info.altitude);
 
-    ds.Latitude_degrees_north = float(meas_info.latitude);
+    ds.Latitude_degrees_north = float(system_info.latitude);
 
-    ds.Longitude_degrees_east = float(meas_info.longitude);
+    ds.Longitude_degrees_east = float(system_info.longitude);
   
-    ds.Lidar_Name = meas_info.lidar_name;
+    ds.Lidar_Name = system_info.lidar_name;
 
-    ds.Lidar_Location = meas_info.location;
+    ds.Station_Name = system_info.station_name;
 
-    ds.Lidar_ID = meas_info.lidar_id;
+    ds.Station_ID = system_info.station_id;
+
+    if 'lidar_id' in system_info.index:
+        ds.Lidar_ID = system_info.lidar_id;
+
+    if 'version_name' in system_info.index:
+        ds.Version_Name = system_info.version_name;
+
+    if 'version_id' in system_info.index:
+        ds.Version_ID = system_info.version_id;  
+    
+    if 'configuration_name' in system_info.index:
+        ds.Configuration_Name = system_info.configuration_name;
+
+    if 'configuration_id' in system_info.index:
+        ds.Configuration_ID = system_info.configuration_id;
 
     ds.Measurement_ID = meas_ID;
 
@@ -146,13 +167,11 @@ def rayleigh_file(meas_info, channel_info, time_info, time_info_d, nc_path,
 
     make_nc_var(ds, name = 'Channel_Bandwidth', value = channel_info.channel_bandwidth.values, dtype = 'float', dims = ('channels',))
 
-    make_nc_var(ds, name = 'Laser_Pointing_Angle', value = np.array(n_scan_angles * [meas_info.zenith_angle]), dtype = 'float', dims = ('scan_angles',))
+    make_nc_var(ds, name = 'Laser_Pointing_Angle', value = np.array(n_scan_angles * [system_info.zenith_angle]), dtype = 'float', dims = ('scan_angles',))
 
-    make_nc_var(ds, name = 'Laser_Pointing_Azimuth_Angle', value = np.array(n_scan_angles * [meas_info.azimuth_angle]), dtype = 'float', dims = ('scan_angles',))
+    make_nc_var(ds, name = 'Laser_Pointing_Azimuth_Angle', value = np.array(n_scan_angles * [system_info.azimuth_angle]), dtype = 'float', dims = ('scan_angles',))
     
     make_nc_var(ds, name = 'Laser_Pointing_Angle_of_Profiles', value = np.zeros([n_time, n_nb_of_time_scales]), dtype = 'int', dims = ('time', 'nb_of_time_scales',))
-
-    make_nc_var(ds, name = 'Laser_Polarization',  value = channel_info.laser_polarization.values, dtype = 'int', dims = ('channels',))
 
     make_nc_var(ds, name = 'Laser_Repetition_Rate', value = channel_info.laser_repetition_rate.values, dtype = 'int', dims = ('channels',))
     
@@ -171,9 +190,11 @@ def rayleigh_file(meas_info, channel_info, time_info, time_info_d, nc_path,
     
     make_nc_var(ds, name = 'Raw_Data_Stop_Time', value = Raw_Stop_Time, dtype = 'int', dims = ('time', 'nb_of_time_scales',))
 
-    make_nc_var(ds, name = 'Trigger_Delay', value = - channel_info.trigger_delay_bins.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float), dtype = 'float', dims = ('channels',))
+    make_nc_var(ds, name = 'Trigger_Delay', value = Trigger_Delay, dtype = 'float', dims = ('channels',))
 
-    make_nc_var(ds, name = 'Trigger_Delay_Bins', value = channel_info.trigger_delay_bins.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'First_Signal_Bin', value = First_Signal_Bin, dtype = 'int', dims = ('channels',))
+
+    make_nc_var(ds, name = 'DAQ_Trigger_Offset', value = channel_info.daq_trigger_offset.values, dtype = 'int', dims = ('channels',))
     
     if not isinstance(sig_d,list):
         
@@ -197,7 +218,7 @@ def rayleigh_file(meas_info, channel_info, time_info, time_info_d, nc_path,
     
     return()
 
-def telecover_file(meas_info, channel_info, time_info, time_info_d, nc_path, 
+def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path, 
                    meas_ID, sig, sig_d, shots, shots_d):
 
     print('-----------------------------------------')
@@ -234,6 +255,12 @@ def telecover_file(meas_info, channel_info, time_info, time_info_d, nc_path,
     Raw_Start_Time[:,0] = start_t
     Raw_Stop_Time[:,0] = end_t
     
+    mask_delay = channel_info.daq_trigger_offset.values >= 0.
+    Trigger_Delay = channel_info.daq_trigger_offset.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
+    First_Signal_Bin = - channel_info.daq_trigger_offset.values.astype(int)
+    Trigger_Delay[~mask_delay] = 0.
+    First_Signal_Bin[mask_delay] = 0
+    
     if not isinstance(sig_d,list):
         n_time_bck = sig_d.time.size
         start_time_d = [np.datetime64(t,'us').item() for t in time_info_d['start_time']] 
@@ -259,17 +286,17 @@ def telecover_file(meas_info, channel_info, time_info, time_info_d, nc_path,
         ds.createDimension('time_bck', n_time_bck)
     
 # Adding Global Parameters
-    ds.Altitude_meter_asl = meas_info.altitude;
+    ds.Altitude_meter_asl = system_info.altitude;
 
-    ds.Latitude_degrees_north = meas_info.latitude;
+    ds.Latitude_degrees_north = system_info.latitude;
 
-    ds.Longitude_degrees_east = meas_info.longitude;
+    ds.Longitude_degrees_east = system_info.longitude;
 
-    ds.Lidar_Name = meas_info.lidar_name;
+    ds.Lidar_Name = system_info.lidar_name;
 
-    ds.Lidar_Location = meas_info.location;
+    ds.Station_Name = system_info.station_name;
 
-    ds.Lidar_ID = meas_info.lidar_id;
+    ds.Station_ID = system_info.station_id;
   
     ds.Measurement_ID = meas_ID;
 
@@ -328,21 +355,21 @@ def telecover_file(meas_info, channel_info, time_info, time_info_d, nc_path,
 
     make_nc_var(ds, name = 'Channel_Bandwidth', value = channel_info.channel_bandwidth.values, dtype = 'float', dims = ('channels',))
     
-    make_nc_var(ds, name = 'Laser_Pointing_Angle', value = np.array(n_scan_angles * [meas_info.zenith_angle]), dtype = 'float', dims = ('scan_angles',))
+    make_nc_var(ds, name = 'Laser_Pointing_Angle', value = np.array(n_scan_angles * [system_info.zenith_angle]), dtype = 'float', dims = ('scan_angles',))
 
-    make_nc_var(ds, name = 'Laser_Pointing_Azimuth_Angle', value = np.array(n_scan_angles * [meas_info.azimuth_angle]), dtype = 'float', dims = ('scan_angles',))
+    make_nc_var(ds, name = 'Laser_Pointing_Azimuth_Angle', value = np.array(n_scan_angles * [system_info.azimuth_angle]), dtype = 'float', dims = ('scan_angles',))
 
     make_nc_var(ds, name = 'Laser_Pointing_Angle_of_Profiles', value = np.zeros([n_time, n_nb_of_time_scales]), dtype = 'int', dims = ('time', 'nb_of_time_scales',))
-
-    make_nc_var(ds, name = 'Laser_Polarization',  value = channel_info.laser_polarization.values, dtype = 'int', dims = ('channels',))
 
     make_nc_var(ds, name = 'Laser_Repetition_Rate', value = channel_info.laser_repetition_rate.values, dtype = 'int', dims = ('channels',))
     
     make_nc_var(ds, name = 'Laser_Shots', value = shots.values, dtype = 'int', dims = ('time', 'channels',))
 
-    make_nc_var(ds, name = 'Trigger_Delay', value = - channel_info.trigger_delay_bins.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float), dtype = 'float', dims = ('channels',))
+    make_nc_var(ds, name = 'Trigger_Delay', value = Trigger_Delay, dtype = 'float', dims = ('channels',))
 
-    make_nc_var(ds, name = 'Trigger_Delay_Bins', value = channel_info.trigger_delay_bins.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'First_Signal_Bin', value = First_Signal_Bin, dtype = 'int', dims = ('channels',))
+
+    make_nc_var(ds, name = 'DAQ_Trigger_Offset', value = channel_info.daq_trigger_offset.values, dtype = 'int', dims = ('channels',))
     
     if not isinstance(sig_d,list):
         make_nc_var(ds, name = 'Background_Shots', value = shots_d.values, dtype = 'int', dims = ('time_bck', 'channels',))
@@ -369,7 +396,7 @@ def telecover_file(meas_info, channel_info, time_info, time_info_d, nc_path,
     return()
 
 def polarization_calibration_file(
-        meas_info, channel_info, time_info, time_info_d, nc_path,
+        system_info, channel_info, time_info, time_info_d, nc_path,
         meas_ID, sig, sig_d, shots, shots_d, molecular_calc = [], 
         P = [], T = [], radiosonde_file = None, rayleigh = []):
 
@@ -403,6 +430,12 @@ def polarization_calibration_file(
     Raw_Start_Time[:,0] = start_t
     Raw_Stop_Time[:,0] = end_t
     
+    mask_delay = channel_info.daq_trigger_offset.values >= 0.
+    Trigger_Delay = channel_info.daq_trigger_offset.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
+    First_Signal_Bin = - channel_info.daq_trigger_offset.values.astype(int)
+    Trigger_Delay[~mask_delay] = 0.
+    First_Signal_Bin[mask_delay] = 0
+    
     if not isinstance(sig_d,list):
         n_time_bck = sig_d.time.size
         start_time_d = [np.datetime64(t,'us').item() for t in time_info_d['start_time']] 
@@ -428,17 +461,17 @@ def polarization_calibration_file(
         ds.createDimension('time_bck', n_time_bck)
 
 # Adding Global Parameters
-    ds.Altitude_meter_asl = meas_info.altitude;
+    ds.Altitude_meter_asl = system_info.altitude;
 
-    ds.Latitude_degrees_north = meas_info.latitude;
+    ds.Latitude_degrees_north = system_info.latitude;
 
-    ds.Longitude_degrees_east = meas_info.longitude;
+    ds.Longitude_degrees_east = system_info.longitude;
 
-    ds.Lidar_Name = meas_info.lidar_name;
+    ds.Lidar_Name = system_info.lidar_name;
 
-    ds.Lidar_Location = meas_info.location;
+    ds.Station_Name = system_info.station_name;
 
-    ds.Lidar_ID = meas_info.lidar_id;
+    ds.Station_ID = system_info.station_id;
   
     ds.Measurement_ID = meas_ID;
     
@@ -501,13 +534,11 @@ def polarization_calibration_file(
 
     make_nc_var(ds, name = 'Channel_Bandwidth', value = channel_info.channel_bandwidth.values, dtype = 'float', dims = ('channels',))
     
-    make_nc_var(ds, name = 'Laser_Pointing_Angle', value = np.array(n_scan_angles * [meas_info.zenith_angle]), dtype = 'float', dims = ('scan_angles',))
+    make_nc_var(ds, name = 'Laser_Pointing_Angle', value = np.array(n_scan_angles * [system_info.zenith_angle]), dtype = 'float', dims = ('scan_angles',))
 
-    make_nc_var(ds, name = 'Laser_Pointing_Azimuth_Angle', value = np.array(n_scan_angles * [meas_info.azimuth_angle]), dtype = 'float', dims = ('scan_angles',))
+    make_nc_var(ds, name = 'Laser_Pointing_Azimuth_Angle', value = np.array(n_scan_angles * [system_info.azimuth_angle]), dtype = 'float', dims = ('scan_angles',))
   
     make_nc_var(ds, name = 'Laser_Pointing_Angle_of_Profiles', value = np.zeros([n_time, n_nb_of_time_scales]), dtype = 'int', dims = ('time', 'nb_of_time_scales',))
-
-    make_nc_var(ds, name = 'Laser_Polarization',  value = channel_info.laser_polarization.values, dtype = 'int', dims = ('channels',))
 
     make_nc_var(ds, name = 'Laser_Repetition_Rate', value = channel_info.laser_repetition_rate.values, dtype = 'int', dims = ('channels',))
     
@@ -526,9 +557,11 @@ def polarization_calibration_file(
     
     make_nc_var(ds, name = 'Raw_Data_Stop_Time', value = Raw_Stop_Time, dtype = 'int', dims = ('time', 'nb_of_time_scales',))
 
-    make_nc_var(ds, name = 'Trigger_Delay', value = - channel_info.trigger_delay_bins.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float), dtype = 'float', dims = ('channels',))
+    make_nc_var(ds, name = 'Trigger_Delay', value = Trigger_Delay, dtype = 'float', dims = ('channels',))
 
-    make_nc_var(ds, name = 'Trigger_Delay_Bins', value = channel_info.trigger_delay_bins.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'First_Signal_Bin', value = First_Signal_Bin, dtype = 'int', dims = ('channels',))
+
+    make_nc_var(ds, name = 'DAQ_Trigger_Offset', value = channel_info.daq_trigger_offset.values, dtype = 'int', dims = ('channels',))
     
     make_nc_var(ds, name = 'calibrator_position', value = time_info.position.values, dtype = 'int', dims = ('time',))
     
@@ -557,7 +590,7 @@ def polarization_calibration_file(
     
     return()
 
-def dark_file(meas_info, channel_info, time_info_d, nc_path, 
+def dark_file(system_info, channel_info, time_info_d, nc_path, 
               meas_ID, sig_d, shots_d):
     
     print('-----------------------------------------')
@@ -592,6 +625,12 @@ def dark_file(meas_info, channel_info, time_info_d, nc_path,
     Bck_Start_Time[:,0] = start_t_d
     Bck_Stop_Time[:,0] = end_t_d
     
+    mask_delay = channel_info.daq_trigger_offset.values >= 0.
+    Trigger_Delay = channel_info.daq_trigger_offset.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
+    First_Signal_Bin = - channel_info.daq_trigger_offset.values.astype(int)
+    Trigger_Delay[~mask_delay] = 0.
+    First_Signal_Bin[mask_delay] = 0
+    
     ds = nc.Dataset(nc_path,mode='w')
 
 # Adding Dimensions
@@ -604,17 +643,17 @@ def dark_file(meas_info, channel_info, time_info_d, nc_path,
     ds.createDimension('time_bck', n_time_bck)    
 
 # Adding Global Parameters
-    ds.Altitude_meter_asl = meas_info.altitude;
+    ds.Altitude_meter_asl = system_info.altitude;
 
-    ds.Latitude_degrees_north = meas_info.latitude;
+    ds.Latitude_degrees_north = system_info.latitude;
 
-    ds.Longitude_degrees_east = meas_info.longitude;
+    ds.Longitude_degrees_east = system_info.longitude;
 
-    ds.Lidar_Name = meas_info.lidar_name;
+    ds.Lidar_Name = system_info.lidar_name;
 
-    ds.Lidar_Location = meas_info.location;
+    ds.Station_Name = system_info.station_name;
 
-    ds.Lidar_ID = meas_info.lidar_id;
+    ds.Station_ID = system_info.station_id;
   
     ds.Measurement_ID = meas_ID;
     
@@ -661,13 +700,11 @@ def dark_file(meas_info, channel_info, time_info_d, nc_path,
 
     make_nc_var(ds, name = 'Channel_Bandwidth', value = channel_info.channel_bandwidth.values, dtype = 'float', dims = ('channels',))
     
-    make_nc_var(ds, name = 'Laser_Pointing_Angle', value = np.array(n_scan_angles * [meas_info.zenith_angle]), dtype = 'float', dims = ('scan_angles',))
+    make_nc_var(ds, name = 'Laser_Pointing_Angle', value = np.array(n_scan_angles * [system_info.zenith_angle]), dtype = 'float', dims = ('scan_angles',))
 
-    make_nc_var(ds, name = 'Laser_Pointing_Azimuth_Angle', value = np.array(n_scan_angles * [meas_info.azimuth_angle]), dtype = 'float', dims = ('scan_angles',))
+    make_nc_var(ds, name = 'Laser_Pointing_Azimuth_Angle', value = np.array(n_scan_angles * [system_info.azimuth_angle]), dtype = 'float', dims = ('scan_angles',))
 
     make_nc_var(ds, name = 'Laser_Pointing_Angle_of_Profiles', value = np.zeros([n_time_bck, n_nb_of_time_scales]), dtype = 'int', dims = ('time_bck', 'nb_of_time_scales',))
-
-    make_nc_var(ds, name = 'Laser_Polarization',  value = channel_info.laser_polarization.values, dtype = 'int', dims = ('channels',))
 
     make_nc_var(ds, name = 'Laser_Repetition_Rate', value = channel_info.laser_repetition_rate.values, dtype = 'int', dims = ('channels',))
     
@@ -677,9 +714,11 @@ def dark_file(meas_info, channel_info, time_info_d, nc_path,
         
     make_nc_var(ds, name = 'Raw_Data_Range_Resolution', value = channel_info.range_resolution.values, dtype = 'float', dims = ('channels',))
 
-    make_nc_var(ds, name = 'Trigger_Delay', value = - channel_info.trigger_delay_bins.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float), dtype = 'float', dims = ('channels',))
+    make_nc_var(ds, name = 'Trigger_Delay', value = Trigger_Delay, dtype = 'float', dims = ('channels',))
 
-    make_nc_var(ds, name = 'Trigger_Delay_Bins', value = channel_info.trigger_delay_bins.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'First_Signal_Bin', value = First_Signal_Bin, dtype = 'int', dims = ('channels',))
+
+    make_nc_var(ds, name = 'DAQ_Trigger_Offset', value = channel_info.daq_trigger_offset.values, dtype = 'int', dims = ('channels',))
     
     make_nc_var(ds, name = 'Bck_Data_Start_Time', value = Bck_Start_Time, dtype = 'int', dims = ('time_bck', 'nb_of_time_scales',))
     

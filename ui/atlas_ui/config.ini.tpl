@@ -5,8 +5,8 @@
 #lidar_name: The lidar name. This field will be reported in the plots. 
 lidar_name = ${lidar.lidar_name.pretty}
 
-#lidar_id: The lidar id according to the EARLINET DB. 
-lidar_id = ${lidar.lidar_id.pretty}
+#station_id: The lidar id according to the EARLINET DB. 
+station_id = ${lidar.station_id.pretty}
 
 #-------------------------------------------------------------------------------------------------------------
 #Optional Variables
@@ -14,9 +14,6 @@ lidar_id = ${lidar.lidar_id.pretty}
 
 #altitude: The altitude of the station above sea level (in meters). 
 altitude = ${lidar.altitude.pretty}
-
-#location: The station location. This field will be displayed in the plots. 
-location = ${lidar.location.pretty}
 
 #latitude: The station latitude (in degrees). 
 latitude = ${lidar.latitude.pretty}
@@ -74,8 +71,8 @@ channel_subtype = ${', '.join([channel.channel_subtype.required for channel in c
 #dead_time: The dead time of the photon counting channels (in ns). (for analog channels set _).
 dead_time = ${print_channels_field(channels, 'dead_time')}
 
-#trigger_delay_bins: The trigger delay per channel in bins. Provide negative values if the recording starts before the Q-switch (pre-triggering) and positive values if the recording starts after the Q-switch. 
-trigger_delay_bins = ${print_channels_field(channels, 'trigger_delay_bins')}
+#daq_trigger_offset: The trigger delay per channel in bins. Provide negative values if the recording starts before the Q-switch (pre-triggering) and positive values if the recording starts after the Q-switch. 
+daq_trigger_offset = ${print_channels_field(channels, 'daq_trigger_offset')}
 
 #-------------------------------------------------------------------------------------------------------------
 #Mandatory Variables for Licel
@@ -116,8 +113,8 @@ detected_wavelength = ${print_channels_field(channels, 'detected_wavelength')}
 channel_bandwidth = ${print_channels_field(channels, 'channel_bandwidth')}
 
 #background_low_bin: Starting bin of the background correction averaging range. Defaults to:
-#    • The 600th bin before the end of the profile if the trigger_delay_bins < 400
-#    • The 100th bin if the trigger_delay_bins >= 400 
+#    • The 600th bin before the end of the profile if the daq_trigger_offset < 400
+#    • The 100th bin if the daq_trigger_offset >= 400 
 #Using default values is currently risky. Please make sure that no spikes are appearing in the pretrigger range that would affect the background correction or manually provide this variable.
 % if len([channel.background_range() for channel in channels if channel.background_range() is not None]) > 0:
 background_low_bin = ${', '.join([f"{channel.background_range()[0]:.0f}" if channel.background_range() is not None else "_" for channel in channels])}
@@ -126,8 +123,8 @@ background_low_bin =
 % endif
 
 #background_high_bin: ending bin of the background correction averaging range. Defaults to:
-#    • The 100th bin before the end of the profile if the trigger_delay_bins < 400
-#    • The 300th bin if the trigger_delay_bins >= 400 
+#    • The 100th bin before the end of the profile if the daq_trigger_offset < 400
+#    • The 300th bin if the daq_trigger_offset >= 400 
 #Using default values is currently risky. Please make sure that no spikes are appearing in the pretrigger range that would affect the background correction or manually provide this variable.
 % if len([channel.background_range() for channel in channels if channel.background_range() is not None]) > 0:
 background_high_bin = ${', '.join([f"{channel.background_range()[1]:.0f}" if channel.background_range() is not None else "_" for channel in channels])}
@@ -145,11 +142,6 @@ acquisition_mode = ${print_channels_field(channels, 'acquisition_mode')}
 
 #bins:  The total bins of the recorded signals per channel. 
 bins = ${print_channels_field(channels, 'bins')}
-
-#laser_polarization: The laser polarization of the recorded signals per channel. Choose among:
-#    • 1: linear
-#    • 3: circular 
-laser_polarization =
 
 #laser_shots: The number of acquired laser shots per channel. Not recommended to provide it manually. If fetched from the metadata, this variable is different per file which is more accurate than providing a constant value here.
 laser_shots = ${print_channels_field(channels, 'laser_shots')}

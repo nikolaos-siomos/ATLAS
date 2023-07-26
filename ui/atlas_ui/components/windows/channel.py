@@ -38,7 +38,7 @@ class ChannelData:
         channel_type,
         channel_subtype,
         dead_time,
-        trigger_delay_bins,
+        daq_trigger_offset,
         recorder_channel_id,
         laser,
         scc_channel_id,
@@ -50,7 +50,6 @@ class ChannelData:
         background_high_bin,
         acquisition_mode,
         bins,
-        laser_polarization,
         laser_shots,
         data_acquisition_range,
         adc_resolution,
@@ -100,8 +99,8 @@ class ChannelWindow (wx.ScrolledWindow):
         self.dead_time = AtlasUIInputField.FromSetting ( self._settings.dead_time, parent = self.panel, label = "Dead time [ns]" )
         self.sizer.Add ( self.dead_time, pos = wx.GBPosition(1, 0), flag = wx.EXPAND )
         
-        self.trigger_delay_bins = AtlasUIInputField.FromSetting ( self._settings.trigger_delay_bins, parent = self.panel, label = "Trigger delay [bins]" )
-        self.sizer.Add ( self.trigger_delay_bins, pos = wx.GBPosition(1, 1), flag = wx.EXPAND )
+        self.daq_trigger_offset = AtlasUIInputField.FromSetting ( self._settings.daq_trigger_offset, parent = self.panel, label = "Trigger delay [bins]" )
+        self.sizer.Add ( self.daq_trigger_offset, pos = wx.GBPosition(1, 1), flag = wx.EXPAND )
         
         self.recorder_channel_id = AtlasUIInputField.FromSetting ( self._settings.recorder_channel_id, parent = self.panel, label = "Channel ID" )
         self.sizer.Add ( self.recorder_channel_id, pos = wx.GBPosition(2, 0), flag = wx.EXPAND )
@@ -135,9 +134,6 @@ class ChannelWindow (wx.ScrolledWindow):
         self.total_bins = AtlasUIInputField.FromSetting ( self._settings.bins, parent = self.optional_box, label = "Total bins" )
         self.optional_box_sizer.Add ( self.total_bins, flag = wx.EXPAND | wx.TOP, border = 25, pos = wx.GBPosition(0, 0) )
 
-        self.laser_polarization = AtlasUIInputField.FromSetting ( self._settings.laser_polarization, parent = self.optional_box, label = "Laser polarization" )
-        self.optional_box_sizer.Add ( self.laser_polarization, flag = wx.EXPAND | wx.TOP, border = 25, pos = wx.GBPosition(0, 1) )
-        
         self.laser_shots = AtlasUIInputField.FromSetting ( self._settings.laser_shots, parent = self.optional_box, label = "Laser shots" )
         self.optional_box_sizer.Add ( self.laser_shots, flag = wx.EXPAND, pos = wx.GBPosition(1, 0) )
         

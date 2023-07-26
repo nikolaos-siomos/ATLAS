@@ -91,6 +91,10 @@ def call_parser():
                         type=str, nargs='?', default = None,
                         help='The format of the raw lidar files. Currently licel and polly_xt are supported')            
 
+    parser.add_argument('--operation_mode', metavar='operation_mode', 
+                        type=str, nargs='?', default = 'labeling',
+                        help='Choose one of: a) labeling: Use when submitting a measurement to CARS. Makes some SCC related field in the configuration file mandatory. b) testing: Use for causal testing of a measurement when there is no dedicated SCC configuration Defaults to: labeling')            
+
     parser.add_argument('--isday', metavar='isday', 
                         type=bool, default = False,
                         action = argparse.BooleanOptionalAction,

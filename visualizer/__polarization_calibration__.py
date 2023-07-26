@@ -380,7 +380,7 @@ def main(args, __version__):
                 channel_r = ch_r, 
                 channel_t = ch_t, 
                 zan = data.Laser_Pointing_Angle_Calibration,
-                loc = data.Lidar_Location,
+                loc = data.Station_Name,
                 dwl = dwl_ch,
                 ewl = ewl_ch,
                 bdw = bdw_ch,
@@ -472,7 +472,7 @@ def main(args, __version__):
                                                  H_T = H_T_ch,   
                                                  wave = dwl_ch, 
                                                  lidar = data.Lidar_Name, 
-                                                 loc = data.Lidar_Location, 
+                                                 loc = data.Station_Name, 
                                                  meas_id = data.Measurement_ID_Calibration, 
                                                  channel_r = ch_r,
                                                  channel_t = ch_t)

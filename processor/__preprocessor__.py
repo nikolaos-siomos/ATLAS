@@ -28,7 +28,7 @@ def main(args, __version__):
     print('-----------------------------------------')
     print('Start reading the QA file(s)...')
     
-    meas_info, channel_info, time_info, time_info_d, \
+    system_info, channel_info, time_info, time_info_d, \
         sig_raw, sig_raw_d, shots, shots_d = \
             read_files.short_reader(
                 args['input_file'],
@@ -38,21 +38,21 @@ def main(args, __version__):
                 exclude_channel_subtype = args['exclude_channel_subtype'], 
                 use_channels = args['channels'])
 
-    print(f'Lidar: {meas_info.Lidar_Name}')
+    print(f'Lidar: {system_info.Lidar_Name}')
     print('-----------------------------------------')
     print(' ')
     
-    meas_type = meas_info.Measurement_type
+    meas_type = system_info.Measurement_type
     meas_label = {'ray' : 'Rayleigh', 
                   'tlc' : 'Telecover', 
                   'pcb' : 'Polarization Calibration'}
     print(f'-- {meas_label[meas_type]} QA file succesfully parsed!')
     
-    if 'Rayleigh_File_Name' in meas_info.keys():
+    if 'Rayleigh_File_Name' in system_info.keys():
         ray_path = os.path.join(os.path.dirname(args['input_file']),  
-                                meas_info['Rayleigh_File_Name'])
+                                system_info['Rayleigh_File_Name'])
         
-        meas_info_r, channel_info_r, time_info_r, time_info_dr, \
+        system_info_r, channel_info_r, time_info_r, time_info_dr, \
             sig_raw_r, sig_raw_dr, shots_r, shots_dr = \
                 read_files.short_reader(
                     ray_path,
@@ -68,7 +68,7 @@ def main(args, __version__):
                   "succesfully parsed!")
         else:
             raise Exception("-- Error! The Rayleigh measurement accompaning the " +
-                            "calibration measurement {meas_info['Rayleigh_File_Name']} " +
+                            "calibration measurement {system_info['Rayleigh_File_Name']} " +
                             "lacks at least of the calibration measurement channels! " +
                             "Please make sure that the Rayleigh measuremen contains " +
                             "at least the channels channels necessary for the calibration")
@@ -81,7 +81,7 @@ def main(args, __version__):
         drk, drk_pack, time_info_d = \
             short_prepro.dark(sig_raw = sig_raw_d, 
                               shots = shots_d, 
-                              meas_info = meas_info, 
+                              system_info = system_info, 
                               channel_info = channel_info, 
                               time_info = time_info_d,
                               external_info = args)
@@ -89,11 +89,11 @@ def main(args, __version__):
     else:
         sig_drk = []
     
-    if 'Rayleigh_File_Name' in meas_info.keys() and not isinstance(sig_raw_d, list):
+    if 'Rayleigh_File_Name' in system_info.keys() and not isinstance(sig_raw_d, list):
         drk_r, drk_pack_r, time_info_dr = \
             short_prepro.dark(sig_raw = sig_raw_dr, 
                               shots = shots_dr, 
-                              meas_info = meas_info_r, 
+                              system_info = system_info_r, 
                               channel_info = channel_info_r, 
                               time_info = time_info_dr,
                               external_info = args)
@@ -106,7 +106,7 @@ def main(args, __version__):
         ray, ray_pack, time_info_ray = \
             short_prepro.standard(sig_raw = sig_raw, 
                                   shots = shots, 
-                                  meas_info = meas_info, 
+                                  system_info = system_info, 
                                   channel_info = channel_info, 
                                   time_info = time_info,
                                   external_info = args,
@@ -116,7 +116,7 @@ def main(args, __version__):
         molec, molec_info, meteo = \
             atmosphere.short_molec(heights = ray_pack['heights'],
                                    ranges = ray_pack['ranges'],
-                                   meas_info = meas_info, 
+                                   system_info = system_info, 
                                    channel_info = channel_info, 
                                    time_info = time_info_ray,
                                    external_info = args)
@@ -125,7 +125,7 @@ def main(args, __version__):
             nc_dataset.rayleigh(sig = ray, 
                                 molec = molec,
                                 meteo = meteo,
-                                meas_info = meas_info, 
+                                system_info = system_info, 
                                 channel_info = channel_info, 
                                 time_info = time_info_ray, 
                                 molec_info = molec_info, 
@@ -139,7 +139,7 @@ def main(args, __version__):
         tlc, tlc_pack, time_info_tlc = \
             short_prepro.standard(sig_raw = sig_raw, 
                                   shots = shots, 
-                                  meas_info = meas_info, 
+                                  system_info = system_info, 
                                   channel_info = channel_info, 
                                   time_info = time_info,
                                   external_info = args,
@@ -148,7 +148,7 @@ def main(args, __version__):
     
         output_files['tlc'] = \
             nc_dataset.telecover(sig = tlc, 
-                                 meas_info = meas_info, 
+                                 system_info = system_info, 
                                  channel_info = channel_info, 
                                  time_info = time_info_tlc, 
                                  heights = tlc_pack['heights'], 
@@ -161,7 +161,7 @@ def main(args, __version__):
         pcb, pcb_pack, time_info_pcb = \
             short_prepro.standard(sig_raw = sig_raw, 
                                   shots = shots, 
-                                  meas_info = meas_info, 
+                                  system_info = system_info, 
                                   channel_info = channel_info, 
                                   time_info = time_info,
                                   external_info = args,
@@ -171,7 +171,7 @@ def main(args, __version__):
         ray, ray_pack, time_info_ray = \
             short_prepro.standard(sig_raw = sig_raw_r, 
                                   shots = shots_r, 
-                                  meas_info = meas_info_r, 
+                                  system_info = system_info_r, 
                                   channel_info = channel_info_r, 
                                   time_info = time_info_r,
                                   external_info = args,
@@ -181,7 +181,7 @@ def main(args, __version__):
         molec, molec_info, meteo = \
             atmosphere.short_molec(heights = ray_pack['heights'],
                                    ranges = ray_pack['ranges'],
-                                   meas_info = meas_info_r, 
+                                   system_info = system_info_r, 
                                    channel_info = channel_info_r, 
                                    time_info = time_info_ray,
                                    external_info = args)
@@ -193,8 +193,8 @@ def main(args, __version__):
                                    sig_ray = ray.loc[dict(channel = pcb_ch)],
                                    molec = molec.loc[dict(channel = pcb_ch)],
                                    meteo = meteo.loc[dict(channel = pcb_ch)],
-                                   meas_info = meas_info, 
-                                   meas_info_ray = meas_info_r, 
+                                   system_info = system_info, 
+                                   system_info_ray = system_info_r, 
                                    channel_info = channel_info, 
                                    channel_info_ray = channel_info.loc[pcb_ch], 
                                    time_info = time_info_pcb, 
@@ -212,7 +212,7 @@ def main(args, __version__):
         qck, qck_pack, time_info_qck = \
             short_prepro.standard(sig_raw = sig_raw, 
                                   shots = shots, 
-                                  meas_info = meas_info, 
+                                  system_info = system_info, 
                                   channel_info = channel_info, 
                                   time_info = time_info,
                                   external_info = args,
@@ -221,7 +221,7 @@ def main(args, __version__):
             
         output_files['qck'] = \
             nc_dataset.quicklook(sig = qck, 
-                                 meas_info = meas_info, 
+                                 system_info = system_info, 
                                  channel_info = channel_info, 
                                  time_info = time_info_qck, 
                                  heights = qck_pack['heights'], 

@@ -827,12 +827,11 @@ class ATLASLidarSettings(BaseSettings):
     def __init__ (self):
         # Mandatory variables
         self.lidar_name = ATLASTextOption ( default = '', mandatory = True )
-        self.lidar_id = ATLASTextOption ( default = '', mandatory = True )
+        self.station_id = ATLASTextOption ( default = '', mandatory = True )
         
         # Optional variables
         self.file_format = ATLASChoiceOption ( default = 'licel', choices = { 'licel': 'Licel', 'polly_xt': 'PollyXT' } )
         self.altitude = ATLASDoubleOption ( default = None, min = 0, max = 8000 )
-        self.location = ATLASTextOption ( default = '' )
         self.latitude = ATLASDoubleOption ( default = None, min = -90, max = 90, increment = .001 )
         self.longitude = ATLASDoubleOption ( default = None, min = -90, max = 90, increment = .001 )
         self.zenith_angle = ATLASDoubleOption ( default = None, min = 0, max = 90, increment = .001 )
@@ -897,7 +896,7 @@ class ATLASChannelSettings(BaseSettings):
         )
         
         self.dead_time = ATLASDoubleOption ( default = 0, increment = .001, mandatory = True )
-        self.trigger_delay_bins = ATLASIntegerOption ( default = 0, min = -4000, max = 4000, mandatory = True )
+        self.daq_trigger_offset = ATLASIntegerOption ( default = 0, min = -4000, max = 4000, mandatory = True )
         self.recorder_channel_id = ATLASTextOption ( default = '' )
         self.laser = ATLASIntegerOption ( default = 1, min = 1, increment = 1 )
         self.scc_channel_id = ATLASIntegerOption ( default = 0 )
@@ -919,13 +918,6 @@ class ATLASChannelSettings(BaseSettings):
         
         # Optional variables
         self.bins = ATLASIntegerOption ( default = None )
-        self.laser_polarization = ATLASChoiceOption (
-            default = None,
-            choices = {
-                '1': 'Linear',
-                '3': 'Circular'
-            }
-        )
         
         self.laser_shots = ATLASIntegerOption ( default = None, min = 0 )
         self.data_acquisition_range = ATLASIntegerOption ( default = None, min = 0 )

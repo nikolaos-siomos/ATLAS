@@ -4,7 +4,7 @@
 
 from ..lidar_processing import signal, diagnose
  
-def standard(sig_raw, shots, meas_info, channel_info, 
+def standard(sig_raw, shots, system_info, channel_info, 
              external_info, time_info, meas_type, sig_drk = []):
     '''
     Perform the signal preprocessing for the rayleigh fit in the following order
@@ -17,7 +17,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
      
      -- background_calculation: Calculates the solar background per timeframe and channel 
      
-     -- trigger_delay: Perform the trigger correction per channel
+     -- trigger_correction: Perform the trigger correction per channel
      
      -- trim_vertically: Trim channels up to a maximum altitude
      
@@ -74,10 +74,10 @@ def standard(sig_raw, shots, meas_info, channel_info,
     daq_range = channel_info.DAQ_Range
     dead_time = channel_info.Dead_Time
     dead_time_cor_type = channel_info.Dead_Time_Correction_Type
-    ground_alt = meas_info.Altitude_meter_asl
+    ground_alt = system_info.Altitude_meter_asl
     resol = channel_info.Raw_Data_Range_Resolution
-    trd_bins = channel_info.Trigger_Delay_Bins
-    zenith_angle = meas_info.Laser_Pointing_Angle
+    trd_bins = channel_info.DAQ_Trigger_Offset
+    zenith_angle = system_info.Laser_Pointing_Angle
 
     # timescale = external_info['timescale']
     # sm_hwin = external_info['smoothing_window']
@@ -112,7 +112,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
     # # --------------------------------------------------    
     # if itrc:
     #     sig = signal.trim_clouds(sig = sig.copy(),
-    #                              trigger_delay_bins = trd_bins)
+    #                              daq_trigger_offset = trd_bins)
 
     # --------------------------------------------------
     # Dead time correction on photon counting channels 
@@ -184,8 +184,8 @@ def standard(sig_raw, shots, meas_info, channel_info,
     # --------------------------------------------------
     # Remove the pre-triggering region (or correct triger delays)
     # --------------------------------------------------
-    sig = signal.trigger_delay(sig = sig.copy(), 
-                               trigger_delay_bins = trd_bins)
+    sig = signal.trigger_correction(sig = sig.copy(), 
+                               daq_trigger_offset = trd_bins)
     
     if external_info['debug']: pack_out['sig_trc'] = sig.copy()
 
@@ -283,7 +283,7 @@ def standard(sig_raw, shots, meas_info, channel_info,
     return(sig, pack_out, time_info)
 
 
-def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
+def dark(sig_raw, shots, system_info, channel_info, external_info, time_info):
     '''
     Perform the dark signal preprocessing in the following order
      
@@ -291,7 +291,7 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
      
      -- background_calculation: Calculates the solar background per timeframe and channel 
      
-     -- trigger_delay: Perform the trigger correction per channel
+     -- trigger_correction: Perform the trigger correction per channel
      
      -- trim_vertically: Trim channels up to a maximum altitude
      
@@ -338,10 +338,10 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
     daq_range = channel_info.DAQ_Range
     dead_time = channel_info.Dead_Time
     dead_time_cor_type = channel_info.Dead_Time_Correction_Type
-    ground_alt = meas_info.Altitude_meter_asl
+    ground_alt = system_info.Altitude_meter_asl
     resol = channel_info.Raw_Data_Range_Resolution
-    trd_bins = channel_info.Trigger_Delay_Bins
-    zenith_angle = meas_info.Laser_Pointing_Angle
+    trd_bins = channel_info.DAQ_Trigger_Offset
+    zenith_angle = system_info.Laser_Pointing_Angle
     
     sig = sig_raw.copy()
     
@@ -413,8 +413,8 @@ def dark(sig_raw, shots, meas_info, channel_info, external_info, time_info):
     # --------------------------------------------------
     # Remove the pre-triggering region (or correct triger delays)
     # --------------------------------------------------
-    sig = signal.trigger_delay(sig = sig.copy(), 
-                               trigger_delay_bins = trd_bins)
+    sig = signal.trigger_correction(sig = sig.copy(), 
+                               daq_trigger_offset = trd_bins)
     
     if external_info['debug']: pack_out['sig_trc'] = sig.copy()
 

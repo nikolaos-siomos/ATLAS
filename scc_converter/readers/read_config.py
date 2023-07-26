@@ -9,34 +9,33 @@ import sys
 
 class config():
     
-    def __init__(self, path, file_format):
+    def __init__(self, path, file_format, operation_mode):
         """Reads the config file at the given path"""
         
         parser = configparser.ConfigParser()
         parser.read(path, encoding="utf-8")
 
 # Lidar
-        if parser.has_section('Lidar'):
+        if parser.has_section('System'):
 
-            self.meas = read_meas(parser['Lidar'], dtype = object)
-            check_meas(meas_info = self.meas)
+            self.system = read_system(parser['System'], dtype = object)
+            check_system(system_info = self.system, operation_mode = operation_mode)
 
         else:
             
-            raise Exception("-- Error: No lidar section is provided in the configuration files. Please include a section with at least the mandatory fields!")
+            raise Exception("-- Error: No System section is provided in the configuration files. Please include a section with at least the mandatory fields!")
 
 # Channels
         if parser.has_section('Channels'):
             
             channel_section = read_channels(parser['Channels'], dtype = object)
             
-            channel_section[channel_section == '_'] = np.nan
-
             check_channels(channel_info = channel_section, 
-                           file_format = file_format)
+                           file_format = file_format,
+                           operation_mode = operation_mode)
             
             if 'recorder_channel_id' in channel_section.columns.values:
-                if file_format == 'licel' or file_format == 'liel_matlab':
+                if file_format == 'licel' or file_format == 'licel_matlab':
                     channels = [f'{channel_section.recorder_channel_id[i]}_L{str(int(channel_section.laser[i]))}'
                                 for i in range(channel_section.index.size)]
                 elif file_format == 'polly_xt':
@@ -52,7 +51,7 @@ class config():
             
 # -------- END OF CLASS
 
-def read_meas(section, dtype=object, skip_vars=[]):
+def read_system(section, dtype=object, skip_vars=[]):
     # Reads the whole or part of the section and returns a Pandas Series
     map_info = []
     
@@ -110,121 +109,121 @@ def comma_split(var, dtype):
         var=[]
     return(var)
 
-def check_channels(channel_info, file_format):
+def check_channels(channel_info, file_format, operation_mode):
 
-    if file_format == 'licel' or  file_format == 'licel_matlab':
-            
-        # recorder_channel_id check
+    # Check the recorder_channel_id for licel systems
+    if file_format == 'licel' or  file_format == 'licel_matlab':            
         if 'recorder_channel_id' not in channel_info.columns.values:
-            
             raise Exception("-- Error: The recorder_channel_id field is mandatory for licel systems! Please provide it in the configuration file. If this is not a licel system, please provide the correct file_format in the settings_file.")
 
-        else:
-            
+        else: 
             for recorder_channel_id in channel_info.recorder_channel_id:
-                
                 if isinstance(recorder_channel_id,str):
-                    
                     if not (recorder_channel_id[:2] == 'BT' or recorder_channel_id[:2] == 'BC'):
-                
                         raise Exception("-- Error: Provided recorder_channel_id not recognized. The first two letters must be either BT or BC. Please do not provide S2A ot S2P channels (currently not supported)!")
-            
-                else:
-                    
+                else: 
                     raise Exception("-- Error: The recorder_channel_id provided in the configuration file must be a string. Please correct!")
 
-        # Laser number check
+        # Check the laser number for licel systems
         if 'laser' not in channel_info.columns.values:
-            
             raise Exception("-- Error: The laser field is mandatory for licel systems! Please provide it in the configuration file")
-
         else:
-            
             for laser in channel_info.laser:
-                                
-                if int(laser) not in [1, 2, 3, 4]:
-            
-                    raise Exception("-- Error: Provided laser number not recognized. Licel uses a laser number between 1 and 4!")
+                if int(laser) not in [1, 2, 3]:
+                    raise Exception("-- Error: Provided laser number not recognized. Licel uses a laser number between 1 and 3!")
 
+    # Check the recorder_channel_id for PollyXTs
     if file_format == 'polly_xt':
-            
-        # recorder_channel_id check
         if 'recorder_channel_id' not in channel_info.columns.values:
-            
             raise Exception("-- Error: Since version 0.4 the recorder_channel_id field is mandatory also for Polly XT systems! Please provide it in the configuration file. For Polly XTs use ascending integers starting from 1 and to the last channel following the order of channel from the raw netcdf files. ")
-
         else:
-            
             for recorder_channel_id in channel_info.recorder_channel_id:
-                
                 if recorder_channel_id.isdigit() == False:
-                    print(recorder_channel_id)
                     raise Exception("-- Error: The recorder_channel_id must be an intereger for PollyXT systems. Please revise the configuration file!")
-            
-                elif recorder_channel_id == 0:
-                    
+                elif recorder_channel_id == 0: 
                     raise Exception("-- Error: The recorder_channel_id cnnot be zero. It must be an integer between 1 and up to the maximum number of available channels in the raw files. Please revise the configuration file!")
 
-
-    mandatory = ['dead_time', 'trigger_delay_bins', 'telescope_type', 
-                 'channel_type', 'channel_subtype']
+    # Check if all mandatory fields are provided
+    if operation_mode == 'testing':
+        mandatory = ['telescope_type', 'channel_type', 'channel_subtype']
+    elif operation_mode == 'labeling':
+        mandatory = ['scc_channel_id', 'telescope_type', 'channel_type', 'channel_subtype']
+        
     
     for mnd in mandatory:
-        
         if mnd not in channel_info.columns.values:
-        
             raise Exception(f"-- Error: The mandatory field {mnd} was not provided. Please include it in the configuration file!")
 
-    # SCC ID check
-    if 'scc_channel_id' not in channel_info.columns.values:
-        channel_info.loc[:,'scc_channel_id'] = np.arange(0,channel_info.index.values.size,1)
-        print('-- Warning: The scc_channel_id field is mandatory for the submission of the QA tests to CARS! Please make sure to include it if you plan to submit this set ') 
-        
-    # Dead time correction type check
-    if 'dead_time_correction_type' not in channel_info.columns.values:
-        
-        channel_info.loc[:,'dead_time_correction_type'] = np.nan * np.zeros(channel_info.loc[:,'dead_time'].size, dtype = object)
-        
-        for i in range(channel_info.dead_time.size):
-            if channel_info.dead_time[i] == channel_info.dead_time[i]:
-                channel_info.loc[i,'dead_time_correction_type'] = '0'
-            
-    # Channel Bandwidth check
-    if 'channel_bandwidth' not in channel_info.columns.values:
-        
-        channel_info.loc[:,'channel_bandwidth'] = '1.'
-        
-        print("-- Warning: The channel_bandwidth field was not provided. The default value (1 nm) has been used for all the channels. Please make sure that this corresponds to the actual system value")
+    # Warn if any partially mandatory fields is not provided
+    partially_optional = ['dead_time', 'daq_trigger_offset', 
+                          'dead_time_correction_type', 'emitted_wavelength',
+                          'detected_wavelength', 'channel_bandwidth',
+                          'background_low_bin', 'background_high_bin']
 
-    # Background Low
-    if 'background_low_bin' not in channel_info.columns.values:
-        print("-- Warning: The background_low_bin was not provided. For a pretriger range >= 400 (< 400) bins it will default to 100 bins (600 bins before the end of the profile). ")
-        for i in range(channel_info.trigger_delay_bins.size):
-            if int(channel_info.trigger_delay_bins[i]) <= -400:
-                channel_info.loc[:,'background_low_bin'] = '100'
+    first = True
+    for mnd in partially_optional:
+        if mnd not in channel_info.columns.values:
+            if first == True:
+                print("-- Warning: The following partially optional fields were not provided in the configuration file. Default values will be used according to the manual. Please make sure that this corresponds to the actual system value:")
+                first = False
+            print(f"-- {mnd}")
+    
+    if ('background_low_bin' in channel_info.columns.values and 'background_high_bin' not in channel_info.columns.values) or \
+        ('background_high_bin' in channel_info.columns.values and 'background_low_bin' not in channel_info.columns.values):
+            raise Exception("-- Error: The background_low_bin and background_high_bin fields must be either provided together or not provided at all. Providing only one of them can lead to assigning unpredictable default values. ")
 
-    # Background High
-    if 'background_high_bin' not in channel_info.columns.values:
-        print("-- Warning: The background_high_bin was not provided. For a pretriger range >= 400 (< 400) bins it will default to 100 bins before the end of the pretrigger range (end of the profile). ") 
-        for i in range(channel_info.trigger_delay_bins.size):
-            if int(channel_info.trigger_delay_bins[i]) <= -400:
-                channel_info.loc[:,'background_high_bin'] = str(-int(channel_info.trigger_delay_bins[i]) - 100)
-                
+    # Check the field type
+    allowed_telescope_types = ['n', 'f', 'x']
+    for ch in channel_info.index:
+        if channel_info.telescope_type.loc[ch] not in allowed_telescope_types:
+            raise Exception(f"-- Error: The telescope_type '{channel_info.loc[ch,'telescope_type']}' of channel {channel_info.recorder_channel_id.loc[ch]} is not was not understood. Please revise the configuration file using values only among {allowed_telescope_types} for the telescope_type")
+        
+    # Check the channel type
+    allowed_channel_types = ['p', 'c', 't', 'v', 'r', 'a', 'f']
+    for ch in channel_info.index:
+        if channel_info.channel_type.loc[ch] not in allowed_channel_types:
+            raise Exception(f"-- Error: The channel_type '{channel_info.loc[ch,'channel_type']}' of channel {channel_info.recorder_channel_id.loc[ch]} was not understood. Please revise the configuration file using values only among {allowed_channel_types} for the channel_type")
+
+    # Check the channel subtype
+    allowed_channel_subtypes = ['r', 't', 'n', 'o', 'w', 'c', 'h', 'l', 'a', 'm', 'b', 's', 'x']
+    for ch in channel_info.index:
+        if channel_info.channel_subtype.loc[ch] not in allowed_channel_subtypes:
+            raise Exception(f"-- Error: The channel_type '{channel_info.channel_subtype.loc[ch]}' of channel {channel_info.recorder_channel_id.loc[ch]} was not understood. Please revise the configuration file using values only among {allowed_channel_subtypes} for the channel_subtype")
+          
+    ### check for the subtype depending on the type
+    allowed_channel_subtypes_per_type ={'p': ['r','t'],
+                                        'c': ['r','t'],
+                                        't': ['r','t','x'],
+                                        'v': ['n', 'o', 'w', 'c'],
+                                        'r': ['x','l','h'],
+                                        'a': ['a', 'm'],
+                                        'f': ['b', 's']}
+    for ch in channel_info.index:
+        if channel_info.loc[ch,'channel_subtype'] not in allowed_channel_subtypes_per_type[channel_info.loc[ch,'channel_type']]:
+            raise Exception(f"-- Error: The channel_subtype '{channel_info.loc[ch,'channel_subtype']}' of channel {channel_info.recorder_channel_id.loc[ch]} is not applicable for the provided channel_type '{channel_info.loc[ch,'channel_type']}'. Please revise the configuration file using values only among {allowed_channel_subtypes_per_type[channel_info.loc[ch,'channel_type']]} for the channel_subtype")
+   
     return()
     
-def check_meas(meas_info):
+def check_system(system_info, operation_mode):
 
-    mandatory = ['lidar_name', 'lidar_id']
+    # Check if all mandatory fields are provided
+    if operation_mode == 'testing':
+        mandatory = ['lidar_name', 'station_id', 'station_name']
+    else:
+        mandatory = ['lidar_name', 'lidar_id', 'station_name', 'station_id', 
+                     'version_name', 'version_id', 'configuration_name',
+                     'configuration_id']
+        
     
     for mnd in mandatory:
-        
-        if mnd not in meas_info.index.values:
-        
+        if mnd not in system_info.index.values:
             raise Exception(f"-- Error: The mandatory field {mnd} was not provided. Please include it in the configuration file!")
             
     return()
 
 def check_len(reference_var, testing_var, section, key):
+    
     if len(reference_var) != len(testing_var):
         raise ValueError(f'Length inconsistencies detected in {section}, variable: {key}. All section variables must have the same length! Please revise the configuration file!')
+    
     return()

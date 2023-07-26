@@ -117,13 +117,11 @@ class ConfigurationWindow(wx.Window):
         self.sizer = wx.GridBagSizer (vgap = 10, hgap = 10)
 
         self.lidar_name = AtlasUIInputField.FromSetting ( parent = self.panel, setting = self.settings.lidar.lidar_name, label = "Lidar name" )
-        self.lidar_id = AtlasUIInputField.FromSetting ( parent = self.panel, setting = self.settings.lidar.lidar_id, label = "EARLINET DB Lidar ID" )
+        self.station_id = AtlasUIInputField.FromSetting ( parent = self.panel, setting = self.settings.lidar.station_id, label = "EARLINET DB Lidar ID" )
         
         self.sizer.Add ( self.lidar_name, pos = wx.GBPosition (0, 0), span = wx.GBSpan (1, 1), flag = wx.EXPAND )
-        self.sizer.Add ( self.lidar_id, pos = wx.GBPosition (0, 1), span = wx.GBSpan (1, 1), flag = wx.EXPAND )
-        
-        self.location = AtlasUIInputField.FromSetting ( parent = self.panel, setting = self.settings.lidar.location, label = "Location name" )
-        
+        self.sizer.Add ( self.station_id, pos = wx.GBPosition (0, 1), span = wx.GBSpan (1, 1), flag = wx.EXPAND )
+                
         self.sizer.Add ( self.location, pos = wx.GBPosition(0, 2), span = wx.GBSpan(1, 1), flag = wx.EXPAND )
         
         self.latitude = AtlasUIInputField.FromSetting ( parent = self.panel, setting = self.settings.lidar.latitude, label = "Latitude [°]" )

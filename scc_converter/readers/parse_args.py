@@ -151,7 +151,11 @@ def call_parser():
     parser.add_argument('--trim_overflows', metavar='trim_overflows', 
                         type=int, nargs='?', default = 0, 
                         help="This options determines how overflow values will be treated. If set to 0 (default), no action will be taken, if set to 1 the files containing at least one overflow value will be screened out. If set to 2, overflow will be interpolated (use with care and only for a few bins per profile). If set to 3 then overflows will be included, use this only for debuging purposes")   
-                
+    
+    parser.add_argument('--operation_mode', metavar='operation_mode', 
+                        type=str, nargs='?', default = 'labeling',
+                        help='Choose one of: a) labeling: Use when submitting a measurement to CARS. Makes some SCC related field in the configuration file mandatory. b) testing: Use for causal testing of a measurement when there is no dedicated SCC configuration Defaults to: labeling')            
+
     args = vars(parser.parse_args())
     
     return(args)
@@ -257,7 +261,9 @@ def check_parser(args):
     if args['rsonde_column_units'][3] not in hum_units:
         raise Exception(f"-- Error: The value of the rsonde_column_units corresponding to the humidity array of the radiosonde file ({args['rsonde_column_units'][3]}) is not recognized! Please select one of: {hum_units}")
                
- 
+    if args['operation_mode'] not in ['labeling', 'testing']:
+        raise Exception(f"The provided operation_mode {args['operation_mode']} is not correct. Please use one of {['labeling', 'testing']} ")
+
     return(args)
 
 def view_parser(args):

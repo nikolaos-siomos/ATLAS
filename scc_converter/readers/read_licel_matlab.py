@@ -20,7 +20,7 @@ def dtfs(dir_meas):
     end_time_arr = []
     filename = []
     
-    meas_info = []
+    system_info = []
     channel_info = []
     time_info = []
     
@@ -40,7 +40,7 @@ def dtfs(dir_meas):
             keys = [key for key in data.keys()]
             
             # Reading the licel file metadatas (header) - only for the first file
-            meas_info = read_meas(buffer = data[keys[5]])
+            system_info = read_meas(buffer = data[keys[5]])
 
             channel_info = read_channels(buffer = data[keys[4]])
             
@@ -113,43 +113,35 @@ def dtfs(dir_meas):
             print('---- Warning! Folder empty \n'+\
                   f'---> !! Skip reading measurement files from folder {dir_meas}')  
 
-    return(meas_info, channel_info, time_info, sig_raw, shots)
+    return(system_info, channel_info, time_info, sig_raw, shots)
 
 
 def read_meas(buffer):
 
     """ Retrieves location and geometry relevant information from 
-    the licel header [location, altitude, latitude, longitude, 
+    the licel header [altitude, latitude, longitude, 
     zenith angle, azimuth angle] and laser relevant information from 
     the licel header [laser A repetion rate, laser B repetion rate if it exists
     laser C repetion rate if it exists]"""
-    meas_info = pd.Series()
+    system_info = pd.Series()
      
     metadata = buffer[2][0][0].split()
 
-    meas_info['location'] = metadata[0]
-
-    meas_info['altitude'] = float(metadata[5])    
-    meas_info['latitude'] = np.round(float(metadata[6]), 4)
-    meas_info['longitude'] = np.round(float(metadata[7]), 4)
+    system_info['altitude'] = float(metadata[5])    
+    system_info['latitude'] = np.round(float(metadata[6]), 4)
+    system_info['longitude'] = np.round(float(metadata[7]), 4)
     
     if len(metadata) > 8:
-        meas_info['zenith_angle'] = float(metadata[8])
+        system_info['zenith_angle'] = float(metadata[8])
 
     if len(metadata) > 9:
-        meas_info['azimuth_angle'] = float(metadata[9])
+        system_info['azimuth_angle'] = float(metadata[9])
 
     metadata = buffer[3][0][0].split()
 
-    meas_info['laser_A_repetition_rate'] = float(metadata[2])
+    system_info['laser_A_repetition_rate'] = float(metadata[2])
 
-    # if len(metadata) > 2:
-    #     meas_info['laser_B_repetition_rate'] = float(metadata[5])
-        
-    # if len(metadata) > 5:
-    #     meas_info['laser_C_repetition_rate'] = float(metadata[8])
-        
-    return(meas_info)
+    return(system_info)
 
 def read_time(buffer):
     
@@ -202,7 +194,6 @@ def read_channels(buffer):
     arr_head = pd.DataFrame(header, columns = cols, dtype = object)
     
     arr_head['laser'] = 1
-    arr_head['laser_polarization'] = 1
 
     # Combine from the recorder channel ID and the laser polarization    
     recorder_channel_id = []
@@ -214,7 +205,7 @@ def read_channels(buffer):
 
     channel_info.index = recorder_channel_id
 
-    info_columns = ['acquisition_mode', 'laser', 'bins', 'laser_polarization', 
+    info_columns = ['acquisition_mode', 'laser', 'bins', 
                     'pmt_high_voltage', 'range_resolution', 
                     'data_acquisition_range', 'analog_to_digital_resolution']
     
@@ -230,23 +221,6 @@ def read_channels(buffer):
 
     channel_info.loc[:,'detected_wavelength'] = wave
     
-    # Fill in default values that depend on the raw file metadata
-    channel_info.loc[:,'background_low_bin'] = channel_info.loc[:,'bins'] - 600
-    channel_info.loc[:,'background_high_bin'] = channel_info.loc[:,'bins'] - 100
-    channel_info.loc[:,'emitted_wavelength'] = np.nan * channel_info.loc[:,'detected_wavelength'] 
-    
-    for i in range(channel_info.loc[:,'detected_wavelength'].size):
-        if channel_info.loc[:,'detected_wavelength'][i] >= 340. and \
-            channel_info.loc[:,'detected_wavelength'][i] < 520.:
-                channel_info.loc[:,'emitted_wavelength'][i] = 355.
-                
-        if channel_info.loc[:,'detected_wavelength'][i] >= 520. and \
-            channel_info.loc[:,'detected_wavelength'][i] < 1000.:
-                channel_info.loc[:,'emitted_wavelength'][i] = 532.
-                
-        if channel_info.loc[:,'detected_wavelength'][i] >= 1000.:
-            channel_info.loc[:,'emitted_wavelength'][i] = 1064.
-
     return(channel_info)
 
 def read_shots(buffer):
