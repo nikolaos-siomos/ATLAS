@@ -124,7 +124,7 @@ def fill_defaults(cfg):
     mask_lbin_fr = (cfg.channels.loc[:,'background_low_bin'] == '_') & (cfg.channels.loc[:,'daq_trigger_offset'].astype(int) >  -400)
     cfg.channels.loc[:,'background_low_bin'][mask_lbin_tr] = 100
     cfg.channels.loc[:,'background_low_bin'][mask_lbin_fr] = cfg.channels.loc[:,'bins'][mask_lbin_fr] - 600
-    cfg.channels.loc[:,'background_low'] = float(cfg.system.loc['altitude']) + np.cos(np.deg2rad(cfg.system['zenith_angle'])) * cfg.channels.loc[:,'background_low_bin'].astype(float) * cfg.channels.loc[:,'range_resolution'].astype(float)
+    cfg.channels.loc[:,'background_low'] = float(cfg.system.loc['altitude']) + np.cos(np.deg2rad(float(cfg.system['zenith_angle']))) * cfg.channels.loc[:,'background_low_bin'].astype(float) * cfg.channels.loc[:,'range_resolution'].astype(float)
   
     # Background High Bin
     if 'background_high_bin' not in cfg.channels.columns.values:
@@ -133,7 +133,7 @@ def fill_defaults(cfg):
     mask_ubin_fr = (cfg.channels.loc[:,'background_high_bin'] == '_') & (cfg.channels.loc[:,'daq_trigger_offset'].astype(int) >  -400)
     cfg.channels.loc[:,'background_high_bin'][mask_ubin_tr] = -cfg.channels.loc[:,'daq_trigger_offset'][mask_ubin_tr].astype(int) - 100
     cfg.channels.loc[:,'background_high_bin'][mask_ubin_fr] = cfg.channels.loc[:,'bins'][mask_ubin_fr] - 100
-    cfg.channels.loc[:,'background_high'] = float(cfg.system.loc['altitude']) + np.cos(np.deg2rad(cfg.system['zenith_angle'])) * cfg.channels.loc[:,'background_high_bin'].astype(float) * cfg.channels.loc[:,'range_resolution'].astype(float)
+    cfg.channels.loc[:,'background_high'] = float(cfg.system.loc['altitude']) + np.cos(np.deg2rad(float(cfg.system['zenith_angle']))) * cfg.channels.loc[:,'background_high_bin'].astype(float) * cfg.channels.loc[:,'range_resolution'].astype(float)
                         
     # Laser repetiotion rate - assign each laser value to the respective channel 
     mask_laser_A = (cfg.channels.loc[:,'laser'] == 1)
