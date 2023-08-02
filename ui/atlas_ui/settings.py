@@ -901,14 +901,6 @@ class ATLASChannelSettings(BaseSettings):
         self.laser = ATLASIntegerOption ( default = 1, min = 1, increment = 1 )
         self.scc_channel_id = ATLASIntegerOption ( default = 0 )
         
-        # Partly optional variables
-        self.dead_time_correction_type = ATLASChoiceOption (
-            default = '0',
-            choices = {
-                '0': 'Non Paralyzable',
-                '1': 'Paralyzable'
-            }
-        )
         self.emitted_wavelength = ATLASDoubleOption ( default = 355, mandatory = True, min = 1, max = 2000, increment = .01 )
         self.detected_wavelength = ATLASDoubleOption ( default = 355, mandatory = True, min = 1, max = 2000, increment = .01 )
         self.channel_bandwidth = ATLASDoubleOption ( default = .5, increment = .01 )
@@ -919,11 +911,9 @@ class ATLASChannelSettings(BaseSettings):
         # Optional variables
         self.bins = ATLASIntegerOption ( default = None )
         
-        self.laser_shots = ATLASIntegerOption ( default = None, min = 0 )
         self.data_acquisition_range = ATLASIntegerOption ( default = None, min = 0 )
         self.analog_to_digital_resolution = ATLASIntegerOption ( default = None, min = 0 )
         self.range_resolution = ATLASDoubleOption ( default = None, min = 0 )
-        self.pmt_high_voltage = ATLASIntegerOption ( default = None, min = 0 )
         self.laser_repetition_rate = ATLASIntegerOption ( default = None, min = 0 )
         
     def GetChannelName ( self ):

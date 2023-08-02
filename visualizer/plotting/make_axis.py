@@ -46,11 +46,18 @@ def quicklook_x(x_lims, x_tick, t_tick, time):
     # Calculate the t_tick (in minutes) if not provided
     if t_tick == None:
         mins = \
-            (time[-1]-time[0]).astype('timedelta64[m]') / np.timedelta64(5,'m') 
-        t_tick = 5. * np.round(mins / 15., decimals = 0)
-    
-        if t_tick == 0:
-            t_tick = 1
+            (time[-1]-time[0]).astype('timedelta64[m]') / np.timedelta64(1,'m') 
+        if mins <= 20:
+            t_tick = 2.
+        elif mins > 20 and mins <= 120.:
+            t_tick = 10.
+        elif mins > 120 and mins <= 300.:
+            t_tick = 30.
+        elif mins > 300 and mins <= 600.:
+            t_tick = 60.
+        else:
+            t_tick = 120.
+
     
     # Identify bins where temporal gaps are encountered (10% acceptance)
     nodes = np.where(time[1:]-time[:-1] > 1.50 * np.nanmin(time[1:]-time[:-1]))[0]

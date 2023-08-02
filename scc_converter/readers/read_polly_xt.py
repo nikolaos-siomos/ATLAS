@@ -164,13 +164,22 @@ def read_meas(raw_data):
     system_info = pd.Series()
     
     system_info['altitude'] = raw_data.location_height.values   
-    system_info['latitude'] = np.round(raw_data.location_coordinates.values[0], 4)
-    system_info['longitude'] = np.round(raw_data.location_coordinates.values[1], 4)
+    system_info['latitude'] = raw_data.location_coordinates.values[0]
+    system_info['longitude'] = raw_data.location_coordinates.values[1]
+    
+    system_info['latitude'] = np.round(system_info['latitude'], decimals = 4)
+    system_info['longitude'] = np.round(system_info['longitude'], decimals = 4)
     
     system_info['zenith_angle'] = raw_data.zenithangle.values
+    system_info['zenith_angle'] = np.round(system_info['zenith_angle'], decimals = 2)
+    
     system_info['azimuth_angle'] = 0.
     
     system_info['laser_A_repetition_rate'] = raw_data.laser_rep_rate.values
+    
+    system_info['laser_B_repetition_rate'] = np.nan
+        
+    system_info['laser_C_repetition_rate'] = np.nan
 
     return(system_info)
 
@@ -180,12 +189,13 @@ def read_channels(raw_data):
     channel_info.loc[:,'acquisition_mode'] = 1 # only photon channels
     channel_info.loc[:,'laser'] = 1 # only 1 laser
     channel_info.loc[:,'bins'] = raw_data.height[-1].values + 1
-    channel_info.loc[:,'pmt_high_voltage'] = raw_data.pm_voltage.values
     channel_info.loc[:,'range_resolution'] = raw_data.measurement_height_resolution.values * 0.15 # nanosecond to meters
     channel_info.loc[:,'data_acquisition_range'] = np.nan # analog channels only
     channel_info.loc[:,'analog_to_digital_resolution'] = np.nan # analog channels only
     channel_info.loc[:,'detected_wavelength'] = raw_data.if_center.values
     channel_info.loc[:,'channel_bandwidth'] = raw_data.if_fwhm.values
+    channel_info.loc[:,'dead_time_correction_type'] = 1. # default for PollyXTs
+
     
     return(channel_info)
 

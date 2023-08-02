@@ -391,7 +391,7 @@ def dark(args, version):
     
         # Add default values to the configuration object when the respective variables are not provided in the configuration file
         cfg = modify.fill_defaults(cfg)
-    
+        
         # Screen profiles that have an iregularly low number of shots
         sig_raw_d = modify.screen_low_shots(time_info_d, channel_info_d, signal = sig_raw_d.copy(), shots = shots_d)
     

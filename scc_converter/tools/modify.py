@@ -49,26 +49,39 @@ def trim_channels(cfg, sig, shots, channel_info, meas_type):
 
 def merge_config(cfg, system_info, channel_info):
     
-    """ The optional fields are that are not provided in the configuration file
+    """ The optional fields that are not provided in the configuration file
     get values from the headers of the raw files. An error is raised if the
     information is not available even from the raw file, which indicates either
     a corrupted input file or a bug in the parser"""
 
-    for key in system_info.index:
+    types_from_raw = get_from_raw('System')
+    for key in types_from_raw.keys():
         
         if key not in cfg.system.index and key not in system_info.index :
-            raise Exception(f"-- Error: The optional field {key} was not provided in the configuration file and was also not found in the raw files. Please verify that the raw file format is correct and contact the developing team if necessary")
+            raise Exception(f"-- Error: The optional field {key} of the System Section was not provided in the configuration file and was also not found in the raw files. Please verify that the raw file format is correct and contact the developing team if necessary")
         
         elif key not in cfg.system.index and key in system_info.index:
-            cfg.system.loc[key] = system_info.loc[key]    
+            cfg.system.loc[key] = flexible_type(system_info.loc[key], 
+                                                scalar_type =  types_from_raw[key])
+            
+        elif key in cfg.system.index:
+            cfg.system.loc[key] = flexible_type(cfg.system.loc[key], 
+                                                scalar_type =  types_from_raw[key])
+            
 
-    for key in channel_info.columns:
+    types_from_raw = get_from_raw('Channels')
+    for key in types_from_raw.keys():
         
         if key not in cfg.channels.columns and key not in channel_info.columns:
             raise Exception(f"-- Error: The optional field {key} of the Channels Section was not provided in the configuration file and was also not found in the raw files. Please verify that the raw file format is correct and contact the developing team if necessary")
         
         elif key not in cfg.channels.columns and key in channel_info.columns:
-            cfg.channels.loc[:,key] = channel_info.loc[:,key].values    
+            cfg.channels.loc[:,key] = channel_info.loc[:,key].values.astype(types_from_raw[key])   
+            
+        elif key in cfg.channels.columns:
+            mask_empty = (cfg.channels.loc[:,key] == '_')
+            cfg.channels.loc[mask_empty,key] = channel_info.loc[mask_empty,key].values   
+            cfg.channels.loc[:,key] = cfg.channels.loc[:,key].astype(types_from_raw[key])
     
     return(cfg)
     
@@ -113,7 +126,6 @@ def fill_defaults(cfg):
         cfg.channels.loc[:,'dead_time_correction_type'] = empty   
     mask_dt_cor_an = (cfg.channels.loc[:,'dead_time_correction_type'] == '_') & (cfg.channels.loc[:,'acquisition_type'] == 'a')
     mask_dt_cor_pc = (cfg.channels.loc[:,'dead_time_correction_type'] == '_') & (cfg.channels.loc[:,'acquisition_type'] == 'p')
-    
     cfg.channels.loc[:,'dead_time_correction_type'][mask_dt_cor_an] = np.nan
     cfg.channels.loc[:,'dead_time_correction_type'][mask_dt_cor_pc] = 0
         
@@ -124,7 +136,6 @@ def fill_defaults(cfg):
     mask_lbin_fr = (cfg.channels.loc[:,'background_low_bin'] == '_') & (cfg.channels.loc[:,'daq_trigger_offset'].astype(int) >  -400)
     cfg.channels.loc[:,'background_low_bin'][mask_lbin_tr] = 100
     cfg.channels.loc[:,'background_low_bin'][mask_lbin_fr] = cfg.channels.loc[:,'bins'][mask_lbin_fr] - 600
-    cfg.channels.loc[:,'background_low'] = float(cfg.system.loc['altitude']) + np.cos(np.deg2rad(float(cfg.system['zenith_angle']))) * cfg.channels.loc[:,'background_low_bin'].astype(float) * cfg.channels.loc[:,'range_resolution'].astype(float)
   
     # Background High Bin
     if 'background_high_bin' not in cfg.channels.columns.values:
@@ -133,7 +144,6 @@ def fill_defaults(cfg):
     mask_ubin_fr = (cfg.channels.loc[:,'background_high_bin'] == '_') & (cfg.channels.loc[:,'daq_trigger_offset'].astype(int) >  -400)
     cfg.channels.loc[:,'background_high_bin'][mask_ubin_tr] = -cfg.channels.loc[:,'daq_trigger_offset'][mask_ubin_tr].astype(int) - 100
     cfg.channels.loc[:,'background_high_bin'][mask_ubin_fr] = cfg.channels.loc[:,'bins'][mask_ubin_fr] - 100
-    cfg.channels.loc[:,'background_high'] = float(cfg.system.loc['altitude']) + np.cos(np.deg2rad(float(cfg.system['zenith_angle']))) * cfg.channels.loc[:,'background_high_bin'].astype(float) * cfg.channels.loc[:,'range_resolution'].astype(float)
                         
     # Laser repetiotion rate - assign each laser value to the respective channel 
     mask_laser_A = (cfg.channels.loc[:,'laser'] == 1)
@@ -141,36 +151,39 @@ def fill_defaults(cfg):
     mask_laser_C = (cfg.channels.loc[:,'laser'] == 3)
     if 'laser_repetition_rate' not in cfg.channels.columns.values:
         cfg.channels.loc[:,'laser_repetition_rate'] = empty
-        cfg.channels.loc[:,'laser_repetition_rate'][mask_laser_A] = cfg.system['laser_A_repetition_rate']
-        if 'laser_B_repetition_rate' in cfg.system.index:
-            cfg.channels.loc[:,'laser_repetition_rate'][mask_laser_B] = cfg.system['laser_B_repetition_rate']
-        if 'laser_C_repetition_rate' in cfg.system.index:
-            cfg.channels.loc[:,'laser_repetition_rate'][mask_laser_C] = cfg.system['laser_C_repetition_rate']
+    cfg.channels.loc[:,'laser_repetition_rate'][mask_laser_A] = cfg.system['laser_A_repetition_rate']
+    if not np.isnan(cfg.system['laser_B_repetition_rate']):
+        cfg.channels.loc[:,'laser_repetition_rate'][mask_laser_B] = cfg.system['laser_B_repetition_rate']
+    if not np.isnan('laser_C_repetition_rate' in cfg.system.index):
+        cfg.channels.loc[:,'laser_repetition_rate'][mask_laser_C] = cfg.system['laser_C_repetition_rate']
 
     # Emitted wavelength
     if 'emitted_wavelength' not in cfg.channels:
         cfg.channels.loc[:,'emitted_wavelength'] = empty
-    mask_uv = (cfg.channels.loc[:,'emitted_wavelength'] == '_') & \
-        (cfg.channels.loc[:,'detected_wavelength'] >= 340.) & \
-            (cfg.channels.loc[:,'detected_wavelength'] < 520.)
-    mask_vs = (cfg.channels.loc[:,'emitted_wavelength'] == '_') & \
-        (cfg.channels.loc[:,'detected_wavelength'] >= 520.) & \
-            (cfg.channels.loc[:,'detected_wavelength'] < 1000.)    
-    mask_ir = (cfg.channels.loc[:,'emitted_wavelength'] == '_') & \
-        (cfg.channels.loc[:,'detected_wavelength'] >= 1000.)
-    cfg.channels.loc[:,'emitted_wavelength'][mask_uv] = 354.717
-    cfg.channels.loc[:,'emitted_wavelength'][mask_vs] = 532.075
-    cfg.channels.loc[:,'emitted_wavelength'][mask_ir] = 1064.150
+    em_wv = cfg.channels.loc[:,'emitted_wavelength'].copy()
+    dt_wv = cfg.channels.loc[:,'detected_wavelength'].copy()
+    mask_uv = (em_wv == '_') & (dt_wv >= 340.) & (dt_wv < 520.)
+    mask_vs = (em_wv == '_') & (dt_wv >= 520.) & (dt_wv < 1000.)    
+    mask_ir = (em_wv == '_') & (dt_wv >= 1000.)
+    if mask_uv.any():
+        emitted_uv = dt_wv[mask_uv].iloc[np.argmin(np.abs(dt_wv[mask_uv] -  355.))]
+        cfg.channels.loc[:,'emitted_wavelength'][mask_uv] = emitted_uv
+    if mask_vs.any():
+        emitted_vs = dt_wv[mask_vs].iloc[np.argmin(np.abs(dt_wv[mask_vs] -  532.))]
+        cfg.channels.loc[:,'emitted_wavelength'][mask_vs] = emitted_vs
+    if mask_ir.any():
+        emitted_ir = dt_wv[mask_ir].iloc[np.argmin(np.abs(dt_wv[mask_ir] - 1064.))]
+        cfg.channels.loc[:,'emitted_wavelength'][mask_ir] = emitted_ir
 
-    # Channel bandwidth
-    if 'channel_bandwidth' not in cfg.channels:
-        cfg.channels.loc[:,'channel_bandwidth'] = empty
-    mask_bdw = (cfg.channels.loc[:,'channel_bandwidth'] == '_')
-    cfg.channels.loc[:,'channel_bandwidth'][mask_bdw] = 1.   
+    # Convert to the correct field type for the partially optional fields
+    default_types = get_default_types()
+    for key in default_types.keys():
+        cfg.channels.loc[:,key] = cfg.channels.loc[:,key].astype(default_types[key])
 
-    # for ch in cfg.channels.index:
-    #     print(cfg.channels.loc[ch,:])
-    #     raise Exception()
+    # Baground Low and High required by the SCC
+    cfg.channels.loc[:,'background_low'] = cfg.system.loc['altitude'] + np.cos(np.deg2rad(cfg.system['zenith_angle'])) * cfg.channels.loc[:,'background_low_bin'].values * cfg.channels.loc[:,'range_resolution'].values
+    cfg.channels.loc[:,'background_high'] = cfg.system.loc['altitude'] + np.cos(np.deg2rad(cfg.system['zenith_angle'])) * cfg.channels.loc[:,'background_high_bin'].values * cfg.channels.loc[:,'range_resolution'].values
+
     return(cfg)
 
 def unit_conv_bits_to_mV(channel_info, signal, shots):
@@ -228,11 +241,63 @@ def screen_low_shots(time_info, channel_info, signal, shots):
                     
                     signal.loc[sel] = np.nan
             
-                    shots.loc[sel] = np.nan
-        
-        # if le
-
-
-        
+                    shots.loc[sel] = np.nan        
             
     return(signal) 
+
+def get_from_raw(section):
+    
+    if section == 'System':
+        fields_from_raw = dict(altitude = 'float', 
+                               latitude = 'float',
+                               longitude = 'float', 
+                               zenith_angle = 'float',
+                               azimuth_angle = 'float',
+                               laser_A_repetition_rate = 'float',
+                               laser_B_repetition_rate = 'float',
+                               laser_C_repetition_rate = 'float')
+                        
+    elif section == 'Channels':
+        fields_from_raw = dict(acquisition_mode = 'int', 
+                               laser = 'int',
+                               bins = 'int', 
+                               range_resolution = 'float', 
+                               data_acquisition_range = 'float',
+                               analog_to_digital_resolution = 'float', 
+                               detected_wavelength = 'float',
+                               channel_bandwidth = 'float')
+        
+    else:
+        raise Exception(f"Section {section} not understood. Please select among System or Channels")
+    
+    return(fields_from_raw)
+
+def get_default_types():
+        
+    default_types = dict(dead_time = 'float', 
+                         daq_trigger_offset = 'int', 
+                         background_low_bin = 'int',
+                         background_high_bin = 'int',
+                         acquisition_mode = 'str',     
+                         dead_time_correction_type = 'float', 
+                         emitted_wavelength = 'float',
+                         laser_repetition_rate = 'float')
+    
+    return(default_types)
+
+
+def flexible_type(val, scalar_type):
+    
+    if scalar_type == 'str':
+        val = str(val)
+        
+    elif scalar_type == 'float':
+        val = float(val)
+    
+    elif scalar_type == 'int':
+        val = int(val)
+        
+    else:
+        raise Exception(f"The provided scalar type {scalar_type} is not understood. Please select among str, int, float") 
+      
+    return(val)

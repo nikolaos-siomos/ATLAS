@@ -253,7 +253,6 @@ def channel_metadata(file):
             'Detected_Wavelength',
             'Emitted_Wavelength',
             'Laser_Repetition_Rate',
-            'PMT_High_Voltage',
             'Raw_Data_Range_Resolution',
             'DAQ_Trigger_Offset']
     

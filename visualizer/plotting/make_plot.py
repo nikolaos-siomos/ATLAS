@@ -11,7 +11,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 import os
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 from subprocess import run
 
 def quicklook(dir_out, fname, title, dpi_val, color_reduction, use_log,
@@ -66,7 +66,28 @@ def quicklook(dir_out, fname, title, dpi_val, color_reduction, use_log,
     ax.set_ylim([y_llim, y_ulim])
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    ax.xaxis.set_major_locator(mdates.MinuteLocator(interval = int(t_tick)))
+
+    if t_tick >= 4.:
+        major_locator = mdates.MinuteLocator(byminute = np.arange(0,60, t_tick).astype(int))
+        major_locator.MAXTICKS = 10000
+        
+        ax.xaxis.set_major_locator(major_locator)
+        
+        minor_locator = mdates.MinuteLocator(byminute = np.arange(0,60, t_tick/4.).astype(int))
+        minor_locator.MAXTICKS = 10000
+        
+        ax.xaxis.set_minor_locator(minor_locator)
+    else:
+        major_locator = mdates.MinuteLocator(byminute = np.arange(0, 60, t_tick).astype(int))
+        major_locator.MAXTICKS = 10000
+        
+        ax.xaxis.set_major_locator(major_locator)
+        
+        minor_locator = mdates.SecondLocator(bysecond = np.arange(0,60, 60. * t_tick/4.).astype(int))
+        minor_locator.MAXTICKS = 10000
+        
+        ax.xaxis.set_minor_locator(minor_locator)
+
 
     plt.xticks(rotation = 35)
 

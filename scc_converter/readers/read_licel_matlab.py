@@ -141,6 +141,10 @@ def read_meas(buffer):
 
     system_info['laser_A_repetition_rate'] = float(metadata[2])
 
+    system_info['laser_B_repetition_rate'] = np.nan
+        
+    system_info['laser_C_repetition_rate'] = np.nan
+    
     return(system_info)
 
 def read_time(buffer):
@@ -206,8 +210,8 @@ def read_channels(buffer):
     channel_info.index = recorder_channel_id
 
     info_columns = ['acquisition_mode', 'laser', 'bins', 
-                    'pmt_high_voltage', 'range_resolution', 
-                    'data_acquisition_range', 'analog_to_digital_resolution']
+                    'range_resolution', 'data_acquisition_range', 
+                    'analog_to_digital_resolution']
     
     channel_info.loc[:, 'recorder_channel_id'] = arr_head.loc[:, 'recorder_channel_id'].copy().values
     channel_info.loc[:, info_columns] = arr_head.loc[:, info_columns].copy().values.astype(float)
@@ -221,6 +225,10 @@ def read_channels(buffer):
 
     channel_info.loc[:,'detected_wavelength'] = wave
     
+    channel_info.loc[:,'channel_bandwidth'] = 1. # default when not available in the raw files
+    
+    channel_info.loc[:,'dead_time_correction_type'] = 0. # default for Licel
+
     return(channel_info)
 
 def read_shots(buffer):

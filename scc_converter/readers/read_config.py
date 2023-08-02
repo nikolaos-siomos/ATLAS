@@ -156,8 +156,6 @@ def check_channels(channel_info, file_format, operation_mode):
 
     # Warn if any partially mandatory fields is not provided
     partially_optional = ['dead_time', 'daq_trigger_offset', 
-                          'dead_time_correction_type', 'emitted_wavelength',
-                          'detected_wavelength', 'channel_bandwidth',
                           'background_low_bin', 'background_high_bin']
 
     first = True

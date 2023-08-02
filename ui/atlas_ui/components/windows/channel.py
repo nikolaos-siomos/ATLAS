@@ -42,7 +42,6 @@ class ChannelData:
         recorder_channel_id,
         laser,
         scc_channel_id,
-        dead_time_correction_type,
         emitted_wavelength,
         detected_wavelength,
         channel_bandwidth,
@@ -50,11 +49,9 @@ class ChannelData:
         background_high_bin,
         acquisition_mode,
         bins,
-        laser_shots,
         data_acquisition_range,
         adc_resolution,
         range_resolution,
-        pmt_high_voltage,
         laser_repetition_rate
     ):
         pass
@@ -111,9 +108,6 @@ class ChannelWindow (wx.ScrolledWindow):
         self.scc_channel_id = AtlasUIInputField.FromSetting ( self._settings.scc_channel_id, parent = self.panel, label = "SCC ID" )
         self.sizer.Add ( self.scc_channel_id, pos = wx.GBPosition(2, 2), flag = wx.EXPAND )
         
-        self.dead_time_correction_type = AtlasUIInputField.FromSetting ( self._settings.dead_time_correction_type, parent = self.panel, label = "Dead time correction type" )
-        self.sizer.Add ( self.dead_time_correction_type, pos = wx.GBPosition(3, 0), flag = wx.EXPAND )
-        
         self.emitted_wavelength = AtlasUIInputField.FromSetting ( self._settings.emitted_wavelength, parent = self.panel, label = "Emitted wavelength [nm]" )
         self.sizer.Add ( self.emitted_wavelength, pos = wx.GBPosition(3, 1), flag = wx.EXPAND )
         
@@ -133,9 +127,6 @@ class ChannelWindow (wx.ScrolledWindow):
         
         self.total_bins = AtlasUIInputField.FromSetting ( self._settings.bins, parent = self.optional_box, label = "Total bins" )
         self.optional_box_sizer.Add ( self.total_bins, flag = wx.EXPAND | wx.TOP, border = 25, pos = wx.GBPosition(0, 0) )
-
-        self.laser_shots = AtlasUIInputField.FromSetting ( self._settings.laser_shots, parent = self.optional_box, label = "Laser shots" )
-        self.optional_box_sizer.Add ( self.laser_shots, flag = wx.EXPAND, pos = wx.GBPosition(1, 0) )
         
         self.daq_range = AtlasUIInputField.FromSetting ( self._settings.data_acquisition_range, parent = self.optional_box, label = "DAQ range [mV]" )
         self.optional_box_sizer.Add ( self.daq_range, flag = wx.EXPAND, pos = wx.GBPosition(1, 1) )
@@ -147,9 +138,6 @@ class ChannelWindow (wx.ScrolledWindow):
         self.optional_box_sizer.Add ( self.range_resolution, flag = wx.EXPAND, pos = wx.GBPosition(2, 1) )
         
         bottom_border = 30 if wx.GetOsVersion()[0] & wx.OS_UNIX else 10
-        
-        self.pmt_high_voltage = AtlasUIInputField.FromSetting ( self._settings.pmt_high_voltage, parent = self.optional_box, label = "PMT voltage [V]" )
-        self.optional_box_sizer.Add ( self.pmt_high_voltage, flag = wx.EXPAND | wx.BOTTOM, border = bottom_border, pos = wx.GBPosition(3, 0) )
         
         self.laser_repetition_rate = AtlasUIInputField.FromSetting ( self._settings.laser_repetition_rate, parent = self.optional_box, label = "Laser repetition rate [Hz]" )
         self.optional_box_sizer.Add ( self.laser_repetition_rate, flag = wx.EXPAND | wx.BOTTOM, border = bottom_border, pos = wx.GBPosition(3, 1) )

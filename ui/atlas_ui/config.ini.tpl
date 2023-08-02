@@ -93,11 +93,6 @@ scc_channel_id = ${print_channels_field(channels, 'scc_channel_id')}
 #Partly Optional Variables
 #-------------------------------------------------------------------------------------------------------------
 #These variables take default values. It is highly recommended though to fill them in because  might not be valid for the system.
-#dead_time_correction_type: The type of dead time correction. Choose among:
-#    • 0: Non Paralyzable
-#    • 1: Paralyzable
-# Defaults to: 0 for photon channels.
-dead_time_correction_type = ${print_channels_field(channels, 'dead_time_correction_type')}
 
 #emitted_wavelength: The wavelength of the originally emitted laser beam per channel. A very rough guess process is applied by default using that detected channel information that it is valid ONLY for Nd:Yag lasers with elastic and vibrational Raman channels. Please provide the values explicitly if your system does not fall in this category. Defaults to:
 #    • 355 for channels with detected wavelength <520nm
@@ -143,9 +138,6 @@ acquisition_mode = ${print_channels_field(channels, 'acquisition_mode')}
 #bins:  The total bins of the recorded signals per channel. 
 bins = ${print_channels_field(channels, 'bins')}
 
-#laser_shots: The number of acquired laser shots per channel. Not recommended to provide it manually. If fetched from the metadata, this variable is different per file which is more accurate than providing a constant value here.
-laser_shots = ${print_channels_field(channels, 'laser_shots')}
-
 #data_acquisition_range: The Data Acquisition Range of each analog channel [mV]. Use _ for photon channels
 data_acquisition_range = ${print_channels_field(channels, 'data_acquisition_range')}
 
@@ -154,9 +146,6 @@ analog_to_digital_resolution = ${print_channels_field(channels, 'analog_to_digit
 
 #range_resolution: The range resolution of each channel [m]. It will be used to calculate the Sampling Rate.
 range_resolution = ${print_channels_field(channels, 'range_resolution')}
-
-#pmt_high_voltage: The high voltage [V] provided to the detection unit per channel.
-pmt_high_voltage = ${print_channels_field(channels, 'pmt_high_voltage')}
 
 #laser_repetition_rate: The Laser Repetition Rate [Hz]
 laser_repetition_rate = ${print_channels_field(channels, 'laser_repetition_rate')}
