@@ -12,7 +12,7 @@ from ..tools.smoothing import sliding_average_1D_fast as smooth_1D_fast
 from ..tools.smoothing import sliding_average_2D_fast as smooth_2D_fast            
 
 def process(x, y, iters, smooth, x_sm_lims, x_sm_win, expo, region):
-            
+
     # Averaging sector signals
     y_m = np.nanmean(y[:iters,:], axis = 0) 
 
@@ -69,6 +69,7 @@ def process(x, y, iters, smooth, x_sm_lims, x_sm_win, expo, region):
     else:
         y_extra = []
         y_extra_sm = []
+        coef_extra = []
         extra = False
         
     # Minimum value per bin of all iterations
@@ -83,5 +84,13 @@ def process(x, y, iters, smooth, x_sm_lims, x_sm_win, expo, region):
                                           x_vals = x,
                                           region = region,
                                           axis = 0)
-    
-    return(coef, y_m, y_sm, y_m_sm, y_l_sm, y_u_sm, y_extra, y_extra_sm, extra)
+
+    if extra:
+        coef_extra, norm_bin_extra = \
+            normalize.to_a_point(sig = y_extra, 
+                                 sig_b = np.ones(x.shape), 
+                                 x_vals = x,
+                                 region = region,
+                                 axis = 0)    
+            
+    return(coef, y_m, y_sm, y_m_sm, y_l_sm, y_u_sm, coef_extra, y_extra, y_extra_sm, extra)

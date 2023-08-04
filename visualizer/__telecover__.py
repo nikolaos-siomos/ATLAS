@@ -14,8 +14,7 @@ from .readers.parse_tlc_args import call_parser, check_parser
 from .readers.check import check_channels
 from .plotting import make_axis, make_title, make_plot
 from .writters import make_header, export_ascii 
-from .tools.smoothing import sliding_average_2D, sliding_average_1D
-from .tools import normalize, sector
+from .tools import sector
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
@@ -62,8 +61,8 @@ def main(args, __version__):
         sig_o = data['Range_Corrected_Signals_Outer_Ring']
         sig_i = data['Range_Corrected_Signals_Inner_Ring']
         
-        sig_o = sig_n.copy().where(sig_o != nc.default_fillvals['f8'])
-        sig_i = sig_e.copy().where(sig_i != nc.default_fillvals['f8'])
+        sig_o = sig_o.copy().where(sig_o != nc.default_fillvals['f8'])
+        sig_i = sig_i.copy().where(sig_i != nc.default_fillvals['f8'])
         
         sampling_rin = np.min([np.min((data.Raw_Data_Stop_Time_Outer_Ring-data.Raw_Data_Start_Time_Outer_Ring).values),
                                np.min((data.Raw_Data_Stop_Time_Inner_Ring-data.Raw_Data_Start_Time_Inner_Ring).values)])
@@ -100,10 +99,10 @@ def main(args, __version__):
                                   use_dis = args['use_distance'])
     
         if isinstance(sig_n,list) == False:
-            iters = np.min([sig_n.time_n.size,
-                            sig_e.time_e.size,
-                            sig_s.time_s.size,
-                            sig_w.time_w.size])
+            iters_sec = np.min([sig_n.time_n.size,
+                                sig_e.time_e.size,
+                                sig_s.time_s.size,
+                                sig_w.time_w.size])
     
             extra_sec = {'N' : False,
                          'E' : False,
@@ -111,10 +110,10 @@ def main(args, __version__):
                          'W' : False}
 
             coef_n, y_m_n, y_sm_n, y_m_sm_n, y_l_sm_n, y_u_sm_n, \
-            y_extra_n, y_extra_sm_n, extra_sec['N'] = \
+            coef_extra_n, y_extra_n, y_extra_sm_n, extra_sec['N'] = \
                 sector.process(x = x_vals, 
                                y = sig_n.loc[ch_d].values, 
-                               iters = iters, 
+                               iters = iters_sec, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
                                x_sm_win = args['smoothing_window'],
@@ -122,10 +121,10 @@ def main(args, __version__):
                                region = args['normalization_region'])
                 
             coef_e, y_m_e, y_sm_e, y_m_sm_e, y_l_sm_e, y_u_sm_e, \
-            y_extra_e, y_extra_sm_e, extra_sec['E'] = \
+            coef_extra_e, y_extra_e, y_extra_sm_e, extra_sec['E'] = \
                 sector.process(x = x_vals, 
                                y = sig_e.loc[ch_d].values, 
-                               iters = iters, 
+                               iters = iters_sec, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
                                x_sm_win = args['smoothing_window'],
@@ -133,10 +132,10 @@ def main(args, __version__):
                                region = args['normalization_region'])
                 
             coef_s, y_m_s, y_sm_s, y_m_sm_s, y_l_sm_s, y_u_sm_s, \
-            y_extra_s, y_extra_sm_s, extra_sec['S'] = \
+            coef_extra_s, y_extra_s, y_extra_sm_s, extra_sec['S'] = \
                 sector.process(x = x_vals, 
                                y = sig_s.loc[ch_d].values, 
-                               iters = iters, 
+                               iters = iters_sec, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
                                x_sm_win = args['smoothing_window'],
@@ -144,10 +143,10 @@ def main(args, __version__):
                                region = args['normalization_region'])
                 
             coef_w, y_m_w, y_sm_w, y_m_sm_w, y_l_sm_w, y_u_sm_w, \
-            y_extra_w, y_extra_sm_w, extra_sec['W'] = \
+            coef_extra_w, y_extra_w, y_extra_sm_w, extra_sec['W'] = \
                 sector.process(x = x_vals, 
                                y = sig_w.loc[ch_d].values, 
-                               iters = iters, 
+                               iters = iters_sec, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
                                x_sm_win = args['smoothing_window'],
@@ -175,7 +174,7 @@ def main(args, __version__):
                                         channel = ch, 
                                         zan = data.Laser_Pointing_Angle,
                                         loc = data.Station_Name,
-                                        iters = iters,
+                                        iters = iters_sec,
                                         sampling = sampling_sec,
                                         smooth = args['smooth'],
                                         sm_lims = args['smoothing_range'],
@@ -223,6 +222,11 @@ def main(args, __version__):
                                         coef_2 = coef_e, 
                                         coef_3 = coef_s, 
                                         coef_4 = coef_w,
+                                        coef_extra_1 = coef_extra_n, 
+                                        coef_extra_2 = coef_extra_e, 
+                                        coef_extra_3 = coef_extra_s, 
+                                        coef_extra_4 = coef_extra_w,
+                                        extra_sec = extra_sec,
                                         ranges = ranges_ch,
                                         x_lbin = x_lbin, x_ubin = x_ubin,
                                         x_llim = x_llim, x_ulim = x_ulim, 
@@ -232,7 +236,7 @@ def main(args, __version__):
                                         x_label = x_label,
                                         x_tick = args['x_tick'],
                                         use_last = args['use_last'],
-                                        iters = iters)
+                                        iters = iters_sec)
             
             sectors = {'N' : y_m_n,
                        'E' : y_m_e,
@@ -248,7 +252,7 @@ def main(args, __version__):
             header = \
                 make_header.telecover(start_date = data.RawData_Start_Date, 
                                       start_time = data.RawData_Start_Time_UT, 
-                                      sampling_sec = iters * sampling_sec, 
+                                      sampling = iters_sec * sampling_sec, 
                                       wave = dwl_ch, 
                                       lidar = data.Lidar_Name, 
                                       loc = data.Station_Name, 
@@ -300,17 +304,17 @@ def main(args, __version__):
             im.save(fpath, "png", pnginfo = meta)
         
         if isinstance(sig_o,list) == False:
-            iters = np.min([sig_o.time_n.size,
-                            sig_i.time_e.size])
+            iters_rin = np.min([sig_o.time_o.size,
+                                sig_i.time_i.size])
         
-            extra_sec = {'O' : False,
+            extra_rin = {'O' : False,
                          'I' : False}
         
             coef_o, y_m_o, y_sm_o, y_m_sm_o, y_l_sm_o, y_u_sm_o, \
-            y_extra_o, y_extra_sm_o, extra_sec['O'] = \
+            coef_extra_o, y_extra_o, y_extra_sm_o, extra_rin['O'] = \
                 sector.process(x = x_vals, 
                                y = sig_o.loc[ch_d].values, 
-                               iters = iters, 
+                               iters = iters_rin, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
                                x_sm_win = args['smoothing_window'],
@@ -318,16 +322,16 @@ def main(args, __version__):
                                region = args['normalization_region'])
                 
             coef_i, y_m_i, y_sm_i, y_m_sm_i, y_l_sm_i, y_u_sm_i, \
-            y_extra_i, y_extra_sm_i, extra_sec['I'] = \
+            coef_extra_i, y_extra_i, y_extra_sm_i, extra_rin['I'] = \
                 sector.process(x = x_vals, 
                                y = sig_i.loc[ch_d].values, 
-                               iters = iters, 
+                               iters = iters_rin, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
                                x_sm_win = args['smoothing_window'],
                                expo = args['smooth_exponential'],
                                region = args['normalization_region'])
-                
+
             # Create the y axis (signal)
             y_llim, y_ulim, y_llim_nr, y_ulim_nr = \
                 make_axis.telecover_y(sig = [y_m_sm_o[slice(x_lbin,x_ubin+1)],
@@ -346,7 +350,7 @@ def main(args, __version__):
                                         channel = ch, 
                                         zan = data.Laser_Pointing_Angle,
                                         loc = data.Station_Name,
-                                        iters = iters,
+                                        iters = iters_rin,
                                         sampling = sampling_sec,
                                         smooth = args['smooth'],
                                         sm_lims = args['smoothing_range'],
@@ -354,11 +358,11 @@ def main(args, __version__):
                                         sm_expo = args['smooth_exponential'])
         
             # Make filename
-            fname = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_sectors_{ch}_ATLAS_{__version__}.png'
+            fname = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_rings_{ch}_ATLAS_{__version__}.png'
 
             # Make the plot
             fpath = \
-                make_plot.telecover_sec(dir_out = args['output_folder'], 
+                make_plot.telecover_rin(dir_out = args['output_folder'], 
                                         fname = fname, title = title,
                                         dpi_val = args['dpi'],
                                         color_reduction = args['color_reduction'],
@@ -379,6 +383,9 @@ def main(args, __version__):
                                         y2_uvar = y_u_sm_i, 
                                         coef_1 = coef_o, 
                                         coef_2 = coef_i, 
+                                        coef_extra_1 = coef_extra_o, 
+                                        coef_extra_2 = coef_extra_i, 
+                                        extra_rin = extra_rin,
                                         ranges = ranges_ch,
                                         x_lbin = x_lbin, x_ubin = x_ubin,
                                         x_llim = x_llim, x_ulim = x_ulim, 
@@ -388,7 +395,7 @@ def main(args, __version__):
                                         x_label = x_label,
                                         x_tick = args['x_tick'],
                                         use_last = args['use_last'],
-                                        iters = iters)
+                                        iters = iters_rin)
             
             sectors = {'O' : y_m_n,
                        'I' : y_m_e}
@@ -400,7 +407,7 @@ def main(args, __version__):
             header = \
                 make_header.telecover(start_date = data.RawData_Start_Date, 
                                       start_time = data.RawData_Start_Time_UT, 
-                                      sampling_sec = iters * sampling_sec, 
+                                      sampling = iters_rin * sampling_rin, 
                                       wave = dwl_ch, 
                                       lidar = data.Lidar_Name, 
                                       loc = data.Station_Name, 

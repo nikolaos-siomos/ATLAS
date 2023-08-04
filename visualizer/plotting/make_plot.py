@@ -255,7 +255,9 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
                   y1_extr_raw, y2_extr_raw, y3_extr_raw, y4_extr_raw,
                   y1_lvar, y2_lvar, y3_lvar, y4_lvar, 
                   y1_uvar, y2_uvar, y3_uvar, y4_uvar, 
-                  coef_1, coef_2, coef_3, coef_4, ranges,
+                  coef_1, coef_2, coef_3, coef_4, 
+                  coef_extra_1, coef_extra_2, coef_extra_3, coef_extra_4, 
+                  extra_sec, ranges,
                   x_lbin, x_ubin, x_llim, x_ulim, 
                   y_llim, y_ulim, y_llim_nr, y_ulim_nr, 
                   x_label, x_tick, use_last, iters):
@@ -308,27 +310,27 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     
     Y_E_N = np.nan * Y_NM
     
-    if len(y1_extr) > 0:
+    if extra_sec['N']:
         Y_E = y1_extr_raw
-        Y_E_N = coef_1 * y1_extr
+        Y_E_N = coef_extra_1 * y1_extr
         Y_O = Y1_N
         extra_label = f'north{iters+1}'
         extra_label_short = f'N{iters+1}'
-    if len(y2_extr) > 0:
+    elif extra_sec['E']:
         Y_E = y2_extr_raw
-        Y_E_N = coef_2 * y2_extr
+        Y_E_N = coef_extra_2 * y2_extr
         Y_O = Y2_N
         extra_label = f'east{iters+1}'
         extra_label_short = f'E{iters+1}'
-    if len(y3_extr) > 0:
+    elif extra_sec['S']:
         Y_E = y3_extr_raw
-        Y_E_N = coef_3 * y3_extr
+        Y_E_N = coef_extra_3 * y3_extr
         Y_O = Y3_N
         extra_label = f'south{iters+1}'
         extra_label_short = f'S{iters+1}'
-    if len(y4_extr) > 0:
+    elif extra_sec['W']:
         Y_E = y4_extr_raw
-        Y_E_N = coef_4 * y4_extr
+        Y_E_N = coef_extra_4 * y4_extr
         Y_O = Y4_N
         extra_label = f'west{iters+1}'
         extra_label_short = f'W{iters+1}'
@@ -546,7 +548,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
                   y1_extr_raw, y2_extr_raw,
                   y1_lvar, y2_lvar, 
                   y1_uvar, y2_uvar,
-                  coef_1, coef_2, ranges,
+                  coef_1, coef_2, 
+                  coef_extra_1, coef_extra_2, extra_rin, ranges,
                   x_lbin, x_ubin, x_llim, x_ulim, 
                   y_llim, y_ulim, y_llim_nr, y_ulim_nr, 
                   x_label, x_tick, use_last, iters):
@@ -583,15 +586,15 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     Y_E = np.nan * Y_NM
     Y_O = np.nan * Y_NM
 
-    if len(y1_extr) > 0:
+    if extra_rin['O']:
         Y_E = y1_extr_raw
-        Y_E_N = coef_1 * y1_extr
+        Y_E_N = coef_extra_1 * y1_extr
         Y_O = Y1_N
         extra_label = f'outer{iters+1}'
         extra_label_short = f'O{iters+1}'
-    if len(y2_extr) > 0:
+    elif extra_rin['I']:
         Y_E = y2_extr_raw
-        Y_E_N = coef_2 * y2_extr
+        Y_E_N = coef_extra_2 * y2_extr
         Y_O = Y2_N
         extra_label = f'inner{iters+1}'
         extra_label_short = f'I{iters+1}'
@@ -634,8 +637,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax4 = fig.add_axes([0.56,0.13,0.07,0.7])
     ax5 = fig.add_axes([0.69,0.13,0.29,0.7])
         
-    ax.plot(X, Y1, color = 'tab:blue', label = 'outer', alpha = 0.7)
-    ax.plot(X, Y2, color = 'tab:cyan', label = 'inner', alpha = 0.7)
+    ax.plot(X, Y1, color = 'tab:cyan', label = 'outer', alpha = 0.7)
+    ax.plot(X, Y2, color = 'tab:olive', label = 'inner', alpha = 0.7)
 
     if use_last == True:
         ax.plot(X, Y_E, color = 'tab:purple', label = extra_label, alpha = 0.7)
@@ -662,8 +665,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
 
     # Subplot: Raw Signals - Far range
     
-    ax2.plot(X, Y1, color = 'tab:blue', alpha = 0.7)
-    ax2.plot(X, Y2, color = 'tab:cyan', alpha = 0.7)
+    ax2.plot(X, Y1, color = 'tab:cyan', alpha = 0.7)
+    ax2.plot(X, Y2, color = 'tab:olive', alpha = 0.7)
 
     if use_last == True:
         ax2.plot(X, Y_E, color = 'tab:purple', alpha = 0.7)
@@ -683,14 +686,14 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     
     # Subplot: Normalized Signals - Near range
         
-    ax3.plot(X, Y1_N, color = 'tab:blue')
-    ax3.plot(X, Y2_N, color = 'tab:cyan')
+    ax3.plot(X, Y1_N, color = 'tab:cyan')
+    ax3.plot(X, Y2_N, color = 'tab:olive')
     
     if use_last == True:
         ax3.plot(X, Y_E_N, color = 'purple')
         
-    ax3.fill_between(X, Y1_NL, Y1_NU, color = 'tab:blue', alpha = 0.3)
-    ax3.fill_between(X, Y2_NL, Y2_NU, color = 'tab:cyan', alpha = 0.3)
+    ax3.fill_between(X, Y1_NL, Y1_NU, color = 'tab:cyan', alpha = 0.3)
+    ax3.fill_between(X, Y2_NL, Y2_NU, color = 'tab:olive', alpha = 0.3)
 
     ax3.set_xticks(x_ticks, labels = x_ticks)
     ax3.set_xlim([x_llim, x_ulim])
@@ -709,18 +712,18 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     
     ax3.text(0.2 * x_ulim, 0.15 * y_ulim_nr, 
              f'norm. region: {n_llim} - {n_ulim} km',
-             bbox=dict(facecolor='tab:cyan', alpha=0.1, zorder = 9))
+             bbox=dict(facecolor='tab:olive', alpha=0.1, zorder = 9))
 
     # Subplot: Normalized Signals - Far Range
         
-    ax4.plot(X, Y1_N, color = 'tab:blue')
-    ax4.plot(X, Y2_N, color = 'tab:cyan')
+    ax4.plot(X, Y1_N, color = 'tab:cyan')
+    ax4.plot(X, Y2_N, color = 'tab:olive')
 
     if use_last == True:
         ax4.plot(X, Y_E_N, color = 'purple')
         
-    ax4.fill_between(X, Y1_NL, Y1_NU, color = 'tab:blue', alpha = 0.3)
-    ax4.fill_between(X, Y2_NL, Y2_NU, color = 'tab:cyan', alpha = 0.3)
+    ax4.fill_between(X, Y1_NL, Y1_NU, color = 'tab:cyan', alpha = 0.3)
+    ax4.fill_between(X, Y2_NL, Y2_NU, color = 'tab:olive', alpha = 0.3)
     
     ax4.set_xlim([x_ulim, 20.])
     # ax4.set_xlabel(x_label)
@@ -732,8 +735,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax4.grid(which = 'both')
 
     # Subplot: Normalized Deviations
-    ax5.plot(X, (Y1_N - Y_NM) / Y_NM, color = 'tab:blue', label='_nolegend_')
-    ax5.plot(X, (Y2_N - Y_NM) / Y_NM, color = 'tab:orange', label='_nolegend_')
+    ax5.plot(X, (Y1_N - Y_NM) / Y_NM, color = 'tab:cyan', label='_nolegend_')
+    ax5.plot(X, (Y2_N - Y_NM) / Y_NM, color = 'tab:olive', label='_nolegend_')
 
     if use_last == True:
         ax5.plot(X, Y_DIFF, color = 'tab:purple', label = f'{extra_label_short}-{extra_label_short[0]}')
@@ -741,9 +744,9 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax5.legend()
 
     ax5.fill_between(X, (Y1_NL - Y_NM) / Y_NM, (Y1_NU - Y_NM) / Y_NM, 
-                     color = 'tab:blue', alpha = 0.3)
+                     color = 'tab:cyan', alpha = 0.3)
     ax5.fill_between(X, (Y2_NL - Y_NM) / Y_NM, (Y2_NU - Y_NM) / Y_NM, 
-                     color = 'tab:orange', alpha = 0.3)
+                     color = 'tab:olive', alpha = 0.3)
 
     ax5.plot(X, np.zeros(X.shape), '--', color = 'black', zorder = 10)
 
@@ -922,9 +925,9 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
                              x_vals_cal, x_vals_vdr,
                              y1_vals, y2_vals, y3_vals, y4_vals, y5_vals, y6_vals,
                              eta, eta_f_s, eta_s,
-                             delta_m, delta_c, delta, epsilon,
+                             delta_m, delta_c_def, delta_c, epsilon,
                              eta_err, eta_f_s_err, eta_s_err,
-                             delta_c_err, delta_err, epsilon_err,
+                             delta_c_def_err, delta_c_err, epsilon_err,
                              x_lbin_cal, x_ubin_cal, 
                              x_llim_cal, x_ulim_cal, 
                              y_llim_cal, y_ulim_cal, 
@@ -935,9 +938,9 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
                              y_label_cal, x_label_cal, x_tick_cal,
                              y_label_vdr, x_label_vdr, x_tick_vdr):
         
-    delta_l = (delta_c - delta_m) / (1. - delta_c * delta_m)
-    delta_l_err = delta_c_err * (1. - delta_m) * (1. + delta_c) / \
-        (1. - delta_m * delta_c)**2
+    delta_l = (delta_c_def - delta_m) / (1. - delta_c_def * delta_m)
+    delta_l_err = delta_c_def_err * (1. - delta_m) * (1. + delta_c_def) / \
+        (1. - delta_m * delta_c_def)**2
     
     # Create the variables to be plotted X, Y
     XA = x_vals_cal[slice(x_lbin_cal, x_ubin_cal)]
@@ -1081,10 +1084,10 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
             r'$δ_m$: '+f'{np.round(delta_m,4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.45 * y_ulim_vdr, 
-            r'$δ^{\star}$'+f': {np.round(delta_c,4)}' + ' $\pm$ ' + f'{round_it(delta_c_err,2)}',
+            r'$δ^{\star}$'+f': {np.round(delta_c_def,4)}' + ' $\pm$ ' + f'{round_it(delta_c_def_err,2)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.35 * y_ulim_vdr, 
-            r'$δ_{c}$'+f': {np.round(delta,4)}' + ' $\pm$ ' + f'{round_it(delta_err,2)}', 
+            r'$δ_{c}$'+f': {np.round(delta_c,4)}' + ' $\pm$ ' + f'{round_it(delta_c_err,2)}', 
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.25 * y_ulim_vdr, 
             r'$δ_{res}$: '+f'{np.round(delta_l,4)}' + ' $\pm$ ' + f'{round_it(delta_l_err,2)}',

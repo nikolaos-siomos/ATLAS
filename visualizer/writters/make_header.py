@@ -66,10 +66,10 @@ def rayleigh(start_date, start_time, start_time_sec, stop_time_sec,
                         
     return(header)
 
-def telecover(start_date, start_time, sampling_sec,
+def telecover(start_date, start_time, sampling,
               wave, lidar, loc, meas_id, channel, iters, extra_sec):
     
-    duration = iters * sampling_sec
+    duration = iters * sampling
     
     date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
     start = f'{start_time[:2]}:{start_time[2:4]}'

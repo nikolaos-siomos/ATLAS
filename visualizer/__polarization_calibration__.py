@@ -336,16 +336,16 @@ def main(args, __version__):
 
         delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta[0]
 
-        delta_c_prf = (delta_s_prf * (G_T_def_ch + H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
+        delta_c_def_prf = (delta_s_prf * (G_T_def_ch + H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
             ((G_R_def_ch - H_R_def_ch) - delta_s_prf * (G_T_def_ch - H_T_def_ch))
         
-        delta_c = (delta_s * (G_T_def_ch+ H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
+        delta_c_def = (delta_s * (G_T_def_ch+ H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
             ((G_R_def_ch - H_R_def_ch) - delta_s * (G_T_def_ch - H_T_def_ch))
-
-        delta_prf = (delta_s_prf * (G_T_ch + H_T_ch) - (G_R_ch + H_R_ch)) /\
+            
+        delta_c_prf = (delta_s_prf * (G_T_ch + H_T_ch) - (G_R_ch + H_R_ch)) /\
             ((G_R_ch - H_R_ch) - delta_s_prf * (G_T_ch - H_T_ch))
 
-        delta = (delta_s * (G_T_ch + H_T_ch) - (G_R_ch + H_R_ch)) /\
+        delta_c = (delta_s * (G_T_ch + H_T_ch) - (G_R_ch + H_R_ch)) /\
             ((G_R_ch - H_R_ch) - delta_s * (G_T_ch - H_T_ch))
                     
         psi = (eta_f_s_p45 - eta_f_s_m45) / (eta_f_s_p45 + eta_f_s_m45)
@@ -365,7 +365,7 @@ def main(args, __version__):
         # Create the y axis (rayleigh)
         y_llim_ray, y_ulim_ray, y_label_ray = \
             make_axis.polarization_calibration_ray_y(
-                ratio = delta_c[0], y_lims_ray = args['y_lims_rayleigh'])
+                ratio = delta_c_def[0], y_lims_ray = args['y_lims_rayleigh'])
         
                 
         # Make title
@@ -411,21 +411,21 @@ def main(args, __version__):
                                                y1_vals = eta_prf, 
                                                y2_vals = eta_p45_prf, 
                                                y3_vals = eta_m45_prf, 
-                                               y4_vals = delta_c_prf,
-                                               y5_vals = delta_prf,
+                                               y4_vals = delta_c_def_prf,
+                                               y5_vals = delta_c_prf,
                                                y6_vals = delta_m_prf,
                                                eta = eta[0], 
                                                eta_f_s = eta_f_s[0], 
                                                eta_s = eta_s[0], 
                                                delta_m = delta_m,
+                                               delta_c_def = delta_c_def[0],
                                                delta_c = delta_c[0],
-                                               delta = delta[0],
                                                epsilon = epsilon[0],
                                                eta_err = np.std(eta[1:]), 
                                                eta_f_s_err = np.std(eta_f_s[1:]), 
                                                eta_s_err = np.std(eta_s[1:]), 
+                                               delta_c_def_err = np.std(delta_c_def[1:]),
                                                delta_c_err = np.std(delta_c[1:]),
-                                               delta_err = np.std(delta[1:]),
                                                epsilon_err = np.std(epsilon[0]),
                                                x_lbin_cal = x_lbin_cal,
                                                x_ubin_cal = x_ubin_cal, 
@@ -451,11 +451,11 @@ def main(args, __version__):
                                                x_label_vdr = x_label_ray, 
                                                x_tick_vdr = args['x_tick_rayleigh'])  
     
-        # pack = np.vstack((x_vals_ray, delta_fit_prf, delta_prf)).T
+        # pack = np.vstack((x_vals_ray, delta_fit_prf, delta_c_prf)).T
     
         # ascii_name = f'{data.Measurement_ID_Calibration}_{data.Lidar_Name_Calibration}_pcb_{ch_r}_to_{ch_t}_ATLAS_{__version__}.txt'
         # np.savetxt(os.path.join(args['output_folder'],'ascii',ascii_name), pack, 
-        #             delimiter = ',', header = 'alt, delta_eta_s, delta')
+        #             delimiter = ',', header = 'alt, delta_eta_s, delta_c')
 
         # Make ascii file header
         header = \
