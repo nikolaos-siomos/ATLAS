@@ -119,7 +119,7 @@ def quicklook(dir_out, fname, title, dpi_val, color_reduction, use_log,
     return(fpath)
 
 def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_region,
-             x_vals, y1_vals, y2_vals, y1_errs, coef, rsem,
+             x_vals, y1_vals, y2_vals, y1_errs, coef, rsem, rslope, pval,
              x_lbin, x_ubin, x_llim, x_ulim, y_llim, y_ulim, 
              x_label, y_label, x_tick):
         
@@ -182,23 +182,41 @@ def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_regi
     n_llim = np.round(norm_region[0], decimals = 2)
     n_ulim = np.round(norm_region[1], decimals = 2)
     
+    if rsem > 0.01:
+        c_rsem = 'tab:red'
+    else:
+        c_rsem = 'tab:green'
+
+    if pval < 0.05:
+        c_pval = 'tab:red'
+    else:
+        c_pval = 'tab:green'
+        
     if use_lin == False:
 
         ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
                 f'norm. region: {n_llim} - {n_ulim} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
-
+            
         ax.text(0.55 * x_ulim, 0.30 * y_ulim, 
-                 f'rsem: {np.round(rsem, decimals = 4)}',
-                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+                f'rsem: {np.round(rsem, decimals = 4)}',
+                bbox = dict(facecolor = c_rsem, alpha = 0.1, zorder = 3))
+        
+        ax.text(0.55 * x_ulim, 0.15 * y_ulim, 
+                f'rslope: {np.round(rslope, decimals = 4)}',
+                bbox = dict(facecolor = c_pval, alpha = 0.1, zorder = 3))
     else:
         ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
                 f'norm. region: {n_llim} - {n_ulim} km',
                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
 
         ax.text(0.55 * x_ulim, 0.82 * y_ulim, 
-                 f'rsem: {np.round(rsem, decimals = 4)}',
-                 bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3))
+                f'rsem: {np.round(rsem, decimals = 4)}',
+                bbox = dict(facecolor = c_rsem, alpha = 0.1, zorder = 3))
+
+        ax.text(0.55 * x_ulim, 0.74 * y_ulim, 
+                f'rslope: {np.round(rslope, decimals = 4)}',
+                bbox = dict(facecolor = c_pval, alpha = 0.1, zorder = 3))
 
     ax2 = fig.add_axes([0.65,0.13,0.30,0.7])
     

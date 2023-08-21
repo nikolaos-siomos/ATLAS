@@ -8,7 +8,8 @@ Created on Sat Sep  3 13:34:47 2022
 
 import sys
 import numpy as np
-
+from scipy import stats
+import xarray as xr
 
 def region(sig, x_vals, region, axis, squeeze = False):
 
@@ -36,6 +37,66 @@ def region(sig, x_vals, region, axis, squeeze = False):
         sem = std/np.sqrt(sig_sel.size)
         
     return(avg, std, sem)
+
+def scan(sig, atb, x_vals):
+    
+    min_win = 0.5
+    
+    max_win = 4.
+    
+    step = 0.1
+    
+    llim = step * np.ceil(x_vals[0] / step)
+    
+    ulim = step * np.floor(x_vals[-1] / step) - max_win
+    
+    edg = np.arange(llim, ulim + step, step)
+    
+    win = np.arange(min_win, max_win + step, step)
+    
+    avg_sig = np.nan * np.zeros((win.size,edg.size))
+    avg_atb = np.nan * np.zeros((win.size,edg.size))
+    std = np.nan * np.zeros((win.size,edg.size))
+    sem = np.nan * np.zeros((win.size,edg.size))
+    
+    for i in range(win.size):
+
+        for j in range(edg.size):
+      
+            mask_x = (x_vals >= edg[j]) & (x_vals < edg[j] + win[i])
+            
+            sig_sel = sig[mask_x]
+
+            atb_sel = atb[mask_x]
+            
+            x_sel = x_vals[mask_x]
+        
+            # Calculate the mean value
+            avg_sig[i,j] = np.nanmean(sig_sel)
+
+            # Calculate the mean value
+            avg_atb[i,j] = np.nanmean(atb_sel)
+            
+            # Calculate the standard deviation
+            std[i,j] = np.nanstd(sig_sel)
+
+            # Calculate the standard error
+            sem[i,j] = np.nanstd(sig_sel) / np.sqrt(sig_sel.size)            
+            
+    avg_sig = xr.DataArray(avg_sig, dims = ['window', 'lower_limit'],
+                           coords = [win, edg])
+
+    avg_atb = xr.DataArray(avg_atb, dims = ['window', 'lower_limit'],
+                           coords = [win, edg])
+    
+    std = xr.DataArray(std, dims = ['window', 'lower_limit'],
+                       coords = [win, edg])
+    
+    sem = xr.DataArray(np.abs(sem/avg_atb), dims = ['window', 'lower_limit'],
+                       coords = [win, edg])
+    
+    
+    return(avg_sig, std, sem)
 
 def get_avg_bin(x_vals, avg_height):
 
