@@ -956,9 +956,9 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
                              y_label_cal, x_label_cal, x_tick_cal,
                              y_label_vdr, x_label_vdr, x_tick_vdr):
         
-    delta_l = (delta_c_def - delta_m) / (1. - delta_c_def * delta_m)
-    delta_l_err = delta_c_def_err * (1. - delta_m) * (1. + delta_c_def) / \
-        (1. - delta_m * delta_c_def)**2
+    delta_l = (delta_c - delta_m) / (1. - delta_c * delta_m)
+    delta_l_err = delta_c_err * (1. - delta_m) * (1. + delta_c) / \
+        (1. - delta_m * delta_c)**2
     
     # Create the variables to be plotted X, Y
     XA = x_vals_cal[slice(x_lbin_cal, x_ubin_cal)]
@@ -1036,17 +1036,22 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     #         f'ε: {round_it(epsilon,2)}'+'${}^o \pm$ '+f'{round_it(epsilon_err,2)}'+'${}^o$,',
     #         bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax.text(0.05 * x_ulim_cal, 0.87 * y_ulim_cal, 
-            f'ε: {round_it(epsilon,2)}'+'${}^o$'+ f', K: {round_it(K, 3)}',
+            f'ε: {round_it(epsilon,2)}' +'${}^o$'+ ' $\pm$ ' + f'{round_it(epsilon_err, 2)}' +'${}^o$' + f', K: {round_it(K, 4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax.text(0.05 * x_ulim_cal, 0.79 * y_ulim_cal, 
-            r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 2)}' + ' $\pm$ ' + f'{round_it(eta_f_s_err, 2)}',
+            r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 3)}' + ' $\pm$ ' + f'{round_it(eta_f_s_err, 2)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax.text(0.05 * x_ulim_cal, 0.71 * y_ulim_cal, 
             r'$η^{\star}$'+f': {round_it(eta_s, 3)}' + ' $\pm$ ' + f'{round_it(eta_s_err, 2)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+    if eta_err / eta <= 0.02:
+        color_eta = 'tab:green'
+    else:
+        color_eta = 'tab:red'
+
     ax.text(0.05 * x_ulim_cal, 0.63 * y_ulim_cal, 
             f'η: {round_it(eta, 3)}' + ' $\pm$ ' + f'{round_it(eta_err, 2)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = color_eta, alpha = 0.1, zorder = 3)) 
 
     ax2 = fig.add_axes([0.55,0.13,0.40,0.65])
 

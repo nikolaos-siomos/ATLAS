@@ -426,7 +426,7 @@ def main(args, __version__):
                                                eta_s_err = np.std(eta_s[1:]), 
                                                delta_c_def_err = np.std(delta_c_def[1:]),
                                                delta_c_err = np.std(delta_c[1:]),
-                                               epsilon_err = np.std(epsilon[0]),
+                                               epsilon_err = np.std(epsilon[1:]),
                                                x_lbin_cal = x_lbin_cal,
                                                x_ubin_cal = x_ubin_cal, 
                                                x_llim_cal = x_llim_cal,
