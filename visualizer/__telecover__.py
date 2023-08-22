@@ -112,7 +112,7 @@ def main(args, __version__):
             coef_n, y_m_n, y_sm_n, y_m_sm_n, y_l_sm_n, y_u_sm_n, \
             coef_extra_n, y_extra_n, y_extra_sm_n, extra_sec['N'] = \
                 sector.process(x = x_vals, 
-                               y = sig_n.loc[ch_d].values, 
+                               y = sig_n.loc[ch_d].values.copy(), 
                                iters = iters_sec, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
@@ -123,7 +123,7 @@ def main(args, __version__):
             coef_e, y_m_e, y_sm_e, y_m_sm_e, y_l_sm_e, y_u_sm_e, \
             coef_extra_e, y_extra_e, y_extra_sm_e, extra_sec['E'] = \
                 sector.process(x = x_vals, 
-                               y = sig_e.loc[ch_d].values, 
+                               y = sig_e.loc[ch_d].values.copy(), 
                                iters = iters_sec, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
@@ -134,7 +134,7 @@ def main(args, __version__):
             coef_s, y_m_s, y_sm_s, y_m_sm_s, y_l_sm_s, y_u_sm_s, \
             coef_extra_s, y_extra_s, y_extra_sm_s, extra_sec['S'] = \
                 sector.process(x = x_vals, 
-                               y = sig_s.loc[ch_d].values, 
+                               y = sig_s.loc[ch_d].values.copy(), 
                                iters = iters_sec, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
@@ -145,7 +145,7 @@ def main(args, __version__):
             coef_w, y_m_w, y_sm_w, y_m_sm_w, y_l_sm_w, y_u_sm_w, \
             coef_extra_w, y_extra_w, y_extra_sm_w, extra_sec['W'] = \
                 sector.process(x = x_vals, 
-                               y = sig_w.loc[ch_d].values, 
+                               y = sig_w.loc[ch_d].values.copy(), 
                                iters = iters_sec, 
                                smooth = args['smooth'], 
                                x_sm_lims = args['smoothing_range'],
@@ -332,12 +332,12 @@ def main(args, __version__):
                                expo = args['smooth_exponential'],
                                region = args['normalization_region'])
 
-            # Create the y axis (signal)
+
             y_llim, y_ulim, y_llim_nr, y_ulim_nr = \
                 make_axis.telecover_y(sig = [y_m_sm_o[slice(x_lbin,x_ubin+1)],
                                              y_m_sm_i[slice(x_lbin,x_ubin+1)]],
-                                      sig_nr = [coef_o * y_m_sm_n[slice(x_lbin,x_ubin+1)],
-                                                coef_i * y_m_sm_e[slice(x_lbin,x_ubin+1)]],
+                                      sig_nr = [coef_o * y_m_sm_o[slice(x_lbin,x_ubin+1)],
+                                                coef_i * y_m_sm_i[slice(x_lbin,x_ubin+1)]],
                                       y_lims = args['y_lims'])
             
                     

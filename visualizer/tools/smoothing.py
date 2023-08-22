@@ -99,7 +99,7 @@ def sliding_average_1D(y_vals, x_vals, x_sm_lims, x_sm_win,
 
     return(y_vals_sm, y_vals_err)
 
-def sliding_average_1D_fast(y_vals, x_vals, x_sm_lims, x_sm_win, expo = None, err_type = 'sem'):
+def sliding_average_1D_fast(y_vals, x_vals, x_sm_lims, x_sm_win, expo = None, err_type = 'sem', buf = []):
     
     win = int(1E-3 * x_sm_win  / (x_vals[1] - x_vals[0]))
     
@@ -108,7 +108,8 @@ def sliding_average_1D_fast(y_vals, x_vals, x_sm_lims, x_sm_win, expo = None, er
     s_bin = np.where(x_vals >= x_sm_lims[0])[0][0]
     e_bin = np.where(x_vals <= x_sm_lims[1])[0][-1]
     
-    buf = int(np.floor(win / 2.))
+    if isinstance(buf, list):
+        buf = int(np.floor(win / 2.))
 
     s_buf = s_bin + buf
     e_buf = e_bin - buf
@@ -171,7 +172,7 @@ def sliding_average_1D_fast(y_vals, x_vals, x_sm_lims, x_sm_win, expo = None, er
 
     return(y_avg, y_err)
 
-def sliding_average_2D_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None):
+def sliding_average_2D_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None, buf = []):
     
     win = int(1E-3 * y_sm_win  / (y_vals[1] - y_vals[0]))
     
@@ -180,7 +181,8 @@ def sliding_average_2D_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None):
     s_bin = np.where(y_vals >= y_sm_lims[0])[0][0]
     e_bin = np.where(y_vals <= y_sm_lims[1])[0][-1]
     
-    buf = int(np.floor(win / 2.))
+    if isinstance(buf, list):
+        buf = int(np.floor(win / 2.))
 
     s_buf = s_bin + buf
     e_buf = e_bin - buf
