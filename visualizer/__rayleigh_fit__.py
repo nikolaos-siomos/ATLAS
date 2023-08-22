@@ -130,13 +130,14 @@ def main(args, __version__):
         #                                         region = args['normalization_region'],
         #                                         axis = 0)
         
-        nder, mder, rerr, rsem, mshp, coef, mneg = \
+        nder, mder, cder, rerr, rsem, mshp, coef, mneg = \
             curve_fit.stats(y1 = sig_ch.copy(),
                             y2 = atb_ch.copy(), 
                             x  = x_vals)   
             
-        norm_reg, mmol, idx, ismol = curve_fit.scan(mder = mder, rsem = rsem, 
-                                                    mshp = mshp, mneg = mneg)
+        norm_reg, mmol, idx, ismol = curve_fit.scan(mder = mder, cder = cder,
+                                                    rsem = rsem, mshp = mshp, 
+                                                    mneg = mneg)
         
         args['normalization_region'] = norm_reg            
         
@@ -238,7 +239,7 @@ def main(args, __version__):
         x_llim = 0.
         x_ulim = 16.
         
-        y_llim = 0.5
+        y_llim = 1.
         y_ulim = 4.
         
         fig_x = 0.42
@@ -265,21 +266,21 @@ def main(args, __version__):
         ax2.set_xlim([x_llim, x_ulim])
         
         ax3 = fig.add_axes([fig_edg1_x, fig_edg2_y, fig_x, fig_y])
-        ax3.pcolormesh(X, Y, mshp.values)
-        ax3.set_title('Shapiro-Wilk mask', pad = 5)
+        ax3.pcolormesh(X, Y, cder.values)
+        ax3.set_title('Curvature mask', pad = 5)
         ax3.set_ylabel('Window [km]')
         ax3.set_ylim([y_llim, y_ulim])
         ax3.set_xlim([x_llim, x_ulim])       
 
         ax4 = fig.add_axes([fig_edg2_x, fig_edg2_y, fig_x, fig_y])
-        ax4.pcolormesh(X, Y, mneg.values)
-        ax4.set_title('Cross-check mask', pad = 5)
+        ax4.pcolormesh(X, Y, mshp.values)
+        ax4.set_title('Shapiro-Wilk mask', pad = 5)
         ax4.set_ylim([y_llim, y_ulim])
         ax4.set_xlim([x_llim, x_ulim])
 
         ax5 = fig.add_axes([fig_edg1_x, fig_edg1_y, fig_x, fig_y])
-        ax5.pcolormesh(X, Y, mmol.values)
-        ax5.set_title('Combined mask', pad = 5)
+        ax5.pcolormesh(X, Y, mneg.values)
+        ax5.set_title('Cross-check mask', pad = 5)
         ax5.set_xlabel('Lower Limit [km]')
         ax5.set_ylabel('Window [km]')
         ax5.set_ylim([y_llim, y_ulim])
@@ -287,7 +288,7 @@ def main(args, __version__):
 
         ax6 = fig.add_axes([0.53, fig_edg1_y, fig_x, fig_y])
         ax6.pcolormesh(X, Y, rsem.where(mmol).values)
-        ax6.set_title('Masked SEM', pad = 5)
+        ax6.set_title('Masked Relative SEM', pad = 5)
         ax6.set_xlabel('Lower Limit [km]')
         ax6.set_ylim([y_llim, y_ulim])
         ax6.set_xlim([x_llim, x_ulim])

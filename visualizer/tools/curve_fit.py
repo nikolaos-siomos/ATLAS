@@ -14,7 +14,7 @@ from scipy.stats import linregress, shapiro
 
 def stats(y1, y2, x):
     
-    min_win = 0.5
+    min_win = 1.
     
     max_win = 4.
     
@@ -30,6 +30,7 @@ def stats(y1, y2, x):
     
     nder = np.nan * np.zeros((win.size,edg.size))
     mder = np.nan * np.zeros((win.size,edg.size))
+    cder = np.nan * np.zeros((win.size,edg.size))
     rerr = np.nan * np.zeros((win.size,edg.size))
     rsem = np.nan * np.zeros((win.size,edg.size))
     mshp = np.nan * np.zeros((win.size,edg.size))
@@ -41,6 +42,10 @@ def stats(y1, y2, x):
         for j in range(edg.size):
       
             mask_x = (x >= edg[j]) & (x < edg[j] + win[i])
+            
+            # mask_x_lh = (x >= edg[j]) & (x < edg[j] + win[i] / 2.)
+
+            # mask_x_uh = (x >= edg[j] + win[i] / 2.) & (x < edg[j] + win[i])
             
             y1_sel = y1[mask_x]
 
@@ -54,7 +59,13 @@ def stats(y1, y2, x):
             
             x_sel = x[mask_x]
             
+            hbin = int(x_sel.size / 2.)
+            
             fit = linregress(x = x_sel, y = res_sel)
+
+            fit_lh = linregress(x = x_sel[:hbin], y = res_sel[:hbin])
+            
+            fit_uh = linregress(x = x_sel[hbin:], y = res_sel[hbin:])     
 
             # Calculate the relative signal standar error derivative
             nder[i,j] = fit[0] / fit[4]
@@ -62,6 +73,9 @@ def stats(y1, y2, x):
             # Calculate the derivative mask (pval < 0.05 means the slope is significant)
             mder[i,j] = fit[3] > 0.05
 
+            # Check if the derivatives inside the 2 halves of the window are aslo not significant
+            cder[i,j] = (fit_lh[3] > 0.05) & (fit_uh[3] > 0.05)
+            
             # Calculate the standard error
             rsem[i,j] = np.nanstd(res_sel) / np.sqrt(res_sel.size) / np.nanmean(y2_sel)
             
@@ -74,12 +88,15 @@ def stats(y1, y2, x):
         
     for i in range(coef.shape[0]):
         for j in range(coef.shape[1]):    
-            mneg[i,j] = ((coef[i,:].copy() - coef[i,j].copy()) / coef[i,j].copy() <= rerr[i,:]).all()
+            mneg[i,j] = ((coef[i,:j].copy() - coef[i,j].copy()) / coef[i,j].copy() <= rerr[i,:j]).all()
             
     nder = xr.DataArray(nder, dims = ['window', 'lower_limit'],
                         coords = [win, edg])
     
     mder = xr.DataArray(mder, dims = ['window', 'lower_limit'],
+                        coords = [win, edg])
+
+    cder = xr.DataArray(cder, dims = ['window', 'lower_limit'],
                         coords = [win, edg])
     
     rerr = xr.DataArray(rerr, dims = ['window', 'lower_limit'],
@@ -97,15 +114,34 @@ def stats(y1, y2, x):
     mneg = xr.DataArray(mneg, dims = ['window', 'lower_limit'],
                         coords = [win, edg])
         
-    return(nder, mder, rerr, rsem, mshp, coef, mneg)
+    return(nder, mder, cder, rerr, rsem, mshp, coef, mneg)
 
-def scan(mder, rsem, mshp, mneg):
+def scan(mder, cder, rsem, mshp, mneg):
     
-    mmol = (mder == True) & (mshp == True) & (rsem <= 0.02) & (mneg == True)
+    mmol = (mder == True) & (cder == True) & (mshp == True) & (rsem <= 0.02) & (mneg == True)
     
+    ell = xr.DataArray(dims = mmol.dims, coords = mmol.coords)
+    for i in range(mmol.window.size):
+        ell[i,:] = ell.lower_limit.values
+    
+    edge_lower_limit = np.nan * np.zeros(mmol.window.size)
+    edge_window = np.nan * np.zeros(mmol.window.size)
+    edge_rsem = np.nan * np.zeros(mmol.window.size)
+
+
     if mmol.any():
-    
-        idx_min = rsem.where(mmol).argmin(dim = ['window', 'lower_limit'])
+        for i in range(mmol.window.size):
+            if mmol[i,:].any():
+                edge_lower_limit[i] = \
+                    mmol[i,:].lower_limit.values[mmol[i,:].values == True][-1]
+                edge_rsem[i] = \
+                    rsem[i,:].values[mmol[i,:].values == True][-1]
+                edge_window[i] = mmol[i,:].window.values
+        lower_limit = edge_lower_limit[np.nanargmin(edge_rsem)]
+        window = edge_window[np.nanargmin(edge_rsem)]
+        idx_min = dict(window = np.where(mmol.window.values == window)[0][0],
+                       lower_limit = np.where(mmol.lower_limit.values == lower_limit)[0][0])
+        # idx_min = rsem.where(mmol).argmin(dim = ['window', 'lower_limit'])
         
         ismol = True
     
