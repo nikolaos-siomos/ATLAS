@@ -351,8 +351,8 @@ def telecover_y(sig, sig_nr, y_lims):
     
     # Get the vertical lower limit
     if y_lims[0] == None:
-        y_llim = 0.
-        y_llim_nr = 0.
+        y_llim = -0.1 * y_max_nr * coef
+        y_llim_nr = -0.1 * y_max_nr
         
     else:
        y_llim = y_lims[0] * coef

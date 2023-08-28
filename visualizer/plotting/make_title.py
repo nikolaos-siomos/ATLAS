@@ -101,12 +101,8 @@ def polarization_calibration(start_date_cal, start_time_cal, end_time_cal,
     start_ray = f'{start_time_ray[:2]}:{start_time_ray[2:4]}:{start_time_ray[4:6]}'
 
     end_ray = f'{end_time_ray[:2]}:{end_time_ray[2:4]}:{end_time_ray[4:6]}'
-         
-    rs_date = f'{rs_start_date[6:]}.{rs_start_date[4:6]}.{rs_start_date[:4]}'
     
-    rs_start = f'{rs_start_time[:2]}:{rs_start_time[2:4]}'
-    
-    mol_part = mol_text(mol_method, st_name, wmo_id, wban_id, rs_date, rs_start)
+    mol_part = mol_text(mol_method, st_name, wmo_id, wban_id, rs_start_date, rs_start_time)
         
     title = f'{lidar} {loc} {channel_r} to {channel_t} - Pol. Calibration'+sm_part+'\n'+\
             f'Calibration on {date_cal} from {start_cal} to {end_cal} UTC, '+\

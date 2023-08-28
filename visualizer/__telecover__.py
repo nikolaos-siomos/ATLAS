@@ -168,18 +168,18 @@ def main(args, __version__):
                     
             # Make title
             title = make_title.telecover(start_date = data.RawData_Start_Date,
-                                        start_time = data.RawData_Start_Time_UT, 
-                                        end_time = data.RawData_Stop_Time_UT, 
-                                        lidar = data.Lidar_Name, 
-                                        channel = ch, 
-                                        zan = data.Laser_Pointing_Angle,
-                                        loc = data.Station_Name,
-                                        iters = iters_sec,
-                                        sampling = sampling_sec,
-                                        smooth = args['smooth'],
-                                        sm_lims = args['smoothing_range'],
-                                        sm_win = args['smoothing_window'],
-                                        sm_expo = args['smooth_exponential'])
+                                         start_time = data.RawData_Start_Time_UT, 
+                                         end_time = data.RawData_Stop_Time_UT, 
+                                         lidar = data.Lidar_Name, 
+                                         channel = ch, 
+                                         zan = data.Laser_Pointing_Angle,
+                                         loc = data.Station_Name,
+                                         iters = iters_sec,
+                                         sampling = sampling_sec,
+                                         smooth = args['smooth'],
+                                         sm_lims = args['smoothing_range'],
+                                         sm_win = args['smoothing_window'],
+                                         sm_expo = args['smooth_exponential'])
         
         
             # Make filename

@@ -99,7 +99,7 @@ def call_parser():
                         help = 'Refer to the smooth option in the quicklook section. Defaults to: True')
 
     parser.add_argument('--smoothing_range', metavar = 'smoothing_range',
-                        type = float, nargs = 2, default = [0., 2.55], 
+                        type = float, nargs = 2, default = [0., 2.50], 
                         help = 'Refer to the smooth option in the quicklook section Defaults to: 0.05, 14.')
 
     parser.add_argument('--smoothing_window', metavar = 'smoothing_window',

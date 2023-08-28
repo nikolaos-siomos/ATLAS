@@ -106,29 +106,6 @@ def main(args, __version__):
             y_vals_sm = sig_ch.copy()
             y_errs = np.nan * y_vals_sm
         
-        # # Normalization of the signals
-        # coef_c, n_bin = normalize.to_a_point(sig = y_vals_sm, 
-        #                                      sig_b = atb_ch.copy(), 
-        #                                      x_vals = x_vals,
-        #                                      region = args['normalization_region'],
-        #                                      axis = 0)
-        
-        # _, _, sem_c = average.region(sig = sig_ch.copy(), 
-        #                              x_vals = x_vals, 
-        #                              region = args['normalization_region'],
-        #                              axis = 0, 
-        #                              squeeze = True)
-        
-        # atb_c, _, _ = average.region(sig = atb_ch.copy(), 
-        #                              x_vals = x_vals, 
-        #                              region = args['normalization_region'],
-        #                              axis = 0, 
-        #                              squeeze = True)
-        
-        # mder, sder, pval = differentiate.region(sig = coef_c[0] * sig_ch.copy() - atb_c,
-        #                                         x_vals = x_vals, 
-        #                                         region = args['normalization_region'],
-        #                                         axis = 0)
         
         nder, mder, cder, rerr, rsem, mshp, coef, mneg = \
             curve_fit.stats(y1 = sig_ch.copy(),
@@ -177,6 +154,7 @@ def main(args, __version__):
                                     rs_start_time = rs_start_time, 
                                     wmo_id = wmo_id,
                                     wban_id = wban_id)
+        
     
         # Make plot filename
         fname = f'{data.Measurement_ID}_{data.Lidar_Name}_ray_{ch}_ATLAS_{__version__}.png'
@@ -230,79 +208,15 @@ def main(args, __version__):
                               atb = atb_ch, 
                               rcs = sig_ch, 
                               header = header)
-
-        from matplotlib import pyplot as plt
-        [X, Y] = np.meshgrid(mmol.lower_limit.values, mmol.window)
-        fig = plt.figure(figsize=(12. , 8.))
-        fig.suptitle(title)
-        
-        x_llim = 0.
-        x_ulim = 16.
-        
-        y_llim = 1.
-        y_ulim = 4.
-        
-        fig_x = 0.42
-        fig_y = 0.23
-        
-        fig_edg1_x = 0.07
-        fig_edg2_x = 0.53
-        
-        fig_edg1_y = 0.07
-        fig_edg2_y = 0.36
-        fig_edg3_y = 0.65
-        
-        ax = fig.add_axes([fig_edg1_x, fig_edg3_y, fig_x, fig_y])
-        ax.pcolormesh(X, Y, mder.values)
-        ax.set_title('Derivative mask', pad = 5)
-        ax.set_ylabel('Window [km]')
-        ax.set_ylim([y_llim, y_ulim])
-        ax.set_xlim([x_llim, x_ulim])
-
-        ax2 = fig.add_axes([fig_edg2_x, fig_edg3_y, fig_x, fig_y])
-        ax2.pcolormesh(X, Y, rsem.values <= 0.02)
-        ax2.set_title('Relative SEM mask', pad = 5)
-        ax2.set_ylim([y_llim, y_ulim])
-        ax2.set_xlim([x_llim, x_ulim])
-        
-        ax3 = fig.add_axes([fig_edg1_x, fig_edg2_y, fig_x, fig_y])
-        ax3.pcolormesh(X, Y, cder.values)
-        ax3.set_title('Curvature mask', pad = 5)
-        ax3.set_ylabel('Window [km]')
-        ax3.set_ylim([y_llim, y_ulim])
-        ax3.set_xlim([x_llim, x_ulim])       
-
-        ax4 = fig.add_axes([fig_edg2_x, fig_edg2_y, fig_x, fig_y])
-        ax4.pcolormesh(X, Y, mshp.values)
-        ax4.set_title('Shapiro-Wilk mask', pad = 5)
-        ax4.set_ylim([y_llim, y_ulim])
-        ax4.set_xlim([x_llim, x_ulim])
-
-        ax5 = fig.add_axes([fig_edg1_x, fig_edg1_y, fig_x, fig_y])
-        ax5.pcolormesh(X, Y, mneg.values)
-        ax5.set_title('Cross-check mask', pad = 5)
-        ax5.set_xlabel('Lower Limit [km]')
-        ax5.set_ylabel('Window [km]')
-        ax5.set_ylim([y_llim, y_ulim])
-        ax5.set_xlim([x_llim, x_ulim])
-
-        ax6 = fig.add_axes([0.53, fig_edg1_y, fig_x, fig_y])
-        ax6.pcolormesh(X, Y, rsem.where(mmol).values)
-        ax6.set_title('Masked Relative SEM', pad = 5)
-        ax6.set_xlabel('Lower Limit [km]')
-        ax6.set_ylim([y_llim, y_ulim])
-        ax6.set_xlim([x_llim, x_ulim])
         
         fname_mask = f'{data.Measurement_ID}_{data.Lidar_Name}_ray_{ch}_mask_ATLAS_{__version__}.png'
-    
-        import os
-        fpath = os.path.join(args['output_folder'], 'plots', fname_mask)
 
-        fig.savefig(fpath, dpi = args['dpi'])
-        
-        fig.clf()
-        
-        plt.close()
+        make_plot.rayleigh_mask(dir_out = args['output_folder'], 
+                                fname = fname_mask, title = title,
+                                dpi_val = args['dpi'],
+                                color_reduction = args['color_reduction'],
+                                mmol = mmol, mder = mder, cder = cder, 
+                                mshp = mshp, mneg = mneg, rsem = rsem)
         
         # Add metadata to the quicklook plot
         from PIL import Image

@@ -265,6 +265,93 @@ def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_regi
     
     return(fpath)
 
+def rayleigh_mask(dir_out, fname, title, dpi_val, color_reduction,
+                  mmol, mder, cder, mshp, mneg, rsem):
+
+    rgb = color_lib.volkers_rgb()
+    vlk_cmap = make_colormap.custom_rgb(rgb, name = 'volkers')
+
+    [X, Y] = np.meshgrid(mmol.lower_limit.values, mmol.window)
+    fig = plt.figure(figsize=(12. , 8.))
+    fig.suptitle(title)
+    
+    x_llim = 0.
+    x_ulim = 16.
+    
+    y_llim = 1.
+    y_ulim = 4.
+    
+    fig_x = 0.44
+    fig_y = 0.23
+    
+    fig_edg1_x = 0.06
+    fig_edg2_x = 0.54
+    
+    fig_edg1_y = 0.07
+    fig_edg2_y = 0.36
+    fig_edg3_y = 0.65
+    
+    ax = fig.add_axes([fig_edg1_x, fig_edg3_y, fig_x, fig_y])
+    ax.pcolormesh(X, Y, mder.values)
+    ax.set_title('Derivative mask', pad = 5)
+    ax.set_ylabel('Window [km]')
+    ax.set_ylim([y_llim, y_ulim])
+    ax.set_xlim([x_llim, x_ulim])
+
+    ax2 = fig.add_axes([fig_edg2_x, fig_edg3_y, fig_x, fig_y])
+    ax2.pcolormesh(X, Y, rsem.values <= 0.02)
+    ax2.set_title('Relative SEM mask', pad = 5)
+    ax2.set_ylim([y_llim, y_ulim])
+    ax2.set_xlim([x_llim, x_ulim])
+    
+    ax3 = fig.add_axes([fig_edg1_x, fig_edg2_y, fig_x, fig_y])
+    ax3.pcolormesh(X, Y, cder.values)
+    ax3.set_title('Curvature mask', pad = 5)
+    ax3.set_ylabel('Window [km]')
+    ax3.set_ylim([y_llim, y_ulim])
+    ax3.set_xlim([x_llim, x_ulim])       
+
+    ax4 = fig.add_axes([fig_edg2_x, fig_edg2_y, fig_x, fig_y])
+    ax4.pcolormesh(X, Y, mshp.values)
+    ax4.set_title('Shapiro-Wilk mask', pad = 5)
+    ax4.set_ylim([y_llim, y_ulim])
+    ax4.set_xlim([x_llim, x_ulim])
+
+    ax5 = fig.add_axes([fig_edg1_x, fig_edg1_y, fig_x, fig_y])
+    ax5.pcolormesh(X, Y, mneg.values)
+    ax5.set_title('Cross-check mask', pad = 5)
+    ax5.set_xlabel('Lower Limit [km]')
+    ax5.set_ylabel('Window [km]')
+    ax5.set_ylim([y_llim, y_ulim])
+    ax5.set_xlim([x_llim, x_ulim])
+
+    ax6 = fig.add_axes([fig_edg2_x, fig_edg1_y, fig_x, fig_y])
+    plot6 = ax6.pcolormesh(X, Y, 100. * rsem.where(mmol).values, vmin = 0., vmax = 2., cmap = vlk_cmap)
+    ax6.set_title('Masked Relative SEM (%)', pad = 5)
+    ax6.grid(which = 'both')
+    ax6.axes.xaxis.set_minor_locator(MultipleLocator(1))
+    ax6.set_xlabel('Lower Limit [km]')
+    ax6.set_ylim([y_llim, y_ulim])
+    ax6.set_xlim([x_llim, x_ulim])
+    
+    cax = fig.add_axes([fig_edg2_x + 0.01, fig_edg1_y +0.01, 0.01, fig_y -0.02])
+
+    fig.colorbar(plot6, cax=cax, orientation='vertical')
+    
+    fpath = os.path.join(dir_out, 'plots', fname)
+
+    fig.savefig(fpath, dpi = dpi_val)
+    
+    fig.clf()
+    
+    plt.close()
+    
+    if color_reduction == True:
+        run(["convert", fpath, "-posterize", "8", fpath])
+    
+    return(fpath)
+
+
 def telecover_sec(dir_out, fname, title, dpi_val, color_reduction, 
                   norm_region, use_nonrc, x_vals, 
                   y1_raw, y2_raw, y3_raw, y4_raw,
@@ -406,20 +493,23 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
         ax.plot(X, Y_E, color = 'tab:purple', label = extra_label, alpha = 0.7)
         
     ax.legend()
+
+    ax.plot([X[0], X[-1]], [0., 0.], color = 'black')
     
     ax.set_xticks(x_ticks, labels = x_ticks)
     ax.set_xlim([x_llim, x_ulim])
     ax.set_xlabel(x_label, loc = "right")
     
-    raw_llim = np.nanmin([Y1[x_lbin:x_ubin], Y2[x_lbin:x_ubin],
-                          Y3[x_lbin:x_ubin], Y4[x_lbin:x_ubin]])
+    # raw_llim = np.nanmin([Y1[x_lbin:x_ubin], Y2[x_lbin:x_ubin],
+    #                       Y3[x_lbin:x_ubin], Y4[x_lbin:x_ubin]])
     raw_ulim = np.nanmax([Y1[x_lbin:x_ubin], Y2[x_lbin:x_ubin],
                           Y3[x_lbin:x_ubin], Y4[x_lbin:x_ubin]])
     
-    if raw_llim > 0.:
-        ax.set_ylim([0, 1.1 * raw_ulim])
-    else:
-        ax.set_ylim([1.1 * raw_llim, 1.1 * raw_ulim])
+    # if raw_llim > 0.:
+    #     ax.set_ylim([0, 1.1 * raw_ulim])
+    # else:
+    #     ax.set_ylim([1.1 * raw_llim, 1.1 * raw_ulim])
+    ax.set_ylim([-0.1*raw_ulim, 1.1 * raw_ulim])
 
     ax.set_ylabel(y_label_1)
     ax.ticklabel_format(axis = 'y', useMathText = True, style='sci', scilimits=(-1,1))
@@ -437,14 +527,17 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     if use_last == True and extra_exists:
         ax2.plot(X, Y_E, color = 'tab:purple', alpha = 0.7)
                 
+    ax2.plot([X[0], X[-1]], [0., 0.], color = 'black')
+
     ax2.set_xlim([x_ulim, 20.])
     # ax2.set_xlabel(x_label)
     ax2.xaxis.set_minor_locator(MultipleLocator(2.))
 
-    if raw_llim > 0.:
-        ax2.set_ylim([0, 1.1 * raw_ulim])
-    else:
-        ax2.set_ylim([1.1 * raw_llim, 1.1 * raw_ulim])
+    # if raw_llim > 0.:
+    #     ax2.set_ylim([0, 1.1 * raw_ulim])
+    # else:
+    #     ax2.set_ylim([1.1 * raw_llim, 1.1 * raw_ulim])
+    ax2.set_ylim([-0.1*raw_ulim, 1.1 * raw_ulim])
 
     ax2.set(yticklabels=[])
 
@@ -464,6 +557,8 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     ax3.fill_between(X, Y2_NL, Y2_NU, color = 'tab:orange', alpha = 0.3)
     ax3.fill_between(X, Y3_NL, Y3_NU, color = 'tab:green', alpha = 0.3)
     ax3.fill_between(X, Y4_NL, Y4_NU, color = 'tab:red', alpha = 0.3)
+
+    ax3.plot([X[0], X[-1]], [0., 0.], color = 'black')
 
     ax3.set_xticks(x_ticks, labels = x_ticks)
     ax3.set_xlim([x_llim, x_ulim])
@@ -498,6 +593,8 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     ax4.fill_between(X, Y2_NL, Y2_NU, color = 'tab:orange', alpha = 0.3)
     ax4.fill_between(X, Y3_NL, Y3_NU, color = 'tab:green', alpha = 0.3)
     ax4.fill_between(X, Y4_NL, Y4_NU, color = 'tab:red', alpha = 0.3)
+
+    ax4.plot([X[0], X[-1]], [0., 0.], color = 'black')
 
     ax4.set_xlim([x_ulim, 20.])
     # ax4.set_xlabel(x_label)
@@ -673,17 +770,20 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
         
     ax.legend()
     
+    ax.plot([X[0], X[-1]], [0., 0.], color = 'black')
+
     ax.set_xticks(x_ticks, labels = x_ticks)
     ax.set_xlim([x_llim, x_ulim])
     ax.set_xlabel(x_label, loc = "right")
     
-    raw_llim = np.nanmin([Y1[x_lbin:x_ubin], Y2[x_lbin:x_ubin]])
+    # raw_llim = np.nanmin([Y1[x_lbin:x_ubin], Y2[x_lbin:x_ubin]])
     raw_ulim = np.nanmax([Y1[x_lbin:x_ubin], Y2[x_lbin:x_ubin]])
     
-    if raw_llim > 0.:
-        ax.set_ylim([0, 1.1 * raw_ulim])
-    else:
-        ax.set_ylim([1.1 * raw_llim, 1.1 * raw_ulim])
+    # if raw_llim > 0.:
+    #     ax.set_ylim([0, 1.1 * raw_ulim])
+    # else:
+    #     ax.set_ylim([1.1 * raw_llim, 1.1 * raw_ulim])
+    ax.set_ylim([-0.1*raw_ulim, 1.1 * raw_ulim])
 
     ax.set_ylabel(y_label_1)
     ax.ticklabel_format(axis = 'y', useMathText = True, style='sci', scilimits=(-1,1))
@@ -699,14 +799,18 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     if use_last == True and extra_exists:
         ax2.plot(X, Y_E, color = 'tab:purple', alpha = 0.7)
                 
+    ax2.plot([X[0], X[-1]], [0., 0.], color = 'black')
+    
     ax2.set_xlim([x_ulim, 20.])
     # ax2.set_xlabel(x_label)
     ax2.xaxis.set_minor_locator(MultipleLocator(2.))
 
-    if raw_llim > 0.:
-        ax2.set_ylim([0, 1.1 * raw_ulim])
-    else:
-        ax2.set_ylim([1.1 * raw_llim, 1.1 * raw_ulim])
+    # if raw_llim > 0.:
+    #     ax2.set_ylim([0, 1.1 * raw_ulim])
+    # else:
+    #     ax2.set_ylim([1.1 * raw_llim, 1.1 * raw_ulim])
+
+    ax2.set_ylim([-0.1*raw_ulim, 1.1 * raw_ulim])
 
     ax2.set(yticklabels=[])
 
@@ -722,6 +826,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
         
     ax3.fill_between(X, Y1_NL, Y1_NU, color = 'tab:green', alpha = 0.3)
     ax3.fill_between(X, Y2_NL, Y2_NU, color = 'tab:orange', alpha = 0.3)
+
+    ax3.plot([X[0], X[-1]], [0., 0.], color = 'black')
 
     ax3.set_xticks(x_ticks, labels = x_ticks)
     ax3.set_xlim([x_llim, x_ulim])
@@ -753,6 +859,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax4.fill_between(X, Y1_NL, Y1_NU, color = 'tab:green', alpha = 0.3)
     ax4.fill_between(X, Y2_NL, Y2_NU, color = 'tab:orange', alpha = 0.3)
     
+    ax4.plot([X[0], X[-1]], [0., 0.], color = 'black')
+
     ax4.set_xlim([x_ulim, 20.])
     # ax4.set_xlabel(x_label)
     ax4.xaxis.set_minor_locator(MultipleLocator(2.))
