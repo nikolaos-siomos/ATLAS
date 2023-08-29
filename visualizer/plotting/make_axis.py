@@ -68,15 +68,15 @@ def quicklook_x(x_lims, x_tick, t_tick, time):
 
 def quicklook_y(heights, ranges, y_lims, use_dis):
 
-    # Use altitude or distance for the y axis  
+    # Use Height or range above the lidar for the y axis  
     if use_dis:
         y_vals = 1E-3 * ranges
         
-        y_label = 'Distance from the Lidar [km]'
+        y_label = 'Range above the lidar [km]'
         
     else:
         y_vals = 1E-3 * heights       
-        y_label = 'Altitude [km]'
+        y_label = 'Height above the lidar [km]'
 
     # # Get the altitude/distance lower limit and bin
     # if y_lims[0] == None or y_lims[0] < y_vals[0]:
@@ -161,15 +161,15 @@ def quicklook_z(sig, y_vals, z_lims, use_log, z_max_zone, z_min_zone):
 
 def rayleigh_x(heights, ranges, x_lims, use_dis):
 
-    # Use altitude or distance for the y axis  
+    # Use Height or range above the lidar for the y axis  
     if use_dis:
         x_vals = 1E-3 * ranges
         
-        x_label = 'Distance from the Lidar [km]'
+        x_label = 'Range above the lidar [km]'
         
     else:
         x_vals = 1E-3 * heights       
-        x_label = 'Altitude [km]'
+        x_label = 'Height above the lidar [km]'
 
     # # Get the altitude/distance lower limit and bin
     # if x_lims[0] == None or x_lims[0] < x_vals[0]:
@@ -223,7 +223,7 @@ def rayleigh_y(sig, atb, y_lims, wave, use_lin):
 
     scale_f = wave / 355.
     scat_ratio_f = 2.5
-    # Get the signal upper limit
+    # Get the signal axis upper limit
     if use_lin == False:
         if y_lims[-1] == None:
             y_ulim = scat_ratio_f * scale_f * y_max
@@ -243,7 +243,7 @@ def rayleigh_y(sig, atb, y_lims, wave, use_lin):
             else:
                 y_ulim =  y_lims[-1]
         
-    # Get the vertical lower limit
+    # Get the signal axis lower limit
     if use_lin == False:
         if y_lims[0] == None:
             y_llim = y_min / 2.
@@ -270,15 +270,15 @@ def rayleigh_y(sig, atb, y_lims, wave, use_lin):
 
 def telecover_x(heights, ranges, x_lims, use_dis):
 
-    # Use altitude or distance for the y axis  
+    # Use Height or range above the lidar for the y axis  
     if use_dis:
         x_vals = 1E-3 * ranges
         
-        x_label = 'Distance from the Lidar [km]'
+        x_label = 'Range above the lidar [km]'
         
     else:
         x_vals = 1E-3 * heights       
-        x_label = 'Altitude [km]'
+        x_label = 'Height above the lidar [km]'
 
     # # Get the altitude/distance lower limit and bin
     # if x_lims[0] == None or x_lims[0] < x_vals[0]:
@@ -422,15 +422,15 @@ def polarization_calibration_ray_y(ratio, y_lims_ray):
 
 def polarization_calibration_x(heights, ranges, x_lims, use_dis):
 
-    # Use altitude or distance for the y axis  
+    # Use Height or range above the lidar for the y axis  
     if use_dis:
         x_vals = 1E-3 * ranges
         
-        x_label = 'Distance from the Lidar [km]'
+        x_label = 'Range above the lidar [km]'
         
     else:
         x_vals = 1E-3 * heights       
-        x_label = 'Altitude [km]'
+        x_label = 'Height above the lidar [km]'
 
     # # Get the altitude/distance lower limit and bin
     # if x_lims[0] == None or x_lims[0] < x_vals[0]:
@@ -482,15 +482,15 @@ def polarization_calibration_x(heights, ranges, x_lims, use_dis):
 
 def intercomparison_x(heights, ranges, x_lims, use_dis):
 
-    # Use altitude or distance for the y axis  
+    # Use Height or range above the lidar for the y axis  
     if use_dis:
         x_vals = 1E-3 * ranges
         
-        x_label = 'Distance from the Lidar [km]'
+        x_label = 'Range above the lidar [km]'
         
     else:
         x_vals = 1E-3 * heights       
-        x_label = 'Altitude [km]'
+        x_label = 'Height above the lidar [km]'
 
     # # Get the altitude/distance lower limit and bin
     # if x_lims[0] == None or x_lims[0] < x_vals[0]:

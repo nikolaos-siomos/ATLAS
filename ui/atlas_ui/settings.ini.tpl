@@ -111,12 +111,12 @@ exclude_acquisition_mode = ${quicklooks.exclude_acquisition_mode.pretty}
 #exclude_channel_subtype: Provide it to entirely exclude all channels of a specific channel_subtype. By default, no channel is excluded if this variable is not provided. 
 exclude_channel_subtype = ${quicklooks.exclude_channel_subtype.pretty}
 
-#use_distance: If set to False, the y axis units of the quicklook will correspond to the altitude in meters above sea level. If set to True, the y axis units corresponds to the distance from the system. This variable determines the units of the following variables: 
+#use_range: If set to False, the y axis units of the quicklook will correspond to the altitude in meters above sea level. If set to True, the y axis units corresponds to the distance from the system. This variable determines the units of the following variables: 
 #    • y_lims 
 #    • z_max_zone
 #    • smoothing_range
 #Defaults to: True
-use_distance = ${quicklooks.use_distance.pretty}
+use_range = ${quicklooks.use_range.pretty}
 
 #x_lims: The x axis limits (lower and upper). Use two integers corresponding to the first and last temporal samples (not date!) that will be plotted in the quicklooks. Use 1 to start from the first sample. If values below 1 or above the total number of samples are used, they will be ignored
 x_lims = ${quicklooks.x_lims.pretty}
@@ -183,17 +183,17 @@ exclude_acquisition_mode = ${rayleigh_fit.exclude_acquisition_mode.pretty}
 #exclude_channel_subtype: Provide it to entirely exclude all channels of a specific channel_subty Defaults to: b, s, a, w, c
 exclude_channel_subtype = ${rayleigh_fit.exclude_channel_subtype.pretty}
 
-#use_distance: If set to False, the x axis units of the Rayleigh fit will correspond to the altitude in meters above sea level. If set to True, the x axis units corresponds to the distance from the system. This variable determines the units of the following variables: 
+#use_range: If set to False, the x axis units of the Rayleigh fit will correspond to the altitude in meters above sea level. If set to True, the x axis units corresponds to the distance from the system. This variable determines the units of the following variables: 
 #    • reference_height
 #    • x_lims 
 #    • smoothing_range
 #Defaults to: True
-use_distance = ${rayleigh_fit.use_distance.pretty}
+use_range = ${rayleigh_fit.use_range.pretty}
 
 #use_lin_scale: If set to True, a linear scale will be used for the y axis (signal axis). If set to False a logarithmic scale will be applied instead. Defaults to False:
 use_lin_scale = ${rayleigh_fit.use_lin_scale.pretty}
 
-#normalization_region: The lower and upper limits of the region used for normalizing the signal in the Rayleigh fit. If use_distance is called, the limits correspond to distance. Defaults to: 8.5, 9.5
+#normalization_region: The lower and upper limits of the region used for normalizing the signal in the Rayleigh fit. If use_range is called, the limits correspond to distance. Defaults to: 8.5, 9.5
 normalization_region = ${rayleigh_fit.normalization_region.pretty}
 
 #x_lims: Set the x axis (altitude/distance) limits in km (lower and upper). If values below 0 or above the maximum altitude/distance are used, they will be ignored. Defaults to: 0., 14.
@@ -241,12 +241,12 @@ exclude_acquisition_mode = ${telecover.exclude_acquisition_mode.pretty}
 #exclude_channel_subtype: Provide it to entirely exclude all channels of a specific channel_subtype. By default, no channel is excluded if this variable is not provided. 
 exclude_channel_subtype = ${telecover.exclude_channel_subtype.pretty}
 
-#use_distance: If set to False, the x axis units of the Telecover test will correspond to the altitude in meters above sea level. If set to True, the x axis units corresponds to the distance from the system. This variable determines the units of the following variables: 
+#use_range: If set to False, the x axis units of the Telecover test will correspond to the altitude in meters above sea level. If set to True, the x axis units corresponds to the distance from the system. This variable determines the units of the following variables: 
 #    • normalization_height
 #    • x_lims 
 #    • smoothing_range
 #Defaults to: True
-use_distance = ${telecover.use_distance.pretty}
+use_range = ${telecover.use_range.pretty}
 
 #x_lims: Set the x axis (altitude/distance) limits in km (lower and upper). If values below 0 or above the maximum altitude/distance are used, they will be ignored. Defaults to: 0., 2.5
 x_lims = ${telecover.x_lims.pretty}
@@ -291,7 +291,7 @@ ch_r = ${', '.join([cp.ReflectedChannel() for cp in polarization_calibration.cha
 #ch_t: Provide here channel names from the available ones with the transmitted channel_subtype (e.g. 0355xcat). The number of reflected channels must be the same as the number of the respective transmitted channels provided by ch_r and by the GHK parameters. By default, all available reflected channels will be matched to all available transmitted channels that share the same telescope type, detection mode, and wavelength. WARNING! The field is mandatory if non-default GHK values are applied. 
 ch_t = ${', '.join([cp.TransmittedChannel() for cp in polarization_calibration.channel_pairs()])}
 
-#calibration_region: The lower and upper limits of the region used for Δ90 calibration. If use_distance is called, the limits correspond to distance. Defaults to: 2., 4. km 
+#calibration_region: The lower and upper limits of the region used for Δ90 calibration. If use_range is called, the limits correspond to distance. Defaults to: 2., 4. km 
 calibration_region = ${polarization_calibration.calibration_region.pretty}
 
 #rayleigh_region: The lower and upper limits of the region used for the comparison with the Rayleigh atmosphere. Defaults to: 8.5, 9.5

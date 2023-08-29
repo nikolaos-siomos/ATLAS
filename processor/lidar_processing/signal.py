@@ -14,8 +14,8 @@ Fucntions
  -- background_correction: Performs the background correction on signals
  -- dark_correction: Removes the dark signals from the normal ananlog signals
  -- dead time correction: Performs the dead time correction onphoton channels
- -- height_calculation: Calculates the height values per bin and channel
- -- range calculation: Calculates the range values per bin and channel
+ -- height_calculation: Calculates the height above the lidar values per bin and channel
+ -- range calculation: Calculates the range above the lidar values per bin and channel
  -- range_correction: Performs the range correction on signals
  -- smoothing: Smooths the signals (sliding average)
  -- trigger_correction: Perform the trigger correction per channel
@@ -423,7 +423,7 @@ def dead_time_correction(sig, dead_time, dead_time_cor_type):
             
     return(sig_out)
 
-def height_calculation(bins, resol, ground_alt, zenith_angle):
+def height_calculation(bins, resol, zenith_angle):
  
     """
     General:
@@ -432,9 +432,6 @@ def height_calculation(bins, resol, ground_alt, zenith_angle):
     Input:
         bins: 
             An 1D numpy array with the signal bins
-            
-        ground_alt: 
-            A float with the ground altitude of the lidar in m
             
         zenith_angle:
             A float with the zenith angle where the lidar points to
@@ -460,7 +457,7 @@ def height_calculation(bins, resol, ground_alt, zenith_angle):
     
     zenith_angle_rad = np.deg2rad(zenith_angle)
     
-    heights = resolution * bins * np.cos(zenith_angle_rad) + float(ground_alt)
+    heights = resolution * bins * np.cos(zenith_angle_rad)
     
     return(heights)
 

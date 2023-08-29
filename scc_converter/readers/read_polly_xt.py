@@ -51,40 +51,44 @@ def dtfs(dir_meas, meas_type):
                 raw_data = xr.open_dataset(mfiles[k])
 
                 # Mask measurements (normal, +45, -45) according to cal_angle (True:norm or +45 or -45 / False:other)     
-                if meas_type == 'pcb':
-                    mask, mask_p45, mask_m45 = get_cal_info(raw_data)    
-                else:
-                    mask = (raw_data.depol_cal_angle.values == 0.)
-
-                    
-                raw_signal = raw_data.raw_signal[mask,:,:].values.astype(float)
-                start_time = raw_data.measurement_time
-                raw_shots = raw_data.measurement_shots.values[mask,:]
+                mask_zer, mask_p45, mask_m45 = \
+                    get_cal_info(pol_cal_angle = raw_data.depol_cal_angle.values, 
+                                 meas_type = meas_type)    
                 
                 filename = np.empty(raw_data.time.size, dtype = object)
                 folder = np.empty(raw_data.time.size, dtype = object)
-                
                 position = np.empty(raw_data.time.size, dtype = object)
                 
                 filename[:] = os.path.basename(mfiles[k])
                 
                 if meas_type == 'pcb':
+                    mask = (mask_p45) | (mask_m45)
                     folder[mask_p45] = '+45'
                     folder[mask_m45] = '-45'
                     position[mask_p45] = 2
-                    position[mask_m45] = 1
+                    position[mask_m45] = 1                
+                else:
+                    mask = mask_zer                    
+                    position[mask_zer] = 0
+                    folder[mask_zer] = 'nrm'
                     
-                elif meas_type == 'tlc':
+                if meas_type == 'tlc':
                     folder[:] = (mfiles[k]).split(os.sep)[-2] 
-
+                
+                raw_signal = raw_data.raw_signal[mask,:,:].values.astype(float)
+                raw_shots = raw_data.measurement_shots.values[mask,:]
+                
                 position = position[mask]
                 filename = filename[mask]
                 folder = folder[mask]
                 
                 # Convert the time to npdatetime format and mask them
-                start_time_arr = convert_time_to_npdatetime(start_time) 
+                start_time = raw_data.measurement_time
 
+                start_time_arr = convert_time_to_npdatetime(start_time) 
+                
                 start_time_arr = start_time_arr[mask]
+
                 end_time_arr = start_time_arr + (start_time_arr[1] - start_time_arr[0])
             
                 # Define signal xarray
@@ -200,27 +204,119 @@ def read_channels(raw_data):
     return(channel_info)
 
 
-def get_cal_info(raw_data):
-        
-    pre_mask = (raw_data.depol_cal_angle.values != 0.)
-
-    angles = raw_data.depol_cal_angle.values
+def get_cal_info(pol_cal_angle, meas_type):
     
-    cal_angle = np.bincount(np.ceil(angles[pre_mask]).astype(int)).argmax()
-    
-    perfect_angles = np.array([45, 225, 135, 315])
-    idx = (np.abs(perfect_angles - cal_angle)).argmin()
-
-    if perfect_angles[idx] in [45, 225]:
-        mask_p45 = (np.round(angles - cal_angle, decimals = 0) == 0)
-        mask_m45 = ((np.round(angles - cal_angle - 90., decimals = 0) == 0.) |\
-                    (np.round(angles - cal_angle + 90., decimals = 0) == 0.))
-
-    if perfect_angles[idx] in [135, 315]:
-        mask_m45 = (np.round(angles - cal_angle, decimals = 0) == 0)
-        mask_p45 =((np.round(angles - cal_angle - 90., decimals = 0) == 0.) |\
-                    (np.round(angles - cal_angle + 90., decimals = 0) == 0.))        
-
-    mask = mask_p45 | mask_m45
+    if meas_type != 'ray' and meas_type != 'pcb':
         
-    return(mask, mask_p45, mask_m45)
+        mask_zer = np.ones(pol_cal_angle.shape, dtype = bool)
+        
+        mask_p45 = np.zeros(pol_cal_angle.shape, dtype = bool)
+        
+        mask_m45 = np.zeros(pol_cal_angle.shape, dtype = bool)
+  
+    else:
+        
+        check_cal_angle(pol_cal_angle)
+        
+        fix_pos = find_fixed_pos(pol_cal_angle)
+        
+        zer_pos, p45_pos, m45_pos = assign_cal_positions(fix_pos)
+        
+        mask_zer = np.abs(pol_cal_angle - zer_pos) <= 0.05
+        
+        mask_p45 = np.abs(pol_cal_angle - p45_pos) <= 0.05
+        
+        mask_m45 = np.abs(pol_cal_angle - m45_pos) <= 0.05
+        
+    return(mask_zer, mask_p45, mask_m45)
+        
+        
+        
+        # pre_mask = (raw_data.depol_cal_angle.values != 0.)
+    
+        # angles = raw_data.depol_cal_angle.values
+        
+        # cal_angle = np.bincount(np.ceil(angles[pre_mask]).astype(int)).argmax()
+        
+        # perfect_angles = np.array([45, 225, 135, 315])
+        # idx = (np.abs(perfect_angles - cal_angle)).argmin()
+    
+        # if perfect_angles[idx] in [45, 225]:
+        #     mask_p45 = (np.round(angles - cal_angle, decimals = 0) == 0)
+        #     mask_m45 = ((np.round(angles - cal_angle - 90., decimals = 0) == 0.) |\
+        #                 (np.round(angles - cal_angle + 90., decimals = 0) == 0.))
+    
+        # if perfect_angles[idx] in [135, 315]:
+        #     mask_m45 = (np.round(angles - cal_angle, decimals = 0) == 0)
+        #     mask_p45 =((np.round(angles - cal_angle - 90., decimals = 0) == 0.) |\
+        #                 (np.round(angles - cal_angle + 90., decimals = 0) == 0.))        
+    
+        # mask = mask_p45 | mask_m45
+            
+
+def check_cal_angle(pol_cal_angle):
+    
+    mask_fin = np.isfinite(pol_cal_angle)
+    
+    if not mask_fin.all():
+        raise Exception(f'-- Error: The pol. calibrator angle provided in the raw files is not finite. For example {pol_cal_angle[~mask_fin]}. Please correct the input file or report this issue to CARS if not necessary')
+    
+    mask_err = (np.abs(pol_cal_angle) <= 360) | (pol_cal_angle == 999.)
+    
+    if not mask_err.all():
+        raise Exception(f'-- Error: The absolute pol. calibrator angle provided in the raw files above 360 degrees without being 999. For example {pol_cal_angle[~mask_err]}. The value 999 is allowed in some old polly_xt systems showing that the calibrator is at the zero position')
+    
+    return()
+
+def find_fixed_pos(pol_cal_angle):
+    
+    mask_dif = np.ones(pol_cal_angle.shape, dtype = bool)
+
+    mask_dif[1:] = (np.abs(pol_cal_angle[1:] - pol_cal_angle[:-1]) <= 0.5)
+    
+    mask_dif[1:-1] = (mask_dif[1:-1]) & (mask_dif[2:])
+
+    uniques, counts =np.unique(pol_cal_angle[mask_dif], return_counts=True)
+    
+    sorted_uniques = uniques[np.argsort(counts)]
+    
+    if sorted_uniques.size == 1:
+        print('-- Warning: The provided normal measurement does not seem to include a calibration measurement. Please make sure that this is really the case')
+    
+    elif sorted_uniques.size == 2:
+        raise Exception('-- Error: The provided normal measurement does not seem to include a normal part. Please correct the input file or report this issue to CARS if not necessary')
+    
+    fix_pos = uniques[np.argsort(counts)][:3]
+    
+    return(fix_pos)
+
+def assign_cal_positions(fix_pos):
+    
+    mask_zer_pos = (np.abs(fix_pos) < 40.) | (np.abs(fix_pos -360.) < 40.) | (fix_pos == 999.)
+    
+    if np.sum(mask_zer_pos) == 0:
+        raise Exception(f'-- Error: It is not possible to assume the zero calibrator position because the absolute calibrator angle in any of the 3 fixed positions {fix_pos} is neither less than 40 degrees nor between 320 and 360 degrees nor is it exactly 999. Please correct the input file or report this issue to CARS if not necessary ')
+    elif np.sum(mask_zer_pos) > 1:
+        raise Exception(f'-- Error: It is not possible to assume the zero calibrator position because the absolute calibrator angle is less than 40 degrees or between 320 and 360 degrees or exactly 999 in more than one fixed positions {fix_pos}. Please correct the input file or report this issue to CARS if not necessary ')
+    else:
+        zer_pos = fix_pos[mask_zer_pos][0]
+
+    mask_p45_pos = (fix_pos != zer_pos) & (((fix_pos > 0.) & (fix_pos < 90.)) | ((fix_pos > 180.) & (fix_pos < 270.)))
+                                           
+    if np.sum(mask_p45_pos) == 0:
+        raise Exception(f'-- Error: It is not possible to assume the +45 calibrator position because the absolute calibrator angle in any of the 2 fixed non zero positions {fix_pos} is not within 0 and 90 degrees nor within 180 and 270 degrees. Please correct the input file or report this issue to CARS if not necessary ')
+    elif np.sum(mask_p45_pos) > 1:
+        raise Exception(f'-- Error: It is not possible to assume the +45 calibrator position because the absolute calibrator angle is within 0 and 90 degrees or within 180 and 270 degrees in both fixed non zero positions {fix_pos}. Please correct the input file or report this issue to CARS if not necessary ')
+    else:
+        p45_pos = fix_pos[mask_p45_pos][0]
+
+    mask_m45_pos = (fix_pos != zer_pos) & (((fix_pos < 0.) & (fix_pos > -90.)) | ((fix_pos > 90.) & (fix_pos < 180.)) | ((fix_pos > 270.) & (fix_pos < 360.)))
+        
+    if np.sum(mask_m45_pos) == 0:
+        raise Exception(f'-- Error: It is not possible to assume the -45 calibrator position because the absolute calibrator angle in any of the 2 fixed non zero positions {fix_pos} is not within 0 and -90 degrees nor within 90 and 180 degrees nor within 270 and 360 degrees. Please correct the input file or report this issue to CARS if not necessary ')
+    elif np.sum(mask_p45_pos) > 1:
+        raise Exception(f'-- Error: It is not possible to assume the -45 calibrator position because the absolute calibrator angle is within 0 and -90 degrees or within 90 and 180 degrees or within 270 and 360 degrees in both fixed non zero positions {fix_pos}. Please correct the input file or report this issue to CARS if not necessary ')
+    else:
+        m45_pos = fix_pos[mask_m45_pos][0]
+    
+    return(zer_pos, p45_pos, m45_pos)

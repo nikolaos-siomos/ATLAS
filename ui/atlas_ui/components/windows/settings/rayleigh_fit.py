@@ -48,11 +48,11 @@ class RayleighFitSettingsWindow (SettingsWindow):
         self.dpi = AtlasUIInputField.FromSetting ( self._settings.dpi, parent = self.limits_sizer.GetStaticBox(), label = "Image DPI")
         
         self.color_reduction = AtlasUIInputField.FromSetting ( self._settings.color_reduction, parent = self.limits_sizer.GetStaticBox(), label = "Color reduction?")
-        self.use_distance = AtlasUIInputField.FromSetting ( self._settings.use_distance, parent = self.limits_sizer.GetStaticBox(), label = "Use distance?")
+        self.use_range = AtlasUIInputField.FromSetting ( self._settings.use_range, parent = self.limits_sizer.GetStaticBox(), label = "Use distance?")
         self.normalization_region = AtlasUIInputField.FromSetting ( self._settings.normalization_region, parent = self.limits_sizer.GetStaticBox(), label = "Normalization region [km]")
         self.use_lin_scale = AtlasUIInputField.FromSetting ( self._settings.use_lin_scale, parent = self.limits_sizer.GetStaticBox(), label = "Use linear scale?")
         
-        limits_row_1.Add ( self.use_distance )
+        limits_row_1.Add ( self.use_range )
         limits_row_1.Add ( self.color_reduction )
         limits_row_1.Add ( self.use_lin_scale )
         

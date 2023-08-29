@@ -20,9 +20,9 @@ def stats(y1, y2, x):
     
     step = 0.1
     
-    llim = step * np.ceil(x[0] / step)
+    llim = 2.
     
-    ulim = step * np.floor(x[-1] / step) - max_win
+    ulim = 16.
     
     edg = np.arange(llim, ulim + step, step)
     
@@ -116,46 +116,88 @@ def stats(y1, y2, x):
         
     return(nder, mder, cder, rerr, rsem, mshp, coef, mneg)
 
-def scan(mder, cder, rsem, mshp, mneg):
+def scan(mder, cder, rsem, mshp, mneg, dflt_region, auto_fit):
     
     mmol = (mder == True) & (cder == True) & (mshp == True) & (rsem <= 0.02) & (mneg == True)
     
-    ell = xr.DataArray(dims = mmol.dims, coords = mmol.coords)
-    for i in range(mmol.window.size):
-        ell[i,:] = ell.lower_limit.values
+    lower_limit = mmol.lower_limit.values
     
-    edge_lower_limit = np.nan * np.zeros(mmol.window.size)
-    edge_window = np.nan * np.zeros(mmol.window.size)
-    edge_rsem = np.nan * np.zeros(mmol.window.size)
+    window = mmol.window.values
+        
+    if auto_fit == True and mmol.any():    
+    
+        ulim = np.nan * mmol.copy()
+        
+        for i in range(ulim.window.size):
+            ulim[i,:] = lower_limit + window[i]
 
-
-    if mmol.any():
-        for i in range(mmol.window.size):
-            if mmol[i,:].any():
-                edge_lower_limit[i] = \
-                    mmol[i,:].lower_limit.values[mmol[i,:].values == True][-1]
-                edge_rsem[i] = \
-                    rsem[i,:].values[mmol[i,:].values == True][-1]
-                edge_window[i] = mmol[i,:].window.values
-        lower_limit = edge_lower_limit[np.nanargmin(edge_rsem)]
-        window = edge_window[np.nanargmin(edge_rsem)]
-        idx_min = dict(window = np.where(mmol.window.values == window)[0][0],
-                       lower_limit = np.where(mmol.lower_limit.values == lower_limit)[0][0])
-        # idx_min = rsem.where(mmol).argmin(dim = ['window', 'lower_limit'])
+        ulim = ulim.where(mmol == True)
+    
+        idx = ulim.argmax(dim = ('window', 'lower_limit'))
         
         ismol = True
-    
+        
+        norm_region = [lower_limit[idx['lower_limit']], 
+                       lower_limit[idx['lower_limit']] + window[idx['window']]] 
+        
     else:
-        idx_min = rsem.argmin(dim = ['window', 'lower_limit'])
+        
+        if not mmol.any():
 
+            print("-- Warning: The Rayleigh fit normalization region could not be automatically retrieved")
+        
+        idx_lower_limit = \
+            np.where(lower_limit >= dflt_region[0])[0][0]
+
+        idx_window = \
+            np.where(window >= dflt_region[1] - dflt_region[0])[0][0]
+        
+        idx = dict(window = idx_window, lower_limit = idx_lower_limit)
+        
         ismol = False
 
-    win = rsem[idx_min].window.values
+        norm_region = dflt_region
+    
+    return(norm_region, mmol, idx, ismol)   
+    
+    # edge_lower_limit = np.nan * np.zeros(mmol.window.size)
 
-    lower_limit = float(rsem[idx_min].lower_limit.values)
-    
-    norm_reg = [lower_limit, lower_limit + win]
-    
-    return(norm_reg, mmol, idx_min, ismol)       
-    
-    
+
+
+    # if mmol.any():
+    #     for i in range(mmol.window.size):
+    #         if mmol[i,:].any():
+    #             edge_lower_limit[i] = \
+    #                 lower_limit[mmol[i,:].values == True][-1]
+    #     edge_upper_limit = edge_lower_limit + window
+    #     print(edge_upper_limit)
+       
+    #     idx_lower_limit = \
+    #         np.where(lower_limit == edge_lower_limit[np.nanargmax(edge_upper_limit)])[0][0]
+        
+    #     print(idx_lower_limit)
+    #     print(np.where(window == window[np.nanargmax(edge_upper_limit)])[0])
+    #     idx_window = \
+    #         np.where(window == window[np.nanargmax(edge_upper_limit)])[0][0]
+        
+    #     idx_min = dict(idx_window, idx_lower_limit)
+        
+    #     ismol = True
+        
+    #     norm_region = [lower_limit[idx_lower_limit], 
+    #                    lower_limit[idx_lower_limit] + window[idx_window]] 
+        
+    # else:
+        
+    #     idx_lower_limit = \
+    #         np.where(lower_limit >= dflt_region[0])[0][0][0]
+
+    #     idx_window = \
+    #         np.where(window >= dflt_region[1] - dflt_region[0])[0][0][0]
+        
+    #     idx_min = dict(idx_window, idx_lower_limit)
+
+    #     ismol = False
+
+    #     norm_region = dflt_region
+

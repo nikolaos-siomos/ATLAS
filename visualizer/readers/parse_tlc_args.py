@@ -42,7 +42,7 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If set to True, and provided that Imagemagick is installed, an adaptive color reduction will be applied to save space when exporting the figures. Defaults to True. A warning will be raised if Imagemagick is not installed. ')
 
-    parser.add_argument('--use_distance', metavar = 'use_distance',
+    parser.add_argument('--use_range', metavar = 'use_range',
                         type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
@@ -83,7 +83,7 @@ def call_parser():
 
     parser.add_argument('--x_lims', metavar = 'x_lims',
                         type = float, nargs = 2, default = [0., 2.5], 
-                        help = 'The x axis limits in km (lower and upper). If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
+                        help = 'The x axis limits in km (lower and upper). If use_range is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
 
     parser.add_argument('--x_tick', metavar = 'x_tick',
                         type = int, nargs = '?', default = 0.5, 
@@ -91,7 +91,7 @@ def call_parser():
 
     parser.add_argument('--normalization_region', metavar = 'normalization_region',
                         type = float, nargs = 2, default = [1.8, 2.4],
-                        help = 'The lower and upper limits of the region used for normalizing the signal in the Telecover test. If use_distance is called, the limits correspond to distance. Defaults to: 0., 2.5')
+                        help = 'The lower and upper limits of the region used for normalizing the signal in the Telecover test. If use_range is called, the limits correspond to distance. Defaults to: 0., 2.5')
 
     parser.add_argument('--smooth', metavar = 'smooth',
                         type = bool, default = True, 

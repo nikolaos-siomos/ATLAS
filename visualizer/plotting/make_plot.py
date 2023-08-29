@@ -114,8 +114,11 @@ def quicklook(dir_out, fname, title, dpi_val, color_reduction, use_log,
     plt.close()
 
     if color_reduction == True:
-        run(["convert", fpath, "-posterize", "8", fpath])
-    
+        if os.name == 'nt':
+            run(["magick", "convert", fpath, "-posterize", "8", fpath])
+        else:
+            run(["convert", fpath, "-posterize", "8", fpath])
+            
     return(fpath)
 
 def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_region,
@@ -182,7 +185,7 @@ def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_regi
     n_llim = np.round(norm_region[0], decimals = 2)
     n_ulim = np.round(norm_region[1], decimals = 2)
     
-    if rsem > 0.01:
+    if rsem > 0.02:
         c_rsem = 'tab:red'
     else:
         c_rsem = 'tab:green'
@@ -261,7 +264,10 @@ def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_regi
     plt.close()
     
     if color_reduction == True:
-        run(["convert", fpath, "-posterize", "8", fpath])
+        if os.name == 'nt':
+            run(["magick", "convert", fpath, "-posterize", "8", fpath])
+        else:
+            run(["convert", fpath, "-posterize", "8", fpath])
     
     return(fpath)
 
@@ -347,8 +353,11 @@ def rayleigh_mask(dir_out, fname, title, dpi_val, color_reduction,
     plt.close()
     
     if color_reduction == True:
-        run(["convert", fpath, "-posterize", "8", fpath])
-    
+        if os.name == 'nt':
+            run(["magick", "convert", fpath, "-posterize", "8", fpath])
+        else:
+            run(["convert", fpath, "-posterize", "8", fpath])
+            
     return(fpath)
 
 
@@ -656,8 +665,11 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     plt.rcParams.update(plt.rcParamsDefault)
 
     if color_reduction == True:
-        run(["convert", fpath, "-posterize", "8", fpath])
-        
+        if os.name == 'nt':
+            run(["magick", "convert", fpath, "-posterize", "8", fpath])
+        else:
+            run(["convert", fpath, "-posterize", "8", fpath])
+            
     return(fpath)
 
 
@@ -914,8 +926,11 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     plt.rcParams.update(plt.rcParamsDefault)
 
     if color_reduction == True:
-        run(["convert", fpath, "-posterize", "8", fpath])
-        
+        if os.name == 'nt':
+            run(["magick", "convert", fpath, "-posterize", "8", fpath])
+        else:
+            run(["convert", fpath, "-posterize", "8", fpath])
+            
     return(fpath)
 
 def intercomparison(dir_out, fname, title, dpi_val, color_reduction, 
@@ -1052,8 +1067,11 @@ def intercomparison(dir_out, fname, title, dpi_val, color_reduction,
     plt.close()
     
     if color_reduction == True:
-        run(["convert", fpath, "-posterize", "8", fpath])
-    
+        if os.name == 'nt':
+            run(["magick", "convert", fpath, "-posterize", "8", fpath])
+        else:
+            run(["convert", fpath, "-posterize", "8", fpath])
+            
     return(fpath)
 
 def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction, 
@@ -1249,8 +1267,11 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     plt.close()
     
     if color_reduction == True:
-        run(["convert", fpath, "-posterize", "8", fpath])
-    
+        if os.name == 'nt':
+            run(["magick", "convert", fpath, "-posterize", "8", fpath])
+        else:
+            run(["convert", fpath, "-posterize", "8", fpath])
+            
     return(fpath)
 
 def round_it(x, sig):

@@ -65,7 +65,7 @@ def main(args, __version__, meas_type):
             make_axis.quicklook_y(heights = data.Height_levels.loc[ch_d].values, 
                                   ranges = data.Range_levels.loc[ch_d].values,
                                   y_lims = args['y_lims'], 
-                                  use_dis = args['use_distance'])
+                                  use_dis = args['use_range'])
 
         # Smoothing
         if args['smooth']:
@@ -140,7 +140,7 @@ def main(args, __version__, meas_type):
                     "dpi" : f"{args['dpi']}",
                     "color_reduction" : f"{args['color_reduction']}",
                     "use_log_scale" : f"{args['use_log_scale']}",
-                    "use_distance" : f"{args['use_distance']}",
+                    "use_range" : f"{args['use_range']}",
                     "z_max_zone" : f"{args['z_max_zone']}",
                     "x_lims" : f"{args['x_lims']}",
                     "y_lims" : f"{args['y_lims']}",

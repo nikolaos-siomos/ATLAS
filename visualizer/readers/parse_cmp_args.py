@@ -42,7 +42,7 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, a linear scale will be used for the y axis (signal) ')
 
-    parser.add_argument('--use_distance', metavar = 'use_distance',
+    parser.add_argument('--use_range', metavar = 'use_range',
                         type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
@@ -58,7 +58,7 @@ def call_parser():
 
     parser.add_argument('--x_lims', metavar = 'x_lims',
                         type = float, nargs = 2, default = [0., 14.], 
-                        help = 'The x axis limits in km (lower and upper). If use_distance is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
+                        help = 'The x axis limits in km (lower and upper). If use_range is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
 
     parser.add_argument('--x_tick', metavar = 'x_tick',
                         type = int, nargs = '?', default = 1, 
@@ -74,7 +74,7 @@ def call_parser():
 
     parser.add_argument('--normalization_height', metavar = 'normalization_height',
                         type = float, nargs = '?', default = 9., 
-                        help = 'The reference height/distance where the signals will be normalized for the Rayleigh fit. If use_distance is called, the limits correspond to distance. Defaults to 9 km ')
+                        help = 'The reference height/distance where the signals will be normalized for the Rayleigh fit. If use_range is called, the limits correspond to distance. Defaults to 9 km ')
 
     parser.add_argument('--half_normalization_window', metavar = 'half_normalization_window',
                         type = float, nargs = '?', default = 500., 
@@ -92,7 +92,7 @@ def call_parser():
 
     parser.add_argument('--smoothing_range', metavar = 'smoothing_range',
                         type = float, nargs = 2, default = [1., 14.], 
-                        help = 'First and last altitude/distance boundaries (depending on the selection of use_distance) where smoothing will be applied, in km. Defines the signal region to be smoothed. If they exceed the current signal boundaries the existing boundaries will be used instead ')
+                        help = 'First and last altitude/distance boundaries (depending on the selection of use_range) where smoothing will be applied, in km. Defines the signal region to be smoothed. If they exceed the current signal boundaries the existing boundaries will be used instead ')
 
     parser.add_argument('--half_window', metavar = 'half_window',
                         type = float, nargs = 2, default = [100., 100.], 

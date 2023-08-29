@@ -80,7 +80,7 @@ def main(args, __version__):
 
         rng_com = np.sort(np.unique(np.hstack([rng1,rng2])))
     
-        if args['use_distance'] == False:
+        if args['use_range'] == False:
             sig1_ch = xr.DataArray(sig1_ch, dims = ['altitude'],  coords = [alt1])
             sig2_ch = xr.DataArray(sig2_ch, dims = ['altitude'],  coords = [alt2])
     
@@ -117,7 +117,7 @@ def main(args, __version__):
             make_axis.rayleigh_x(heights = alt_com, 
                                  ranges = rng_com,
                                  x_lims = args['x_lims'], 
-                                 use_dis = args['use_distance'])
+                                 use_dis = args['use_range'])
     
         # Smoothing
         if args['smooth']:
@@ -238,7 +238,7 @@ if __name__ == '__main__':
     #             "half_window (upper)": f"{args['half_window'][-1]}",
     #             "dpi" : f"{args['dpi']}",
     #             "use_log_scale" : f"{args['use_log_scale']}",
-    #             "use_distance" : f"{args['use_distance']}",
+    #             "use_range" : f"{args['use_range']}",
     #             "x_lims (lower)" : f"{x_llim}",
     #             "x_lims (upper)" : f"{x_ulim}",
     #             "y_lims (lower)" : f"{y_vals[y_llim]}",

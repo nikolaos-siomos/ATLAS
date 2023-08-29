@@ -186,7 +186,7 @@ def main(args, __version__):
                 heights = data.Height_levels_Calibration.loc[ch_r_d].values, 
                 ranges = data.Range_levels_Calibration.loc[ch_r_d].values,
                 x_lims = args['x_lims_calibration'], 
-                use_dis = args['use_distance'])
+                use_dis = args['use_range'])
     
         # Create the y axis (height/range)
         x_lbin_ray, x_ubin_ray, x_llim_ray, x_ulim_ray, x_vals_ray, x_label_ray = \
@@ -194,7 +194,7 @@ def main(args, __version__):
                 heights = data.Height_levels_Rayleigh.loc[ch_r_d].values, 
                 ranges = data.Range_levels_Rayleigh.loc[ch_r_d].values,
                 x_lims = args['x_lims_rayleigh'], 
-                use_dis = args['use_distance'])
+                use_dis = args['use_range'])
     
         # Smoothing
         if args['smooth']== True:
@@ -510,7 +510,7 @@ def main(args, __version__):
                     "color_reduction" : f"{args['color_reduction']}",
                     "calibration_region" : f"{args['calibration_region']}",
                     "rayleigh_region" : f"{args['rayleigh_region']}",
-                    "use_distance" : f"{args['use_distance']}",
+                    "use_range" : f"{args['use_range']}",
                     "x_lims_calibration" : f"{args['x_lims_calibration']}",
                     "x_lims_rayleigh" : f"{args['x_lims_rayleigh']}",
                     "y_lims_calibration" : f"{args['y_lims_calibration']}",
@@ -560,7 +560,7 @@ if __name__ == '__main__':
     #             "smoothing_window (upper)": f"{args['smoothing_window'][-1]}",
     #             "dpi" : f"{args['dpi']}",
     #             "use_log_scale" : f"{args['use_log_scale']}",
-    #             "use_distance" : f"{args['use_distance']}",
+    #             "use_range" : f"{args['use_range']}",
     #             "y_lims (lower)" : f"{y_llim}",
     #             "y_lims (upper)" : f"{y_ulim}",
     #             "x_lims (lower)" : f"{y_vals[x_llim]}",

@@ -96,7 +96,7 @@ def main(args, __version__):
             make_axis.telecover_x(heights = data.Height_levels.loc[ch_d].values, 
                                   ranges = data.Range_levels.loc[ch_d].values,
                                   x_lims = args['x_lims'], 
-                                  use_dis = args['use_distance'])
+                                  use_dis = args['use_range'])
     
         if isinstance(sig_n,list) == False:
             iters_sec = np.min([sig_n.time_n.size,
@@ -287,7 +287,7 @@ def main(args, __version__):
                         "dpi" : f"{args['dpi']}",
                         "color_reduction" : f"{args['color_reduction']}",
                         "normalization_region" : f"{args['normalization_region']}",
-                        "use_distance" : f"{args['use_distance']}",
+                        "use_range" : f"{args['use_range']}",
                         "use_last" : f"{args['use_last']}",
                         "use_non_rangecor" : f"{args['use_non_rangecor']}",
                         "x_lims" : f"{args['x_lims']}",
@@ -442,7 +442,7 @@ def main(args, __version__):
                         "dpi" : f"{args['dpi']}",
                         "color_reduction" : f"{args['color_reduction']}",
                         "normalization_region" : f"{args['normalization_region']}",
-                        "use_distance" : f"{args['use_distance']}",
+                        "use_range" : f"{args['use_range']}",
                         "use_last" : f"{args['use_last']}",
                         "use_non_rangecor" : f"{args['use_non_rangecor']}",
                         "x_lims" : f"{args['x_lims']}",

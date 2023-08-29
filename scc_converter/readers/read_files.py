@@ -452,16 +452,16 @@ def radiosonde(finput_rs, delimiter, skip_header, skip_footer,
 
     bad_dates = [int(date[:4]) not in np.arange(1960,9999,1) or \
                  int(date[4:6]) not in np.arange(1,13,1) or \
-                 int(date[6:8]) not in np.arange(1,31,1) for date in dates]
+                 int(date[6:8]) not in np.arange(1,32,1) for date in dates]
 
     bad_times = [int(time[:2]) not in np.arange(0,24,1) or \
                  int(time[2:4]) not in np.arange(0,60,1) for time in times]
         
     if any(bad_dates):
-        raise Exception("-- Error: The date provided in at least one radiosonde filename is not correct. Please revise the following files: {bpaths[bad_dates]}. It should start with 'yyyymmdd_hhmm' and end with '.txt' ")
+        raise Exception(f"-- Error: The date provided in at least one radiosonde filename is not correct. Please revise the following files: {np.array(bname)[bad_dates]}. It should start with 'yyyymmdd_hhmm' and end with '.txt' ")
 
     if any(bad_times):
-        raise Exception("-- Error: The time provided in at least radiosond filename is not correct. Please revise the following files: {bpaths[bad_times]}. It should start with 'yyyymmdd_hhmm' and end with '.txt' ")
+        raise Exception(f"-- Error: The time provided in at least radiosond filename is not correct. Please revise the following files: {np.array(bname)[bad_times]}. It should start with 'yyyymmdd_hhmm' and end with '.txt' ")
         
     date_dt = np.array([datetime.strptime(date + time,'%Y%m%d%H%M') 
                         for date, time in zip(dates, times)])

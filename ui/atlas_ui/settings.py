@@ -391,7 +391,7 @@ class ATLASPreprocessorSettings(BaseSettings):
 class ATLASQuicklooksSettings(BaseSettings):
     def __init__ (self):
         self.use_log_scale = ATLASSelectOption ( default = False )
-        self.use_distance =  ATLASSelectOption ( default = True )
+        self.use_range =  ATLASSelectOption ( default = True )
         
         self.channels = ATLASMultipleChoiceOption ( default = [] )
         self.exclude_telescope_type =  ATLASMultipleChoiceOption (
@@ -531,7 +531,7 @@ class ATLASRayleighFitSettings(BaseSettings):
         self.dpi =  ATLASIntegerOption ( default = 300, min = 100, max = 500 )
         self.color_reduction =  ATLASSelectOption ( default = False )
         
-        self.use_distance =  ATLASSelectOption ( default = True )
+        self.use_range =  ATLASSelectOption ( default = True )
         self.use_lin_scale =  ATLASSelectOption ( default = False )
         
         self.normalization_region =  ATLASDoubleRangeOption ( default = (8.5, 9.5) )
@@ -602,7 +602,7 @@ class ATLASTelecoverSettings(BaseSettings):
         self.dpi =  ATLASIntegerOption ( default = 300, min = 100, max = 500 )
         self.color_reduction =  ATLASSelectOption ( default = False )
         
-        self.use_distance =  ATLASSelectOption ( default = True )
+        self.use_range =  ATLASSelectOption ( default = True )
         self.use_lin_scale =  ATLASSelectOption ( default = True )
         self.use_non_range_cor =  ATLASSelectOption ( default = False )
         
@@ -731,7 +731,7 @@ class ATLASPolarizationCalibrationSettings(BaseSettings):
         self.y_lims_calibration = ATLASDoubleRangeOption ( default = None )
         self.y_lims_rayleigh = ATLASDoubleRangeOption ( default = None )
         
-        self.use_distance = ATLASSelectOption ( default = True )
+        self.use_range = ATLASSelectOption ( default = True )
         
         # self.smooth_calibration =  ATLASSelectOption ( default = True )
         # self.smoothing_range_calibration =  ATLASDoubleRangeOption ( default = (1., 15) )

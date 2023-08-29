@@ -85,7 +85,7 @@ def main(args, __version__):
             make_axis.rayleigh_x(heights = data.Height_levels.loc[ch_d].values, 
                                  ranges = data.Range_levels.loc[ch_d].values,
                                  x_lims = args['x_lims'], 
-                                 use_dis = args['use_distance'])
+                                 use_dis = args['use_range'])
     
         # Smoothing
         if args['smooth']:
@@ -112,12 +112,13 @@ def main(args, __version__):
                             y2 = atb_ch.copy(), 
                             x  = x_vals)   
             
-        norm_reg, mmol, idx, ismol = curve_fit.scan(mder = mder, cder = cder,
-                                                    rsem = rsem, mshp = mshp, 
-                                                    mneg = mneg)
-        
-        args['normalization_region'] = norm_reg            
-        
+        norm_region, mmol, idx, ismol = \
+            curve_fit.scan(mder = mder, cder = cder,
+                           rsem = rsem, mshp = mshp, 
+                           mneg = mneg,
+                           dflt_region = args['normalization_region'],
+                           auto_fit = args['auto_fit'])
+                
         nder_c = float(nder[idx].values)
         mder_c = float(mder[idx].values)
         rsem_c = float(rsem[idx].values)
@@ -165,7 +166,7 @@ def main(args, __version__):
                                    dpi_val = args['dpi'],
                                    color_reduction = args['color_reduction'],
                                    use_lin = args['use_lin_scale'],
-                                   norm_region = args['normalization_region'],
+                                   norm_region = norm_region,
                                    x_vals = x_vals, 
                                    y1_vals = y_vals_sm,
                                    y2_vals = atb_ch,
@@ -191,7 +192,7 @@ def main(args, __version__):
                                  loc = data.Station_Name, 
                                  meas_id = data.Measurement_ID, 
                                  channel = ch, 
-                                 norm_region = args['normalization_region'], 
+                                 norm_region = norm_region, 
                                  st_name = st_name, 
                                  rs_start_date = rs_start_date,
                                  rs_start_time = rs_start_time, 
@@ -233,7 +234,7 @@ def main(args, __version__):
                     "color_reduction" : f"{args['color_reduction']}",
                     "normalization_region" : f"{args['normalization_region']}",
                     "use_lin_scale" : f"{args['use_lin_scale']}",
-                    "use_distance" : f"{args['use_distance']}",
+                    "use_range" : f"{args['use_range']}",
                     "x_lims" : f"{args['x_lims']}",
                     "y_lims" : f"{args['y_lims']}",
                     "x_tick" : f"{args['x_tick']}"}

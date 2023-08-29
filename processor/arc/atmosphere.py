@@ -30,7 +30,8 @@ def short_molec(heights, ranges, system_info, channel_info,
                                    system_info['Sounding_File_Name'])
         
         meteo, molec_info = from_rsonde(path = rsonde_path, 
-                                        heights = heights)
+                                        heights = heights,
+                                        elevation = system_info.Altitude_meter_asl)
         
         print('-- Radiosond file succesfully parsed!')
 
@@ -47,9 +48,9 @@ def short_molec(heights, ranges, system_info, channel_info,
         print('-- US Standard Atmosphere succesfully constructed!')
     
     
-    channels = heights.channel.values
+    channels = ranges.channel.values
 
-    bins = heights.bins.values
+    bins = ranges.bins.values
     
     ewl = channel_info.Emitted_Wavelength
     
@@ -87,6 +88,21 @@ def short_molec(heights, ranges, system_info, channel_info,
         ch_d = dict(channel = ch)
         
         ewl_ch = ewl.loc[ch]
+        
+        dwl_ch = dwl.loc[ch]
+
+        bdw_ch = bdw.loc[ch]
+        
+        wns_ch = 1E7 * (1. / ewl_ch - 1. / dwl_ch )
+        
+        if ch_type.loc[ch] in ['p', 'c', 't', 'a'] and np.abs(wns_ch) > 50:
+            raise Exception(f"-- Error: Channel {ch_d['channel']} has type '{ch_type.loc[ch]}' (not Raman or fluorescence) but the wavenumber shift between the provided detected and emitted wavelengths is too large. Please correct the corresponding fields in the configuration file and/or in the raw file header")
+
+        if ch_type.loc[ch] == 'r' and (np.abs(wns_ch) > 500 or wns_ch < -50):
+            raise Exception(f"-- Error: Channel {ch_d['channel']} has type '{ch_type.loc[ch]}' (rotational Ramn) but the wavenumber shift between the provided detected and emitted wavelengths is too large. Please correct the corresponding fields in the configuration file and/or in the raw file header")
+
+        if ch_type.loc[ch] == 'v' and (wns_ch > 9000 or wns_ch < -50):
+            raise Exception(f"-- Error: Channel {ch_d['channel']} has type '{ch_type.loc[ch]}' (vibrational Ramn) but the wavenumber shift between the provided detected and emitted wavelengths is too large. Please correct the corresponding fields in the configuration file and/or in the raw file header")
 
         max_bin = meteo.loc[ch_d].dropna(dim = 'bins', how = 'any')\
             .loc[dict(properties  = 'Number_Density')].bins.values[-1]
@@ -95,9 +111,9 @@ def short_molec(heights, ranges, system_info, channel_info,
             
         # Defining a gaussian filter for the IFF
         if ch_type.loc[ch] == 'r':
-            filter_trans = SquareFilter(dwl.loc[ch],bdw.loc[ch]) 
+            filter_trans = SquareFilter(dwl_ch, bdw_ch) 
         else:
-            filter_trans = GaussianFilter(dwl.loc[ch],bdw.loc[ch])    
+            filter_trans = GaussianFilter(dwl_ch, bdw_ch)    
 
         # Extracting molecular parameters in specific range bins
         N = meteo.loc[ch_d].loc[dict(properties  = 'Number_Density')] .values
@@ -264,9 +280,9 @@ def from_us_std(pressure, temperature, elevation, heights):
     
         ch_d = dict(channel = ch)
         
-        P = np.array([atm.pressure(h) for h in heights.loc[ch_d].values]) 
+        P = np.array([atm.pressure(h) for h in heights.loc[ch_d].values + elevation]) 
         
-        T = np.array([atm.temperature(h) for h in heights.loc[ch_d].values]) 
+        T = np.array([atm.temperature(h) for h in heights.loc[ch_d].values + elevation]) 
         
         RH = np.zeros(P.size)
         
@@ -285,7 +301,7 @@ def from_us_std(pressure, temperature, elevation, heights):
     
     return(meteo, molec_info)
 
-def from_rsonde(path, heights):
+def from_rsonde(path, heights, elevation):
 
     channels = heights.channel
     
@@ -332,7 +348,7 @@ def from_rsonde(path, heights):
     
     for ch in channels:
         
-        height_arr = heights.loc[ch].values
+        height_arr = heights.loc[ch].values + elevation
         
         # Extrapolate near ground if the first radiosonde altitude is above the lidar ground altitude
         if H[0] > height_arr[0]:

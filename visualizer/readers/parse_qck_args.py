@@ -47,7 +47,7 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If set to True, a logarithmic scale will be used for the visualization of the z_axis (signal levels). It affects the selection of the default z_lims. Defaults to False.')
 
-    parser.add_argument('--use_distance', metavar = 'use_distance',
+    parser.add_argument('--use_range', metavar = 'use_range',
                         type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
@@ -90,7 +90,7 @@ def call_parser():
 
     parser.add_argument('--y_lims', metavar = 'y_lims',
                         type = float, nargs = 2, default = [0., 14.], 
-                        help = 'The y axis limits in km (lower and upper). If use_distance is called, the limits correspond to distance. Defaults to the altitude/distance of the lowermost (lower) and the highermost (upper) bin. If values below 0 or above the maximum altitude/distance are used, they will be ignored')
+                        help = 'The y axis limits in km (lower and upper). If use_range is called, the limits correspond to distance. Defaults to the altitude/distance of the lowermost (lower) and the highermost (upper) bin. If values below 0 or above the maximum altitude/distance are used, they will be ignored')
 
     parser.add_argument('--y_tick', metavar = 'y_tick',
                         type = int, nargs = 1, default = 1, 

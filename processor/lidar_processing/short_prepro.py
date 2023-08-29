@@ -221,7 +221,6 @@ def standard(sig_raw, shots, system_info, channel_info,
     # --------------------------------------------------
     heights = signal.height_calculation(bins = sig.copy().bins.values, 
                                         resol = resol,
-                                        ground_alt = ground_alt,
                                         zenith_angle = zenith_angle)
 
     pack_out['heights'] = heights.copy()
@@ -462,7 +461,6 @@ def dark(sig_raw, shots, system_info, channel_info, external_info, time_info):
     # --------------------------------------------------
     heights = signal.height_calculation(bins = sig.copy().bins.values, 
                                         resol = resol,
-                                        ground_alt = ground_alt,
                                         zenith_angle = zenith_angle)
     
     pack_out['heights'] = heights.copy()
@@ -492,30 +490,3 @@ def dark(sig_raw, shots, system_info, channel_info, external_info, time_info):
     print('')        
     
     return(sig, pack_out, time_info)
-
-    # # --------------------------------------------------
-    # # Error simulation and xarray expansion to 4D
-    # # --------------------------------------------------
-    # if ierr:     
-    #     if not isinstance(dark_pack,list): # normal signal with dark signal available
-    #         sig, info_sig = error(sig.copy(), cfg, info_sig, frames, 
-    #                               isdark, drk_inp = dark_avg.copy()) 
-
-    #     if isinstance(dark_pack,list): # signal without dark signal availability
-    #         sig, info_sig = error(sig.copy(), cfg, info_sig, frames, isdark) 
-
-    #     sig_mc = sig.copy()
- 
-    #     print(f'-- Error simulations [{mc_sim}] and 4D array expansion complete!')
-
-    # # --------------------------------------------------
-    # # Calculation of the signals heights
-    # # --------------------------------------------------
-    # heights = signal.height_calculation(bins = sig.copy().bins.values, 
-    #                                     ground_alt = ground_alt,
-    #                                     zenith_angle = zenith_angle,                                       
-    #                                     resol = resol)
-    
-    # pack_out['heights'] = heights.copy()
-        
-    # print('-- Heights calculated per signal bin and channel!')
