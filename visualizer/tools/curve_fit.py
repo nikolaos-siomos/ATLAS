@@ -20,7 +20,7 @@ def stats(y1, y2, x):
     
     step = 0.1
     
-    llim = 2.
+    llim = 0.
     
     ulim = 16.
     
@@ -85,10 +85,18 @@ def stats(y1, y2, x):
             # Calculate the p value of the Saphiro-Wilkinson test (<0.05 means not normal)
             mshp[i,j] = shapiro(res_sel)[1] > 0.05
 
-        
+    
+    coef_clean = coef.copy()
+    mask_clean = (mder == True) & (cder == True) & (mshp == True) & (rsem <= 0.02)
+    coef_clean[~mask_clean] = np.nan
     for i in range(coef.shape[0]):
-        for j in range(coef.shape[1]):    
-            mneg[i,j] = ((coef[i,:j].copy() - coef[i,j].copy()) / coef[i,j].copy() <= rerr[i,:j]).all()
+        for j in range(coef.shape[1]):  
+            if not np.isnan(coef_clean[i,j]):
+                isneg = (coef_clean[i,:j] - coef_clean[i,j]) / coef_clean[i,j] <= rerr[i,:j]
+                isnan = np.isnan(coef_clean[i,:j])
+                mneg[i,j] = ((isneg) | (isnan)).all()
+            else:
+                mneg[i,j] = np.nan
             
     nder = xr.DataArray(nder, dims = ['window', 'lower_limit'],
                         coords = [win, edg])

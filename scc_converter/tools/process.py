@@ -40,7 +40,13 @@ def rayleigh(args, version):
     # Read the files in the rayleigh folder
     sig_raw, shots, system_info, channel_info, time_info = \
         read_files.rayleigh(finput_ray = path_ray, file_format = file_format)
-
+        
+    sig_raw, shots, time_info = \
+        modify.slice_in_time(sig_raw = sig_raw, 
+                             shots = shots, 
+                             time_info = time_info,
+                             slice_reg = args['slice_rayleigh'])
+    
     if not isinstance(sig_raw,list):
         # Remove channels that should be excluded according to the configuration file
         if not isinstance(sig_raw_d,list):

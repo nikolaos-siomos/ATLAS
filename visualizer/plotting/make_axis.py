@@ -132,7 +132,7 @@ def quicklook_z(sig, y_vals, z_lims, use_log, z_max_zone, z_min_zone):
     # Get the max signal bin and value
     mask_max_zone = (y_vals >= z_max_zone[0]) & (y_vals <= z_max_zone[1])
 
-    z_vals_sm = np.mean(z_vals[:,mask_max_zone],axis = 0)
+    z_vals_sm = np.nanmean(z_vals[:,mask_max_zone],axis = 0)
         
     z_max = round_it(np.nanmax(z_vals_sm),1)
     
@@ -149,7 +149,7 @@ def quicklook_z(sig, y_vals, z_lims, use_log, z_max_zone, z_min_zone):
         # Get the min signal bin and value
         mask_min_zone = (y_vals >= z_min_zone[0]) & (y_vals <= z_min_zone[1])
 
-        z_vals_sm = np.mean(z_vals[:,mask_min_zone],axis = 0)
+        z_vals_sm = np.nanmean(z_vals[:,mask_min_zone],axis = 0)
         
         z_llim = round_it(np.nanmin(z_vals_sm),2)
         

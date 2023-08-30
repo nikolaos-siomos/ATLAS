@@ -113,6 +113,10 @@ def call_parser():
                         type=str, nargs='*', default = ['ray'],
                         help='Choose which quicklooks to process.  It is only taken into account if visualize is set to True. It must be a subset of process. Note that each visualizer module (ray, tlc, pcb) can create their own quicklooks. Use any of: ray (Rayleigh Fit), tlc (Telecover Test), pcb (Polarization Calibration), off (Nothing will be processed). Defaults to: ray')            
 
+    parser.add_argument('--slice_rayleigh', metavar='slice_rayleigh', 
+                        type=str, nargs='*', default = [None, None],
+                        help='Provide temporal limits for the processing of the normal measurement. Use the following format: HHMM for the limits. For example use: --slice_rayleigh 2300, 0130 to slice between 23:00 UTC and 01:30 UTC (the next day) Defaults to: None, None ')            
+
     # parser.add_argument('-e', '--export_legacy', metavar = 'export_legacy',
     #                     type = bool, default = False, 
     #                     action = argparse.BooleanOptionalAction,

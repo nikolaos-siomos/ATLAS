@@ -8,6 +8,7 @@ Created on Tue Jul 26 15:22:31 2022
 
 import numpy as np
 import sys
+import datetime as dt
 
 def trim_channels(cfg, sig, shots, channel_info, meas_type):
     
@@ -301,3 +302,38 @@ def flexible_type(val, scalar_type):
         raise Exception(f"The provided scalar type {scalar_type} is not understood. Please select among str, int, float") 
       
     return(val)
+
+def slice_in_time(sig_raw, shots, time_info, slice_reg):
+    
+    s_slice = slice_reg[0]
+    e_slice = slice_reg[1]
+    
+    if s_slice != None and e_slice != None:
+    
+        s_date = time_info.index[0].date()
+        e_date = time_info.index[1].date()
+        
+        s_year = s_date.year
+        s_month = s_date.month
+        s_day = s_date.day
+        e_day = e_date.day
+    
+        if e_day - s_day > 1:
+            raise Exception("-- Error: Slicing measurements that cover more than two consequetive days is not supported. You have to split the measurement manually for now")
+      
+        s_hour = int(s_slice[:2])
+        s_mins = int(s_slice[2:])
+        e_hour = int(e_slice[:2])
+        e_mins = int(e_slice[2:])    
+    
+        s_dt = dt.datetime(s_year, s_month, s_day, s_hour, s_mins)
+        if e_hour + e_mins / 60.  > s_hour + s_mins / 60.:
+            e_dt = dt.datetime(s_year, s_month, s_day, e_hour, e_mins)
+        else:
+            e_dt = dt.datetime(s_year, s_month, s_day + 1, e_hour, e_mins)
+    
+        time_info = time_info.loc[s_dt:e_dt].copy()
+        sig_raw = sig_raw.loc[s_dt:e_dt,:,:].copy()
+        shots = shots.loc[s_dt:e_dt,:].copy()
+        
+    return(sig_raw, shots, time_info)

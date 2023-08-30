@@ -156,6 +156,10 @@ def call_parser():
                         type=str, nargs='?', default = 'labeling',
                         help='Choose one of: a) labeling: Use when submitting a measurement to CARS. Makes some SCC related field in the configuration file mandatory. b) testing: Use for causal testing of a measurement when there is no dedicated SCC configuration Defaults to: labeling')            
 
+    parser.add_argument('--slice_rayleigh', metavar='slice_rayleigh', 
+                        type=str, nargs='*', default = [None, None],
+                        help='Provide temporal limits for the processing of the normal measurement. Use the following format: HHMM for the limits. For example use: --slice_rayleigh 2300, 0130 to slice between 23:00 UTC and 01:30 UTC (the next day) Defaults to: None, None ')            
+
     args = vars(parser.parse_args())
     
     return(args)
