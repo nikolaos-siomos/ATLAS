@@ -68,7 +68,7 @@ def call_parser():
                         help='The path to the results folder. This optional argument can be used if the results folder must be placed out of the parent_folder. Defaults to parent_folder/scc_converter ')
 
     parser.add_argument('-d', '--debug', metavar = 'debug',
-                        type = bool, default = False, 
+                        type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called then debugging files will be generated in ./results/debug folder. These included the metadata gathered from the configuration file, the licel header, and the combination of the two. Default to False ')
 
@@ -204,14 +204,14 @@ def check_parser(args):
 
     if args['file_format'] == None:
         raise Exception("The mandatory argument file_format was not provided. Please add it with the --file_format option ")   
-    elif args['file_format'] not in ['licel','polly_xt','licel_matlab']:
+    elif args['file_format'] not in ['licel','polly_xt','licel_matlab','polly_xt_first','licel_old2rack']:
         raise Exception(f"The provided file_format: {args['file_format']} is not supported. Please choose among: licel, polly_xt")   
         
     fld = ['dark_folder', 'rayleigh_folder', 'telecover_sectors_folder', 
            'telecover_rings_folder', 'pcb_cal_p45_folder', 
            'pcb_cal_m45_folder', 'pcb_cal_stc_folder']
     
-    if args['file_format'] == 'licel' or  args['file_format'] == 'licel_matlab':
+    if args['file_format'] in ['licel', 'licel_matlab', 'polly_xt_first', 'licel_old2rack']:
         default_loc = ['drk', 'nrm', 'tlc', 
                        'tlc_rin', os.path.join('pcb','+45'),
                        os.path.join('pcb','-45'), os.path.join('pcb','stc')]

@@ -54,6 +54,7 @@ def standard(sig_raw, shots, system_info, channel_info,
     meas_label = {'ray' : 'Rayleigh', 
                   'tlc' : 'Telecover',
                   'pcb' : 'Polarization Calibration',
+                  'drk' : 'Dark',
                   'qck' : 'Quicklook'}
     
 
@@ -94,7 +95,14 @@ def standard(sig_raw, shots, system_info, channel_info,
     sig = signal.unit_conv_counts_to_MHz(sig = sig.copy(), 
                                          shots = shots.copy(), 
                                          resol = resol)
-    
+    # from matplotlib import pyplot as plt
+    # import numpy as np
+    # for j in range(sig.channel.size):
+    #     sig[:,j,3033:3043].plot.line(hue = 'time',add_legend=False)
+    #     plt.savefig(f'/home/nikos/Nextcloud4/pot/83_232_784_202300907/trg_{sig.channel.values[j]}.png')
+    #     plt.xticks(np.arange(3034,3044))
+    #     plt.show()
+    # raise Exception
 
     if external_info['debug']: pack_out['sig_puc'] = sig.copy()
     

@@ -61,7 +61,11 @@ def check_channels(sel_channels, all_channels, exclude_telescope_type,
 def check_channels_no_exclude(sel_channels, all_channels):
     
     if not isinstance(sel_channels,type(None)):
-        sel_channels = np.array(sel_channels)
+        if not isinstance(sel_channels,list):
+            sel_channels = np.array([sel_channels])
+        else:
+            sel_channels = np.array(sel_channels)
+
         all_channels = np.array(all_channels)
 
         missing_ch = [ch not in all_channels for ch in sel_channels]

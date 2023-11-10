@@ -72,17 +72,9 @@ def call_parser():
                         type = str, nargs = '+', default = [], 
                         help = 'Provide all the channel scattering types that you want to EXCLUDE (None: None, r: Signal Reflected from a PBS, t: Signal Transmitted through a PBS, n: N2 Ramal line, o: O2 Ramal line, w: H2O Ramal line, c: CH4 Ramal line, h: High Rotational Raman, l: Low Rotational Raman, a: Mie (aerosol) HSRL signal, m: Molecular HSRL signal, b: Broadband Fluorescence, s: Spectral Fluorescence, x: No specific subtype). Nothing is excluded by default in ATLAS preprocessor ')
     
-    parser.add_argument('--x_lims', metavar = 'x_lims',
-                        type = int, nargs = 2, default = [None, None], 
-                        help = 'The x axis limits (lower and upper). Use two integers corresponding to the first and last timeframe (not date!) that will be plotted. Use 1 to start from the first timeframe. If values below 1 or above the total number of timeframes are used, they will be ignored')
-
-    parser.add_argument('--x_tick', metavar = 'x_tick',
-                        type = int, nargs = 1, default = None, 
-                        help = 'The x axis finest tick in number of timeframes. ')
-
     parser.add_argument('--t_lims', metavar = 't_lims',
-                        type = str, nargs = 2, default = [None, None], 
-                        help = 'The x axis limits in time units. Use the following format hh:mm eg. --t_lims 17:38 21:56')
+                        type = int, nargs = 2, default = [None, None], 
+                        help = 'The x axis limits in time units. Use the following format: hhmm for both limits (not meant to be used for daylong quicklooks). Defaults to: automatic selection.')
     
     parser.add_argument('--t_tick', metavar = 't_tick',
                         type = int, nargs = 1, default = None, 
@@ -127,7 +119,7 @@ def call_parser():
                         help = 'This variable is ignored if the upper and lower values of smoothing_window are the same. Choose one of: True: a smoothing window that exponentially increases with altitude/distance will be applied, False:  a smoothing window that exponentially increases with altitude/distance will be applied. Defaults to: True.')
 
     args = vars(parser.parse_args())
-
+    
     return(args)
 
 def check_parser(args):
@@ -158,7 +150,16 @@ def check_parser(args):
         os.makedirs(os.path.join(args['output_folder'], 'plots'), exist_ok = True)
     elif not os.path.exists(args['output_folder'] ):
         raise Exception(f"The provided output folder {args['output_folder']} does not exist! Please use an existing folder or don't provide one and let the the parser create the default output folder ") 
-        
+    
+    if args['t_lims'][0] != None:
+        if len(str(args['t_lims'][0])) != 4: raise Exception("Wrong formating of the lower of the t_lims at the quicklook section of the settings file")
+
+    if args['t_lims'][-1] != None:
+        if len(str(args['t_lims'][-1])) != 4: raise Exception("Wrong formating of the upper of the t_lims at the quicklook section of the settings file")
+
+    if args['t_lims'][0] != None and args['t_lims'][-1] != None:
+        if len(str(args['t_lims'][0])) > len(str(args['t_lims'][-1])): raise Exception("The upper value of t_lims is lower than the lower value at the quicklook section of the settings file")
+                                            
     return(args)
 
 def view_parser(args):

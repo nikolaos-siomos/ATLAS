@@ -99,7 +99,7 @@ def rayleigh(args, version):
         meas_ID = make.meas_id(lr_id = cfg.system['station_id'], time = sig_raw.time)
               
         # Creating the paths and folders
-        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.system['lidar_name'], meas_type = 'ray', version = version)
+        nc_path = make.path(output_folder = args['output_folder'], system_info = cfg.system, time = sig_raw.time, meas_type = 'ray', version = version)
         
         # Checking for radiosonde data
         if os.path.isdir(args['radiosonde']):
@@ -223,7 +223,7 @@ def telecover(args, version):
         meas_ID = make.meas_id(lr_id = cfg.system['station_id'], time = sig_raw.time)
               
         # Creating the paths and folders
-        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.system['lidar_name'], meas_type = 'tlc', version = version)
+        nc_path = make.path(output_folder = args['output_folder'], system_info = cfg.system, time = sig_raw.time, meas_type = 'tlc', version = version)
         
         # Making the raw SCC file
         make.telecover_file(system_info = cfg.system.copy(), 
@@ -334,7 +334,7 @@ def polarization_calibration(args, version):
         meas_ID = make.meas_id(lr_id = cfg.system['station_id'], time = sig_raw.time)
               
         # Creating the paths and folders
-        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.system['lidar_name'], meas_type = 'pcb', version = version)
+        nc_path = make.path(output_folder = args['output_folder'], system_info = cfg.system, time = sig_raw.time, meas_type = 'pcb', version = version)
         
         # Making the raw SCC file
         make.polarization_calibration_file(system_info = cfg.system.copy(), 
@@ -367,7 +367,7 @@ def polarization_calibration(args, version):
     return([nc_path])
 
 def dark(args, version):
-   
+
     path_drk = os.path.join(args['parent_folder'],'drk')
     path_cfg = args['config_file']
 
@@ -389,7 +389,7 @@ def dark(args, version):
     if not isinstance(sig_raw_d,list):
         # Remove channels that should be excluded according to the configuration file
         sig_raw_d, shots_d, channel_info_d, cfg = \
-            modify.trim_channels(cfg = cfg, sig = sig_raw_d, shots = shots_d, channel_info = channel_info_d, meas_type = 'drk', version = version)
+            modify.trim_channels(cfg = cfg, sig = sig_raw_d, shots = shots_d, channel_info = channel_info_d, meas_type = 'drk')
         
     
         # Add the information from the raw file headers to the configuration object
@@ -417,14 +417,14 @@ def dark(args, version):
         meas_ID = make.meas_id(lr_id = cfg.system['station_id'], time = sig_raw_d.time)
               
         # Creating the paths and folders
-        nc_path = make.path(output_folder = args['output_folder'], meas_ID = meas_ID, lidar = cfg.system['lidar_name'], meas_type = 'drk', version = version)
+        nc_path = make.path(output_folder = args['output_folder'], system_info = cfg.system, time = sig_raw_d.time, meas_type = 'drk', version = version)
         
         # Making the raw SCC file
         make.dark_file(system_info = cfg.system.copy(), 
                        channel_info = cfg.channels.copy(),
-                       time_info_d = time_info_d,
+                       time_info = time_info_d,
                        nc_path = nc_path, meas_ID = meas_ID, 
-                       sig_d = sig_raw_d, shots_d = shots_d)
+                       sig = sig_raw_d, shots = shots_d)
     
         # Creating debugging files from the configuration and licel input
         if args['debug']:

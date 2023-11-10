@@ -35,10 +35,10 @@ class config():
                            operation_mode = operation_mode)
             
             if 'recorder_channel_id' in channel_section.columns.values:
-                if file_format == 'licel' or file_format == 'licel_matlab':
+                if file_format == 'licel' or file_format == 'licel_matlab' or file_format == 'licel_old2rack':
                     channels = [f'{channel_section.recorder_channel_id[i]}_L{str(int(channel_section.laser[i]))}'
                                 for i in range(channel_section.index.size)]
-                elif file_format == 'polly_xt':
+                elif file_format == 'polly_xt' or file_format == 'polly_xt_first':
                     channels = channel_section.recorder_channel_id.values
 
                 channel_section.index = channels 
@@ -133,7 +133,7 @@ def check_channels(channel_info, file_format, operation_mode):
                     raise Exception("-- Error: Provided laser number not recognized. Licel uses a laser number between 1 and 3!")
 
     # Check the recorder_channel_id for PollyXTs
-    if file_format == 'polly_xt':
+    if file_format == 'polly_xt' or file_format == 'polly_xt_first':
         if 'recorder_channel_id' not in channel_info.columns.values:
             raise Exception("-- Error: Since version 0.4 the recorder_channel_id field is mandatory also for Polly XT systems! Please provide it in the configuration file. For Polly XTs use ascending integers starting from 1 and to the last channel following the order of channel from the raw netcdf files. ")
         else:
@@ -141,7 +141,7 @@ def check_channels(channel_info, file_format, operation_mode):
                 if recorder_channel_id.isdigit() == False:
                     raise Exception("-- Error: The recorder_channel_id must be an intereger for PollyXT systems. Please revise the configuration file!")
                 elif recorder_channel_id == 0: 
-                    raise Exception("-- Error: The recorder_channel_id cnnot be zero. It must be an integer between 1 and up to the maximum number of available channels in the raw files. Please revise the configuration file!")
+                    raise Exception("-- Error: The recorder_channel_id cannot be zero. It must be an integer between 1 and up to the maximum number of available channels in the raw files. Please revise the configuration file!")
 
     # Check if all mandatory fields are provided
     if operation_mode == 'testing':
@@ -166,10 +166,31 @@ def check_channels(channel_info, file_format, operation_mode):
                 first = False
             print(f"-- {mnd}")
     
+    # Avoid high positive daq_trigger_offset
+    if 'daq_trigger_offset' in channel_info.columns.values:
+        if (channel_info.daq_trigger_offset.astype(float) > 50).any():
+            raise Exception("-- Error: Unnaturally high positive daq_trigger_offset values (> 50 bins) were provided for one of the channels. Please note that for channels where the data aquisition starts BEFORE the Q-switch (pretriggering) the daq_trigger_offset must be negative! ")
+    
+    # Make sure the background_low_bin and background_high_bin are not set in the near range
     if ('background_low_bin' in channel_info.columns.values and 'background_high_bin' not in channel_info.columns.values) or \
         ('background_high_bin' in channel_info.columns.values and 'background_low_bin' not in channel_info.columns.values):
             raise Exception("-- Error: The background_low_bin and background_high_bin fields must be either provided together or not provided at all. Providing only one of them can lead to assigning unpredictable default values. ")
 
+    if 'background_low_bin' in channel_info.columns.values:
+        if (channel_info.background_high_bin.astype(float) - channel_info.background_low_bin.astype(float) < 100).any():
+            raise Exception("-- Error: One of the background_high_bin values is less than 100 bins higher than the corresponding background_low_bin values. Please use a broader background correction range")
+            
+    if 'daq_trigger_offset' not in channel_info.columns.values and 'background_low_bin' in channel_info.columns.values:
+        if ((channel_info.background_low_bin.astype(float) < 1000) & (channel_info.background_low_bin.astype(float) >= 0)).any():
+            raise Exception("-- Error: One of the background_high_bin values is smaller than 1000 bins while the daq_trigger_offset is not provided. This will lead to a wrong background subraction ")
+    elif 'daq_trigger_offset' in channel_info.columns.values  and 'background_low_bin' in channel_info.columns.values:
+        if ((channel_info.daq_trigger_offset.astype(float) >= 0) & (channel_info.background_low_bin.astype(float) - channel_info.daq_trigger_offset.astype(float) < 1000) & (channel_info.background_low_bin.astype(float) >= 0)).any():
+            raise Exception("-- Error: One of the background_low_bin values is less than 1000 bins above its corresponding absolute daq_trigger_offset. This will lead to a wrong background subraction ")
+        if ((channel_info.daq_trigger_offset.astype(float) < 0) & (channel_info.background_low_bin.astype(float) + channel_info.daq_trigger_offset.astype(float) < 1000) & (channel_info.background_low_bin.astype(float) + channel_info.daq_trigger_offset.astype(float) >= 0) & (channel_info.background_low_bin.astype(float) >= 0)).any():             
+            raise Exception("-- Error: One of the background_low_bin values is less than 1000 bins above its corresponding absolute daq_trigger_offset. This will lead to a wrong background subraction ")
+        if ((channel_info.daq_trigger_offset.astype(float) < 0) & (channel_info.background_high_bin.astype(float) + channel_info.daq_trigger_offset.astype(float) < 1000) & (channel_info.background_high_bin.astype(float) + channel_info.daq_trigger_offset.astype(float) >= 0) & (channel_info.background_high_bin.astype(float) >= 0)).any():             
+            raise Exception("-- Error: One of the background_high_bin values is less than 1000 bins above its corresponding absolute daq_trigger_offset. This will lead to a wrong background subraction ")
+            
     # Check the field type
     allowed_telescope_types = ['n', 'f', 'x']
     for ch in channel_info.index:

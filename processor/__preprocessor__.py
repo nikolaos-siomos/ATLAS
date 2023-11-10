@@ -37,6 +37,7 @@ def main(args, __version__):
                 exclude_acquisition_mode = args['exclude_acquisition_mode'], 
                 exclude_channel_subtype = args['exclude_channel_subtype'], 
                 use_channels = args['channels'])
+            
 
     print(f'Lidar: {system_info.Lidar_Name}')
     print('-----------------------------------------')
@@ -45,7 +46,8 @@ def main(args, __version__):
     meas_type = system_info.Measurement_type
     meas_label = {'ray' : 'Rayleigh', 
                   'tlc' : 'Telecover', 
-                  'pcb' : 'Polarization Calibration'}
+                  'pcb' : 'Polarization Calibration',
+                  'drk' : 'Dark'}
     print(f'-- {meas_label[meas_type]} QA file succesfully parsed!')
     
     if 'Rayleigh_File_Name' in system_info.keys():
@@ -75,9 +77,8 @@ def main(args, __version__):
     
     print('-----------------------------------------')
     print("")
-    
-            
-    if meas_type == 'drk' or not isinstance(sig_raw_d, list):
+
+    if meas_type != 'drk' and not isinstance(sig_raw_d, list):
         drk, drk_pack, time_info_d = \
             short_prepro.dark(sig_raw = sig_raw_d, 
                               shots = shots_d, 
@@ -89,7 +90,7 @@ def main(args, __version__):
     else:
         sig_drk = []
     
-    if 'Rayleigh_File_Name' in system_info.keys() and not isinstance(sig_raw_d, list):
+    if meas_type != 'drk' and 'Rayleigh_File_Name' in system_info.keys() and not isinstance(sig_raw_d, list):
         drk_r, drk_pack_r, time_info_dr = \
             short_prepro.dark(sig_raw = sig_raw_dr, 
                               shots = shots_dr, 
@@ -207,6 +208,28 @@ def main(args, __version__):
                                    version = __version__,
                                    dir_out = args['output_folder'])
     
+    if meas_type == 'drk':
+        args['vertical_trimming'] = False
+        drk, drk_pack, time_info_drk = \
+            short_prepro.standard(sig_raw = sig_raw, 
+                                  shots = shots, 
+                                  system_info = system_info, 
+                                  channel_info = channel_info, 
+                                  time_info = time_info,
+                                  external_info = args,
+                                  meas_type = 'drk')
+        sig_drk = []
+
+        output_files['drk'] = \
+            nc_dataset.dark(sig = drk, 
+                            system_info = system_info, 
+                            channel_info = channel_info, 
+                            time_info = time_info, 
+                            heights = drk_pack['heights'], 
+                            ranges = drk_pack['ranges'],
+                            version = __version__,
+                            dir_out = args['output_folder'])
+
     if args['quicklook']:
                 
         qck, qck_pack, time_info_qck = \

@@ -96,13 +96,13 @@ def short_molec(heights, ranges, system_info, channel_info,
         wns_ch = 1E7 * (1. / ewl_ch - 1. / dwl_ch )
         
         if ch_type.loc[ch] in ['p', 'c', 't', 'a'] and np.abs(wns_ch) > 50:
-            raise Exception(f"-- Error: Channel {ch_d['channel']} has type '{ch_type.loc[ch]}' (not Raman or fluorescence) but the wavenumber shift between the provided detected and emitted wavelengths is too large. Please correct the corresponding fields in the configuration file and/or in the raw file header")
+            raise Exception(f"-- Error: Channel {ch_d['channel']} has type '{ch_type.loc[ch]}' (not Raman or fluorescence) but the wavenumber shift between the provided detected {dwl_ch} and emitted {ewl_ch} wavelengths is too large. Please correct the corresponding fields in the configuration file and/or in the raw file header")
 
-        if ch_type.loc[ch] == 'r' and (np.abs(wns_ch) > 500 or wns_ch < -50):
-            raise Exception(f"-- Error: Channel {ch_d['channel']} has type '{ch_type.loc[ch]}' (rotational Ramn) but the wavenumber shift between the provided detected and emitted wavelengths is too large. Please correct the corresponding fields in the configuration file and/or in the raw file header")
+        if ch_type.loc[ch] == 'r' and np.abs(wns_ch) > 500:
+            raise Exception(f"-- Error: Channel {ch_d['channel']} has type '{ch_type.loc[ch]}' (rotational Ramn) but the wavenumber shift between the provided detected {dwl_ch} and emitted {ewl_ch} wavelengths is too large. Please correct the corresponding fields in the configuration file and/or in the raw file header")
 
         if ch_type.loc[ch] == 'v' and (wns_ch > 9000 or wns_ch < -50):
-            raise Exception(f"-- Error: Channel {ch_d['channel']} has type '{ch_type.loc[ch]}' (vibrational Ramn) but the wavenumber shift between the provided detected and emitted wavelengths is too large. Please correct the corresponding fields in the configuration file and/or in the raw file header")
+            raise Exception(f"-- Error: Channel {ch_d['channel']} has type '{ch_type.loc[ch]}' (vibrational Ramn) but the wavenumber shift between the provided detected {dwl_ch} and emitted {ewl_ch} wavelengths is too large. Please correct the corresponding fields in the configuration file and/or in the raw file header")
 
         max_bin = meteo.loc[ch_d].dropna(dim = 'bins', how = 'any')\
             .loc[dict(properties  = 'Number_Density')].bins.values[-1]
@@ -112,6 +112,8 @@ def short_molec(heights, ranges, system_info, channel_info,
         # Defining a gaussian filter for the IFF
         if ch_type.loc[ch] == 'r':
             filter_trans = SquareFilter(dwl_ch, bdw_ch) 
+        elif ch_type.loc[ch] == 'v':
+            filter_trans = None
         else:
             filter_trans = GaussianFilter(dwl_ch, bdw_ch)    
 
@@ -138,25 +140,27 @@ def short_molec(heights, ranges, system_info, channel_info,
         exs_bck_i = np.nan * np.zeros(sel_bins.size)
 
         # Automatically calculate the Raman vibrational shift from the emitted wavelength
-        if ch_type.loc[ch] != 'v':
-            swl_ch = ewl.loc[ch]
-        else:
+        if ch_type.loc[ch] not in ['r', 'v', 'f']:
+            swl_ch = ewl_ch
+        elif ch_type.loc[ch] == 'v':
             if ch_stype.loc[ch] == 'n':
                 swl_ch = 1./(1./ewl.loc[ch] - 2331.*1E-7) # N2 wavenumber shift is 2331 cm-1
             else:
                 print(f'-- Warning: Molecular atmosphere calculations are only supported for N2. No molecular calculations were performed for channel {ch}')
-
+        else:
+            swl_ch = dwl_ch    
+               
         for i in range(sel_bins.size):
             
             # Create the gas dictonaries needed for the Raman calculations
-            N2 = make_gas.N2(swl_ch,relative_concentration = c_N2[i])
-            O2 = make_gas.O2(swl_ch,relative_concentration = c_O2[i])
-            Ar = make_gas.Ar(swl_ch,relative_concentration = c_Ar[i])
-            CO2 = make_gas.CO2(swl_ch,relative_concentration = c_CO2[i])
-            H2O = make_gas.H2O(swl_ch,relative_concentration = c_H2O[i])
+            N2 = make_gas.N2(ewl_ch,relative_concentration = c_N2[i])
+            O2 = make_gas.O2(ewl_ch,relative_concentration = c_O2[i])
+            Ar = make_gas.Ar(ewl_ch,relative_concentration = c_Ar[i])
+            CO2 = make_gas.CO2(ewl_ch,relative_concentration = c_CO2[i])
+            H2O = make_gas.H2O(ewl_ch,relative_concentration = c_H2O[i])
 
             # Create the RR object for the backscatter cross sections
-            rrb = RotationalRaman(wavelength = swl_ch, 
+            rrb = RotationalRaman(wavelength = ewl_ch, 
                                   max_J = 51, 
                                   temperature = T[i], 
                                   optical_filter = filter_trans,
@@ -166,36 +170,43 @@ def short_molec(heights, ranges, system_info, channel_info,
                                   CO2_parameters = CO2, 
                                   H2O_parameters = H2O) 
 
-            # Create the RR object for the scattering/extinction cross sections            
-            rre = RotationalRaman(wavelength = ewl_ch, 
-                                  max_J = 51, 
-                                  temperature = T[i], 
-                                  N2_parameters = N2, 
-                                  O2_parameters = O2, 
-                                  Ar_parameters = Ar, 
-                                  CO2_parameters = CO2, 
-                                  H2O_parameters = H2O,
-                                  istotal = True) 
+            # Create the RR object for the forward scattering/extinction cross sections            
+            rre_f = RotationalRaman(wavelength = ewl_ch, 
+                                    max_J = 51, 
+                                    temperature = T[i], 
+                                    N2_parameters = N2, 
+                                    O2_parameters = O2, 
+                                    Ar_parameters = Ar, 
+                                    CO2_parameters = CO2, 
+                                    H2O_parameters = H2O,
+                                    istotal = True) 
 
-            if ch_type.loc[ch] == 'v':
-                # Create the RR object for the scattering/extinction cross sections            
-                rrv = RotationalRaman(wavelength = swl_ch, 
-                                      max_J = 51, 
-                                      temperature = T[i], 
-                                      N2_parameters = N2, 
-                                      O2_parameters = O2, 
-                                      Ar_parameters = Ar, 
-                                      CO2_parameters = CO2, 
-                                      H2O_parameters = H2O,
-                                      istotal = True) 
-                
+            # Create the gas dictonaries needed for the Raman calculations
+            N2 = make_gas.N2(swl_ch,relative_concentration = c_N2[i])
+            O2 = make_gas.O2(swl_ch,relative_concentration = c_O2[i])
+            Ar = make_gas.Ar(swl_ch,relative_concentration = c_Ar[i])
+            CO2 = make_gas.CO2(swl_ch,relative_concentration = c_CO2[i])
+            H2O = make_gas.H2O(swl_ch,relative_concentration = c_H2O[i])
             
+            # Create the RR object for the backward scattering/extinction cross sections            
+            rre_b = RotationalRaman(wavelength = swl_ch, 
+                                    max_J = 51, 
+                                    temperature = T[i], 
+                                    N2_parameters = N2, 
+                                    O2_parameters = O2, 
+                                    Ar_parameters = Ar, 
+                                    CO2_parameters = CO2, 
+                                    H2O_parameters = H2O,
+                                    istotal = True) 
+
+
             bxs_tot_i[i], _, _ = rrb.rayleigh_cross_section()
-            exs_fth_i[i], _, _ = rre.rayleigh_cross_section()
-            if ch_type.loc[ch] == 'v':
-                exs_bck_i[i], _, _ = rrv.rayleigh_cross_section()
-            else:
-                exs_bck_i[i] = exs_fth_i[i]   
+            exs_fth_i[i], _, _ = rre_f.rayleigh_cross_section()
+            exs_bck_i[i], _, _ = rre_b.rayleigh_cross_section()
+            
+            if ch_stype.loc[ch] == 'n':
+                bxs_tot_i[i] = c_N2[i] * bxs_tot_i[i]
+
             mdr_i[i] = rrb.delta_mol_rayleigh(method = 'line_summation')
 
         # Interpolate for every range bin (calculations are performed only on selected bins)
@@ -207,26 +218,18 @@ def short_molec(heights, ranges, system_info, channel_info,
         bxs_tot = bxs_tot_f(bins)  
         exs_bck = exs_bck_f(bins)
         exs_fth = exs_fth_f(bins)
+        
         bcf_tot = N * bxs_tot 
         ecf_bck = N * exs_bck
         ecf_fth = N * exs_fth
 
         if ch_type.loc[ch] in ['p', 'c', 't']:
             mdr = mdr_f(bins)
-        # elif pol.loc[ch] == 3 and ch_type.loc[ch] in ['o', 'x', 't']:
-        #     mdr = 2. * mdr_f(bins) / (1. - mdr_f(bins))
-        # elif (pol.loc[ch] == 3 and ch_type.loc[ch] in ['p', 'c', 't']) or \
-        #     (pol.loc[ch] == 1 and ch_type.loc[ch] in ['o', 'x', 't']) or \
-        #         (ch_type.loc[ch] not in ['p', 'c', 'o', 'x', 't']):
-        #     mdr = np.ones(bins.size)
-        # else:
-        #     print(f'-- Warning: Elliptical polarization not supported. Molecular calculation will assume unpolarized backscater radiation for channel {ch}')
-        #     mdr = np.ones(bins.size)
-
+            
         rng = ranges.loc[ch_d].values
         trn_bck = transmittance(x_range = rng, extinction = ecf_bck)
         trn_fth = transmittance(x_range = rng, extinction = ecf_fth)
-
+        
         if ch_type.loc[ch] in ['t', 'v', 'r', 'f']:
             atb = bcf_tot * trn_fth * trn_bck
         if ch_type.loc[ch] in ['p', 'o']:
@@ -237,15 +240,15 @@ def short_molec(heights, ranges, system_info, channel_info,
         # Pack into a single xarray object
         molec.loc[dict(properties = 'Backscatter_Cross_Section')]\
             .loc[ch_d] = bxs_tot       
-        molec.loc[dict(properties = 'Extinction_Cross_Section_Forward')]\
-            .loc[ch_d] = exs_bck
         molec.loc[dict(properties = 'Extinction_Cross_Section_Backward')]\
+            .loc[ch_d] = exs_bck
+        molec.loc[dict(properties = 'Extinction_Cross_Section_Forward')]\
             .loc[ch_d] = exs_fth
         molec.loc[dict(properties = 'Backscatter_Coefficient')]\
             .loc[ch_d] = bcf_tot               
-        molec.loc[dict(properties = 'Extinction_Coefficient_Forward')]\
-            .loc[ch_d] = ecf_bck   
         molec.loc[dict(properties = 'Extinction_Coefficient_Backward')]\
+            .loc[ch_d] = ecf_bck   
+        molec.loc[dict(properties = 'Extinction_Coefficient_Forward')]\
             .loc[ch_d] = ecf_fth   
         molec.loc[dict(properties = 'Molecular_Linear_Depolarization_Ratio')]\
             .loc[ch_d] = mdr
@@ -255,6 +258,7 @@ def short_molec(heights, ranges, system_info, channel_info,
     print('-- Molecular calculations succesfully complete!')
     print('-----------------------------------------')
     print('')
+
         
     return(molec, molec_info, meteo)
         

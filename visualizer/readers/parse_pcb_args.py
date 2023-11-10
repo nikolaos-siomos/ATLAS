@@ -79,6 +79,11 @@ def call_parser():
                         type = str, nargs = '+', 
                         help = 'Type one or more channel names (e.g. xpat0355) here that correspond to the transmitted channels used for the polarization calibration calculation. The number of transmitted channels must be the same as the number of the respective reflected channels ')
 
+    parser.add_argument('--auto_fit', metavar = 'auto_fit',
+                        type = bool, default = False, 
+                        action = argparse.BooleanOptionalAction,
+                        help = 'If set to True an automatic identification of the calibration and Rayleigh regions will be attempted. If the automatic procedure is successful, the calibration_region and rayleigh_region variables will be ignored. If the procedure is not successful or auto_ray is set to False, the manually-provided/default values will be used. Defaults to True')
+
     parser.add_argument('--calibration_region', metavar = 'calibration_region',
                         type = float, nargs = 2, default = [2., 4.], 
                         help = 'The lower and upper limits of the region used for Δ90 calibration. If use_range is called, the limits correspond to distance. Defaults to: 2., 4. km ')

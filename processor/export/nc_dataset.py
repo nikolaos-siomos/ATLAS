@@ -51,8 +51,22 @@ def rayleigh(sig, molec, meteo, system_info, channel_info, time_info,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
     
-    fname = f'{system_info.Measurement_ID}_{system_info.Lidar_Name}_ray_ATLAS_{version}_prepro.nc'
+    station_id = system_info['Station_ID'].lower()
+    start_date = system_info['RawData_Start_Date']
+    start_time = system_info['RawData_Start_Time_UT']
+        
+    try: lidar_id = system_info['Lidar_ID']
+    except: lidar_id = ''
     
+    try: version_id = system_info['Version_ID']
+    except: version_id = ''
+    
+    try: config_id = system_info['Configuration_ID']
+    except: config_id = ''
+    
+    parts = [str(station_id), str(lidar_id), str(version_id), str(config_id), str(start_date), str(start_time), 'ray', 'ATLAS', str(version), 'prepro']
+    fname = "_".join([part for part in parts if len(part) > 0]) + ".nc"
+            
     fpath = os.path.join(dir_out, fname)
     
     nc_file.to_netcdf(path = fpath, mode = 'w')
@@ -120,24 +134,23 @@ def telecover(sig, system_info, channel_info, time_info,
     
 
     if any(sector == 1) == False and any(sector == 5) == True:
-        
-        idx_inner = np.where(sector == 5)[0]
-        idx_outer = np.where(sector == 6)[0]
+
+        idx_outer = np.where(sector == 5)[0]
+        idx_inner = np.where(sector == 6)[0]
         
         nc_file = xr.Dataset(coords = {'time_i' : time[idx_inner],
                                        'time_o' : time[idx_outer],
                                        'channel' : sig.channel.values, 
                                        'bins': sig.bins.values})
         
-
         nc_file['Range_Corrected_Signals_Inner_Ring'] = \
-            (['time','channel','bins'], sig[dict(time = idx_inner)]\
+            (['time_i','channel','bins'], sig[dict(time = idx_inner)]\
              .fillna(netCDF4.default_fillvals['f8']).values)  
 
         nc_file['Range_Corrected_Signals_Outer_Ring'] = \
-            (['time','channel','bins'], sig[dict(time = idx_outer)]\
+            (['time_o','channel','bins'], sig[dict(time = idx_outer)]\
              .fillna(netCDF4.default_fillvals['f8']).values)     
-
+        
         for clm in time_info.columns.values:
             if clm not in ['sector']:
                 nc_file[f'{clm}_Inner_Ring'] = \
@@ -226,8 +239,22 @@ def telecover(sig, system_info, channel_info, time_info,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
     
-    fname = f'{system_info.Measurement_ID}_{system_info.Lidar_Name}_tlc_ATLAS_{version}_prepro.nc'
+    station_id = system_info['Station_ID'].lower()
+    start_date = system_info['RawData_Start_Date']
+    start_time = system_info['RawData_Start_Time_UT']
+        
+    try: lidar_id = system_info['Lidar_ID']
+    except: lidar_id = ''
     
+    try: version_id = system_info['Version_ID']
+    except: version_id = ''
+    
+    try: config_id = system_info['Configuration_ID']
+    except: config_id = ''
+    
+    parts = [str(station_id), str(lidar_id), str(version_id), str(config_id), str(start_date), str(start_time), 'tlc', 'ATLAS', str(version), 'prepro']
+    fname = "_".join([part for part in parts if len(part) > 0]) + ".nc"
+        
     fpath = os.path.join(dir_out, fname)
     
     nc_file.to_netcdf(path = fpath, mode = 'w')
@@ -248,7 +275,8 @@ def calibration(sig, sig_ray, meteo, molec, system_info, system_info_ray,
     print('-----------------------------------------')
     
     
-    pcb_group = ['Lidar_Name', 'Station_Name',
+    pcb_group = ['Lidar_Name', 'Station_Name', 'Lidar_ID', 'Version_ID',
+                 'Configuration_ID', 'Configuration_Name',
                  'Station_ID', 'Altitude_meter_asl', 'Latitude_degrees_north',
                  'Longitude_degrees_east', 'Measurement_type', 'Rayleigh_File_Name']
     
@@ -330,8 +358,22 @@ def calibration(sig, sig_ray, meteo, molec, system_info, system_info_ray,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
     
-    fname = f'{system_info.Measurement_ID}_{system_info.Lidar_Name}_pcb_ATLAS_{version}_prepro.nc'
-
+    station_id = system_info['Station_ID'].lower()
+    start_date = system_info['RawData_Start_Date']
+    start_time = system_info['RawData_Start_Time_UT']
+        
+    try: lidar_id = system_info['Lidar_ID']
+    except: lidar_id = ''
+    
+    try: version_id = system_info['Version_ID']
+    except: version_id = ''
+    
+    try: config_id = system_info['Configuration_ID']
+    except: config_id = ''
+    
+    parts = [str(station_id), str(lidar_id), str(version_id), str(config_id), str(start_date), str(start_time), 'pcb', 'ATLAS', str(version), 'prepro']
+    fname = "_".join([part for part in parts if len(part) > 0]) + ".nc"
+    
     fpath = os.path.join(dir_out, fname)
     
     nc_file.to_netcdf(path = fpath, mode = 'w')
@@ -358,7 +400,7 @@ def quicklook(sig, system_info, channel_info, time_info,
     for clm in channel_info.columns.values:
         nc_file[clm] = (['channel'], channel_info.loc[:,clm]\
                         .fillna(netCDF4.default_fillvals['f8']))
-    
+
     for clm in time_info.columns.values:
         nc_file[clm] = (['time'], time_info.loc[:,clm]\
                         .fillna(netCDF4.default_fillvals['f8']))
@@ -371,13 +413,83 @@ def quicklook(sig, system_info, channel_info, time_info,
 
     nc_file.attrs['processing_software'] = 'ATLAS'
 
-    fname = f'{system_info.Measurement_ID}_{system_info.Lidar_Name}_{meas_type}_qck_ATLAS_{version}_prepro.nc'
+    station_id = system_info['Station_ID'].lower()
+    start_date = system_info['RawData_Start_Date']
+    start_time = system_info['RawData_Start_Time_UT']
+        
+    try: lidar_id = system_info['Lidar_ID']
+    except: lidar_id = ''
+    
+    try: version_id = system_info['Version_ID']
+    except: version_id = ''
+    
+    try: config_id = system_info['Configuration_ID']
+    except: config_id = ''
+    
+    parts = [str(station_id), str(lidar_id), str(version_id), str(config_id), str(start_date), str(start_time), 'qck', str(meas_type), 'ATLAS', str(version), 'prepro']
+    fname = "_".join([part for part in parts if len(part) > 0]) + ".nc"
     
     fpath = os.path.join(dir_out, fname)
     nc_file.to_netcdf(path = fpath, mode = 'w')
     
-    print('-- Quicklook ATLAS file succesfully created!')
+    print(f'-- Quicklook ({meas_type}) ATLAS file succesfully created!')
     print('-----------------------------------------')
     print('')
 
     return([fpath])
+
+def dark(sig, system_info, channel_info, time_info, 
+         heights, ranges, version, dir_out):
+
+    print('-----------------------------------------')
+    print('Start exporting to a Rayleigh ATLAS file...')
+    print('-----------------------------------------')
+    
+    nc_file = sig[dict(time = 0)]\
+        .to_dataset(name = 'Range_Corrected_Signals')\
+            .fillna(netCDF4.default_fillvals['f8'])
+        
+    for idx in system_info.index.values:
+        nc_file.attrs[idx] = system_info[idx]
+    
+    for clm in channel_info.columns.values:
+        nc_file[clm] = (['channel'], channel_info.loc[:,clm]\
+                        .fillna(netCDF4.default_fillvals['f8']))
+    
+    for clm in time_info.columns.values:
+        nc_file[clm] = time_info.loc[:,clm].iloc[0]
+            
+    nc_file['Height_levels'] = heights   
+
+    nc_file['Range_levels'] = ranges
+    
+    nc_file.attrs['version'] = version
+
+    nc_file.attrs['processing_software'] = 'ATLAS'
+    
+    station_id = system_info['Station_ID'].lower()
+    start_date = system_info['RawData_Start_Date']
+    start_time = system_info['RawData_Start_Time_UT']
+        
+    try: lidar_id = system_info['Lidar_ID']
+    except: lidar_id = ''
+    
+    try: version_id = system_info['Version_ID']
+    except: version_id = ''
+    
+    try: config_id = system_info['Configuration_ID']
+    except: config_id = ''
+    
+    parts = [str(station_id), str(lidar_id), str(version_id), str(config_id), str(start_date), str(start_time), 'drk', 'ATLAS', str(version), 'prepro']
+    fname = "_".join([part for part in parts if len(part) > 0]) + ".nc"
+    
+    fpath = os.path.join(dir_out, fname)
+    
+    nc_file.to_netcdf(path = fpath, mode = 'w')
+
+    print('-- Dark ATLAS file succesfully created!')
+    print('-----------------------------------------')
+    print('')
+
+    return([fpath])
+

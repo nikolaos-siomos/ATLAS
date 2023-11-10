@@ -10,61 +10,66 @@ import numpy as np
 from ..tools.smoothing import sliding_average_1D_fast as smooth_1D
 from ..tools.smoothing import sliding_average_2D_fast as smooth_2D
 
-def quicklook_x(x_lims, x_tick, t_tick, time):
-    
-    # Get the x lower limit
-    if x_lims[0] == None or x_lims[0] < 0:
-        x_llim = 0
-        
-    else:
-        x_llim = x_lims[0] - 1
+def quicklook_x(t_lims, t_tick, time):
 
-    # Get the x upper limit
-    if x_lims[-1] == None or x_lims[-1] > time.size:
-        x_ulim = time.size
-        
-    else:
-        x_ulim = x_lims[-1]
+    # # Identify bins where temporal gaps are encountered (10% acceptance)
+    # nodes = np.where(time[1:]-time[:-1] > 1.50 * np.nanmin(time[1:]-time[:-1]))[0]
+    # print(nodes)
+    # if nodes > 0:
+    #     print('-- Warning: The quicklook will contain gaps as the dataset is not continuous. The ascending number of timeframes will not be display as a secondary x_axis')
     
+    # Get the lowest time based on the t-lims
+    if t_lims[0] == None:
+        ltime = time[0]
+    else:
+        lmins = int(str(t_lims[0])[:2]) * 60 + int(str(t_lims[0])[2:])
+        ltime = time.astype('datetime64[D]')[0] + np.timedelta64(lmins, 'm')
+
+    if t_lims[-1] == None:
+        utime = time[-1]
+    else:
+        umins = int(str(t_lims[-1])[:2]) * 60 + int(str(t_lims[-1])[2:])
+        utime = time.astype('datetime64[D]')[-1] + np.timedelta64(umins, 'm')
+
+    t_vals = time[(time >= ltime) & (time <= utime)]
+
+    # Get the x lower limit
+    x_lbin = np.where((time >= ltime))[0][0]
+    
+    # Get the x upper limit
+    x_ubin = np.where((time >= utime))[0][0]
+    
+    # Calculate the x_tick (number of timeframes) if not provided
+    if time.size / 15. > 10.:
+        x_tick = np.round(time.size / 15., decimals = -1)
+    else:
+        x_tick = np.round(time.size / 15., decimals = 0)
+    if x_tick == 0:
+        x_tick = 1.
+            
     # Get the timeframe levels
-    x_vals = np.arange(0, time.size, 1)
     t_vals = time
 
-    # Get the x axis labels
-    x_label = ' '
-    t_label = 'Time UTC'
-
-    # Calculate the x_tick (number of timeframes) if not provided
-    if x_tick == None:
-        if time.size / 15. > 10.:
-            x_tick = np.round(time.size / 15., decimals = -1)
-        else:
-            x_tick = np.round(time.size / 15., decimals = 0)
-        if x_tick == 0:
-            x_tick = 1.
-        
     # Calculate the t_tick (in minutes) if not provided
     if t_tick == None:
         mins = \
-            (time[-1]-time[0]).astype('timedelta64[m]') / np.timedelta64(1,'m') 
-        if mins <= 20:
+            (t_vals[x_ubin]-t_vals[x_lbin]).astype('timedelta64[m]') / np.timedelta64(1,'m') 
+        if mins < 5:
+            t_tick = 1.
+        elif mins >= 5 and mins < 20:
             t_tick = 2.
-        elif mins > 20 and mins <= 120.:
+        elif mins >= 20 and mins < 40.:
+            t_tick = 4.
+        elif mins >= 40 and mins < 120.:
             t_tick = 10.
-        elif mins > 120 and mins <= 300.:
+        elif mins >= 120 and mins < 240.:
+            t_tick = 20.
+        elif mins >= 240 and mins < 480.:
             t_tick = 30.
-        elif mins > 300 and mins <= 600.:
-            t_tick = 60.
         else:
-            t_tick = 120.
-
+            t_tick = 60.
     
-    # Identify bins where temporal gaps are encountered (10% acceptance)
-    nodes = np.where(time[1:]-time[:-1] > 1.50 * np.nanmin(time[1:]-time[:-1]))[0]
-
-    
-    return(x_llim, x_ulim, x_vals, t_vals, x_label, t_label, 
-           x_tick, t_tick, nodes)
+    return(x_lbin, x_ubin, x_tick, t_vals, t_tick)
 
 def quicklook_y(heights, ranges, y_lims, use_dis):
 
@@ -268,7 +273,7 @@ def rayleigh_y(sig, atb, y_lims, wave, use_lin):
     
     return(y_llim, y_ulim, y_label)
 
-def telecover_x(heights, ranges, x_lims, use_dis):
+def telecover_x(heights, ranges, x_lims, x_tick, use_dis, telescope_type):
 
     # Use Height or range above the lidar for the y axis  
     if use_dis:
@@ -280,50 +285,41 @@ def telecover_x(heights, ranges, x_lims, use_dis):
         x_vals = 1E-3 * heights       
         x_label = 'Height above the lidar [km]'
 
-    # # Get the altitude/distance lower limit and bin
-    # if x_lims[0] == None or x_lims[0] < x_vals[0]:
-    #     x_lbin = 0
-    #     x_llim = x_vals[x_lbin]
-    #     x_llim = np.round(x_vals[x_lbin], decimals = 2)
-
-    # else:
-    #     x_lbin = np.where(x_vals >= x_lims[0])[0][0]
-        
-    #     if x_lbin > 0:
-    #         x_lbin = x_lbin - 1
-        
-    #     x_llim = x_lims[0]
-
-    # # Get the altitude/distance upper limit and bin
-    # if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
-    #     x_ubin = x_vals.size - 1
-    #     x_ulim = np.round(x_vals[x_ubin], decimals = 2)
-
-    # else:
-    #     x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
-        
-    #     if x_ubin < x_vals.size:
-    #         x_ubin = x_ubin + 1
-
-    #     x_ulim = x_lims[-1]
     
+    # Set the lower x limit
+    if x_lims[0] == None:
+        x_llim = 0.
+    else:
+        x_llim = x_lims[0]
+        
+    # Set the upper x limit depending on the telescope_type
+    if x_lims[-1] == None:
+        if telescope_type in ['l', 'm', 'n', 'x']:
+            x_ulim = 2.5
+        else:
+            x_ulim = 5.
+    else:
+        x_ulim = x_lims[-1]
+
+    # Set the x_tick depending on the telescope_type
+    if x_tick == None and telescope_type in ['l', 'm', 'n', 'x']:
+        x_tick = 0.5
+    elif x_tick == None and telescope_type in ['f', 'g',' h']:
+        x_tick = 1.
+
     # Get the altitude/distance lower limit and bin
-    x_lbin = np.where(x_vals >= x_lims[0])[0][0]
+    x_lbin = np.where(x_vals >= x_llim)[0][0]
     
     if x_lbin > 0:
         x_lbin = x_lbin - 1
     
-    x_llim = x_lims[0]
-
     # Get the altitude/distance upper limit and bin
-    x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
+    x_ubin = np.where(x_vals <= x_ulim)[0][-1] 
     
     if x_ubin < x_vals.size:
         x_ubin = x_ubin + 1
-
-    x_ulim = x_lims[-1]
     
-    return(x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label)
+    return(x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_tick, x_label)
 
 def telecover_y(sig, sig_nr, y_lims):
     
@@ -343,12 +339,12 @@ def telecover_y(sig, sig_nr, y_lims):
        y_ulim = y_lims[-1] * coef
        y_ulim_nr = y_lims[-1]
       
-    if np.isnan(y_ulim) or y_ulim <= 0.:
+    if not np.isfinite(y_ulim) or y_ulim <= 0.:
         y_ulim = 1.
 
-    if np.isnan(y_ulim_nr) or y_ulim_nr <= 0.:
+    if not np.isfinite(y_ulim_nr) or y_ulim_nr <= 0.:
         y_ulim_nr = 1.
-    
+   
     # Get the vertical lower limit
     if y_lims[0] == None:
         y_llim = -0.1 * y_max_nr * coef
@@ -357,6 +353,13 @@ def telecover_y(sig, sig_nr, y_lims):
     else:
        y_llim = y_lims[0] * coef
        y_llim_nr = y_lims[0] 
+
+      
+    if not np.isfinite(y_llim) or y_llim <= 0.:
+        y_llim = 0.
+
+    if not np.isfinite(y_llim_nr) or y_llim_nr <= 0.:
+        y_llim_nr = 0.
     
     return(y_llim, y_ulim, y_llim_nr, y_ulim_nr)
 
@@ -368,20 +371,20 @@ def polarization_calibration_cal_y(ratio_m, ratio_p, y_lims_cal):
     y_min_cal = np.nanmin([ratio_m, ratio_p])
 
     # Get the eta upper limit
-    if y_max_cal == y_max_cal and y_lims_cal[-1] == None:
+    if np.isfinite(y_max_cal) and y_lims_cal[-1] == None:
         y_ulim_cal = y_max_cal * 2.
             
-    elif y_max_cal == y_max_cal and y_lims_cal[-1] != None:
+    elif np.isfinite(y_max_cal) and y_lims_cal[-1] != None:
         y_ulim_cal = y_lims_cal[-1]
         
     else:
         y_ulim_cal = 1.
     
     # Get the vertical lower limit
-    if y_min_cal == y_min_cal and y_lims_cal[0] == None:
+    if np.isfinite(y_min_cal) and y_lims_cal[0] == None:
         y_llim_cal = y_min_cal / 1.5
             
-    elif y_min_cal == y_min_cal and y_lims_cal[0] != None:
+    elif np.isfinite(y_min_cal) and y_lims_cal[0] != None:
            y_llim_cal = y_lims_cal[0]
     
     else:
@@ -398,10 +401,10 @@ def polarization_calibration_ray_y(ratio, y_lims_ray):
     y_max_ray = ratio
     
     # Get the delta upper limit
-    if y_max_ray == y_max_ray and y_lims_ray[-1] == None:
+    if np.isfinite(y_max_ray) and y_lims_ray[-1] == None:
         y_ulim_ray = y_max_ray * 2.5
     
-    elif y_max_ray == y_max_ray and y_lims_ray[-1] != None:
+    elif np.isfinite(y_max_ray) and y_lims_ray[-1] != None:
         y_ulim_ray = y_lims_ray[-1]
             
     else:
@@ -432,33 +435,6 @@ def polarization_calibration_x(heights, ranges, x_lims, use_dis):
         x_vals = 1E-3 * heights       
         x_label = 'Height above the lidar [km]'
 
-    # # Get the altitude/distance lower limit and bin
-    # if x_lims[0] == None or x_lims[0] < x_vals[0]:
-    #     x_lbin = 0
-    #     x_llim = np.round(x_vals[x_lbin], decimals = 2)
-
-    # else:
-    #     x_lbin = np.where(x_vals >= x_lims[0])[0][0]
-        
-    #     if x_lbin > 0:
-    #         x_lbin = x_lbin - 1
-        
-    #     x_llim = x_lims[0]
-
-
-    # # Get the altitude/distance upper limit and bin
-    # if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
-    #     x_ubin = x_vals.size - 1
-    #     x_ulim = np.round(x_vals[x_ubin], decimals = 2)
-
-    # else:
-    #     x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
-        
-    #     if x_ubin < x_vals.size:
-    #         x_ubin = x_ubin + 1
-
-    #     x_ulim = x_lims[-1]
-
     # Get the altitude/distance lower limit and bin
     x_lbin = np.where(x_vals >= x_lims[0])[0][0]
     
@@ -466,7 +442,6 @@ def polarization_calibration_x(heights, ranges, x_lims, use_dis):
         x_lbin = x_lbin - 1
     
     x_llim = x_lims[0]
-
 
     # Get the altitude/distance upper limit and bin
     x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
@@ -492,33 +467,6 @@ def intercomparison_x(heights, ranges, x_lims, use_dis):
         x_vals = 1E-3 * heights       
         x_label = 'Height above the lidar [km]'
 
-    # # Get the altitude/distance lower limit and bin
-    # if x_lims[0] == None or x_lims[0] < x_vals[0]:
-    #     x_lbin = 0
-    #     x_llim = np.round(x_vals[x_lbin], decimals = 2)
-
-    # else:
-    #     x_lbin = np.where(x_vals >= x_lims[0])[0][0]
-        
-    #     if x_lbin > 0:
-    #         x_lbin = x_lbin - 1
-        
-    #     x_llim = x_lims[0]
-
-
-    # # Get the altitude/distance upper limit and bin
-    # if x_lims[-1] == None or x_lims[-1] > x_vals[-1]:
-    #     x_ubin = x_vals.size - 1
-    #     x_ulim = np.round(x_vals[x_ubin], decimals = 2)
-
-    # else:
-    #     x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
-        
-    #     if x_ubin < x_vals.size:
-    #         x_ubin = x_ubin + 1
-
-    #     x_ulim = x_lims[-1]
-
     # Get the altitude/distance lower limit and bin
     x_lbin = np.where(x_vals >= x_lims[0])[0][0]
     
@@ -526,7 +474,6 @@ def intercomparison_x(heights, ranges, x_lims, use_dis):
         x_lbin = x_lbin - 1
     
     x_llim = x_lims[0]
-
 
     # Get the altitude/distance upper limit and bin
     x_ubin = np.where(x_vals <= x_lims[-1])[0][-1] 
@@ -539,6 +486,47 @@ def intercomparison_x(heights, ranges, x_lims, use_dis):
 
     return(x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label)
 
+# def intercomparison_y(sig1, sig2, y_lims, use_lin):
+    
+#     # Get the max signal bin and value       
+#     y_max = np.nanmax([np.nanmax(sig1[:int(sig1.size/2)]),
+#                        np.nanmax(sig2[:int(sig2.size/2)])])
+#     y_min = np.nanmin([np.nanmin(sig1[int(sig1.size/2):]),
+#                        np.nanmin(sig2[int(sig2.size/2):])])
+
+#     # Get the signal upper limit
+#     if use_lin == False:
+#         if y_lims[-1] == None:
+#             if not np.isfinite(y_max) or y_max <= 0:
+#                 y_ulim = 1
+#             else:
+#                 y_ulim = 2. * y_max
+#         else:
+#             if y_lims[0] <= 0:
+#                 print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+#                 y_ulim = 1
+#             else:
+#                 y_ulim =  y_lims[-1]
+        
+#     # Get the vertical lower limit
+#     if use_lin == False:
+#         if y_lims[0] == None:
+#             if not np.isfinite(y_min) or y_min <= 0:
+#                 y_llim = y_ulim * 1E-3
+#             else:
+#                 y_llim = 0.5 * y_min
+#         else:
+#             if y_lims[0] <= 0:
+#                 print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+#                 y_llim = 0.
+#             else:
+#                 y_llim =  y_lims[0]
+    
+#     # Get the y axis labels
+#     y_label = 'Attenuated Backscatter [$m^{-1} sr^{-1}$]'
+
+#     return(y_llim, y_ulim, y_label)
+
 def intercomparison_y(sig1, sig2, y_lims, use_lin):
     
     # Get the max signal bin and value       
@@ -547,16 +535,17 @@ def intercomparison_y(sig1, sig2, y_lims, use_lin):
     y_min = np.nanmin([np.nanmin(sig1[int(sig1.size/2):]),
                        np.nanmin(sig2[int(sig2.size/2):])])
 
+
     # Get the signal upper limit
     if use_lin == False:
         if y_lims[-1] == None:
-            if np.isnan(y_max) or np.isinf(y_max) or y_max <= 0:
+            if not np.isfinite(y_max) or y_max <= 0:
                 y_ulim = 1
             else:
                 y_ulim = 2. * y_max
         else:
             if y_lims[0] <= 0:
-                print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                print('-- Warning: intercomparison y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
                 y_ulim = 1
             else:
                 y_ulim =  y_lims[-1]
@@ -564,25 +553,25 @@ def intercomparison_y(sig1, sig2, y_lims, use_lin):
     # Get the vertical lower limit
     if use_lin == False:
         if y_lims[0] == None:
-            if np.isnan(y_min) or np.isinf(y_min) or y_min <= 0:
+            if not np.isfinite(y_min) or y_min <= 0:
                 y_llim = y_ulim * 1E-3
             else:
                 y_llim = 0.5 * y_min
         else:
             if y_lims[0] <= 0:
-                print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                print('-- Warning: intercomparison y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
                 y_llim = 0.
             else:
                 y_llim =  y_lims[0]
     
     # Get the y axis labels
-    y_label = 'Attenuated Backscatter [$m^{-1} sr^{-1}$]'
-
+    y_label = 'Norm. RC Signals [$m^{-1} sr^{-1}$]'
+    
     return(y_llim, y_ulim, y_label)
 
 def round_it(x, sig):
     
-    if not np.isfinite(x) or np.isnan(x):
+    if not np.isfinite(x):
         x = -999.
         sig = 3
         

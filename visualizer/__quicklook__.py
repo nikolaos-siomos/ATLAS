@@ -13,7 +13,9 @@ import netCDF4 as nc
 from .readers.parse_qck_args import call_parser, check_parser
 from .readers.check import check_channels
 from .plotting import make_axis, make_title, make_plot
-
+from PIL import Image
+from PIL import PngImagePlugin
+       
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
@@ -22,7 +24,7 @@ def main(args, __version__, meas_type):
     args = check_parser(args)
     
     print('-----------------------------------------')
-    print('Start generating Quicklooks...')
+    print(f'Start generating Quicklooks ({meas_type})...')
     print('-----------------------------------------')
 
     # Read the quicklook file
@@ -34,7 +36,21 @@ def main(args, __version__, meas_type):
 
     # Extract signal time, channels, and bins
     time = sig.time.values
-    bins = sig.bins.values
+    
+    # Extract SCC info
+    station_id = data.Station_ID.lower()
+    lidar_id = data.Lidar_ID
+    version_id = data.Version_ID
+    config_id = data.Configuration_ID
+    config_name = data.Configuration_Name
+    scc_id = data.channel_ID
+
+    # Extract date info
+    start_date = data.RawData_Start_Date
+    start_time = data.RawData_Start_Time_UT
+    stop_time = data.RawData_Stop_Time_UT
+
+    delta_t = data.Raw_Data_Stop_Time - data.Raw_Data_Start_Time
 
     # Check if the parsed channels exist
     channels = \
@@ -46,9 +62,8 @@ def main(args, __version__, meas_type):
                        exclude_channel_subtype = args['exclude_channel_subtype'])
 
     # Create the x axis (time)
-    x_lbin, x_ubin, x_vals, t_vals, x_label, t_label, x_tick, t_tick, nodes, = \
-        make_axis.quicklook_x(x_lims = args['x_lims'], 
-                              x_tick = args['x_tick'],
+    x_lbin, x_ubin, x_tick, t_vals, t_tick, = \
+        make_axis.quicklook_x(t_lims = args['t_lims'],
                               t_tick = args['t_tick'], 
                               time = time)
 
@@ -59,6 +74,7 @@ def main(args, __version__, meas_type):
 
         ch_d = dict(channel = ch)
         sig_ch = sig.copy().loc[ch_d]
+        scc_id_ch = scc_id.copy().loc[ch_d].values
             
         # Create the y axis (height/range)
         y_lbin, y_ubin, y_llim, y_ulim, y_vals, y_label = \
@@ -97,6 +113,12 @@ def main(args, __version__, meas_type):
                                     end_time = data.RawData_Stop_Time_UT, 
                                     lidar = data.Lidar_Name, 
                                     channel = ch, 
+                                    station_id = station_id,
+                                    lidar_id = lidar_id,
+                                    version_id = version_id,
+                                    config_id = config_id,
+                                    config_name = config_name,
+                                    scc_id = scc_id_ch,
                                     zan = data.Laser_Pointing_Angle,
                                     loc = data.Station_Name,
                                     smooth = args['smooth'],
@@ -106,33 +128,34 @@ def main(args, __version__, meas_type):
       
   
         # Make filename
-        fname = f'{data.Measurement_ID}_{data.Lidar_Name}_{meas_type}_qck_{ch}_ATLAS_{__version__}.png'
+        fname = f'{station_id}_{lidar_id}_{version_id}_{config_id}_{start_date}_{start_time}_qck_{meas_type}_{ch}_{scc_id_ch}_ATLAS_{__version__}.png'
 
         # Make the plot
-        fpath = make_plot.quicklook(dir_out = args['output_folder'], 
+        fpath = make_plot.quicklook(dir_out = os.path.join(args['output_folder'],'plots'), 
                                     fname = fname, title = title,
                                     dpi_val = args['dpi'],
                                     color_reduction = args['color_reduction'],
                                     use_log = args['use_log_scale'],
-                                    x_vals = x_vals, t_vals = t_vals, 
-                                    y_vals = y_vals, z_vals = z_vals, 
+                                    delta_t = delta_t,
+                                    t_vals = t_vals, y_vals = y_vals, 
+                                    z_vals = z_vals, 
                                     x_lbin = x_lbin, x_ubin = x_ubin, 
                                     y_lbin = y_lbin, y_ubin = y_ubin, 
                                     y_llim = y_llim, y_ulim = y_ulim, 
                                     z_llim = z_llim, z_ulim = z_ulim,
-                                    x_label = x_label, t_label = t_label, 
                                     y_label = y_label, 
-                                    x_tick = x_tick, t_tick = t_tick, 
-                                    y_tick = args['y_tick'], nodes = nodes)  
+                                    t_tick = t_tick, x_tick = x_tick,
+                                    y_tick = args['y_tick'])  
     
      
         # Add metadata to the quicklook plot
-        from PIL import Image
-        from PIL import PngImagePlugin
-       
         METADATA = {"processing_software" : f"ATLAS_{data.version}",
-                    "measurement_id" : f"{data.Measurement_ID}",
+                    "station_id" : f"{station_id}",
+                    "lidar_id" : f"{lidar_id}",
+                    "version_id" : f"{version_id}",
+                    "config_id" : f"{config_id}",
                     "channel" : f"{ch}",
+                    "scc_id" : f"{scc_id_ch}",
                     "smooth" : f"{args['smooth']}",
                     "smoothing_exponential" : f"{args['smooth_exponential']}",
                     "smoothing_range" : f"{args['smoothing_range']}",
@@ -142,10 +165,8 @@ def main(args, __version__, meas_type):
                     "use_log_scale" : f"{args['use_log_scale']}",
                     "use_range" : f"{args['use_range']}",
                     "z_max_zone" : f"{args['z_max_zone']}",
-                    "x_lims" : f"{args['x_lims']}",
                     "y_lims" : f"{args['y_lims']}",
                     "z_lims" : f"{args['z_lims']}",
-                    "x_tick" : f"{args['x_tick']}",
                     "y_tick" : f"{args['y_tick']}"}
                 
         im = Image.open(fpath)

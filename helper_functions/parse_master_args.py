@@ -106,12 +106,12 @@ def call_parser():
                         help='Defaults to: False. If set to True the converter and the preprocessing modules will not be called if the algorithm detects output files already produced by them for a specific measurement. This mainly saves time during execution.')            
 
     parser.add_argument('--process', metavar='process', 
-                        type=str, nargs='?', default = ['ray','tlc','pcb'],
+                        type=str, nargs='?', default = ['ray','tlc','pcb','drk'],
                         help='The user can choose specific QA test(s) to process. It is only taken into account if visualize is set to True. Use any of: ray (Rayleigh Fit), tlc (Telecover Test), pcb (Polarization Calibration), off (Nothing will be processed). Defaults to: ray, tlc, pcb')            
 
     parser.add_argument('--process_qck', metavar='process_qck', 
-                        type=str, nargs='*', default = ['ray'],
-                        help='Choose which quicklooks to process.  It is only taken into account if visualize is set to True. It must be a subset of process. Note that each visualizer module (ray, tlc, pcb) can create their own quicklooks. Use any of: ray (Rayleigh Fit), tlc (Telecover Test), pcb (Polarization Calibration), off (Nothing will be processed). Defaults to: ray')            
+                        type=str, nargs='*', default = ['ray','tlc','pcb','drk'],
+                        help='Choose which quicklooks to process.  It is only taken into account if visualize is set to True. It must be a subset of process. Note that each visualizer module (ray, tlc, pcb) can create their own quicklooks. Use any of: ray (Rayleigh Fit), tlc (Telecover Test), pcb (Polarization Calibration), off (Nothing will be processed). Defaults to: ray tlc pcb')            
 
     parser.add_argument('--slice_rayleigh', metavar='slice_rayleigh', 
                         type=str, nargs='*', default = [None, None],
@@ -128,7 +128,7 @@ def call_parser():
 
 def check_parser(args):
 
-    raw_fmts = ['licel','polly_xt','licel_matlab']
+    raw_fmts = ['licel','polly_xt','licel_matlab','polly_xt_first','licel_old2rack']
     if args['file_format'] == None:
         raise Exception("The mandatory argument file_format was not provided. Please add it with the --file_format option ")   
     elif args['file_format'] not in raw_fmts:

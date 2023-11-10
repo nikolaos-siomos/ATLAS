@@ -13,8 +13,11 @@ import netCDF4 as nc
 from .readers.parse_pcb_args import call_parser, check_parser
 from .readers.check import check_channels_no_exclude as check_channels
 from .plotting import make_axis, make_title, make_plot
-from .tools import average
+from .tools import average, curve_fit
 from .writters import make_header, export_ascii 
+import os
+from PIL import Image
+from PIL import PngImagePlugin
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
@@ -49,11 +52,24 @@ def main(args, __version__):
     
     # Extract signal time, channels, and bins
     channels = data.channel.values
-    
+
     # Extract IFF info
     dwl = data.Detected_Wavelength_Rayleigh
     ewl = data.Emitted_Wavelength_Rayleigh
     bdw = data.Channel_Bandwidth_Rayleigh
+    
+    # Extract SCC info
+    station_id = data.Station_ID.lower()
+    lidar_id = data.Lidar_ID
+    version_id = data.Version_ID
+    config_id = data.Configuration_ID
+    config_name = data.Configuration_Name
+    scc_id = data.channel_ID_Calibration
+
+    # Extract date info
+    start_date = data.RawData_Start_Date_Calibration
+    start_time = data.RawData_Start_Time_UT_Calibration
+    stop_time = data.RawData_Stop_Time_UT_Calibration
     
     mol_method = data.Molecular_atmosphere_method
     if 'Sounding_Station_Name' in data.attrs:
@@ -77,6 +93,11 @@ def main(args, __version__):
         channels_t = []
         ch_r_all = np.array([ch for ch in channels if ch[7] == 'r'])
         ch_t_all = np.array([ch for ch in channels if ch[7] == 't'])
+        if len(ch_r_all) == 0:
+            print("-- Warning: No relfected channels were detected. Please make sure that the channel_subtype in set correctly in the configuration file")
+        if len(ch_t_all) == 0:
+            print("-- Warning: No transmitted channels were detected. Please make sure that the channel_subtype in set correctly in the configuration file")
+        
         for ch_r in ch_r_all:
             for ch_t in ch_t_all:
                 if ch_r[4]  == ch_t[4] and ch_r[6]  == ch_t[6] and \
@@ -151,11 +172,11 @@ def main(args, __version__):
                 
         ch_r = channels_r[i]
         ch_t = channels_t[i]
-        K_ch = K[i]
-        G_R_ch = G_R[i]
-        G_T_ch = G_T[i]
-        H_R_ch = H_R[i]
-        H_T_ch = H_T[i]
+        K_ch = float(K[i])
+        G_R_ch = float(G_R[i])
+        G_T_ch = float(G_T[i])
+        H_R_ch = float(H_R[i])
+        H_T_ch = float(H_T[i])
         G_R_def_ch = G_R_def[i]
         G_T_def_ch = G_T_def[i]
         H_R_def_ch = H_R_def[i]
@@ -166,6 +187,9 @@ def main(args, __version__):
 
         ch_r_d = dict(channel = ch_r)
         ch_t_d = dict(channel = ch_t)
+
+        scc_id_ch_r = scc_id.copy().loc[ch_r_d].values
+        scc_id_ch_t = scc_id.copy().loc[ch_t_d].values
         
         dwl_ch = dwl.copy().loc[ch_r_d].values
         ewl_ch = ewl.copy().loc[ch_r_d].values
@@ -253,67 +277,161 @@ def main(args, __version__):
             y_r_rax_sm = sig_r_ray_ch
             y_t_rax_sm = sig_t_ray_ch
         
-        avg_r_m45, _, sem_r_m45 = \
-            average.region(sig = sig_r_m45_ch, 
-                           x_vals = x_vals_cal, 
-                           region = args['calibration_region'], 
-                           axis = 0,
-                           squeeze = True)
-        
-        avg_t_m45, _, sem_t_m45 = \
-            average.region(sig = sig_t_m45_ch, 
-                           x_vals = x_vals_cal, 
-                           region = args['calibration_region'], 
-                           axis = 0,
-                           squeeze = True)
-        
-        avg_r_p45, _, sem_r_p45 = \
-            average.region(sig = sig_r_p45_ch, 
-                           x_vals = x_vals_cal, 
-                           region = args['calibration_region'], 
-                           axis = 0,
-                           squeeze = True)
-        
-        avg_t_p45, _, sem_t_p45 = \
-            average.region(sig = sig_t_p45_ch, 
-                           x_vals = x_vals_cal, 
-                           region = args['calibration_region'], 
-                           axis = 0,
-                           squeeze = True)
-        
-        avg_r_ray, _, sem_r_ray = \
-            average.region(sig = sig_r_ray_ch, 
-                           x_vals = x_vals_ray, 
-                           region = args['rayleigh_region'], 
-                           axis = 0,
-                           squeeze = True)
-        
-        avg_t_ray, _, sem_t_ray = \
-            average.region(sig = sig_t_ray_ch, 
-                           x_vals = x_vals_ray, 
-                           region = args['rayleigh_region'], 
-                           axis = 0,
-                           squeeze = True)
-
-        delta_m, _, _ = \
-            average.region(sig = delta_m_prf, 
-                           x_vals = x_vals_ray, 
-                           region = args['rayleigh_region'], 
-                           axis = 0,
-                           squeeze = True) 
-                
         eta_m45_prf = (y_r_m45_sm / y_t_m45_sm) 
     
         eta_p45_prf = (y_r_p45_sm / y_t_p45_sm)
         
         eta_prf = np.sqrt(eta_m45_prf * eta_p45_prf)
         
+        delta_r_prf = (y_r_rax_sm / y_t_rax_sm)
+        
+        llim = 0.5
+        ulim = 11.
+        min_win = 1.
+        max_win = 4.
+        
+        if args['calibration_region'][0] < llim:
+            llim = args['calibration_region'][0]
+        if args['calibration_region'][0] > ulim:
+            ulim = args['calibration_region'][1]
+        if args['calibration_region'][1] - args['calibration_region'][0] < min_win:
+            min_win = args['calibration_region'][1] - args['calibration_region'][0]
+        if args['calibration_region'][1] - args['calibration_region'][0] > max_win:
+            max_win = args['calibration_region'][1] - args['calibration_region'][0]
+        
+        # Check for a fit range for the Δ90 calibration
+        rsem, nder, mfit, msem, mder, msec, mshp, mcrc, coef = \
+            curve_fit.stats(y1 = eta_prf.copy(),
+                            y2 = np.ones(eta_prf.shape), 
+                            x  = x_vals_cal,
+                            min_win = min_win,
+                            max_win = max_win,
+                            step = 0.1,
+                            llim = llim,
+                            ulim = ulim,
+                            rsem_lim = 0.05,
+                            cross_check_type = 'both',
+                            cross_check_all_points = False,
+                            cross_check_crit = 'both',
+                            der_lim = 0.001,
+                            cancel_shp = True)
+        # from matplotlib import pyplot as plt
+        # msem.plot()
+        # plt.title('SEM')
+        # plt.show()
+        # mder.plot()
+        # plt.title('DER')
+        # plt.show()
+        # msec.plot()
+        # plt.title('SEC')
+        # plt.show()
+        # mshp.plot()
+        # plt.title('SHP')
+        # plt.show()
+        # mcrc.plot()
+        # plt.title('CRC')
+        # plt.show()
+        # mfit.plot()
+        # plt.title('FIT')
+        # plt.show() 
+
+        norm_region_cal, idx_cal, fit_cal = \
+            curve_fit.scan(mfit = mfit,
+                           dflt_region = args['calibration_region'],
+                           auto_fit = args['auto_fit'],
+                           prefered_range = "near")
+
+        llim = 1.
+        ulim = 11.
+        min_win = 0.5
+        max_win = 4.
+        
+        if args['rayleigh_region'][0] < llim:
+            llim = args['rayleigh_region'][0]
+        if args['rayleigh_region'][0] > ulim:
+            ulim = args['rayleigh_region'][1]
+        if args['rayleigh_region'][1] - args['rayleigh_region'][0] < min_win:
+            min_win = args['rayleigh_region'][1] - args['rayleigh_region'][0]
+        if args['rayleigh_region'][1] - args['rayleigh_region'][0] > max_win:
+            max_win = args['rayleigh_region'][1] - args['rayleigh_region'][0]
+        
+        # Check for a fit range for the Rayleigh calibration
+        rsem, nder, mfit, msem, mder, msec, mshp, mcrc, coef = \
+            curve_fit.stats(y1 = delta_r_prf.copy(),
+                            y2 = delta_m_prf.copy(), 
+                            x  = x_vals_cal,
+                            min_win = min_win,
+                            max_win = max_win,
+                            step = 0.1,
+                            llim = llim,
+                            ulim = ulim,
+                            rsem_lim = 0.05,
+                            cross_check_type = 'both',
+                            cross_check_all_points = False,
+                            der_lim = 0.001,
+                            cancel_shp = True)    
+
+        norm_region_ray, idx_ray, fit_ray = \
+            curve_fit.scan(mfit = mfit,
+                           dflt_region = args['rayleigh_region'],
+                           auto_fit = args['auto_fit'],
+                           prefered_range = "far")
+                        
+        avg_r_m45, _, sem_r_m45 = \
+            average.region(sig = sig_r_m45_ch, 
+                           x_vals = x_vals_cal, 
+                           region = norm_region_cal, 
+                           axis = 0,
+                           squeeze = True)
+        
+        avg_t_m45, _, sem_t_m45 = \
+            average.region(sig = sig_t_m45_ch, 
+                           x_vals = x_vals_cal, 
+                           region = norm_region_cal, 
+                           axis = 0,
+                           squeeze = True)
+        
+        avg_r_p45, _, sem_r_p45 = \
+            average.region(sig = sig_r_p45_ch, 
+                           x_vals = x_vals_cal, 
+                           region = norm_region_cal, 
+                           axis = 0,
+                           squeeze = True)
+        
+        avg_t_p45, _, sem_t_p45 = \
+            average.region(sig = sig_t_p45_ch, 
+                           x_vals = x_vals_cal, 
+                           region = norm_region_cal, 
+                           axis = 0,
+                           squeeze = True)
+                
+        avg_r_ray, _, sem_r_ray = \
+            average.region(sig = sig_r_ray_ch, 
+                           x_vals = x_vals_ray, 
+                           region = norm_region_ray, 
+                           axis = 0,
+                           squeeze = True)
+            
+        avg_t_ray, _, sem_t_ray = \
+            average.region(sig = sig_t_ray_ch, 
+                           x_vals = x_vals_ray, 
+                           region = norm_region_ray, 
+                           axis = 0,
+                           squeeze = True)
+
+        delta_m, _, _ = \
+            average.region(sig = delta_m_prf, 
+                           x_vals = x_vals_ray, 
+                           region = norm_region_ray, 
+                           axis = 0,
+                           squeeze = True) 
+            
         avg_r_m45_i = np.random.normal(loc = avg_r_m45, scale = sem_r_m45, size = 200)
         avg_t_m45_i = np.random.normal(loc = avg_t_m45, scale = sem_t_m45, size = 200)
         avg_r_p45_i = np.random.normal(loc = avg_r_p45, scale = sem_r_p45, size = 200)
         avg_t_p45_i = np.random.normal(loc = avg_t_p45, scale = sem_t_p45, size = 200)
         avg_r_ray_i = np.random.normal(loc = avg_r_ray, scale = sem_r_ray, size = 200)
-        avg_t_ray_i = np.random.normal(loc = avg_t_p45, scale = sem_t_p45, size = 200)
+        avg_t_ray_i = np.random.normal(loc = avg_t_ray, scale = sem_t_ray, size = 200)
 
         eta_f_s_m45 = (avg_r_m45_i / avg_t_m45_i)
         
@@ -332,9 +450,8 @@ def main(args, __version__):
         delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta[0]
 
         delta_s = (avg_r_ray_i / avg_t_ray_i) / eta
+            
         delta_s[0] = (avg_r_ray / avg_t_ray) / eta[0]
-
-        delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta[0]
 
         delta_c_def_prf = (delta_s_prf * (G_T_def_ch + H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
             ((G_R_def_ch - H_R_def_ch) - delta_s_prf * (G_T_def_ch - H_T_def_ch))
@@ -354,8 +471,59 @@ def main(args, __version__):
         
         epsilon = np.rad2deg(0.5 * np.arcsin(np.tan(0.5 * np.arcsin(psi) / kappa)))
         # kappa = np.tan(0.5 * np.arcsin(psi)) / np.sin(2. * np.deg2rad(epsilon)) 
-    
+        
+        delta_l = (delta_c - delta_m) / (1. - delta_c * delta_m)
+        
+        # delta_l_err = delta_c_err * (1. - delta_m) * (1. + delta_c) / \
+        #     (1. - delta_m * delta_c)**2
+                      
+        base_delta_v = np.ceil(1E3 * delta_m) / 1E3
+        delta_v = np.hstack((np.arange(base_delta_v, 0.021, 0.001),
+                             np.arange(0.02, 0.31, 0.01)))
+        
+        err_v = delta_l[0]
+        err_p = 0.05
+        
+
+        alpha = (1. + delta_m)**2 * (err_v - err_p)
+        beta = (1. + delta_m) * (2. * err_p * (1. + delta_v + err_v / 2.) - err_v * (1. + delta_m))
+        gamma = - err_p * (1. + delta_v) * (1. + delta_v + err_v)
+        
+        # scat_lim_1 = (-beta + np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
+        sr_lim = (-beta - np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
+
+        # R = np.arange(1.005, 10.005, 0.005)
+
+        # def d_p(delta_m, delta_v, R):
             
+        #     delta_p = np.nan * np.zeros((delta_v.size, R.size))
+            
+        #     for i in range(delta_v.size):
+        #         crit_1 = (1. + delta_v[i]) * delta_m / ((1. + delta_m) * delta_v[i])
+        #         crit_2 = (1. + delta_v[i]) / (1. + delta_m)
+                
+        #         for j in range(R.size):
+        #             if (R[j] >= crit_1 and R[j] >= crit_2) or (R[j] <= -crit_1 and R[j] <= -crit_2):
+        #                 delta_p[i,j] = \
+        #                     ((1. + delta_m) * delta_v[i] * R[j] - (1. + delta_v[i]) * delta_m) /\
+        #                     ((1. + delta_m) * R[j] - (1. + delta_v[i]))
+        #     return(delta_p)
+        
+        # delta_p_cor = d_p(delta_m = delta_m, delta_v = delta_v, R = R)
+        # delta_p_off = d_p(delta_m = delta_m, delta_v = delta_v + err_v, R = R)
+        
+        # from matplotlib import pyplot as plt
+        # [X, Y] = np.meshgrid(delta_v, R)
+        # Z = (delta_p_off - delta_p_cor)
+        # plt.pcolormesh(X,Y,Z.T[:-1,:-1], vmin =0, vmax=0.05)
+        # plt.colorbar(label= 'PLDR error')
+        # plt.title(f'VLDR Offset: {np.round(err_v, decimals = 4)} ')
+        # # plt.plot(delta_v, scat_lim_1)
+        # plt.plot(delta_v, sr_lim, c = 'tab:orange')
+        # plt.xlabel('VLDR')
+        # plt.ylabel('Scattering Ratio')
+        # plt.show()
+        
         # Create the y axis (calibration)
         y_llim_cal, y_ulim_cal, y_label_cal = \
             make_axis.polarization_calibration_cal_y(
@@ -377,9 +545,17 @@ def main(args, __version__):
                 start_time_ray = data.RawData_Start_Time_UT_Rayleigh, 
                 end_time_ray = data.RawData_Stop_Time_UT_Rayleigh,
                 lidar = data.Lidar_Name, 
+                lidar_id = lidar_id,
+                station_id = station_id,
+                version_id = version_id,
+                config_id = config_id,
+                config_name = config_name,
+                scc_id_r = scc_id_ch_r,
+                scc_id_t = scc_id_ch_t,
                 channel_r = ch_r, 
                 channel_t = ch_t, 
-                zan = data.Laser_Pointing_Angle_Calibration,
+                zan_cal = data.Laser_Pointing_Angle_Calibration,
+                zan_ray = data.Laser_Pointing_Angle_Rayleigh,
                 loc = data.Station_Name,
                 dwl = dwl_ch,
                 ewl = ewl_ch,
@@ -395,17 +571,19 @@ def main(args, __version__):
                 wmo_id = wmo_id,
                 wban_id = wban_id)
         
-       
         # Make filename
-        fname = f'{data.Measurement_ID_Calibration}_{data.Lidar_Name}_pcb_{ch_r}_to_{ch_t}_ATLAS_{__version__}.png'
+        fname = f'{station_id}_{lidar_id}_{version_id}_{config_id}_{start_date}_{start_time}_pcb_{ch_r}_{scc_id_ch_r}_to_{ch_t}_{scc_id_ch_t}_ATLAS_{__version__}.png'
 
         fpath = \
-            make_plot.polarization_calibration(dir_out = args['output_folder'], 
+            make_plot.polarization_calibration(dir_out = os.path.join(args['output_folder'],'plots'), 
                                                fname = fname, title = title,
                                                dpi_val = args['dpi'],
+                                               auto_fit = args['auto_fit'],
                                                color_reduction = args['color_reduction'],
-                                               cal_region = args['calibration_region'],
-                                               vdr_region = args['rayleigh_region'],
+                                               cal_region = norm_region_cal,
+                                               vdr_region = norm_region_ray,
+                                               fit_cal = fit_cal,
+                                               fit_ray = fit_ray,
                                                x_vals_cal = x_vals_cal, 
                                                x_vals_vdr = x_vals_ray, 
                                                y1_vals = eta_prf, 
@@ -420,12 +598,16 @@ def main(args, __version__):
                                                delta_m = delta_m,
                                                delta_c_def = delta_c_def[0],
                                                delta_c = delta_c[0],
+                                               delta_l = delta_l[0],
                                                epsilon = epsilon[0],
+                                               sr_lim = sr_lim[-1],
+                                               err_p = err_p,
                                                eta_err = np.std(eta[1:]), 
                                                eta_f_s_err = np.std(eta_f_s[1:]), 
                                                eta_s_err = np.std(eta_s[1:]), 
                                                delta_c_def_err = np.std(delta_c_def[1:]),
                                                delta_c_err = np.std(delta_c[1:]),
+                                               delta_l_err = np.std(delta_l[1:]),
                                                epsilon_err = np.std(epsilon[1:]),
                                                x_lbin_cal = x_lbin_cal,
                                                x_ubin_cal = x_ubin_cal, 
@@ -478,7 +660,7 @@ def main(args, __version__):
                                                  channel_t = ch_t)
         
         # Make the ascii filename
-        ascii_name = f'{data.Measurement_ID_Calibration}_{data.Lidar_Name}_pcb_{ch_r}_to_{ch_t}_ATLAS_{__version__}.txt'
+        ascii_name = f'{station_id}_{lidar_id}_{version_id}_{config_id}_{start_date}_{start_time}_pcb_{ch_r}_{scc_id_ch_r}_to_{ch_t}_{scc_id_ch_t}_ATLAS_{__version__}.txt'
 
         # Export to ascii (Volker's format)        
         export_ascii.polarisation_calibration(dir_out = args['output_folder'], 
@@ -494,14 +676,16 @@ def main(args, __version__):
                                               header = header)
         
         # Add metadata to the quicklook plot
-        from PIL import Image
-        from PIL import PngImagePlugin
        
         METADATA = {"processing_software" : f"ATLAS_{data.version}",
-                    "measurement_id_calibration" : f"{data.Measurement_ID_Calibration}",
-                    "measurement_id_rayleigh" : f"{data.Measurement_ID_Rayleigh}",
+                    "station_id" : f"{station_id}",
+                    "lidar_id" : f"{lidar_id}",
+                    "version_id" : f"{version_id}",
+                    "config_id" : f"{config_id}",
                     "channel_r" : f"{ch_r}",
                     "channel_t" : f"{ch_t}",
+                    "scc_id_r" : f"{scc_id_ch_r}",
+                    "scc_id_t" : f"{scc_id_ch_t}",
                     "smooth" : f"{args['smooth']}",
                     "smoothing_exponential" : f"{args['smooth_exponential']}",
                     "smoothing_range" : f"{args['smoothing_range']}",

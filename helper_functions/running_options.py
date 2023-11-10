@@ -10,15 +10,18 @@ def auto_set_process(process):
     
     processing = {'ray' : True,
                   'tlc' : True,
-                  'pcb' : True}
+                  'pcb' : True,
+                  'drk' : True}
 
     if 'ray' not in process: processing['ray'] = False
     if 'tlc' not in process: processing['tlc'] = False
     if 'pcb' not in process: processing['pcb'] = False
+    if 'drk' not in process: processing['drk'] = False
     if 'off' in process: 
         processing['ray'] = False
         processing['tlc'] = False
         processing['pcb'] = False
+        processing['drk'] = False
 
         
     return(processing)
@@ -40,15 +43,18 @@ def auto_set_quicklook(process_qck):
 
     quicklook = {'ray' : True,
                  'tlc' : True,
-                 'pcb' : True}
+                 'pcb' : True,
+                 'drk' : True}
     
     
     if 'ray' not in process_qck: quicklook['ray'] = False
     if 'tlc' not in process_qck: quicklook['tlc'] = False
     if 'pcb' not in process_qck: quicklook['pcb'] = False
+    if 'drk' not in process_qck: quicklook['drk'] = False
     if 'off' in process_qck: 
         quicklook['ray'] = False
         quicklook['tlc'] = False
         quicklook['pcb'] = False
+        quicklook['drk'] = False
         
     return(quicklook)

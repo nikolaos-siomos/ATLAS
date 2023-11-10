@@ -30,7 +30,7 @@ def call_parser():
 
     parser.add_argument('--dpi', metavar = 'dpi',
                         type = int, nargs = '?', default = 300, 
-                        help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 300 ')
+                        help = 'The dots per inch (dpi) resolution of the exported figures. Defaults to 100 ')
 
     parser.add_argument('--color_reduction', metavar = 'color_reduction',
                         type = bool, default = True, 
@@ -40,29 +40,12 @@ def call_parser():
     parser.add_argument('--use_lin_scale', metavar = 'use_lin_scale',
                         type = bool, default = False, 
                         action = argparse.BooleanOptionalAction,
-                        help = 'If called, a linear scale will be used for the y axis (signal) ')
+                        help = 'If called, a linear scale will be used for the x axis (signal) ')
 
     parser.add_argument('--use_range', metavar = 'use_range',
                         type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
                         help = 'If called, the y axis of the quicklook will correspond to the distance between the laser pulse and the telescope (vertical range) ')
-
-    parser.add_argument('--use_molecular', metavar = 'use_molecular',
-                        type = bool, default = False, 
-                        action = argparse.BooleanOptionalAction,
-                        help = 'If called, the molecular attenuated backcatter will be plotted along the intercompared signals')
-
-    parser.add_argument('--y_lims', metavar = 'y_lims',
-                        type = float, nargs = 2, default = [None, None], 
-                        help = 'The y axis limits (lower and upper) of the normalized RC signal. Defaults to 0 (lower) 1.2 (upper) when use_lin_scale is True. If use_lin_scale is true then the lower limit becomes 1E-5 ')
-
-    parser.add_argument('--x_lims', metavar = 'x_lims',
-                        type = float, nargs = 2, default = [0., 14.], 
-                        help = 'The x axis limits in km (lower and upper). If use_range is called, the limits correspond to distance. Defaults to 0 km (lower) and 14 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
-
-    parser.add_argument('--x_tick', metavar = 'x_tick',
-                        type = int, nargs = '?', default = 1, 
-                        help = 'The x axis finest tick in km. Defaults to 1km ')
 
     parser.add_argument('--channels_1', metavar = 'channels_1',
                         type = str, nargs = '+', default = None, 
@@ -71,32 +54,45 @@ def call_parser():
     parser.add_argument('--channels_2', metavar = 'channels_2',
                         type = str, nargs = '+', default = None, 
                         help = 'Type one or more channel names from the ones included in the second file (e.g. xpar0355) here in order to define a channel to be compared. Each channel here corresponds to one channel provided in channel_1 ')
+    
+    parser.add_argument('--y_lims', metavar = 'y_lims',
+                        type = float, nargs = 2, default = [None, None], 
+                        help = 'The y axis limits (lower and upper) of the normalized RC signal. Defaults to 0 (lower) 1.2 (upper) when use_lin_scale is True. If use_lin_scale is true then the lower limit becomes 1E-5 ')
 
-    parser.add_argument('--normalization_height', metavar = 'normalization_height',
-                        type = float, nargs = '?', default = 9., 
-                        help = 'The reference height/distance where the signals will be normalized for the Rayleigh fit. If use_range is called, the limits correspond to distance. Defaults to 9 km ')
+    parser.add_argument('--x_lims', metavar = 'x_lims',
+                        type = float, nargs = 2, default = [0., 20.], 
+                        help = 'The x axis limits in km (lower and upper). If use_range is called, the limits correspond to distance. Defaults to 0 km (lower) and 20 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
 
-    parser.add_argument('--half_normalization_window', metavar = 'half_normalization_window',
-                        type = float, nargs = '?', default = 500., 
-                        help = 'The half window in meters used for the normalization. Defaults to 100 m ')
+    parser.add_argument('--x_tick', metavar = 'x_tick',
+                        type = int, nargs = '?', default = 2, 
+                        help = 'The x axis finest tick in km. Defaults to 2km ')
+
+    parser.add_argument('--normalization_region', metavar = 'normalization_region',
+                        type = float, nargs = 2, default = [8.5, 9.5],
+                        help = 'The lower and upper limits of the region used for normalizing the signal in the Rayleigh fit. If use_range is called, the limits correspond to distance. If auto_ray is set to True and the automatic identification is successful for a specific channel, the normalization_region values will e ignored. Defaults to: 8.5, 9.5')
+
+    parser.add_argument('--auto_fit', metavar = 'auto_fit',
+                        type = bool, default = True, 
+                        action = argparse.BooleanOptionalAction,
+                        help = 'If set to True an automatic identification of the molecular regions will be attempted. If the automatic procedure is successful, the normalization_region variable will be ignored. If the procedure is not successful or auto_ray is set to False, the manually-provided/default normalization will be used. Defaults to True')
 
     parser.add_argument('--smooth', metavar = 'smooth',
                         type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,
-                        help = 'If called, a sliding average smoothing will be applied on the signals for better visualization ')
+                        help = 'Refer to the smooth option in the quicklook section. Defaults to: True')
+
+    parser.add_argument('--smoothing_range', metavar = 'smoothing_range',
+                        type = float, nargs = 2, default = [0., 20.], 
+                        help = 'Refer to the smooth option in the quicklook section Defaults to: 0.05, 14.')
+
+    parser.add_argument('--smoothing_window', metavar = 'smoothing_window',
+                        type = float, nargs = "?", default = 500., 
+                        help = 'The full smoothing window in the first and last bin of the smoothing region, in m. The widow progressively changes between from the first to the last value. Use the only one value twice to apply a constant window. Defaults to: smoothing_window = 100.')
 
     parser.add_argument('--smooth_exponential', metavar = 'smooth',
                         type = bool, default = False, 
                         action = argparse.BooleanOptionalAction,
-                        help = 'If called, an exponentially increasing wind (base 2) will be applied. Defaut to a linearly increasing window ')
-
-    parser.add_argument('--smoothing_range', metavar = 'smoothing_range',
-                        type = float, nargs = 2, default = [1., 14.], 
-                        help = 'First and last altitude/distance boundaries (depending on the selection of use_range) where smoothing will be applied, in km. Defines the signal region to be smoothed. If they exceed the current signal boundaries the existing boundaries will be used instead ')
-
-    parser.add_argument('--half_window', metavar = 'half_window',
-                        type = float, nargs = 2, default = [100., 100.], 
-                        help = 'Half smoothing window in the first and last bin of the smoothing region, in m. The widow progressively changes between from the first to the last value. Use the same value twice to apply a constant window ')
+                        help = 'Refer to the smooth option in the quicklook section. Defaults to: False.')
 
     args = vars(parser.parse_args())
     

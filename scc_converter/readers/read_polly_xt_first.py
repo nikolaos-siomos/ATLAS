@@ -10,7 +10,7 @@ import os
 import xarray as xr
 
 
-def dtfs(dir_meas, meas_type):
+def dtfs(dir_meas):
     
     # Setting sig, info, and time as empty lists in the beggining    
     sig_raw = []     
@@ -49,98 +49,62 @@ def dtfs(dir_meas, meas_type):
             for k in range(len(mfiles)):
             
                 raw_data = xr.open_dataset(mfiles[k])
-
-                # Mask measurements (normal, +45, -45) according to cal_angle (True:norm or +45 or -45 / False:other)     
-                mask_zer, mask_p45, mask_m45 = \
-                    get_cal_info(pol_cal_angle = raw_data.depol_cal_angle.values, 
-                                 meas_type = meas_type)    
                 
                 filename = np.empty(raw_data.time.size, dtype = object)
                 folder = np.empty(raw_data.time.size, dtype = object)
-                position = np.empty(raw_data.time.size, dtype = object)
                 
                 filename[:] = os.path.basename(mfiles[k])
+            
+                raw_signal = raw_data.raw_signal.values.astype(float)
+                raw_shots = raw_data.measurement_shots.values
                 
-                if meas_type == 'pcb':
-                    mask = (mask_p45) | (mask_m45)
-                    folder[mask_p45] = '+45'
-                    folder[mask_m45] = '-45'
-                    position[mask_p45] = 2
-                    position[mask_m45] = 1                
-                elif meas_type == 'nrm':
-                    mask = mask_zer                    
-                    position[mask_zer] = 0
-                    folder[mask_zer] = 'nrm'
-                else:
-                    mask = mask_zer                    
-                    position[mask_zer] = 0   
-                    
-                if meas_type == 'tlc':
-                    folder[:] = (mfiles[k]).split(os.sep)[-2] 
+                # Convert the time to npdatetime format and mask them
+                start_time = raw_data.measurement_time
+
+                start_time_arr = convert_time_to_npdatetime(start_time) 
                 
-                if mask.any():
-                    raw_signal = raw_data.raw_signal[mask,:,:].values.astype(float)
-                    raw_shots = raw_data.measurement_shots.values[mask,:]
+                end_time_arr = start_time_arr + (start_time_arr[1] - start_time_arr[0])
+            
+                if (mfiles[k]).split(os.sep)[-2] in ['north', 'east', 'south', 'west', 'inner', 'outer', '+45', '-45', 'static']:
+                    folder[k] = (mfiles[k]).split(os.sep)[-2]
+            
+                # Define signal xarray
+                sig_f = xr.DataArray(raw_signal, 
+                                   coords=[end_time_arr, bins_arr, channels],
+                                   dims=['time', 'bins', 'channel'])
+                                
+                shots_f = xr.DataArray(raw_shots, 
+                                       coords=[end_time_arr, channels],
+                                       dims=['time', 'channel']) 
+
+                # Define temporal data pandas Dataframe
+                tdata = np.array([folder, filename, 
+                                  start_time_arr, end_time_arr], dtype = object)
+                   
+                properties = ['folder', 'filename', 'start_time', 'end_time']
+
+                time_info_f = pd.DataFrame(tdata.T,  
+                                           index = end_time_arr,
+                                           columns = properties)  
                     
-                    position = position[mask]
-                    filename = filename[mask]
-                    folder = folder[mask]
-                    
-                    # Convert the time to npdatetime format and mask them
-                    start_time = raw_data.measurement_time
-    
-                    start_time_arr = convert_time_to_npdatetime(start_time) 
-                    
-                    start_time_arr = start_time_arr[mask]
-    
-                    end_time_arr = start_time_arr + (start_time_arr[1] - start_time_arr[0])
-                
-                    # Define signal xarray
-                    sig_f = xr.DataArray(raw_signal, 
-                                       coords=[end_time_arr, bins_arr, channels],
-                                       dims=['time', 'bins', 'channel'])
-                                    
-                    shots_f = xr.DataArray(raw_shots, 
-                                           coords=[end_time_arr, channels],
-                                           dims=['time', 'channel']) 
-    
-                    # Define temporal data pandas Dataframe
-                    if meas_type == 'pcb':
-                        properties = ['folder', 'filename', 
-                                      'start_time', 'end_time', 'position']
-                        tdata = np.array([folder, filename, 
-                                          start_time_arr, end_time_arr, position], 
-                                         dtype = object)
-                        
-                    else:
-                        properties = ['folder', 'filename', 'start_time', 'end_time']
-                        tdata = np.array([folder, filename, 
-                                          start_time_arr, end_time_arr], 
-                                         dtype = object)
-                        
-                    time_info_f = pd.DataFrame(tdata.T,  
-                                               index = end_time_arr,
-                                               columns = properties)  
-                        
-                    # Append the arrays to list in order to concatenate later
-                    list_sig.append(sig_f)
-                    list_shots.append(shots_f)                
-                    list_time.append(time_info_f)
+                # Append the arrays to list in order to concatenate later
+                list_sig.append(sig_f)
+                list_shots.append(shots_f)                
+                list_time.append(time_info_f)
         
-            if len(list_sig) > 0:
-                # Append in the time dimension all the time frames
-                sig_raw = xr.concat(list_sig, dim='time')
-                shots = xr.concat(list_shots, dim='time')
-                time_info = pd.concat(list_time)
-                
-                # Transpose the dims in [time, channel, bins]            
-                sig_raw = sig_raw.transpose('time','channel','bins')
-                shots = shots.transpose('time','channel')
-                
-                # Sort by time
-                sig_raw = sig_raw.sortby('time').copy()
-                shots = shots.sortby('time').copy()
-                time_info = time_info.sort_index() 
+            # Append in the time dimension all the time frames
+            sig_raw = xr.concat(list_sig, dim='time')
+            shots = xr.concat(list_shots, dim='time')
+            time_info = pd.concat(list_time)
+            
+            # Transpose the dims in [time, channel, bins]            
+            sig_raw = sig_raw.transpose('time','channel','bins')
+            shots = shots.transpose('time','channel')
+            
+            # Sort by time
+            sig_raw = sig_raw.sortby('time').copy()
+            shots = shots.sortby('time').copy()
+            time_info = time_info.sort_index() 
 
         else:
             print('---- Warning! Folder empty \n'+\

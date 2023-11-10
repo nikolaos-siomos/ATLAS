@@ -89,7 +89,7 @@ def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
 
     ds.Station_Name = system_info.station_name;
 
-    ds.Station_ID = system_info.station_id;
+    ds.Station_ID = system_info.station_id.lower();
 
     if 'lidar_id' in system_info.index:
         ds.Lidar_ID = system_info.lidar_id;
@@ -294,7 +294,22 @@ def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path,
 
     ds.Station_Name = system_info.station_name;
 
-    ds.Station_ID = system_info.station_id;
+    ds.Station_ID = system_info.station_id.lower();
+
+    if 'lidar_id' in system_info.index:
+        ds.Lidar_ID = system_info.lidar_id;
+
+    if 'version_name' in system_info.index:
+        ds.Version_Name = system_info.version_name;
+
+    if 'version_id' in system_info.index:
+        ds.Version_ID = system_info.version_id;  
+    
+    if 'configuration_name' in system_info.index:
+        ds.Configuration_Name = system_info.configuration_name;
+
+    if 'configuration_id' in system_info.index:
+        ds.Configuration_ID = system_info.configuration_id;
   
     ds.Measurement_ID = meas_ID;
 
@@ -467,7 +482,22 @@ def polarization_calibration_file(
 
     ds.Station_Name = system_info.station_name;
 
-    ds.Station_ID = system_info.station_id;
+    ds.Station_ID = system_info.station_id.lower();
+
+    if 'lidar_id' in system_info.index:
+        ds.Lidar_ID = system_info.lidar_id;
+
+    if 'version_name' in system_info.index:
+        ds.Version_Name = system_info.version_name;
+
+    if 'version_id' in system_info.index:
+        ds.Version_ID = system_info.version_id;  
+    
+    if 'configuration_name' in system_info.index:
+        ds.Configuration_Name = system_info.configuration_name;
+
+    if 'configuration_id' in system_info.index:
+        ds.Configuration_ID = system_info.configuration_id;
   
     ds.Measurement_ID = meas_ID;
     
@@ -584,8 +614,8 @@ def polarization_calibration_file(
     
     return()
 
-def dark_file(system_info, channel_info, time_info_d, nc_path, 
-              meas_ID, sig_d, shots_d):
+def dark_file(system_info, channel_info, time_info, nc_path, 
+              meas_ID, sig, shots):
     
     print('-----------------------------------------')
     print('Start exporting to a Standalone Dark QA file...')
@@ -595,10 +625,10 @@ def dark_file(system_info, channel_info, time_info_d, nc_path,
     https://docs.scc.imaa.cnr.it/en/latest/file_formats/netcdf_file.html
     and exports it to nc_path"""
             
-    n_time_bck = sig_d.time.size
-    n_channels = sig_d.channel.size
-    n_points = sig_d.bins.size
-
+    n_time = sig.time.size
+    n_channels = sig.channel.size
+    n_points = sig.bins.size
+    
     n_nb_of_time_scales = 1
     n_scan_angles = 1
     
@@ -609,15 +639,17 @@ def dark_file(system_info, channel_info, time_info_d, nc_path,
                     np.round(channel_info.detected_wavelength.values.astype(float),
                              decimals = 0).astype('str')
                     
-    n_time_bck = sig_d.time.size
-    start_time_d = [np.datetime64(t,'us').item() for t in time_info_d['start_time']] 
-    end_time_d = [np.datetime64(t,'us').item() for t in time_info_d['end_time']]
-    start_t_d = [(dt - start_time_d[0]).seconds for dt in start_time_d]
-    end_t_d = [(dt - start_time_d[0]).seconds for dt in end_time_d]
-    Bck_Start_Time = np.nan * np.zeros([n_time_bck,n_nb_of_time_scales])
-    Bck_Stop_Time = np.nan * np.zeros([n_time_bck,n_nb_of_time_scales])
-    Bck_Start_Time[:,0] = start_t_d
-    Bck_Stop_Time[:,0] = end_t_d
+    start_time = [np.datetime64(t,'us').item() for t in time_info['start_time']]
+    end_time = [np.datetime64(t,'us').item() for t in time_info['end_time']]
+    
+    start_t = [(dt - start_time[0]).seconds for dt in start_time]
+    end_t = [(dt - start_time[0]).seconds for dt in end_time]
+        
+    Raw_Start_Time = np.nan * np.zeros([n_time,n_nb_of_time_scales])
+    Raw_Stop_Time = np.nan * np.zeros([n_time,n_nb_of_time_scales])
+    
+    Raw_Start_Time[:,0] = start_t
+    Raw_Stop_Time[:,0] = end_t
     
     mask_delay = channel_info.daq_trigger_offset.values >= 0.
     Trigger_Delay = channel_info.daq_trigger_offset.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
@@ -628,13 +660,13 @@ def dark_file(system_info, channel_info, time_info_d, nc_path,
     ds = nc.Dataset(nc_path,mode='w')
 
 # Adding Dimensions
+    ds.createDimension('time', n_time)
     ds.createDimension('channels', n_channels)
     ds.createDimension('points', n_points)
     ds.createDimension('nb_of_time_scales', n_nb_of_time_scales)
     ds.createDimension('scan_angles', n_scan_angles)
     ds.createDimension('nchar_channel',4)
-    ds.createDimension('nchar_filename',15)
-    ds.createDimension('time_bck', n_time_bck)    
+    ds.createDimension('nchar_filename',15)  
 
 # Adding Global Parameters
     ds.Altitude_meter_asl = system_info.altitude;
@@ -647,17 +679,32 @@ def dark_file(system_info, channel_info, time_info_d, nc_path,
 
     ds.Station_Name = system_info.station_name;
 
-    ds.Station_ID = system_info.station_id;
+    ds.Station_ID = system_info.station_id.lower();
+
+    if 'lidar_id' in system_info.index:
+        ds.Lidar_ID = system_info.lidar_id;
+
+    if 'version_name' in system_info.index:
+        ds.Version_Name = system_info.version_name;
+
+    if 'version_id' in system_info.index:
+        ds.Version_ID = system_info.version_id;  
+    
+    if 'configuration_name' in system_info.index:
+        ds.Configuration_Name = system_info.configuration_name;
+
+    if 'configuration_id' in system_info.index:
+        ds.Configuration_ID = system_info.configuration_id;
   
     ds.Measurement_ID = meas_ID;
     
     ds.Measurement_type = 'drk';
 
-    ds.RawBck_Start_Date = start_time_d[0].strftime('%Y%m%d');
+    ds.RawData_Start_Date = start_time[0].strftime('%Y%m%d');
 
-    ds.RawBck_Start_Time_UT = start_time_d[0].strftime('%H%M%S');
+    ds.RawData_Start_Time_UT = start_time[0].strftime('%H%M%S');
 
-    ds.RawBck_Stop_Time_UT = end_time_d[-1].strftime('%H%M%S');
+    ds.RawData_Stop_Time_UT = end_time[-1].strftime('%H%M%S');
 
 # Adding Variables
     make_nc_var(ds, name = 'Acquisition_Mode', value = channel_info.acquisition_mode.values, dtype = 'int', dims = ('channels',))
@@ -672,7 +719,7 @@ def dark_file(system_info, channel_info, time_info_d, nc_path,
     
     make_nc_var(ds, name = 'Background_High', value = channel_info.background_high.values, dtype = 'float', dims = ('channels',))
         
-    make_nc_var(ds, name = 'Background_Profile', value = sig_d.values, dtype = 'float', dims = ('time_bck', 'channels', 'points',))
+    make_nc_var(ds, name = 'Raw_Lidar_Data', value = sig.values, dtype = 'float', dims = ('time', 'channels', 'points',))
 
     make_nc_var(ds, name = 'channel_ID', value = channel_info.scc_channel_id.values, dtype = 'int', dims = ('channels',))
 
@@ -688,7 +735,7 @@ def dark_file(system_info, channel_info, time_info_d, nc_path,
     
     make_nc_var(ds, name = 'Emitted_Wavelength', value = channel_info.emitted_wavelength.values, dtype = 'float', dims = ('channels',))
 
-    make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = 15)    
+    make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = 15)    
                     
     make_nc_var(ds, name = 'id_timescale', value = np.zeros(n_channels), dtype = 'int', dims = ('channels',))
 
@@ -698,11 +745,11 @@ def dark_file(system_info, channel_info, time_info_d, nc_path,
 
     make_nc_var(ds, name = 'Laser_Pointing_Azimuth_Angle', value = np.array(n_scan_angles * [system_info.azimuth_angle]), dtype = 'float', dims = ('scan_angles',))
 
-    make_nc_var(ds, name = 'Laser_Pointing_Angle_of_Profiles', value = np.zeros([n_time_bck, n_nb_of_time_scales]), dtype = 'int', dims = ('time_bck', 'nb_of_time_scales',))
+    make_nc_var(ds, name = 'Laser_Pointing_Angle_of_Profiles', value = np.zeros([n_time, n_nb_of_time_scales]), dtype = 'int', dims = ('time', 'nb_of_time_scales',))
 
     make_nc_var(ds, name = 'Laser_Repetition_Rate', value = channel_info.laser_repetition_rate.values, dtype = 'int', dims = ('channels',))
     
-    make_nc_var(ds, name = 'Background_Shots', value = shots_d.values, dtype = 'int', dims = ('time_bck', 'channels',))
+    make_nc_var(ds, name = 'Laser_Shots', value = shots.values, dtype = 'int', dims = ('time', 'channels',))
         
     make_nc_var(ds, name = 'Raw_Data_Range_Resolution', value = channel_info.range_resolution.values, dtype = 'float', dims = ('channels',))
 
@@ -712,10 +759,10 @@ def dark_file(system_info, channel_info, time_info_d, nc_path,
 
     make_nc_var(ds, name = 'DAQ_Trigger_Offset', value = channel_info.daq_trigger_offset.values, dtype = 'int', dims = ('channels',))
     
-    make_nc_var(ds, name = 'Bck_Data_Start_Time', value = Bck_Start_Time, dtype = 'int', dims = ('time_bck', 'nb_of_time_scales',))
+    make_nc_var(ds, name = 'Raw_Data_Start_Time', value = Raw_Start_Time, dtype = 'int', dims = ('time', 'nb_of_time_scales',))
     
-    make_nc_var(ds, name = 'Bck_Data_Stop_Time', value = Bck_Stop_Time, dtype = 'int', dims = ('time_bck', 'nb_of_time_scales',))
-    
+    make_nc_var(ds, name = 'Raw_Data_Stop_Time', value = Raw_Stop_Time, dtype = 'int', dims = ('time', 'nb_of_time_scales',))
+
     ds.close()
     
     return()
@@ -798,11 +845,29 @@ def meas_id(lr_id, time):
     
     return(meas_ID)
         
-def path(output_folder, meas_ID, meas_type, lidar, version):
+def path(output_folder, system_info, time, meas_type, version):
     """Creates a sting variable with the full path to the output QA file: 
     https://docs.scc.imaa.cnr.it/en/latest/file_formats/netcdf_file.html"""
+
+    start_date = time.dt.date.values[0].strftime('%Y%m%d')
+
+    start_time = time.dt.time.values[0].strftime('%H%M%S')
+
+    station_id = system_info['station_id'].lower()
+
+    try: lidar_id = system_info['lidar_id']
+    except: lidar_id = ''
     
-    nc_path = os.path.join(output_folder,f'{meas_ID}_{lidar}_{meas_type}_ATLAS_{version}.nc')
+    try: version_id = system_info['version_id']
+    except: version_id = ''
+    
+    try: config_id = system_info['configuration_id']
+    except: config_id = ''
+    
+    parts = [str(station_id), str(lidar_id), str(version_id), str(config_id), str(start_date), str(start_time), meas_type, 'ATLAS', str(version), 'prepro']
+    fname = "_".join([part for part in parts if len(part) > 0]) + ".nc"
+    
+    nc_path = os.path.join(output_folder,fname)
     
     if os.path.exists(output_folder) == False:
         os.makedirs(nc_path)

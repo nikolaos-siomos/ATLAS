@@ -137,6 +137,8 @@ def fill_defaults(cfg):
     mask_lbin_fr = (cfg.channels.loc[:,'background_low_bin'] == '_') & (cfg.channels.loc[:,'daq_trigger_offset'].astype(int) >  -400)
     cfg.channels.loc[:,'background_low_bin'][mask_lbin_tr] = 100
     cfg.channels.loc[:,'background_low_bin'][mask_lbin_fr] = cfg.channels.loc[:,'bins'][mask_lbin_fr] - 600
+    mask_lbin_ng = (cfg.channels.loc[:,'background_low_bin'].astype(int) < 0)
+    cfg.channels.loc[:,'background_low_bin'][mask_lbin_ng] = (cfg.channels.loc[:,'bins'][mask_lbin_ng] + cfg.channels.loc[:,'background_low_bin'][mask_lbin_ng].astype(int)).astype(object)
   
     # Background High Bin
     if 'background_high_bin' not in cfg.channels.columns.values:
@@ -145,7 +147,9 @@ def fill_defaults(cfg):
     mask_ubin_fr = (cfg.channels.loc[:,'background_high_bin'] == '_') & (cfg.channels.loc[:,'daq_trigger_offset'].astype(int) >  -400)
     cfg.channels.loc[:,'background_high_bin'][mask_ubin_tr] = -cfg.channels.loc[:,'daq_trigger_offset'][mask_ubin_tr].astype(int) - 100
     cfg.channels.loc[:,'background_high_bin'][mask_ubin_fr] = cfg.channels.loc[:,'bins'][mask_ubin_fr] - 100
-                        
+    mask_ubin_ng = (cfg.channels.loc[:,'background_high_bin'].astype(float) < 0)
+    cfg.channels.loc[:,'background_high_bin'][mask_ubin_ng] = (cfg.channels.loc[:,'bins'][mask_ubin_ng] + cfg.channels.loc[:,'background_high_bin'][mask_ubin_ng].astype(int)).astype(object)
+                      
     # Laser repetiotion rate - assign each laser value to the respective channel 
     mask_laser_A = (cfg.channels.loc[:,'laser'] == 1)
     mask_laser_B = (cfg.channels.loc[:,'laser'] == 2)
@@ -228,8 +232,9 @@ def screen_low_shots(time_info, channel_info, signal, shots):
             
             if not np.isnan(shots_ch).all():
                 
-                mask_t = shots_ch < 0.9 * np.nanmax(shots_ch)
-                            
+                mask_t = (shots_ch < 0.9 * np.nanmax(shots_ch)) & \
+                    (np.nanmax(shots_ch) > 20)
+                
                 time_ls.extend(time[mask_t])
     
                 if len(time[mask_t]) > 0:                

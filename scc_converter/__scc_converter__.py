@@ -24,27 +24,30 @@ def main(args, __version__, dry_run = False):
     # A) Read and pre-process the signals
     #------------------------------------------------------------
     allowed_types = ['rayleigh', 'telecover', 
-                     'polarization_calibration'] 
+                     'polarization_calibration', 'dark'] 
     
     processors = {'rayleigh' : process.rayleigh,
                   'telecover' : process.telecover,
                   'polarization_calibration' : process.polarization_calibration,
-                  'standalone_dark' : process.dark}
+                  'dark' : process.dark}
     
     modes = {'rayleigh' : 'R',
              'telecover' : 'T',
              'polarization_calibration' : 'C',
-             'standalone_dark' : 'D'}
+             'dark' : 'D'}
     
     output_files = {'rayleigh' : None,
                     'telecover' : None,
                     'polarization_calibration' : None,
-                    'standalone_dark' : None,
+                    'dark' : None,
                     'radiosonde' : None} 
     
     # Call all the processors sequentially
     for mtype in allowed_types: 
         if mtype in meas_type and (args['mode'] == 'A' or args['mode'] == modes[mtype]):
+            
+            print(f"Processing {mtype} measurement")
+            
             nc_fname = processors[mtype](args, version = __version__)
             
             if nc_fname[0] != None:

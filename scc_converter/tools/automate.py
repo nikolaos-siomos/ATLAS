@@ -31,14 +31,12 @@ def get_meas_type(args):
         or os.path.exists(dirs['pcb_stc']):
         meas_type.append('polarization_calibration')
 
-    if os.path.exists(dirs['drk']) and \
-        all([not(os.path.exists(dirs[key])) 
-             for key in dirs.keys() if key != 'drk']):
-        meas_type.append('standalone_dark')
+    if os.path.exists(dirs['drk']):
+        meas_type.append('dark')
     
     if len(meas_type) == 0:
         raise Exception('-- Error: None of the input folders exists!')
-                
+
     return(meas_type)
 
 

@@ -5,7 +5,6 @@ import glob
 from datetime import datetime as dt
 from datetime import timedelta
 import xarray as xr
-import re
 
 # Read measurement
 def dtfs(dir_meas):
@@ -80,7 +79,7 @@ def dtfs(dir_meas):
                 
                 if stime == etime: #only possible if the files are different by only milliseconds 
                     end_time_arr[k] = etime + timedelta(milliseconds = 500)
-                    # print(f'-- Warning! File {filename[k]} has the same start and end time reported (recording lasted < 1s). Please check it! ')
+                    print(f'-- Warning! File {filename[k]} has the same start and end time reported (recording lasted < 1s). Please check it! ')
                 else:
                     end_time_arr[k] = etime
 
@@ -176,24 +175,18 @@ def read_meas(buffer, sep):
     # Convert header to text, parse metadata
     header = str(header_bytes, encoding="utf-8").split("\r\n")
 
-    metadata = header[1].split()
-    
-    pattern = re.compile('.*/.*/.*')
+    metadata = header[3].split()
 
-    for i in range(len(metadata)):
-        if bool(pattern.match(metadata[i])):
-            shift = i -1
-            break
-        
-    system_info['altitude'] = float(metadata[5+shift])    
-    system_info['latitude'] = np.round(float(metadata[6+shift]), 4)
-    system_info['longitude'] = np.round(float(metadata[7+shift]), 4)
-    
-    if len(metadata) > 8:
-        system_info['zenith_angle'] = float(metadata[8+shift])
-
-    if len(metadata) > 9:
-        system_info['azimuth_angle'] = float(metadata[9+shift])
+    system_info['altitude'] = float(metadata[9])    
+    system_info['latitude'] = np.round(float(metadata[8]), 4)
+    system_info['longitude'] = np.round(float(metadata[7]), 4)
+     
+#     if len(metadata) > 8:
+#         system_info['zenith_angle'] = float(metadata[8])
+# 
+#     if len(metadata) > 9:
+#         system_info['azimuth_angle'] = float(metadata[9])
+#     
 
     # Now i points to the start of search_sequence, AKA end of header
     header_bytes = buffer[0:sep-1]
@@ -201,7 +194,7 @@ def read_meas(buffer, sep):
     # Convert header to text, parse metadata
     header = str(header_bytes, encoding="utf-8").split("\r\n")
 
-    metadata = header[2].split()
+    metadata = header[4].split()
 
     system_info['laser_A_repetition_rate'] = float(metadata[1])
 
@@ -209,12 +202,12 @@ def read_meas(buffer, sep):
         system_info['laser_B_repetition_rate'] = float(metadata[3])
     else:
         system_info['laser_B_repetition_rate'] = np.nan
-        
-    if len(metadata) > 5:
+     
+    if len(metadata) > 9999:
         system_info['laser_C_repetition_rate'] = float(metadata[6])
     else:
         system_info['laser_C_repetition_rate'] = np.nan
-        
+    
     return(system_info)
 
 def read_time(buffer, sep):
@@ -228,18 +221,12 @@ def read_time(buffer, sep):
     # Convert header to text, parse metadata
     header = str(header_bytes, encoding="utf-8").split("\r\n")
 
-    metadata = header[1].split()
-    
-    pattern = re.compile('.*/.*/.*')
-    for i in range(len(metadata)):
-        if bool(pattern.match(metadata[i])):
-            shift = i -1
-            break
+    metadata = header[3].split()
 
-    start_date = metadata[1+shift]
-    start_time = metadata[2+shift]
-    end_date = metadata[3+shift]
-    end_time = metadata[4+shift]
+    start_date = metadata[1]
+    start_time = metadata[2]
+    end_date = metadata[3]
+    end_time = metadata[4]
 
     stime = dt.strptime(start_date + ' ' + start_time, "%d/%m/%Y %H:%M:%S") # start meas
     etime = dt.strptime(end_date + ' ' + end_time, "%d/%m/%Y %H:%M:%S") # start meas
@@ -256,9 +243,15 @@ def read_channels(buffer, sep):
 
     channel_info = pd.DataFrame()
        
+#     cols = ['active', 'acquisition_mode', 'laser', 'bins', 
+#             'laser_polarization', 'pmt_high_voltage', 'range_resolution', 
+#             'wave_pol', 'unk1', 'unk2', 'unk3', 'unk4', 
+#             'analog_to_digital_resolution', 'shots', 'data_acquisition_range',
+#             'recorder_channel_id']
+	     
     cols = ['active', 'acquisition_mode', 'laser', 'bins', 
             'laser_polarization', 'pmt_high_voltage', 'range_resolution', 
-            'wave_pol', 'unk1', 'unk2', 'unk3', 'unk4', 
+            'wave_pol', 
             'analog_to_digital_resolution', 'shots', 'data_acquisition_range',
             'recorder_channel_id']
 
@@ -269,7 +262,7 @@ def read_channels(buffer, sep):
     header = str(header_bytes, encoding="utf-8").split("\r\n")
 
     # Header rows
-    header = np.array([line[1:].split()[:len(cols)] for line in header[3:]], 
+    header = np.array([line[1:].split()[:len(cols)] for line in header[5:]], 
                       dtype = object)
 
     arr_head = pd.DataFrame(header, columns = cols, dtype = object)
@@ -310,10 +303,15 @@ def read_shots(buffer, sep):
     
     """ Gets the number of shots for each channel and file"""
 
-
+# 
+#     cols = ['active', 'acquisition_mode', 'laser', 'bins', 
+#             'laser_polarization', 'pmt_high_voltage', 'range_resolution', 
+#             'wave_pol', 'unk1', 'unk2', 'unk3', 'unk4', 
+#             'analog_to_digital_resolution', 'shots', 'data_acquisition_range',
+#             'recorder_channel_id']
     cols = ['active', 'acquisition_mode', 'laser', 'bins', 
             'laser_polarization', 'pmt_high_voltage', 'range_resolution', 
-            'wave_pol', 'unk1', 'unk2', 'unk3', 'unk4', 
+            'wave_pol', 
             'analog_to_digital_resolution', 'shots', 'data_acquisition_range',
             'recorder_channel_id']
 
@@ -324,7 +322,7 @@ def read_shots(buffer, sep):
     header = str(header_bytes, encoding="utf-8").split("\r\n")
 
     # Header rows
-    header = np.array([line[1:].split()[:len(cols)] for line in header[3:]], 
+    header = np.array([line[1:].split()[:len(cols)] for line in header[5:]], 
                       dtype = object)
     
     ind_shots = np.where(np.array(cols) == 'shots')[0][0]

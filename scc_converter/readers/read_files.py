@@ -3,10 +3,11 @@
 """
 import os, sys, glob
 import numpy as np
-from ..readers import read_licel, read_polly_xt, read_licel_matlab
+from ..readers import read_licel, read_polly_xt, read_licel_matlab, read_polly_xt_first, read_licel_old2rack
 import xarray as xr
 import pandas as pd
 from datetime import datetime
+import re
 
 def rayleigh(finput_ray, file_format):
     
@@ -24,6 +25,10 @@ def rayleigh(finput_ray, file_format):
         system_info, channel_info, time_info, sig, shots = \
             read_polly_xt.dtfs(dir_meas = finput_ray, meas_type = 'ray')
             
+    elif file_format == 'polly_xt_first':
+        system_info, channel_info, time_info, sig, shots = \
+            read_polly_xt_first.dtfs(dir_meas = finput_ray)
+            
     elif file_format == 'licel':
         system_info, channel_info, time_info, sig, shots = \
             read_licel.dtfs(dir_meas = finput_ray)
@@ -31,6 +36,10 @@ def rayleigh(finput_ray, file_format):
     elif file_format == 'licel_matlab':
         system_info, channel_info, time_info, sig, shots = \
             read_licel_matlab.dtfs(dir_meas = finput_ray)
+
+    elif file_format == 'licel_old2rack':
+        system_info, channel_info, time_info, sig, shots = \
+            read_licel_old2rack.dtfs(dir_meas = finput_ray)
 
 
     print('Reading Rayleigh signals complete!')
@@ -73,6 +82,10 @@ def telecover(finput_sec, finput_rin, file_format,
                     if file_format == 'polly_xt':
                         system_info, channel_info, time_info, sig, shots = \
                             read_polly_xt.dtfs(dir_meas = path, meas_type = 'tlc')
+                    
+                    elif file_format == 'polly_xt_first':
+                        system_info, channel_info, time_info, sig, shots = \
+                            read_polly_xt_first.dtfs(dir_meas = path)
                           
                     elif file_format == 'licel':
                         system_info, channel_info, time_info, sig, shots = \
@@ -82,6 +95,9 @@ def telecover(finput_sec, finput_rin, file_format,
                         system_info, channel_info, time_info, sig, shots = \
                             read_licel_matlab.dtfs(dir_meas = path)
 
+                    elif file_format == 'licel_old2rack':
+                        system_info, channel_info, time_info, sig, shots = \
+                            read_licel_old2rack.dtfs(dir_meas = path)
 
                     sector = folder_to_sector(folder = time_info['folder'].values)
     
@@ -108,6 +124,10 @@ def telecover(finput_sec, finput_rin, file_format,
                     system_info, channel_info, time_info, sig, shots = \
                         read_polly_xt.dtfs(dir_meas = finput_sec, meas_type = 'tlc')
                           
+                elif file_format == 'polly_xt_first':
+                    system_info, channel_info, time_info, sig, shots = \
+                        read_polly_xt_first.dtfs(dir_meas = finput_sec)
+                        
                 elif file_format == 'licel':
                     system_info, channel_info, time_info, sig, shots = \
                         read_licel.dtfs(dir_meas = finput_sec)
@@ -115,6 +135,10 @@ def telecover(finput_sec, finput_rin, file_format,
                 elif file_format == 'licel_matlab':
                     system_info, channel_info, time_info, sig, shots = \
                         read_licel_matlab.dtfs(dir_meas = finput_sec)
+                        
+                elif file_format == 'licel_old2rack':
+                    system_info, channel_info, time_info, sig, shots = \
+                        read_licel_old2rack.dtfs(dir_meas = finput_sec)
                     
                 sector = time_to_sector(folder = time_info['folder'], 
                                         files_per_sector = files_per_sector)
@@ -144,6 +168,10 @@ def telecover(finput_sec, finput_rin, file_format,
                         system_info, channel_info, time_info, sig, shots = \
                             read_polly_xt.dtfs(dir_meas = path, meas_type = 'tlc')
                           
+                    elif file_format == 'polly_xt_first':
+                        system_info, channel_info, time_info, sig, shots = \
+                            read_polly_xt_first.dtfs(dir_meas = path)
+                            
                     elif file_format == 'licel':
                         system_info, channel_info, time_info, sig, shots = \
                             read_licel.dtfs(dir_meas = path)
@@ -151,6 +179,10 @@ def telecover(finput_sec, finput_rin, file_format,
                     elif file_format == 'licel_matlab':
                         system_info, channel_info, time_info, sig, shots = \
                             read_licel_matlab.dtfs(dir_meas = path)
+                            
+                    elif file_format == 'licel_old2rack':
+                        system_info, channel_info, time_info, sig, shots = \
+                            read_licel_old2rack.dtfs(dir_meas = path)
                 
                     ring = folder_to_sector(folder = time_info['folder'].values)
                     time_info['sector'] = ring
@@ -174,6 +206,10 @@ def telecover(finput_sec, finput_rin, file_format,
                 if file_format == 'polly_xt':
                     system_info, channel_info, time_info, sig, shots = \
                         read_polly_xt.dtfs(dir_meas = finput_rin, meas_type = 'tlc')
+
+                elif file_format == 'polly_xt_first':
+                    system_info, channel_info, time_info, sig, shots = \
+                        read_polly_xt_first.dtfs(dir_meas = finput_rin)
                         
                 elif file_format == 'licel':
                     system_info, channel_info, time_info, sig, shots = \
@@ -182,6 +218,10 @@ def telecover(finput_sec, finput_rin, file_format,
                 elif file_format == 'licel_matlab':
                     system_info, channel_info, time_info, sig, shots = \
                         read_licel_matlab.dtfs(dir_meas = finput_rin)
+                        
+                elif file_format == 'licel_old2rack':
+                    system_info, channel_info, time_info, sig, shots = \
+                        read_licel_old2rack.dtfs(dir_meas = finput_rin)                        
                         
                 ring = time_to_ring(folder = time_info['folder'], 
                                     files_per_ring = files_per_ring)
@@ -341,6 +381,120 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
             shots = xr.concat(shots_pos, dim = 'time').sortby('time')
             time_info = pd.concat(time_info_pos).sort_index()
 
+    elif file_format == 'licel_old2rack':
+        if os.path.exists(finput_stc):
+            if os.listdir(finput_stc):
+                print('-- Reading static calibration files..')  
+                
+                system_info, channel_info, time_info, sig, shots = \
+                    read_licel_old2rack.dtfs(dir_meas = finput_stc)
+            
+                position = np.array(time_info.index.size * [0])
+                time_info['position'] = position
+                sig_pos.append(sig)
+                shots_pos.append(shots)
+                position_pos.append(position)
+                time_info_pos.append(time_info)
+            else:
+                print(f'-- Warning: Folder {finput_stc} is empty! No files to read ')
+                       
+        if os.path.exists(finput_m45):
+            if os.listdir(finput_m45):
+                print('-- Reading -45 files..')  
+                
+                system_info, channel_info, time_info, sig, shots = \
+                    read_licel_old2rack.dtfs(dir_meas = finput_m45)
+    
+                position = np.array(time_info.index.size * [1])
+                time_info['position'] = position
+        
+                sig_pos.append(sig)
+                shots_pos.append(shots)
+                position_pos.append(position)
+                time_info_pos.append(time_info)
+            else:
+                print(f'-- Warning: Folder {finput_m45} is empty! No files to read ')
+                    
+    
+        if os.path.exists(finput_p45):
+            if os.listdir(finput_p45):
+                print('-- Reading +45 files..')  
+    
+                system_info, channel_info, time_info, sig, shots = \
+                    read_licel_old2rack.dtfs(dir_meas = finput_p45)
+    
+                position = np.array(time_info.index.size * [2])
+                time_info['position'] = position
+                
+                sig_pos.append(sig)
+                shots_pos.append(shots)
+                position_pos.append(position)
+                time_info_pos.append(time_info)
+            else:
+                print(f'-- Warning: Folder {finput_p45} is empty! No files to read ')
+        
+        if len(sig_pos) != 0:        
+            sig = xr.concat(sig_pos, dim = 'time').sortby('time')
+            shots = xr.concat(shots_pos, dim = 'time').sortby('time')
+            time_info = pd.concat(time_info_pos).sort_index()
+
+    elif file_format == 'polly_xt_first':
+        if os.path.exists(finput_stc):
+            if os.listdir(finput_stc):
+                print('-- Reading static calibration files..')  
+                
+                system_info, channel_info, time_info, sig, shots = \
+                    read_polly_xt_first.dtfs(dir_meas = finput_stc)
+            
+                position = np.array(time_info.index.size * [0])
+                time_info['position'] = position
+                sig_pos.append(sig)
+                shots_pos.append(shots)
+                position_pos.append(position)
+                time_info_pos.append(time_info)
+            else:
+                print(f'-- Warning: Folder {finput_stc} is empty! No files to read ')
+                       
+        if os.path.exists(finput_m45):
+            if os.listdir(finput_m45):
+                print('-- Reading -45 files..')  
+                
+                system_info, channel_info, time_info, sig, shots = \
+                    read_polly_xt_first.dtfs(dir_meas = finput_m45)
+    
+                position = np.array(time_info.index.size * [1])
+                time_info['position'] = position
+        
+                sig_pos.append(sig)
+                shots_pos.append(shots)
+                position_pos.append(position)
+                time_info_pos.append(time_info)
+            else:
+                print(f'-- Warning: Folder {finput_m45} is empty! No files to read ')
+                    
+
+        if os.path.exists(finput_p45):
+            if os.listdir(finput_p45):
+                print('-- Reading +45 files..')  
+  
+                system_info, channel_info, time_info, sig, shots = \
+                    read_polly_xt_first.dtfs(dir_meas = finput_p45)
+    
+                position = np.array(time_info.index.size * [2])
+                time_info['position'] = position
+                
+                sig_pos.append(sig)
+                shots_pos.append(shots)
+                position_pos.append(position)
+                time_info_pos.append(time_info)
+            else:
+                print(f'-- Warning: Folder {finput_p45} is empty! No files to read ')
+        
+        if len(sig_pos) != 0:        
+            sig = xr.concat(sig_pos, dim = 'time').sortby('time')
+            shots = xr.concat(shots_pos, dim = 'time').sortby('time')
+            time_info = pd.concat(time_info_pos).sort_index()
+
     # Select reader based on the file format
     elif file_format == 'polly_xt':
         if os.path.exists(finput_ray):
@@ -373,13 +527,19 @@ def dark(finput_drk, file_format):
     if file_format == 'polly_xt':
         system_info, channel_info, time_info, sig, shots = \
             read_polly_xt.dtfs(dir_meas = finput_drk, meas_type = 'drk')
+    elif file_format == 'polly_xt_first':
+        system_info, channel_info, time_info, sig, shots = \
+            read_polly_xt_first.dtfs(dir_meas = finput_drk)
     elif file_format == 'licel':
         system_info, channel_info, time_info, sig, shots = \
             read_licel.dtfs(dir_meas = finput_drk)
     elif file_format == 'licel_matlab':
         system_info, channel_info, time_info, sig, shots = \
             read_licel_matlab.dtfs(dir_meas = finput_drk)
-
+    elif file_format == 'licel_old2rack':
+        system_info, channel_info, time_info, sig, shots = \
+            read_licel_old2rack.dtfs(dir_meas = finput_drk)
+            
     print('Reading dark signals complete!')
     print('-----------------------------------------')
     print('')
@@ -400,6 +560,9 @@ def radiosonde(finput_rs, delimiter, skip_header, skip_footer,
     
     paths = glob.glob(os.path.join(finput_rs,'*_*.txt'))
     
+    if len(paths) == 0:
+        raise Exception(f"-- Error: No txt file was found in the radiosonde folder: {finput_rs} Please make sure that the radiosonde files are in txt format")
+    
     lib_delimiter =  {"S": "",
                       "C": ",",
                       "T": "\t"}
@@ -419,7 +582,7 @@ def radiosonde(finput_rs, delimiter, skip_header, skip_footer,
         return(x * Re / (Re - x))
     
     def Pa_to_hPa(x):
-        return(1E-3 * x)
+        return(1E-2 * x)
     
     def atm_to_hPa(x):
         return(x * 1013.25)
@@ -443,7 +606,9 @@ def radiosonde(finput_rs, delimiter, skip_header, skip_footer,
     if any(bad_length) :
         raise Exception(f"-- Error: Radiosonde filename with wrong length detected! Please revise the following files: {bname[bad_length]}. They should start with 'yyyymmdd_hhmm' and end with '.txt' ")
     else:
-        bad_format = [name[8] != '_' for name in bname]
+        pattern = "20[0-9]{2}[0-1][0-9][0-3][0-9]_[0-2][0-9][0-5][0-9]"
+        bad_format = [not(bool(re.search(pattern,name))) for name in bname]
+
         if any(bad_format):
             raise Exception(f"-- Error: Radiosonde filename with wrong format detected! Please revise the following files: {bname[bad_format]}. They should start with 'yyyymmdd_hhmm' and end with '.txt' ")
         else:
@@ -488,7 +653,6 @@ def radiosonde(finput_rs, delimiter, skip_header, skip_footer,
                          autostrip = True,
                          usecols = np.array(usecols) - 1, dtype = float)
 
-    
     if units[0] == 'km_asl':
         data[:,0] = km_asl_to_m_asl(data[:,0])
 

@@ -14,8 +14,10 @@ from .readers.parse_tlc_args import call_parser, check_parser
 from .readers.check import check_channels
 from .plotting import make_axis, make_title, make_plot
 from .writters import make_header, export_ascii 
-from .tools import sector
-
+from .tools import sector, curve_fit
+from PIL import Image
+from PIL import PngImagePlugin
+              
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
@@ -31,7 +33,21 @@ def main(args, __version__):
     data = xr.open_dataset(args['input_file'])
     ranges = data.Range_levels
 
+    # Extract IFF info
     dwl = data.Detected_Wavelength
+    
+    # Extract SCC info
+    station_id = data.Station_ID.lower()
+    lidar_id = data.Lidar_ID
+    version_id = data.Version_ID
+    config_id = data.Configuration_ID
+    config_name = data.Configuration_Name
+    scc_id = data.channel_ID
+
+    # Extract date info
+    start_date = data.RawData_Start_Date
+    start_time = data.RawData_Start_Time_UT
+    stop_time = data.RawData_Stop_Time_UT
     
     # Extract signal
     if 'Range_Corrected_Signals_North_Sector' in data.keys():
@@ -90,13 +106,16 @@ def main(args, __version__):
         ranges_ch = ranges.copy().loc[ch_d].values
         
         dwl_ch = dwl.loc[ch_d].values
-        
+        scc_id_ch = scc_id.copy().loc[ch_d].values
+
         # Create the x axis (height/range)
-        x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label = \
+        x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_tick, x_label = \
             make_axis.telecover_x(heights = data.Height_levels.loc[ch_d].values, 
                                   ranges = data.Range_levels.loc[ch_d].values,
                                   x_lims = args['x_lims'], 
-                                  use_dis = args['use_range'])
+                                  x_tick = args['x_tick'],
+                                  use_dis = args['use_range'],
+                                  telescope_type = ch[4])
     
         if isinstance(sig_n,list) == False:
             iters_sec = np.min([sig_n.time_n.size,
@@ -108,6 +127,72 @@ def main(args, __version__):
                          'E' : False,
                          'S' : False,
                          'W' : False}
+            
+            n_s_ratio = np.nanmean(sig_n.loc[ch_d].values.copy(), axis = 0) /\
+                np.nanmean(sig_s.loc[ch_d].values.copy(), axis = 0)
+            
+            y_m_n = np.nanmean(sig_n.loc[ch_d].values.copy(), axis = 0)
+            y_m_e = np.nanmean(sig_e.loc[ch_d].values.copy(), axis = 0)
+            y_m_s = np.nanmean(sig_s.loc[ch_d].values.copy(), axis = 0)
+            y_m_w = np.nanmean(sig_w.loc[ch_d].values.copy(), axis = 0)
+            sector_dev = np.nanstd(np.vstack((y_m_n,y_m_e,y_m_s,y_m_w)), axis = 0)
+
+            llim = 1.
+            ulim = 3.
+            min_win = 0.5
+            max_win = 2.
+            
+            if args['normalization_region'][0] < llim:
+                llim = args['normalization_region'][0]
+            if args['normalization_region'][0] > ulim:
+                ulim = args['normalization_region'][1]
+            if args['normalization_region'][1] - args['normalization_region'][0] < min_win:
+                min_win = args['normalization_region'][1] - args['normalization_region'][0]
+            if args['normalization_region'][1] - args['normalization_region'][0] > max_win:
+                max_win = args['normalization_region'][1] - args['normalization_region'][0]
+            
+            # Check for a fit range for the Δ90 calibration
+            rsem, nder, mfit, msem, mder, msec, mshp, mcrc, coef = \
+                curve_fit.stats(y1 = sector_dev,
+                                y2 = np.ones(n_s_ratio.shape), 
+                                x  = x_vals,
+                                min_win = min_win,
+                                max_win = max_win,
+                                step = 0.1,
+                                llim = llim,
+                                ulim = ulim,
+                                rsem_lim = 0.05,
+                                cancel_shp = True,
+                                cross_check_type = 'both',
+                                cross_check_crit = 'both',
+                                cross_check_all_points = False)
+                
+            # from matplotlib import pyplot as plt
+            # msem.plot()
+            # plt.title('SEM')
+            # plt.show()
+            # mder.plot()
+            # plt.title('DER')
+            # plt.show()
+            # msec.plot()
+            # plt.title('SEC')
+            # plt.show()
+            # mshp.plot()
+            # plt.title('SHP')
+            # plt.show()
+            # mcrc.plot()
+            # plt.title('CRC')
+            # plt.show()
+            # mfit.plot()
+            # plt.title('FIT')
+            # plt.show() 
+
+                    
+            norm_region, idx, fit = \
+                curve_fit.scan(mfit = mfit,
+                               dflt_region = args['normalization_region'],
+                               auto_fit = args['auto_fit'],
+                               prefered_range = "near")
 
             coef_n, y_m_n, y_sm_n, y_m_sm_n, y_l_sm_n, y_u_sm_n, \
             coef_extra_n, y_extra_n, y_extra_sm_n, extra_sec['N'] = \
@@ -115,10 +200,10 @@ def main(args, __version__):
                                y = sig_n.loc[ch_d].values.copy(), 
                                iters = iters_sec, 
                                smooth = args['smooth'], 
-                               x_sm_lims = args['smoothing_range'],
+                               x_sm_lims = [x_llim, x_ulim],
                                x_sm_win = args['smoothing_window'],
                                expo = args['smooth_exponential'],
-                               region = args['normalization_region'])
+                               region = norm_region)
                 
             coef_e, y_m_e, y_sm_e, y_m_sm_e, y_l_sm_e, y_u_sm_e, \
             coef_extra_e, y_extra_e, y_extra_sm_e, extra_sec['E'] = \
@@ -126,10 +211,10 @@ def main(args, __version__):
                                y = sig_e.loc[ch_d].values.copy(), 
                                iters = iters_sec, 
                                smooth = args['smooth'], 
-                               x_sm_lims = args['smoothing_range'],
+                               x_sm_lims = [x_llim, x_ulim],
                                x_sm_win = args['smoothing_window'],
                                expo = args['smooth_exponential'],
-                               region = args['normalization_region'])
+                               region = norm_region)
                 
             coef_s, y_m_s, y_sm_s, y_m_sm_s, y_l_sm_s, y_u_sm_s, \
             coef_extra_s, y_extra_s, y_extra_sm_s, extra_sec['S'] = \
@@ -137,10 +222,10 @@ def main(args, __version__):
                                y = sig_s.loc[ch_d].values.copy(), 
                                iters = iters_sec, 
                                smooth = args['smooth'], 
-                               x_sm_lims = args['smoothing_range'],
+                               x_sm_lims = [x_llim, x_ulim],
                                x_sm_win = args['smoothing_window'],
                                expo = args['smooth_exponential'],
-                               region = args['normalization_region'])
+                               region = norm_region)
                 
             coef_w, y_m_w, y_sm_w, y_m_sm_w, y_l_sm_w, y_u_sm_w, \
             coef_extra_w, y_extra_w, y_extra_sm_w, extra_sec['W'] = \
@@ -148,10 +233,10 @@ def main(args, __version__):
                                y = sig_w.loc[ch_d].values.copy(), 
                                iters = iters_sec, 
                                smooth = args['smooth'], 
-                               x_sm_lims = args['smoothing_range'],
+                               x_sm_lims = [x_llim, x_ulim],
                                x_sm_win = args['smoothing_window'],
                                expo = args['smooth_exponential'],
-                               region = args['normalization_region'])
+                               region = norm_region)
 
             # Create the y axis (signal)
             y_llim, y_ulim, y_llim_nr, y_ulim_nr = \
@@ -172,26 +257,34 @@ def main(args, __version__):
                                          end_time = data.RawData_Stop_Time_UT, 
                                          lidar = data.Lidar_Name, 
                                          channel = ch, 
+                                         station_id = station_id,
+                                         lidar_id = lidar_id,
+                                         version_id = version_id,
+                                         config_id = config_id,
+                                         config_name = config_name,
+                                         scc_id = scc_id_ch,
                                          zan = data.Laser_Pointing_Angle,
                                          loc = data.Station_Name,
                                          iters = iters_sec,
                                          sampling = sampling_sec,
                                          smooth = args['smooth'],
-                                         sm_lims = args['smoothing_range'],
+                                         sm_lims = [x_llim, x_ulim],
                                          sm_win = args['smoothing_window'],
                                          sm_expo = args['smooth_exponential'])
         
         
             # Make filename
-            fname = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_sectors_{ch}_ATLAS_{__version__}.png'
+            fname = f'{station_id}_{lidar_id}_{version_id}_{config_id}_{start_date}_{start_time}_tlc_{ch}_{scc_id_ch}_ATLAS_{__version__}.png'
 
             # Make the plot
             fpath = \
-                make_plot.telecover_sec(dir_out = args['output_folder'], 
+                make_plot.telecover_sec(dir_out = os.path.join(args['output_folder'],'plots'), 
                                         fname = fname, title = title,
                                         dpi_val = args['dpi'],
                                         color_reduction = args['color_reduction'],
-                                        norm_region = args['normalization_region'],
+                                        auto_fit = args['auto_fit'],
+                                        norm_region = norm_region,
+                                        fit = fit,
                                         use_nonrc = args['use_non_rangecor'],
                                         x_vals = x_vals, 
                                         y1_raw = y_m_n, 
@@ -234,7 +327,7 @@ def main(args, __version__):
                                         y_llim_nr = y_llim_nr, 
                                         y_ulim_nr = y_ulim_nr, 
                                         x_label = x_label,
-                                        x_tick = args['x_tick'],
+                                        x_tick = x_tick,
                                         use_last = args['use_last'],
                                         iters = iters_sec)
             
@@ -262,8 +355,8 @@ def main(args, __version__):
                                       extra_sec = extra_sec)
             
             # Make the ascii filename
-            ascii_name = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_sectors_{ch}_ATLAS_{__version__}.txt'
-    
+            ascii_name = f'{station_id}_{lidar_id}_{version_id}_{config_id}_{start_date}_{start_time}_tlc_{ch}_{scc_id_ch}_ATLAS_{__version__}.txt'
+
             # Export to ascii (Volker's format)        
             export_ascii.telecover(dir_out = args['output_folder'], 
                                    fname = ascii_name, 
@@ -274,25 +367,27 @@ def main(args, __version__):
                                    sectors_e = sectors_e)
 
             # Add metadata to the quicklook plot
-            from PIL import Image
-            from PIL import PngImagePlugin
                        
             METADATA = {"processing_software" : f"ATLAS_{data.version}",
-                        "measurement_id" : f"{data.Measurement_ID}",
+                        "station_id" : f"{station_id}",
+                        "lidar_id" : f"{lidar_id}",
+                        "version_id" : f"{version_id}",
+                        "config_id" : f"{config_id}",
                         "channel" : f"{ch}",
+                        "scc_id" : f"{scc_id_ch}",
                         "smooth" : f"{args['smooth']}",
                         "smoothing_exponential" : f"{args['smooth_exponential']}",
-                        "smoothing_range" : f"{args['smoothing_range']}",
+                        "smoothing_range" : f"{[x_llim, x_ulim]}",
                         "smoothing_window": f"{args['smoothing_window']}",
                         "dpi" : f"{args['dpi']}",
                         "color_reduction" : f"{args['color_reduction']}",
-                        "normalization_region" : f"{args['normalization_region']}",
+                        "normalization_region" : f"{norm_region}",
                         "use_range" : f"{args['use_range']}",
                         "use_last" : f"{args['use_last']}",
                         "use_non_rangecor" : f"{args['use_non_rangecor']}",
                         "x_lims" : f"{args['x_lims']}",
                         "y_lims" : f"{args['y_lims']}",
-                        "x_tick" : f"{args['x_tick']}"}
+                        "x_tick" : f"{x_tick}"}
     
                     
             im = Image.open(fpath)
@@ -310,16 +405,60 @@ def main(args, __version__):
             extra_rin = {'O' : False,
                          'I' : False}
         
+            i_o_ratio = np.nanmean(sig_i.loc[ch_d].values.copy(), axis = 0) /\
+                np.nanmean(sig_o.loc[ch_d].values.copy(), axis = 0)
+                
+            y_m_i = np.nanmean(sig_i.loc[ch_d].values.copy(), axis = 0)
+            y_m_o = np.nanmean(sig_o.loc[ch_d].values.copy(), axis = 0)
+            sector_dev = np.nanstd(np.vstack((y_m_o,y_m_i)), axis = 0)
+                
+            llim = 1.
+            ulim = 3.
+            min_win = 0.5
+            max_win = 2.
+            
+            if args['normalization_region'][0] < llim:
+                llim = args['normalization_region'][0]
+            if args['normalization_region'][0] > ulim:
+                ulim = args['normalization_region'][1]
+            if args['normalization_region'][1] - args['normalization_region'][0] < min_win:
+                min_win = args['normalization_region'][1] - args['normalization_region'][0]
+            if args['normalization_region'][1] - args['normalization_region'][0] > max_win:
+                max_win = args['normalization_region'][1] - args['normalization_region'][0]
+            
+            # Check for a fit range for the Δ90 calibration
+            rsem, nder, mfit, msem, mder, msec, mshp, mcrc, coef = \
+                curve_fit.stats(y1 = sector_dev,
+                                y2 = np.ones(i_o_ratio.shape),
+                                x  = x_vals,
+                                min_win = min_win,
+                                max_win = max_win,
+                                step = 0.1,
+                                llim = llim,
+                                ulim = ulim,
+                                rsem_lim = 0.05,
+                                cancel_shp = True,
+                                cross_check_type = 'both',
+                                cross_check_crit = 'both',
+                                cross_check_all_points = False)
+                
+                    
+            norm_region, idx, fit = \
+                curve_fit.scan(mfit = mfit,
+                               dflt_region = args['normalization_region'],
+                               auto_fit = args['auto_fit'],
+                               prefered_range = "near")
+
             coef_o, y_m_o, y_sm_o, y_m_sm_o, y_l_sm_o, y_u_sm_o, \
             coef_extra_o, y_extra_o, y_extra_sm_o, extra_rin['O'] = \
                 sector.process(x = x_vals, 
                                y = sig_o.loc[ch_d].values, 
                                iters = iters_rin, 
                                smooth = args['smooth'], 
-                               x_sm_lims = args['smoothing_range'],
+                               x_sm_lims = [x_llim, x_ulim],
                                x_sm_win = args['smoothing_window'],
                                expo = args['smooth_exponential'],
-                               region = args['normalization_region'])
+                               region = norm_region)
                 
             coef_i, y_m_i, y_sm_i, y_m_sm_i, y_l_sm_i, y_u_sm_i, \
             coef_extra_i, y_extra_i, y_extra_sm_i, extra_rin['I'] = \
@@ -327,10 +466,10 @@ def main(args, __version__):
                                y = sig_i.loc[ch_d].values, 
                                iters = iters_rin, 
                                smooth = args['smooth'], 
-                               x_sm_lims = args['smoothing_range'],
+                               x_sm_lims = [x_llim, x_ulim],
                                x_sm_win = args['smoothing_window'],
                                expo = args['smooth_exponential'],
-                               region = args['normalization_region'])
+                               region = norm_region)
 
 
             y_llim, y_ulim, y_llim_nr, y_ulim_nr = \
@@ -344,30 +483,37 @@ def main(args, __version__):
                     
             # Make title
             title = make_title.telecover(start_date = data.RawData_Start_Date,
-                                        start_time = data.RawData_Start_Time_UT, 
-                                        end_time = data.RawData_Stop_Time_UT, 
-                                        lidar = data.Lidar_Name, 
-                                        channel = ch, 
-                                        zan = data.Laser_Pointing_Angle,
-                                        loc = data.Station_Name,
-                                        iters = iters_rin,
-                                        sampling = sampling_sec,
-                                        smooth = args['smooth'],
-                                        sm_lims = args['smoothing_range'],
-                                        sm_win = args['smoothing_window'],
-                                        sm_expo = args['smooth_exponential'])
+                                         start_time = data.RawData_Start_Time_UT, 
+                                         end_time = data.RawData_Stop_Time_UT, 
+                                         lidar = data.Lidar_Name, 
+                                         channel = ch, 
+                                         station_id = station_id,
+                                         lidar_id = lidar_id,
+                                         version_id = version_id,
+                                         config_id = config_id,
+                                         config_name = config_name,
+                                         scc_id = scc_id_ch,
+                                         zan = data.Laser_Pointing_Angle,
+                                         loc = data.Station_Name,
+                                         iters = iters_rin,
+                                         sampling = sampling_sec,
+                                         smooth = args['smooth'],
+                                         sm_lims = [x_llim, x_ulim],
+                                         sm_win = args['smoothing_window'],
+                                         sm_expo = args['smooth_exponential'])
         
             # Make filename
             fname = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_rings_{ch}_ATLAS_{__version__}.png'
 
             # Make the plot
             fpath = \
-                make_plot.telecover_rin(dir_out = args['output_folder'], 
+                make_plot.telecover_rin(dir_out = os.path.join(args['output_folder'],'plots'), 
                                         fname = fname, title = title,
                                         dpi_val = args['dpi'],
                                         color_reduction = args['color_reduction'],
-                                        norm_region = args['normalization_region'],
-                                        use_nonrc = args['use_non_rangecor'],
+                                        auto_fit = args['auto_fit'],
+                                        norm_region = norm_region,
+                                        fit = fit,                                        use_nonrc = args['use_non_rangecor'],
                                         x_vals = x_vals, 
                                         y1_raw = y_m_o, 
                                         y2_raw = y_m_i, 
@@ -393,15 +539,15 @@ def main(args, __version__):
                                         y_llim_nr = y_llim_nr, 
                                         y_ulim_nr = y_ulim_nr, 
                                         x_label = x_label,
-                                        x_tick = args['x_tick'],
+                                        x_tick = x_tick,
                                         use_last = args['use_last'],
                                         iters = iters_rin)
             
-            sectors = {'O' : y_m_n,
-                       'I' : y_m_e}
+            sectors = {'O' : y_m_o,
+                       'I' : y_m_i}
             
-            sectors_e = {'O' : y_extra_n,
-                         'I' : y_extra_e}
+            sectors_e = {'O' : y_extra_o,
+                         'I' : y_extra_i}
             
             # Make ascii file header
             header = \
@@ -414,7 +560,7 @@ def main(args, __version__):
                                       meas_id = data.Measurement_ID, 
                                       channel = ch,
                                       iters = 1,
-                                      extra_sec = extra_sec)
+                                      extra_sec = extra_rin)
             
             # Make the ascii filename
             ascii_name = f'{data.Measurement_ID}_{data.Lidar_Name}_tlc_sectors_{ch}_ATLAS_{__version__}.txt'
@@ -428,28 +574,28 @@ def main(args, __version__):
                                    sectors = sectors, 
                                    sectors_e = sectors_e)
 
-            # Add metadata to the quicklook plot
-            from PIL import Image
-            from PIL import PngImagePlugin
-                       
+            # Add metadata to the quicklook plot         
             METADATA = {"processing_software" : f"ATLAS_{data.version}",
-                        "measurement_id" : f"{data.Measurement_ID}",
+                        "station_id" : f"{station_id}",
+                        "lidar_id" : f"{lidar_id}",
+                        "version_id" : f"{version_id}",
+                        "config_id" : f"{config_id}",
                         "channel" : f"{ch}",
+                        "scc_id" : f"{scc_id_ch}",
                         "smooth" : f"{args['smooth']}",
                         "smoothing_exponential" : f"{args['smooth_exponential']}",
-                        "smoothing_range" : f"{args['smoothing_range']}",
+                        "smoothing_range" : f"{[x_llim, x_ulim]}",
                         "smoothing_window": f"{args['smoothing_window']}",
                         "dpi" : f"{args['dpi']}",
                         "color_reduction" : f"{args['color_reduction']}",
-                        "normalization_region" : f"{args['normalization_region']}",
+                        "normalization_region" : f"{norm_region}",
                         "use_range" : f"{args['use_range']}",
                         "use_last" : f"{args['use_last']}",
                         "use_non_rangecor" : f"{args['use_non_rangecor']}",
                         "x_lims" : f"{args['x_lims']}",
                         "y_lims" : f"{args['y_lims']}",
-                        "x_tick" : f"{args['x_tick']}"}
-    
-                    
+                        "x_tick" : f"{x_tick}"}
+
             im = Image.open(fpath)
             meta = PngImagePlugin.PngInfo()
         

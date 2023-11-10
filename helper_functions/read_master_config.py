@@ -77,6 +77,15 @@ class config():
         else:
             
             self.pcb = dict()
+            
+# Dark
+        if parser.has_section('dark'):
+
+            self.drk = read_section(parser['dark'], dtype = object, squeeze = True)
+
+        else:
+            
+            self.drk = dict()
 
 
 # -------- END OF CLASS
