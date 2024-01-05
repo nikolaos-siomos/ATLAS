@@ -24,7 +24,10 @@ def short_molec(heights, ranges, system_info, channel_info,
     print('-----------------------------------------')
     print('Start making molecular calculations...')
     print('-----------------------------------------')
-        
+    
+    ldr_types = ['p', 'c', 't']
+    bsc_stypes = ['r', 't', 'n', 'o', 'h', 'l', 'm', 'x']
+    
     if 'Sounding_File_Name' in system_info.keys() :
         rsonde_path = os.path.join(os.path.dirname(external_info['input_file']),  
                                    system_info['Sounding_File_Name'])
@@ -92,6 +95,11 @@ def short_molec(heights, ranges, system_info, channel_info,
         dwl_ch = dwl.loc[ch]
 
         bdw_ch = bdw.loc[ch]
+        
+        mdr = np.nan * np.zeros(bins.size)
+        bxs_tot = np.nan * np.zeros(bins.size)
+        exs_fth = np.nan * np.zeros(bins.size)
+        exs_bck = np.nan * np.zeros(bins.size)
         
         wns_ch = 1E7 * (1. / ewl_ch - 1. / dwl_ch )
         
@@ -206,6 +214,8 @@ def short_molec(heights, ranges, system_info, channel_info,
             
             if ch_stype.loc[ch] == 'n':
                 bxs_tot_i[i] = c_N2[i] * bxs_tot_i[i]
+            if ch_stype.loc[ch] == 'o':
+                bxs_tot_i[i] = c_O2[i] * bxs_tot_i[i]
 
             mdr_i[i] = rrb.delta_mol_rayleigh(method = 'line_summation')
 
@@ -215,7 +225,8 @@ def short_molec(heights, ranges, system_info, channel_info,
         exs_bck_f = interp1d(sel_bins, exs_bck_i, bounds_error = False, fill_value = np.nan)
         mdr_f = interp1d(sel_bins, mdr_i, bounds_error = False, fill_value = np.nan)
         
-        bxs_tot = bxs_tot_f(bins)  
+        if ch_stype.loc[ch] in bsc_stypes:
+            bxs_tot = bxs_tot_f(bins)  
         exs_bck = exs_bck_f(bins)
         exs_fth = exs_fth_f(bins)
         
@@ -223,37 +234,43 @@ def short_molec(heights, ranges, system_info, channel_info,
         ecf_bck = N * exs_bck
         ecf_fth = N * exs_fth
 
-        if ch_type.loc[ch] in ['p', 'c', 't']:
+        if ch_type.loc[ch] in ldr_types:
             mdr = mdr_f(bins)
             
         rng = ranges.loc[ch_d].values
         trn_bck = transmittance(x_range = rng, extinction = ecf_bck)
         trn_fth = transmittance(x_range = rng, extinction = ecf_fth)
         
-        if ch_type.loc[ch] in ['t', 'v', 'r', 'f']:
+        if ch_type.loc[ch] not in ['p', 'c']:
             atb = bcf_tot * trn_fth * trn_bck
-        if ch_type.loc[ch] in ['p', 'o']:
+        elif ch_type.loc[ch] in ['p']:
             atb = bcf_tot * trn_fth * trn_bck / (1. + mdr) 
-        if ch_type.loc[ch] in ['c', 'x']:
-            atb = bcf_tot * mdr * trn_fth * trn_bck / (1. + mdr) 
+        elif ch_type.loc[ch] in ['c']:
+            atb = bcf_tot * trn_fth * trn_bck * mdr / (1. + mdr) 
                             
-        # Pack into a single xarray object
-        molec.loc[dict(properties = 'Backscatter_Cross_Section')]\
-            .loc[ch_d] = bxs_tot       
+        # Pack into a single xarray object     
         molec.loc[dict(properties = 'Extinction_Cross_Section_Backward')]\
             .loc[ch_d] = exs_bck
         molec.loc[dict(properties = 'Extinction_Cross_Section_Forward')]\
             .loc[ch_d] = exs_fth
-        molec.loc[dict(properties = 'Backscatter_Coefficient')]\
-            .loc[ch_d] = bcf_tot               
         molec.loc[dict(properties = 'Extinction_Coefficient_Backward')]\
             .loc[ch_d] = ecf_bck   
         molec.loc[dict(properties = 'Extinction_Coefficient_Forward')]\
             .loc[ch_d] = ecf_fth   
         molec.loc[dict(properties = 'Molecular_Linear_Depolarization_Ratio')]\
             .loc[ch_d] = mdr
+        molec.loc[dict(properties = 'Backscatter_Cross_Section')]\
+            .loc[ch_d] = bxs_tot       
+        molec.loc[dict(properties = 'Backscatter_Coefficient')]\
+            .loc[ch_d] = bcf_tot    
         molec.loc[dict(properties = 'Attenuated_Backscatter')]\
             .loc[ch_d] = atb
+
+        # if ch_type.loc[ch] not in ldr_types:
+        #     print(f"-- Warning: No molec. LDR calculation. Channel type {ch_type.loc[ch]} not in {ldr_types}")
+        # if ch_stype.loc[ch] not in bsc_stypes:
+        #     print(f"-- Warning: No molec. bsc calculation. Channel type {ch_stype.loc[ch]} not in {bsc_stypes}")
+        
 
     print('-- Molecular calculations succesfully complete!')
     print('-----------------------------------------')

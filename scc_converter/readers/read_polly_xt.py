@@ -315,17 +315,33 @@ def get_masks(pol_cal_angle, zer_pos, p45_pos, m45_pos):
     mask_zer = ((np.abs(pol_cal_angle - zer_pos)) <= 0.05) & \
         (np.isfinite(pol_cal_angle))
     
+    mask_zer = trim_edges(mask_zer)
+    
     if p45_pos == p45_pos:
         mask_p45 = (np.abs(pol_cal_angle - p45_pos) <= 0.05) & \
             (np.isfinite(pol_cal_angle))
+        mask_p45 = trim_edges(mask_p45)
+
     else:
        mask_p45 = np.zeros(pol_cal_angle.size, dtype = bool)
        
     if m45_pos == m45_pos:
         mask_m45 = (np.abs(pol_cal_angle - m45_pos) <= 0.05) & \
             (np.isfinite(pol_cal_angle))
+        mask_m45 = trim_edges(mask_m45)
     else:
-       mask_m45 = np.zeros(pol_cal_angle.size, dtype = bool)
+        mask_m45 = np.zeros(pol_cal_angle.size, dtype = bool)
       
     return(mask_zer, mask_p45, mask_m45)
+
+def trim_edges(mask):
+    
+    mask[1:-1] = (mask[2:].astype(int) - mask[1:-1].astype(int) == 0) & \
+        (mask[1:-1].astype(int) - mask[:-2].astype(int) == 0) & \
+            (mask[1:-1] == True)
+    mask[0] = (mask[1].astype(int) - mask[0].astype(int) == 0) & (mask[0] == True)
+    mask[-1] = (mask[-1].astype(int) - mask[-2].astype(int) == 0) & (mask[-1] == True)
+    
+    return(mask)
+    
             
