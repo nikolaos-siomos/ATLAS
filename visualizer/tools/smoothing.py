@@ -128,7 +128,7 @@ def sliding_average_2D_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None, er
             else:
                 raise Exception('Error type provided is not understoud. Please select one of: sem, std')
     
-    return(z_avg)
+    return(z_avg, z_err)
 
 def sliding_average_1D(y_vals, x_vals, x_sm_lims, x_sm_win, 
                        expo = False, err_type = 'sem'):

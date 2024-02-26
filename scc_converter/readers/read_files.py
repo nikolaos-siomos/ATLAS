@@ -635,7 +635,7 @@ def radiosonde(finput_rs, delimiter, skip_header, skip_footer,
 
     ind_rs = np.argmin(np.abs(delta_t))
     
-    if not any(np.abs(delta_t) < 18):
+    if not any(np.abs(delta_t) < 24):
         raise Exception(f"-- Error: The nearest radiosonde in time {bname[ind_rs]} was launched with a time difference of {np.round(delta_t[ind_rs],decimals=1)} hours with respect to the middle time of the measurement! Please provide a radiosond file with less than 18 hours temporal difference")
     else:
         print(f'-- Selected radiosonde file: {bname[ind_rs]}')

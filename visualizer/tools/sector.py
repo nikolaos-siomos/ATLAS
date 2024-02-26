@@ -43,7 +43,7 @@ def process(x, y, iters, smooth, x_sm_lims, x_sm_win, expo, region):
                            expo = False)
 
         # Smoothing unaveraged sectors            
-        y_sm_n = \
+        y_sm_n, _ = \
             smooth_2D(z_vals = y, 
                       y_vals = x,
                       y_sm_lims = x_sm_lims,
@@ -51,7 +51,7 @@ def process(x, y, iters, smooth, x_sm_lims, x_sm_win, expo, region):
                       expo = expo)
 
 
-        y_sm_f = \
+        y_sm_f, _ = \
             smooth_2D_fast(z_vals = y, 
                            y_vals = x,
                            y_sm_lims = [x_sm_lims[1], 20.],

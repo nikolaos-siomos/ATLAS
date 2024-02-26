@@ -28,7 +28,9 @@ def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
 
     n_nb_of_time_scales = 1
     n_scan_angles = 1
-        
+    
+    n_char_fname = len(time_info.filename.values[0])
+    
     atlas_channel_label = channel_info.telescope_type.values + \
         channel_info.channel_type.values + \
             channel_info.acquisition_type.values + \
@@ -64,6 +66,7 @@ def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
         Bck_Stop_Time = np.nan * np.zeros([n_time_bck,n_nb_of_time_scales])
         Bck_Start_Time[:,0] = start_t_d
         Bck_Stop_Time[:,0] = end_t_d
+        n_char_fname_d = len(time_info_d.filename.values[0])
     
     ds = nc.Dataset(nc_path,mode='w')
 
@@ -74,9 +77,10 @@ def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
     ds.createDimension('nb_of_time_scales', n_nb_of_time_scales)
     ds.createDimension('scan_angles', n_scan_angles)
     ds.createDimension('nchar_channel',4)
-    ds.createDimension('nchar_filename',15)
+    ds.createDimension('nchar_filename',n_char_fname)
     if not isinstance(sig_d,list):  
         ds.createDimension('time_bck', n_time_bck)
+        ds.createDimension('nchar_filename_d',n_char_fname)
     
 # Adding Global Parameters
     ds.Altitude_meter_asl = float(system_info.altitude);
@@ -158,10 +162,10 @@ def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
     
     make_nc_var(ds, name = 'Emitted_Wavelength', value = channel_info.emitted_wavelength.values, dtype = 'float', dims = ('channels',))
 
-    make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = 15)    
+    make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = n_char_fname)    
 
     if not isinstance(sig_d,list):
-        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = 15)    
+        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = n_char_fname_d)    
             
     make_nc_var(ds, name = 'id_timescale', value = np.zeros(n_channels), dtype = 'int', dims = ('channels',))
 
@@ -234,6 +238,8 @@ def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path,
     n_nb_of_time_scales = 1
     n_scan_angles = 1
     
+    n_char_fname = len(time_info.filename.values[0])
+
     atlas_channel_label = channel_info.telescope_type.values + \
         channel_info.channel_type.values + \
             channel_info.acquisition_type.values + \
@@ -269,7 +275,8 @@ def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path,
         Bck_Stop_Time = np.nan * np.zeros([n_time_bck,n_nb_of_time_scales])
         Bck_Start_Time[:,0] = start_t_d
         Bck_Stop_Time[:,0] = end_t_d
-        
+        n_char_fname_d = len(time_info_d.filename.values[0])
+
     ds = nc.Dataset(nc_path,mode='w')
 
 # Adding Dimensions    
@@ -279,9 +286,10 @@ def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path,
     ds.createDimension('nb_of_time_scales', n_nb_of_time_scales)
     ds.createDimension('scan_angles', n_scan_angles)
     ds.createDimension('nchar_channel',4)
-    ds.createDimension('nchar_filename',15)
-    if not isinstance(sig_d,list):
+    ds.createDimension('nchar_filename',n_char_fname)
+    if not isinstance(sig_d,list):  
         ds.createDimension('time_bck', n_time_bck)
+        ds.createDimension('nchar_filename_d',n_char_fname)
     
 # Adding Global Parameters
     ds.Altitude_meter_asl = system_info.altitude;
@@ -359,11 +367,11 @@ def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path,
     
     make_nc_var(ds, name = 'Emitted_Wavelength', value = channel_info.emitted_wavelength.values, dtype = 'float', dims = ('channels',))
 
-    make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = 15)    
+    make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = n_char_fname)    
 
     if not isinstance(sig_d,list):
-        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = 15)    
-                    
+        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = n_char_fname_d)    
+            
     make_nc_var(ds, name = 'id_timescale', value = np.zeros(n_channels), dtype = 'int', dims = ('channels',))
 
     make_nc_var(ds, name = 'Channel_Bandwidth', value = channel_info.channel_bandwidth.values, dtype = 'float', dims = ('channels',))
@@ -427,6 +435,8 @@ def polarization_calibration_file(
     n_nb_of_time_scales = 1
     n_scan_angles = 1
 
+    n_char_fname = len(time_info.filename.values[0])
+
     atlas_channel_label = channel_info.telescope_type.values + channel_info.channel_type.values + channel_info.acquisition_type.values + channel_info.channel_subtype.values
     
     start_time = [np.datetime64(t,'us').item() for t in time_info['start_time']]
@@ -457,7 +467,8 @@ def polarization_calibration_file(
         Bck_Stop_Time = np.nan * np.zeros([n_time_bck,n_nb_of_time_scales])
         Bck_Start_Time[:,0] = start_t_d
         Bck_Stop_Time[:,0] = end_t_d
-    
+        n_char_fname_d = len(time_info_d.filename.values[0])
+
     ds = nc.Dataset(nc_path,mode='w')
 
 # Adding Dimensions
@@ -467,9 +478,10 @@ def polarization_calibration_file(
     ds.createDimension('nb_of_time_scales', n_nb_of_time_scales)
     ds.createDimension('scan_angles', n_scan_angles)
     ds.createDimension('nchar_channel',4)
-    ds.createDimension('nchar_filename',15)
-    if not isinstance(sig_d,list):
+    ds.createDimension('nchar_filename',n_char_fname)
+    if not isinstance(sig_d,list):  
         ds.createDimension('time_bck', n_time_bck)
+        ds.createDimension('nchar_filename_d',n_char_fname)
 
 # Adding Global Parameters
     ds.Altitude_meter_asl = system_info.altitude;
@@ -551,11 +563,11 @@ def polarization_calibration_file(
     
     make_nc_var(ds, name = 'Emitted_Wavelength', value = channel_info.emitted_wavelength.values, dtype = 'float', dims = ('channels',))
 
-    make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = 15)    
+    make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = n_char_fname)    
 
     if not isinstance(sig_d,list):
-        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = 15)    
-                    
+        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = n_char_fname_d)    
+            
     make_nc_var(ds, name = 'id_timescale', value = np.zeros(n_channels), dtype = 'int', dims = ('channels',))
 
     make_nc_var(ds, name = 'Channel_Bandwidth', value = channel_info.channel_bandwidth.values, dtype = 'float', dims = ('channels',))
@@ -632,6 +644,8 @@ def dark_file(system_info, channel_info, time_info, nc_path,
     n_nb_of_time_scales = 1
     n_scan_angles = 1
     
+    n_char_fname = len(time_info.filename.values[0])
+
     atlas_channel_label = channel_info.telescope_type.values + \
         channel_info.channel_type.values + \
             channel_info.acquisition_type.values + \
@@ -666,8 +680,8 @@ def dark_file(system_info, channel_info, time_info, nc_path,
     ds.createDimension('nb_of_time_scales', n_nb_of_time_scales)
     ds.createDimension('scan_angles', n_scan_angles)
     ds.createDimension('nchar_channel',4)
-    ds.createDimension('nchar_filename',15)  
-
+    ds.createDimension('nchar_filename',n_char_fname)
+        
 # Adding Global Parameters
     ds.Altitude_meter_asl = system_info.altitude;
 
@@ -735,7 +749,7 @@ def dark_file(system_info, channel_info, time_info, nc_path,
     
     make_nc_var(ds, name = 'Emitted_Wavelength', value = channel_info.emitted_wavelength.values, dtype = 'float', dims = ('channels',))
 
-    make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = 15)    
+    make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = n_char_fname)    
                     
     make_nc_var(ds, name = 'id_timescale', value = np.zeros(n_channels), dtype = 'int', dims = ('channels',))
 

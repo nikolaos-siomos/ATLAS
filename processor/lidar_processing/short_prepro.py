@@ -430,10 +430,10 @@ def dark(sig_raw, shots, system_info, channel_info, external_info, time_info):
     # --------------------------------------------------
     # Smoothing
     # --------------------------------------------------
-    sig = signal.smoothing(sig = sig.copy(), 
-                            smoothing_window = 500,
-                            smoothing_sbin = 750,
-                            smoothing_ebin = -1)
+    sig, _ = signal.smoothing(sig = sig.copy(), 
+                              smoothing_window = 500,
+                              smoothing_sbin = 750,
+                              smoothing_ebin = -1)
         
     if external_info['debug']: pack_out['sig_flt'] = sig.copy()
     

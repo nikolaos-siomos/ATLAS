@@ -537,7 +537,7 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
         
         smoothing_sbin:
             An integer with the starting bin for smoothing. No smoothing will 
-            be applied before it. If set to -1 the first bin will be used
+            be applied before it. If set to 0 the first bin will be used
             
         smoothing_ebin:
             An integer with the ending bin for smoothing. No smoothing will 
@@ -551,9 +551,7 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
     """   
     
     sig_out = sig.copy()
-
-    if smoothing_sbin == -1:
-        smoothing_sbin = 1
+    std_out = sig.copy()
         
     if smoothing_ebin == -1:
         smoothing_ebin = sig.bins.size
@@ -562,8 +560,11 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
 
     sig_out.loc[bins_d] = sig.copy()\
         .rolling(bins = smoothing_window, center = True).mean().loc[bins_d]
-        
-    return(sig_out)
+
+    std_out.loc[bins_d] = sig.copy()\
+        .rolling(bins = smoothing_window, center = True).std().loc[bins_d]
+                
+    return(sig_out, std_out)
 
 # def trim_clouds(sig, daq_trigger_offset):
 

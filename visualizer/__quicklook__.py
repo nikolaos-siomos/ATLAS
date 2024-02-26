@@ -90,11 +90,11 @@ def main(args, __version__, meas_type):
             else:
                 from .tools.smoothing import sliding_average_2D as smooth_2D
 
-            z_vals = smooth_2D(z_vals = sig_ch, 
-                               y_vals = y_vals,
-                               y_sm_lims = args['smoothing_range'],
-                               y_sm_win = args['smoothing_window'],
-                               expo = args['smooth_exponential'])
+            z_vals, _ = smooth_2D(z_vals = sig_ch, 
+                                  y_vals = y_vals,
+                                  y_sm_lims = args['smoothing_range'],
+                                  y_sm_win = args['smoothing_window'],
+                                  expo = args['smooth_exponential'])
         else:
             z_vals = sig_ch
 

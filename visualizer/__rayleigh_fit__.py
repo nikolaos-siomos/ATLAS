@@ -131,7 +131,15 @@ def main(args, __version__):
                           x_sm_win = args['smoothing_window'],
                           expo = args['smooth_exponential'],
                           err_type = 'std')
-    
+
+            atb_ch, y_errs_mol = \
+                smooth_1D(y_vals = atb_ch.copy(), 
+                          x_vals = x_vals,
+                          x_sm_lims = args['smoothing_range'],
+                          x_sm_win = args['smoothing_window'],
+                          expo = args['smooth_exponential'],
+                          err_type = 'std')
+        
         else:
             y_vals_sm = sig_ch.copy()
             y_errs = np.nan * y_vals_sm   
