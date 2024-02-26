@@ -127,6 +127,7 @@ def make_title(mtype, timescale, smoothing_window, channel, date_part):
     if len(date_part) > 0:
         title = str.strip(f'{label}\n {date_part}')
         
+    print(title)
     return(title)
 
 def make_filename(mtype, timescale, smoothing_window, channel, 
@@ -180,7 +181,11 @@ def multi_line_plot(signal, x_vals = [], channels = None,
             title = make_title(mtype = mtype, timescale = timescale, 
                                smoothing_window = smoothing_window, 
                                channel = ch, date_part = date_part)
-            plt.title(title)
+            
+            fig = plt.figure(figsize=(6. , 3.))
+            ax = fig.add_axes([0.1,0.15,0.86,0.70])
+            
+            ax.set_title(title)
 
             if len(xlims) > 0 and x_units == 'range':
                 if len(np.where(x_vals[j,:] < xlims[0])[0]) == 0:
@@ -202,26 +207,28 @@ def multi_line_plot(signal, x_vals = [], channels = None,
                 
                 if x_units == 'bins': 
                     if len(xlims) > 0:
-                        plt.plot(x_vals[xbins[0]:xbins[1] + 1], 
+                        ax.plot(x_vals[xbins[0]:xbins[1] + 1], 
                                  signal[i, j, xbins[0]:xbins[1] + 1])
-                        plt.xlim([xlims[0], xlims[1]])
+                        ax.set_xlim([xlims[0], xlims[1]])
                     else:
-                        plt.plot(x_vals, signal[i, j, :])
-                    plt.xlabel('Bins')
+                        ax.set_plot(x_vals, signal[i, j, :])
+                    ax.set_xlabel('Bins')
 
                 else:
                     if len(xlims) > 0:
-                        plt.plot(x_vals[j, xbins[0]:xbins[1] + 1], 
+                        ax.plot(x_vals[j, xbins[0]:xbins[1] + 1], 
                                  signal[i, j, xbins[0]:xbins[1] + 1])
-                        plt.xlim([xlims[0], xlims[1]])
+                        ax.set_xlim([xlims[0], xlims[1]])
                     else:
-                        plt.plot(x_vals[j, :], signal[i, j, :])
-                    plt.xlabel('Range [km]')        
+                        ax.plot(x_vals[j, :], signal[i, j, :])
+                    ax.set_xlabel('Range [km]')        
 
                 if len(ylims) > 0:
-                    plt.ylim([ylims[0],ylims[1]])
-                plt.ylabel('Signal [AU]')                    
-            plt.grid()
+                    ax.set_ylim([ylims[0],ylims[1]])
+                ax.set_ylabel('Signal [AU]')                    
+            ax.grid()
+            ax.ticklabel_format(axis = 'y', useMathText = True, style='sci', scilimits=(-1,1))
+
             
             if len(exp_dir) > 0 and os.path.exists(exp_dir):
                 fname = make_filename(mtype, timescale = timescale, 
@@ -233,12 +240,12 @@ def multi_line_plot(signal, x_vals = [], channels = None,
 
                 fpath = os.path.join(exp_dir, fname)
                 
-                plt.tight_layout()
+                # plt.tight_layout()
                 
-                plt.savefig(fpath, dpi = dpi_val)
+                fig.savefig(fpath, dpi = dpi_val)
             
             plt.show()
-            plt.clf()
+            fig.clf()
             
             plt.close()
     

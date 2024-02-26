@@ -25,16 +25,16 @@ parent_folders = ['/home/nikos/Nextcloud3/ARS-stations/the/179_199_664_20231221/
 timescale = '5Min'
 smoothing_window = 4000.
 
-raw_pattern = '_drk_ATLAS_'
+raw_pattern = '_ray_ATLAS_'
 prp_pattern = '_qck_ray_ATLAS_'
 
-raw_mtype = 'Raw Dark'
+raw_mtype = 'Raw Ray'
 prp_mtype = 'RC Ray'
 
-raw_channels = '0532xppt' #can be a list or scalar
+raw_channels = '0532xcpr' #can be a list or scalar
 prp_channels = '1064xtax' #can be a list or scalar
 
-raw_xlims = [3200,4200] #in bins
+raw_xlims = [0,1000] #in bins
 prp_xlims = [0, 20] #in kms
 
 raw_ylims = []
