@@ -140,7 +140,7 @@ def read_body(channel_info, buffer, sep):
         icount = 0
         for i in range(nbin_s, nbin_e, 4):
             sig_raw_arr[j,icount] = int.from_bytes(data[i:i+4], 
-                                                   byteorder = 'little')
+                                                   byteorder = 'little') # maybe use  sys.byteorder to get the order in the future
             icount = icount + 1
 
         nbin_s = nbin_e + 2

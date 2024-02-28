@@ -253,7 +253,7 @@ def get_overflow_mask(sig, acquisition_mode, daq_range):
 
         ch_d = dict(channel = ch)
 
-        if acquisition_mode.loc[ch] == 1: #3rd digit of channel name is the acquisition mode (a or p)
+        if int(acquisition_mode.loc[ch]) == 1: #3rd digit of channel name is the acquisition mode (a or p)
         
             max_count = np.power(2.,15)
 
@@ -264,7 +264,7 @@ def get_overflow_mask(sig, acquisition_mode, daq_range):
 
                 mask.loc[ch_d] = crit.values                                           
 
-        if acquisition_mode.loc[ch] == 0: #3rd digit of channel name is the acquisition mode (a or p)
+        if int(acquisition_mode.loc[ch]) == 0: #3rd digit of channel name is the acquisition mode (a or p)
 
             max_mV = daq_range.loc[ch]
         

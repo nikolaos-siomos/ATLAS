@@ -22,7 +22,7 @@ parent_folders = ['/home/nikos/Nextcloud3/ARS-stations/the/179_199_664_20231221/
 
 #parent_folders = ['/home/nikos/Nextcloud3/ARS-stations/gar/203_246_823_20240222/netcdf/']                                 
 
-timescale = '5Min'
+timescale = ''
 smoothing_window = 4000.
 
 raw_pattern = '_ray_ATLAS_'
@@ -34,13 +34,14 @@ prp_mtype = 'RC Ray'
 raw_channels = '0532xcpr' #can be a list or scalar
 prp_channels = '1064xtax' #can be a list or scalar
 
-raw_xlims = [0,1000] #in bins
+raw_xlims = [0,9000] #in bins
 prp_xlims = [0, 20] #in kms
 
 raw_ylims = []
 prp_ylims = [-0.4E7,0.4E7]
 
-exp_dir = '/home/nikos/Nextcloud3/ARS-stations/the/dark_distortions'
+# exp_dir = '/home/nikos/Nextcloud3/ARS-stations/the/dark_distortions'
+exp_dir = ''
 
 #------------------------------------------------------------------------------
 # B) Calculations 
