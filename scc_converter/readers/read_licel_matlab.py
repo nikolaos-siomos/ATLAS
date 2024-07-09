@@ -109,6 +109,10 @@ def dtfs(dir_meas):
             shots = shots.sortby('time').copy()
             time_info = time_info.sort_index()
             
+            sig_raw = unit_conv_bits_to_mV_and_MHz_to_counts(channel_info, 
+                                                             sig_raw.copy(), 
+                                                             shots)
+            
         else:
             print('---- Warning! Folder empty \n'+\
                   f'---> !! Skip reading measurement files from folder {dir_meas}')  
@@ -252,3 +256,35 @@ def read_buffer(fname):
         buffer = f.read()
         
     return(buffer)
+
+def unit_conv_bits_to_mV_and_MHz_to_counts(channel_info, signal, shots):
+
+    """Converts analog signals from mV to bits """
+    
+    if len(signal) > 0:
+        
+        mask_an = channel_info.acquisition_mode.values == 0
+
+        mask_pc = channel_info.acquisition_mode.values == 1
+        
+        channel_id_an = channel_info.index.values[mask_an]
+
+        channel_id_pc = channel_info.index.values[mask_pc]
+        
+        data_acquisition_range = channel_info.data_acquisition_range
+        
+        analog_to_digital_resolution = channel_info.analog_to_digital_resolution
+        
+        sampl_rate = 150. / channel_info.range_resolution
+
+        for ch in channel_id_an:
+            ch_d = dict(channel = ch)
+            # analog conversion (to bits)
+            signal.loc[ch_d] = signal.loc[ch_d]*(shots.loc[ch_d]*(np.power(2,analog_to_digital_resolution.loc[ch])-1.))/data_acquisition_range.loc[ch]
+
+        for ch in channel_id_pc:
+            ch_d = dict(channel = ch)        
+            # analog conversion (to counts)
+            signal.loc[ch_d] = signal.loc[ch_d] * shots.loc[ch_d] / sampl_rate.loc[ch]
+
+    return(signal) 

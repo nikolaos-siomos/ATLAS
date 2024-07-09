@@ -268,11 +268,19 @@ def get_overflow_mask(sig, acquisition_mode, daq_range):
 
             max_mV = daq_range.loc[ch]
         
-            crit = (sig.loc[ch_d] >= max_mV) | (sig.loc[ch_d] <= 0.)
-            
-            if crit.any():
-                print(f"-- Warning: Channel {ch} - Analog signal mV values above the data acqusition range or below 0. were detected! ")
+            crit_max_mV = (sig.loc[ch_d] >= max_mV) 
 
+            if crit_max_mV.any():
+                print(f"-- Warning: Channel {ch} - Analog signal mV values above the data acqusition range were detected! ")
+            
+            crit_neg = (sig.loc[ch_d] <= 0.)
+            
+            if crit_neg.any():
+                print(f"-- Warning: Channel {ch} - Analog signal mV values below 0. were detected! ")
+
+            crit = crit_max_mV | crit_neg
+
+            if crit.any():
                 mask.loc[ch_d] = crit.values
     
     return(mask)
