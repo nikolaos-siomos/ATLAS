@@ -148,9 +148,9 @@ def crc_check(coef, rerr, mtmp, crc_fac, crc_lim, cross_check_type, cross_check_
 
                     if cross_check_crit == 'min':
                         crit = (coef[i,slicer] - coef[i,j]) / coef[i,j] <= crc_fac * rerr[i,slicer]
-                    elif cross_check_type == 'max':
+                    elif cross_check_crit == 'max':
                         crit = (coef[i,slicer] - coef[i,j]) / coef[i,j] >= crc_fac * rerr[i,slicer]
-                    elif cross_check_type == 'both':
+                    elif cross_check_crit == 'both':
                         crit = np.abs((coef[i,slicer] - coef[i,j]) / coef[i,j]) <= crc_fac * rerr[i,slicer]
                     else:
                         raise Exception(f"-- Error: The provided cross_check_crit {cross_check_crit} is wrong. Please select one of: min, max, both")
@@ -172,9 +172,9 @@ def crc_check(coef, rerr, mtmp, crc_fac, crc_lim, cross_check_type, cross_check_
 
                     if cross_check_crit == 'min':
                         crit = (coef[i,slicer] - coef[i,j]) / coef[i,j] <= crc_lim
-                    elif cross_check_type == 'max':
+                    elif cross_check_crit == 'max':
                         crit = (coef[i,slicer] - coef[i,j]) / coef[i,j] >= crc_lim
-                    elif cross_check_type == 'both':
+                    elif cross_check_crit == 'both':
                         crit = np.abs((coef[i,slicer] - coef[i,j]) / coef[i,j]) <= np.abs(crc_lim)
                     else:
                         raise Exception(f"-- Error: The provided cross_check_crit {cross_check_crit} is wrong. Please select one of: min, max, both")

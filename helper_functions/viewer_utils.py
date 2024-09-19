@@ -15,6 +15,8 @@ import os, glob
 from visualizer.tools.smoothing import sliding_average_2D_fast
 import matplotlib.dates as mdates
 from scipy.stats import linregress
+from bokeh.plotting import figure, show
+from bokeh.models import Panel, Tabs
 
 def get_fpaths(parent_folders, raw_pattern = '_ray_ATLAS_', 
                prp_pattern = '_qck_drk_ATLAS_'): 
@@ -196,7 +198,7 @@ def multi_line_plot(signal, ranges = [], channels = None, zero_bins = [],
                     mtype = '', stype = 'Raw', 
                     timescale = '', smoothing_window = [],
                     start_date = '', start_time = '', end_time = '',
-                    exp_dir = '', dpi_val = 300):
+                    exp_dir = '', dpi_val = 300, interactive = False):
     
     if channels == None:
         channels = signal.channel.values
@@ -310,18 +312,114 @@ def multi_line_plot(signal, ranges = [], channels = None, zero_bins = [],
                 
                 fig.savefig(fpath, dpi = dpi_val)
             
-            plt.show()
-            fig.clf()
+            if interactive:
+                plt.ion()
+                plt.show()
+            else:
+                plt.show()
+                fig.clf()
             
-            plt.close()
+                plt.close()
     
     return()
+
+def multi_line_plot_bokeh(signal, ranges = [], channels = None, zero_bins = [],
+                          resol = [], xlims = [], ylims = [],
+                          mtype = '', stype = 'Raw', 
+                          timescale = '', smoothing_window = [],
+                          start_date = '', start_time = '', end_time = '',
+                          exp_dir = '', dpi_val = 300, interactive = False):
+    
+    if channels == None:
+        channels = signal.channel.values
+    else:
+        channels = np.array(channels)
+    
+    if stype not in ['RC','Raw']:
+        raise Exception(f"-- Error: The provided stype ({stype}) was not recognize. Please select one of: ['RC','Raw']")
+            
+    
+    n_time = signal.time.size
+    n_channel = signal.channel.size
+    
+    if len(start_date) > 0 and len(start_time) > 0 and len(end_time) > 0:
+        date_part = date_text(start_date = start_date, 
+                              start_time = start_time,
+                              end_time = end_time) 
+    else:
+        date_part = ''
+    
+    tabs = []
+    
+    for j in range(n_channel):
+        ch = signal.channel.values[j]
+
+        if ch in channels:
+            title = make_title_mline(mtype = mtype, stype = stype,
+                                     timescale = timescale, 
+                                     smoothing_window = smoothing_window, 
+                                     channel = ch, date_part = date_part)  
+            
+            if stype == 'Raw' and ch[6] == 'a':
+                y_units = 'mV'
+            elif stype == 'Raw' and ch[6] == 'p':
+                y_units = 'Counts'
+            elif stype == 'RC':
+                y_units = 'AU'
+                
+            if len(ranges) == 0:
+                x_units = 'bins'
+                x_vals_1 = signal.bins.values
+                x_vals_2 = (x_vals_1 + zero_bins.loc[ch]) * resol.loc[ch] * 1E-3
+                x_label_1 = 'bins'
+                x_label_2 = 'Range [km]'
+                y_label = f'Raw Signal [{y_units}]'
+            else:
+                x_units = 'range' 
+                x_vals_1 = ranges[j,:].values
+                x_vals_2 = np.round(1E3 * x_vals_1 / resol.loc[ch] - zero_bins.loc[ch], decimals = 0)
+                x_label_1 = 'Range [km]'
+                x_label_2 = 'bins'
+                y_label = 'RC Signal'
+
+            p = figure(width = 800, height = 400, title = title,
+                       x_axis_label = x_label_1, 
+                       y_axis_label = y_label)   
+                
+            for i in range(n_time):
+                p.line(x_vals_1, signal[i, j, :].values, alpha=0.5)
+
+            print(p)
+            show(p)
+            raise Exception
+            tab = Panel(child = p, title = title)
+
+            
+            tabs.append(tab)
+                    
+            if len(exp_dir) > 0 and os.path.exists(exp_dir):
+                fname = make_filename(mtype = mtype, stype = stype,
+                                      timescale = timescale, 
+                                      smoothing_window = smoothing_window, 
+                                      channel = ch, 
+                                      start_date = start_date, 
+                                      start_time = start_time, 
+                                      end_time = end_time,
+                                      ptype = 'mline')
+
+                fpath = os.path.join(exp_dir, fname)
+                
+                # plt.tight_layout()
+                            
+            show(Tabs(tabs = tabs))
+    
+    return(tab)
 
 def time_series_plot(signal, channels = None, ranges = [], 
                      xlims = [], ylims = [], mtype = '', stype = 'Raw', 
                      timescale = '', smoothing_window = [],
                      start_date = '', start_time = '', end_time = '',
-                     exp_dir = '', dpi_val = 300):
+                     exp_dir = '', dpi_val = 300, interactive = False):
     
     if channels == None:
         channels = signal.channel.values
@@ -443,10 +541,14 @@ def time_series_plot(signal, channels = None, ranges = [],
                 
                 fig.savefig(fpath, dpi = dpi_val)
             
-            plt.show()
-            fig.clf()
+            if interactive:
+                plt.ion()
+                plt.show()
+            else:
+                plt.show()
+                fig.clf()
             
-            plt.close()
+                plt.close()
     
     return()
 

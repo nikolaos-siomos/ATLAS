@@ -173,7 +173,9 @@ def main(args, __version__):
             curve_fit.scan(mfit = mfit,
                            dflt_region = args['normalization_region'],
                            auto_fit = args['auto_fit'])
-                
+        
+        args['normalization_region'] = norm_region
+        
         nder_c = float(nder[idx].values)
         mder_c = float(mder[idx].values)
         rsem_c = float(rsem[idx].values)

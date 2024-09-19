@@ -76,6 +76,10 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If set to True an automatic identification of the molecular regions will be attempted. If the automatic procedure is successful, the normalization_region variable will be ignored. If the procedure is not successful or auto_ray is set to False, the manually-provided/default normalization will be used. Defaults to True')
 
+    parser.add_argument('--cross_check_lim', metavar = 'cross_check_lim',
+                        type = float, nargs = '?', default = 2, 
+                        help = 'Lower limit applied for the cross-check criterion for the calculation of the Rayleigh fit mask. Use in case a high distance of full overlap is causing the cross-check test to fail. Defaults to 2km ')
+
     parser.add_argument('--smooth', metavar = 'smooth',
                         type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,

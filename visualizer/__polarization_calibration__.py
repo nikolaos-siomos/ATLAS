@@ -281,7 +281,10 @@ def main(args, __version__):
     
         eta_p45_prf = (y_r_p45_sm / y_t_p45_sm)
         
-        eta_prf = np.sqrt(eta_m45_prf * eta_p45_prf)
+        if args['calibration_factor_method'] == 0:
+            eta_prf = np.sqrt(eta_m45_prf * eta_p45_prf)
+        elif args['calibration_factor_method'] == 1:
+            eta_prf = (eta_m45_prf + eta_p45_prf) / 2.            
         
         delta_r_prf = (y_r_rax_sm / y_t_rax_sm)
         
@@ -315,25 +318,6 @@ def main(args, __version__):
                             cross_check_crit = 'both',
                             der_lim = 0.001,
                             cancel_shp = True)
-        # from matplotlib import pyplot as plt
-        # msem.plot()
-        # plt.title('SEM')
-        # plt.show()
-        # mder.plot()
-        # plt.title('DER')
-        # plt.show()
-        # msec.plot()
-        # plt.title('SEC')
-        # plt.show()
-        # mshp.plot()
-        # plt.title('SHP')
-        # plt.show()
-        # mcrc.plot()
-        # plt.title('CRC')
-        # plt.show()
-        # mfit.plot()
-        # plt.title('FIT')
-        # plt.show() 
 
         norm_region_cal, idx_cal, fit_cal = \
             curve_fit.scan(mfit = mfit,
@@ -441,7 +425,10 @@ def main(args, __version__):
 
         eta_f_s_p45[0] = (avg_r_p45 / avg_t_p45)
         
-        eta_f_s = np.sqrt(eta_f_s_p45 * eta_f_s_m45)
+        if args['calibration_factor_method'] == 0:
+            eta_f_s = np.sqrt(eta_f_s_p45 * eta_f_s_m45)
+        elif args['calibration_factor_method'] == 1:
+            eta_f_s = (eta_f_s_p45 + eta_f_s_m45) / 2.
         
         eta_s = eta_f_s / TR_to_TT_ch
 
@@ -489,41 +476,8 @@ def main(args, __version__):
         beta = (1. + delta_m) * (2. * err_p * (1. + delta_v + err_v / 2.) - err_v * (1. + delta_m))
         gamma = - err_p * (1. + delta_v) * (1. + delta_v + err_v)
         
-        # scat_lim_1 = (-beta + np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
         sr_lim = (-beta - np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
 
-        # R = np.arange(1.005, 10.005, 0.005)
-
-        # def d_p(delta_m, delta_v, R):
-            
-        #     delta_p = np.nan * np.zeros((delta_v.size, R.size))
-            
-        #     for i in range(delta_v.size):
-        #         crit_1 = (1. + delta_v[i]) * delta_m / ((1. + delta_m) * delta_v[i])
-        #         crit_2 = (1. + delta_v[i]) / (1. + delta_m)
-                
-        #         for j in range(R.size):
-        #             if (R[j] >= crit_1 and R[j] >= crit_2) or (R[j] <= -crit_1 and R[j] <= -crit_2):
-        #                 delta_p[i,j] = \
-        #                     ((1. + delta_m) * delta_v[i] * R[j] - (1. + delta_v[i]) * delta_m) /\
-        #                     ((1. + delta_m) * R[j] - (1. + delta_v[i]))
-        #     return(delta_p)
-        
-        # delta_p_cor = d_p(delta_m = delta_m, delta_v = delta_v, R = R)
-        # delta_p_off = d_p(delta_m = delta_m, delta_v = delta_v + err_v, R = R)
-        
-        # from matplotlib import pyplot as plt
-        # [X, Y] = np.meshgrid(delta_v, R)
-        # Z = (delta_p_off - delta_p_cor)
-        # plt.pcolormesh(X,Y,Z.T[:-1,:-1], vmin =0, vmax=0.05)
-        # plt.colorbar(label= 'PLDR error')
-        # plt.title(f'VLDR Offset: {np.round(err_v, decimals = 4)} ')
-        # # plt.plot(delta_v, scat_lim_1)
-        # plt.plot(delta_v, sr_lim, c = 'tab:orange')
-        # plt.xlabel('VLDR')
-        # plt.ylabel('Scattering Ratio')
-        # plt.show()
-        
         # Create the y axis (calibration)
         y_llim_cal, y_ulim_cal, y_label_cal = \
             make_axis.polarization_calibration_cal_y(
