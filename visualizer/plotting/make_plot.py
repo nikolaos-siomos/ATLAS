@@ -986,7 +986,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
                              x_lbin_vdr, x_ubin_vdr, 
                              x_llim_vdr, x_ulim_vdr, 
                              y_llim_vdr, y_ulim_vdr, 
-                             K, G_R, G_T, H_R, H_T,
+                             K, Kf, G_R, G_T, H_R, H_T,
                              y_label_cal, x_label_cal, x_tick_cal,
                              y_label_vdr, x_label_vdr, x_tick_vdr):
     
@@ -1075,7 +1075,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
             f'ε: {round_it(epsilon,2)}' +'${}^o$'+ ' $\pm$ ' + f'{round_it(epsilon_err, 2)}' +'${}^o$' + f', K: {round_it(K, 4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax.text(0.05 * x_ulim_cal, 0.76 * y_ulim_cal, 
-            r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 3)}' + ' $\pm$ ' + f'{round_it(eta_f_s_err, 2)}',
+            r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 3)}' + ' $\pm$ ' + f'{round_it(eta_f_s_err, 2)}' + f', $K_f$: {round_it(Kf, 4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
     ax.text(0.05 * x_ulim_cal, 0.67 * y_ulim_cal, 
             r'$η^{\star}$'+f': {round_it(eta_s, 3)}' + ' $\pm$ ' + f'{round_it(eta_s_err, 2)}',
@@ -1144,7 +1144,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
         c_ray = 'tab:red'
     else:
         c_ray = 'tab:green'
-        
+    
     ax2.text(0.05 * x_ulim_vdr, 0.90 * y_ulim_vdr, 
              f'mol. cal. region: {m_llim} - {m_ulim} km',
             bbox = dict(facecolor = c_ray, alpha = 0.1, zorder = 3))  
@@ -1166,10 +1166,15 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     ax2.text(0.05 * x_ulim_vdr, 0.18 * y_ulim_vdr, 
             r'$H_R$: '+f'{np.round(H_R,4)}, $H_T$: '+f'{round_it(H_T,4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-    ax2.text(0.05 * x_ulim_vdr, 0.06 * y_ulim_vdr, 
-            r'$SR$ > '+f'{np.round(sr_lim,3)}, ' + r'$Δδ_p$ < ' + f'{np.round(err_p,decimals = 2)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
 
+    if type(sr_lim) in [float,np.float64]:
+        ax2.text(0.05 * x_ulim_vdr, 0.06 * y_ulim_vdr, 
+                r'$SR$ > '+f'{np.round(sr_lim,3)}, ' + r'$Δδ_p$ < ' + f'{np.round(err_p,decimals = 3)}',
+                bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+    else:
+        ax2.text(0.05 * x_ulim_vdr, 0.06 * y_ulim_vdr, 
+                r'$SR$ > '+f'{sr_lim}, ' + r'$Δδ_p$ < ' + f'{np.round(err_p,decimals = 3)}',
+                bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
 
     fpath = os.path.join(dir_out, fname)
     
