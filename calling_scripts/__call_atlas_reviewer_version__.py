@@ -6,11 +6,10 @@ Created on Tue Sep 19 17:43:26 2023
 @author: nikos, vf
 """
 
-import subprocess, os, sys, glob
+import os, sys, glob
 import numpy as np
 from datetime import datetime
 from PIL import Image
-from PIL import PngImagePlugin
 import base64
 
 # -----------------------------------------------------------------------------
@@ -58,6 +57,15 @@ expert_analyst = ''
 export_all = False
 
 # -----------------------------------------------------------------------------
+# User-specific paths (set only once)
+# -----------------------------------------------------------------------------
+# ATLAS folder 
+atlas_folder = ''
+
+# Main folder
+main_data_folder = ''
+
+# -----------------------------------------------------------------------------
 # Explicit folders per test (non-default for ATLAS)
 # Provide only if it is necessary to deviate from the default folder structure
 # Otherwise leave as ''
@@ -76,18 +84,6 @@ tlc_rin = ''
 
 # Provide the name of the ring telecover folder inside the parent folder (e.g. tlc_rin_01)
 drk = ''
-
-# -----------------------------------------------------------------------------
-# User-specific paths (set only once)
-# -----------------------------------------------------------------------------
-# ATLAS folder 
-# atlas_folder = '/home/nikos/Nextcloud/Programs/git/atlas_dev/'
-atlas_folder = '/home/nikos/Nextcloud/Programs/off_line/ATLAS-0.4.9_patched/'
-
-# Main folder
-# main_data_folder = '/home/nikos/Dummy_ARS/'
-# main_data_folder = '/home/nikos/ATLAS_test/'
-main_data_folder = '/home/nikos/Nextcloud3/ARS-stations/'
 
 # -----------------------------------------------------------------------------
 # Relative paths
@@ -136,7 +132,7 @@ mst_args = parse_mst()
 mst_args['parent_folder']       = parent_folder
 mst_args['settings_file']       = settings_file
 mst_args['config_file']         = config_file
-mst_args['radiosonde']   = rsonde_folder
+mst_args['radiosonde']          = rsonde_folder
 mst_args['file_format']         = file_format
 
 if len(nrm) > 0:

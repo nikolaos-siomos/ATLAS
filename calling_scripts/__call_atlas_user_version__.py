@@ -6,24 +6,23 @@ Created on Tue Sep 19 17:43:26 2023
 @author: nikos, vf
 """
 
-import subprocess, os, sys, glob
+import os, sys, glob
 import numpy as np
 from datetime import datetime
 from PIL import Image
-from PIL import PngImagePlugin
 import base64
 
 # -----------------------------------------------------------------------------
 # Dictionary with Configuration IDs
 # -----------------------------------------------------------------------------
 # Station ID (e.g. 'aky', 'brc') 
-st_id = 'mun'
+st_id = ''
 
 # Configuration ID (in the format <lidar_ID>_<version_ID>_<config_ID>)
-config_id = '0_0_0'
+config_id = ''
 
 # Date 'yyyymmdd' format (e.g. 20240101)
-date = '20250219'
+date = ''
 
 # Subfolder name (to be provided if the parent folder is a subfolder of the <config_id>_<date> folder)
 subfolder = ''
@@ -34,7 +33,7 @@ subfolder = ''
 # licel_matlab:   brc, run
 # polly_xt_first: evo
 # licel_old2rack: cbw
-file_format = 'licel'
+file_format = ''
 
 #Enable/Disable True run (generate only plots) - choose among: True or false
 quick_run = False
@@ -49,13 +48,29 @@ process_qck = ''
 slice_rayleigh = ['', '']
 
 # Shortcut of the anaylsing expert (vf, ns, lb, aa)
-expert_analyst = 'ns'
-
-# Use radiosonde
-use_rsonde = True
+expert_analyst = ''
 
 # Export all channels in the html
 export_all = False
+
+# -----------------------------------------------------------------------------
+# User-specific paths (set only once)
+# -----------------------------------------------------------------------------
+# ATLAS folder 
+# atlas_folder = '/home/nikos/Nextcloud/Programs/git/atlas_dev/'
+atlas_folder = ''
+
+# Main folder
+main_data_folder = ''
+
+# Configuration file
+config_file = ''
+
+# Settings file
+settings_file = ''
+
+# Radiosonde folder
+rsonde_folder = ''
 
 # -----------------------------------------------------------------------------
 # Explicit folders per test (non-default for ATLAS)
@@ -79,27 +94,6 @@ tlc_rin = ''
 
 # Provide the name of the ring telecover folder inside the parent folder (e.g. tlc_rin_01)
 drk = ''
-
-# -----------------------------------------------------------------------------
-# User-specific paths (set only once)
-# -----------------------------------------------------------------------------
-# ATLAS folder 
-# atlas_folder = '/home/nikos/Nextcloud/Programs/git/atlas_dev/'
-atlas_folder = '/home/nikos/Nextcloud/Programs/off_line/ATLAS-0.4.9_patched/'
-
-# Main folder
-# main_data_folder = '/home/nikos/Dummy_ARS/'
-# main_data_folder = '/home/nikos/ATLAS_test/'
-main_data_folder = '/home/nikos/Nextcloud/ACTRIS-CARS-LMU/Instruments (POLIS-6, POLIS-1064)/POLIS-1064/Laser/Interspersion_measurements_APD_flex/'
-
-# Configuration file
-config_file = '/home/nikos/Nextcloud/ACTRIS-CARS-LMU/Instruments (POLIS-6, POLIS-1064)/POLIS-1064/ATLAS_setup/configurations/config_file.ini'
-
-# Settings file
-settings_file = '/home/nikos/Nextcloud/ACTRIS-CARS-LMU/Instruments (POLIS-6, POLIS-1064)/POLIS-1064/ATLAS_setup/settings/settings_file.ini'
-
-# Radiosonde folder
-rsonde_folder = '/home/nikos/Nextcloud/ACTRIS-CARS-LMU/Instruments (POLIS-6, POLIS-1064)/POLIS-1064/ATLAS_setup/radiosondes'
 
 # Parent folder
 if len(date) > 0:
@@ -130,8 +124,7 @@ mst_args = parse_mst()
 mst_args['parent_folder']       = parent_folder
 mst_args['settings_file']       = settings_file
 mst_args['config_file']         = config_file
-if use_rsonde:
-    mst_args['radiosonde']   = rsonde_folder
+mst_args['radiosonde']          = rsonde_folder
 mst_args['file_format']         = file_format
 
 if len(nrm) > 0:
