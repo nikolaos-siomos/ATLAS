@@ -137,14 +137,17 @@ def main(args, __version__):
                             min_win = 1.,
                             max_win = 4.,
                             step = 0.1,
-                            llim = args['cross_check_lim'],
+                            llim = 2.,
                             ulim = 16.,
                             rsem_lim = rsem_lim,
-                            cross_check_type = 'both',
-                            cross_check_crit = 'both',
-                            cross_check_all_points = False)   
+                            cross_check_all_points = False,
+                            cross_check_type = 'all')
+
             
-        norm_region, idx, fit = \
+        # Negate the cross-check mask for the signal comparison
+        # mneg = np.ones(mder.shape, dtype = bool)
+        
+        norm_region, idx, ismol = \
             curve_fit.scan(mfit = mfit,
                            dflt_region = args['normalization_region'],
                            auto_fit = args['auto_fit'])
@@ -196,8 +199,6 @@ def main(args, __version__):
                                    rslope = nder_c,
                                    pval = mder_c,
                                    rsem_lim = rsem_lim,
-                                   fit = fit,
-                                   auto_fit = args['auto_fit'],
                                    x_lbin = x_lbin, x_ubin = x_ubin,
                                    x_llim = x_llim, x_ulim = x_ulim, 
                                    y_llim = y_llim, y_ulim = y_ulim, 

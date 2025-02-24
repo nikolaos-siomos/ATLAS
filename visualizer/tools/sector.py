@@ -10,8 +10,6 @@ import numpy as np
 from . import normalize
 from ..tools.smoothing import sliding_average_1D_fast as smooth_1D_fast
 from ..tools.smoothing import sliding_average_2D_fast as smooth_2D_fast            
-from ..tools.smoothing import sliding_average_1D as smooth_1D_slow
-from ..tools.smoothing import sliding_average_2D as smooth_2D_slow            
 
 def process(x, y, iters, smooth, x_sm_lims, x_sm_win, expo, region):
 

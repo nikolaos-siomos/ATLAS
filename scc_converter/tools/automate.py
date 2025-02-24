@@ -253,7 +253,7 @@ def get_overflow_mask(sig, acquisition_mode, daq_range):
 
         ch_d = dict(channel = ch)
 
-        if int(acquisition_mode.loc[ch]) == 1: #3rd digit of channel name is the acquisition mode (a or p)
+        if acquisition_mode.loc[ch] == 1: #3rd digit of channel name is the acquisition mode (a or p)
         
             max_count = np.power(2.,15)
 
@@ -264,23 +264,15 @@ def get_overflow_mask(sig, acquisition_mode, daq_range):
 
                 mask.loc[ch_d] = crit.values                                           
 
-        if int(acquisition_mode.loc[ch]) == 0: #3rd digit of channel name is the acquisition mode (a or p)
+        if acquisition_mode.loc[ch] == 0: #3rd digit of channel name is the acquisition mode (a or p)
 
             max_mV = daq_range.loc[ch]
         
-            crit_max_mV = (sig.loc[ch_d] >= max_mV) 
-
-            if crit_max_mV.any():
-                print(f"-- Warning: Channel {ch} - Analog signal mV values above the data acqusition range were detected! ")
+            crit = (sig.loc[ch_d] >= max_mV) | (sig.loc[ch_d] <= 0.)
             
-            crit_neg = (sig.loc[ch_d] <= 0.)
-            
-            if crit_neg.any():
-                print(f"-- Warning: Channel {ch} - Analog signal mV values below 0. were detected! ")
-
-            crit = crit_max_mV | crit_neg
-
             if crit.any():
+                print(f"-- Warning: Channel {ch} - Analog signal mV values above the data acqusition range or below 0. were detected! ")
+
                 mask.loc[ch_d] = crit.values
     
     return(mask)

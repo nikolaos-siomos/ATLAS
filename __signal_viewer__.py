@@ -15,129 +15,99 @@ warnings.filterwarnings('ignore')
 #------------------------------------------------------------------------------
 # A) Inputs
 #------------------------------------------------------------------------------
+# Path to the parent folder fs ATLAS 
+# parent_folder = '/home/nikos/Nextcloud3/ARS-stations/the/179_199_664_20240221'
+parent_folder = os.path.join('/home/nikos/Nextcloud/ACTRIS-CARS-LMU/Instruments (POLIS-6, POLIS-1064)/POLIS-1064/Laser/Interspersion_measurements_APD_flex/',
+                             '20250219','50us_pretrigger')
 
-# parent_folders = ['/home/nikos/Nextcloud3/ARS-stations/the/179_199_664_20231221/netcdf',
-#                   '/home/nikos/Nextcloud3/ARS-stations/the/179_199_664_20240116/netcdf',
-#                   '/home/nikos/Nextcloud3/ARS-stations/the/179_199_665_20230930/netcdf',
-#                   '/home/nikos/Nextcloud3/ARS-stations/the/179_199_665_20231221/netcdf',
-#                   '/home/nikos/Nextcloud3/ARS-stations/the/179_199_664_20240221/netcdf',
-#                   '/home/nikos/Nextcloud3/ARS-stations/the/179_199_665_20240224/netcdf']                                 
+timescale = '10min'#'1h' # Set to None to skip averaging. Use e.g. 10s for 10 second averages, 30min for 30 minute averages, or 1h for 1 hour averages. Use 'all' to average all files. Use None to apply no averaging
 
-parent_folders = ['/home/nikos/Nextcloud3/ARS-stations/puy/175_229_765_230727/netcdf/']                                 
-# parent_folders = ['/home/nikos/Nextcloud3/ARS-stations/the/archive/179_199_664_20240221/netcdf/']                                 
-# parent_folders = ['/home/nikos/Nextcloud3/ARS-stations/brc/123_202_812_20240205/netcdf/']                                 
+smoothing_window = 1000.#1000. #1. # in meters. Set to None to skip smoothing
 
-timescale = ''
-smoothing_window = 0.
-interactive = True
+smoothing_range = [9., 60.] #[2, 60] # in km. Set to None to smooth the whole profile. It will be applied only if the smoothing window is not None
 
-raw_pattern = '_ray_ATLAS_'
-prp_pattern = '_qck_ray_ATLAS_'
+normalization_range = None#[10., 20.] # in km. Set to None to skip normalization. All profiles will be normalized to their temporal mean
 
-raw_mtype = 'Ray'
-prp_mtype = 'Ray'
+background_range = [9., 60.] # in km. Set to None to skip background correction of each profile. It will be ignored if the signal type is set to 'rangecor'
 
-# channels = ['0354xrax', '0354xrpx', '0355xtat', '0355xtpt', '1064xtax', '0530xrax',
-#         '0530xrpx', '0532xtat', '0532xtpt', '0532xcar', '0532xcpr', '0355xcar',
-#         '0355xcpr'] #can be a list or scalar
+statistics_range = [9., 60.] # in km. Select a range to calculate statistics on signals to be displayed on the plots per channel. Statistics are calculated after averaging. Set to None to skip
 
-channels = ['0355xcar', '0355xpat', '0532xcat', '0532xpar', '1064xtax'] #can be a list or scalar
+mtype = 'drk' # set to either 'ray', 'drk', 'tlc', 'pcb' to plot the signals of the corresponding QA test 
 
-# xlims in bins or km
-raw_mline_xlims = [0,8000]
-prp_mline_xlims = [0,8000]
+signal_type = 'raw' # select either 'raw' or 'rangecor' to plots the raw or the rangecorrected signals, respectively
 
-raw_tseries_xlims = [2000, 3000]
-prp_tseries_xlims = [5.5, 7.5]
-
-# raw_ylims = [1.795,1.81]
-raw_ylims = [0.,15]
-prp_ylims = [-2E6,10E6]
-
-raw_plot_mline = True
-raw_plot_tseries = False
-
-prp_plot_mline = False
-prp_plot_tseries = False
-
-exp_dir = '/home/nikos/Nextcloud3/ARS-stations/tst/raw_sig_test'
-# exp_dir = ''
-
+channels = ['1064xpat'] # use the ATLAS IDs to plot only specific channels, can be a list or scalar, set to None to plot all channels
     
+colorscale = 'sequential' # select the colorscale ('sequential' or 'discreet') - If discreet is used 4 different colors will be applied iteratively for each measurement. If sequential is used, a colorscale of up to 256 colors will be used with the first/last measurement getting the first/last color repsectively. If there are more measurements than colors then the same colors might be used more than once for adjacent measurements   
+
+custom_label = 'pretrigger_50us' # provide a label to be added to the plot title. Use '' to skip
+
 #------------------------------------------------------------------------------
 # B) Calculations 
 #------------------------------------------------------------------------------
-fpath_raw, fpath_prp = viewer_utils.get_fpaths(parent_folders, 
-                                               raw_pattern = raw_pattern,
-                                               prp_pattern = prp_pattern)
+# Path to the 'netcdf' folder that contains the files exported from ATLAS (more than 1 paths can be provided)
+netcdf_folder = os.path.join(parent_folder, 'netcdf')
 
-for fpath in fpath_raw:
-    system_info, channel_info, time_info, time_info_d,\
-        sig, sig_d, shots, shots_d = viewer_utils.get_converter_signals(fpath)
+# Path to the folder where the plots will be placed. If set to None
+plot_folder = os.path.join(parent_folder, 'html')
 
-for fpath in fpath_prp:
-    sig_rc, std_rc, ranges, \
-        start_date, start_time, end_time = \
-            viewer_utils.get_prepro_signals(fpath, timescale = timescale, 
-                                            smoothing_window = smoothing_window)
+options = dict(netcdf_folder = netcdf_folder,
+               plot_folder = plot_folder,
+               timescale = timescale,
+               smoothing_window = smoothing_window,
+               smoothing_range = smoothing_range,
+               normalization_range = normalization_range,
+               background_range = background_range,
+               statistics_range = statistics_range,
+               mtype = mtype,
+               signal_type = signal_type,
+               channels = channels,
+               colorscale = colorscale,
+               custom_label = custom_label)
 
-for fpath in fpath_raw:
-    if raw_plot_mline:
-        viewer_utils.multi_line_plot_bokeh(signal = sig, 
-                                           xlims = raw_mline_xlims,
-                                           ylims = raw_ylims,
-                                           channels = channels, 
-                                           zero_bins = channel_info.DAQ_Trigger_Offset,
-                                           resol = channel_info.Raw_Data_Range_Resolution,
-                                           mtype = raw_mtype,
-                                           stype = 'Raw',
-                                           start_date = system_info.RawData_Start_Date,
-                                           start_time = system_info.RawData_Start_Time_UT,
-                                           end_time = system_info.RawData_Stop_Time_UT,
-                                           exp_dir = exp_dir,
-                                           interactive = interactive)
-        
-    if raw_plot_tseries:
-        viewer_utils.time_series_plot(signal = sig, 
-                                      xlims = raw_tseries_xlims,
-                                      ylims = [],
-                                      channels = channels, 
-                                      mtype = raw_mtype,
-                                      stype = 'Raw',
-                                      start_date = system_info.RawData_Start_Date,
-                                      start_time = system_info.RawData_Start_Time_UT,
-                                      end_time = system_info.RawData_Stop_Time_UT,
-                                      exp_dir = exp_dir,
-                                      interactive = interactive)
-        
+viewer_utils.check_options(options)
 
-for fpath in fpath_prp:
-    if prp_plot_mline:
-        viewer_utils.multi_line_plot(signal = sig_rc, 
-                                     ranges = ranges, 
-                                     xlims = prp_mline_xlims,
-                                     ylims = prp_ylims,
-                                     channels = channels, 
-                                     mtype = prp_mtype,
-                                     stype = 'RC',
-                                     timescale = timescale,
-                                     smoothing_window = smoothing_window,
-                                     start_date = start_date,
-                                     start_time = start_time,
-                                     end_time = end_time,
-                                     exp_dir = exp_dir,
-                                     interactive = interactive)
 
-    if prp_plot_tseries:
-        viewer_utils.time_series_plot(signal = sig_rc, 
-                                      xlims = prp_tseries_xlims,
-                                      ylims = [],
-                                      ranges = ranges, 
-                                      channels = channels, 
-                                      mtype = raw_mtype,
-                                      stype = 'RC',
-                                      start_date = system_info.RawData_Start_Date,
-                                      start_time = system_info.RawData_Start_Time_UT,
-                                      end_time = system_info.RawData_Stop_Time_UT,
-                                      exp_dir = exp_dir,
-                                      interactive = interactive)
+#------------------------------------------------------------------------------
+# C) Reading files 
+#------------------------------------------------------------------------------
+fpath_list = viewer_utils.get_fpaths(netcdf_folder = options['netcdf_folder'], 
+                                     signal_type = options['signal_type'],
+                                     mtype = options['mtype'])
+    
+if options['signal_type'] == 'raw':
+    for fpath in fpath_list:
+        sig, ranges, date_info, stats, system_info, channel_info, time_info, shots = \
+            viewer_utils.get_converter_signals(fpath = fpath,
+                                               options = options)
+    
+if options['signal_type'] == 'rangecor':
+    for fpath in fpath_list:
+        sig, ranges, date_info, stats = \
+            viewer_utils.get_prepro_signals(fpath = fpath,
+                                            options = options)
+
+#------------------------------------------------------------------------------
+# E) Plotting 
+#------------------------------------------------------------------------------
+for k in range(len(fpath_list)):
+    options['channels'] = channels
+
+    titles = viewer_utils.make_title_mline(channels = options['channels'], 
+                                           options = options,
+                                           date_info = date_info) 
+
+bname = \
+    viewer_utils.make_plot_filename(fpath_list = fpath_list,
+                                    options = options)
+    
+viewer_utils.multi_line_plot_bokeh(signal = sig, 
+                                   signal_type = options['signal_type'],
+                                   ranges = ranges,
+                                   channels = channels, 
+                                   colorscale = options['colorscale'],
+                                   titles = titles,
+                                   plot_folder = plot_folder,
+                                   filename = bname[k],
+                                   stats = stats,
+                                   statistics_range = options['statistics_range'])

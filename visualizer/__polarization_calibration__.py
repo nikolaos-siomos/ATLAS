@@ -182,7 +182,6 @@ def main(args, __version__):
         H_R_def_ch = H_R_def[i]
         H_T_def_ch = H_T_def[i]
         TR_to_TT_ch = TR_to_TT[i]
-        Kf_ch = K_ch * TR_to_TT_ch
         
         print(f"-- channels: {ch_r} & {ch_t}")
 
@@ -282,10 +281,7 @@ def main(args, __version__):
     
         eta_p45_prf = (y_r_p45_sm / y_t_p45_sm)
         
-        if args['calibration_factor_method'] == 0:
-            eta_prf = np.sqrt(eta_m45_prf * eta_p45_prf)
-        elif args['calibration_factor_method'] == 1:
-            eta_prf = (eta_m45_prf + eta_p45_prf) / 2.            
+        eta_prf = np.sqrt(eta_m45_prf * eta_p45_prf)
         
         delta_r_prf = (y_r_rax_sm / y_t_rax_sm)
         
@@ -317,8 +313,27 @@ def main(args, __version__):
                             cross_check_type = 'both',
                             cross_check_all_points = False,
                             cross_check_crit = 'both',
-                            der_lim = 0.001,
+                            der_fac = 2.,
                             cancel_shp = True)
+        # from matplotlib import pyplot as plt
+        # msem.plot()
+        # plt.title('SEM')
+        # plt.show()
+        # mder.plot()
+        # plt.title('DER')
+        # plt.show()
+        # msec.plot()
+        # plt.title('SEC')
+        # plt.show()
+        # mshp.plot()
+        # plt.title('SHP')
+        # plt.show()
+        # mcrc.plot()
+        # plt.title('CRC')
+        # plt.show()
+        # mfit.plot()
+        # plt.title('FIT')
+        # plt.show() 
 
         norm_region_cal, idx_cal, fit_cal = \
             curve_fit.scan(mfit = mfit,
@@ -353,7 +368,7 @@ def main(args, __version__):
                             rsem_lim = 0.05,
                             cross_check_type = 'both',
                             cross_check_all_points = False,
-                            der_lim = 0.001,
+                            der_fac = 2.,
                             cancel_shp = True)    
 
         norm_region_ray, idx_ray, fit_ray = \
@@ -426,10 +441,7 @@ def main(args, __version__):
 
         eta_f_s_p45[0] = (avg_r_p45 / avg_t_p45)
         
-        if args['calibration_factor_method'] == 0:
-            eta_f_s = np.sqrt(eta_f_s_p45 * eta_f_s_m45)
-        elif args['calibration_factor_method'] == 1:
-            eta_f_s = (eta_f_s_p45 + eta_f_s_m45) / 2.
+        eta_f_s = np.sqrt(eta_f_s_p45 * eta_f_s_m45)
         
         eta_s = eta_f_s / TR_to_TT_ch
 
@@ -465,53 +477,52 @@ def main(args, __version__):
         # delta_l_err = delta_c_err * (1. - delta_m) * (1. + delta_c) / \
         #     (1. - delta_m * delta_c)**2
                       
-        # base_delta_v = np.ceil(1E3 * delta_m) / 1E3
-        # delta_v = np.hstack((np.arange(base_delta_v, 0.021, 0.001),
-        #                      np.arange(0.02, 0.31, 0.01)))
+        base_delta_v = np.ceil(1E3 * delta_m) / 1E3
+        delta_v = np.hstack((np.arange(base_delta_v, 0.021, 0.001),
+                             np.arange(0.02, 0.31, 0.01)))
         
-        # err_v = delta_l[0]
-
+        err_v = delta_l[0]
+        err_p = 0.05
         
-        # alpha = (1. + delta_m)**2 * (err_v - err_p)
-        # beta = (1. + delta_m) * (2. * err_p * (1. + delta_v + err_v / 2.) - err_v * (1. + delta_m))
-        # gamma = - err_p * (1. + delta_v) * (1. + delta_v + err_v)
 
-        def get_sr_lim(delta_v, err_v, err_p, delta_m):
-            
-            err_p = np.abs(err_p)
-            
-            llim = np.max([(1. + delta_v + err_v) / (1. + delta_m), (1. + delta_v) / (1. + delta_m)])
-
-            R = np.arange(llim, 1000, 0.001)
-            
-            if np.abs(err_v) < err_p and np.abs(err_v) >= 0.0001:
-                A = delta_v / delta_m
-                Ap = (delta_v +err_v) / delta_m
-                
-                B = (1. + delta_v) / (1. + delta_m)
-                Bp = (1. + delta_v + err_v) / (1. + delta_m)
-                
-                err_p_R = ((Ap * R - Bp) / (R - Bp) - (A * R - B) / (R - B)) * delta_m
-                ind_m = np.argmin(np.abs(np.abs(err_p_R) - err_p))
-                
-                R_r = np.linspace(np.max([R[ind_m]-0.1,llim]), R[ind_m]+0.1, 10000)
-                
-                err_p_R_r = ((Ap * R_r - Bp) / (R_r - Bp) - (A * R_r - B) / (R_r - B)) * delta_m
-                ind_m_r = np.argmin(np.abs(np.abs(err_p_R_r) - np.abs(err_p)))
-
-                R_lim = R_r[ind_m_r]
-            elif np.abs(err_v) < err_p and np.abs(err_v) < 0.0001:
-                R_lim = 1.
-            else:
-               R_lim = '--' 
-            
-            return(R_lim)
+        alpha = (1. + delta_m)**2 * (err_v - err_p)
+        beta = (1. + delta_m) * (2. * err_p * (1. + delta_v + err_v / 2.) - err_v * (1. + delta_m))
+        gamma = - err_p * (1. + delta_v) * (1. + delta_v + err_v)
         
-        err_p = 0.025
-        delta_v = 0.3
+        # scat_lim_1 = (-beta + np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
+        sr_lim = (-beta - np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
+
+        # R = np.arange(1.005, 10.005, 0.005)
+
+        # def d_p(delta_m, delta_v, R):
+            
+        #     delta_p = np.nan * np.zeros((delta_v.size, R.size))
+            
+        #     for i in range(delta_v.size):
+        #         crit_1 = (1. + delta_v[i]) * delta_m / ((1. + delta_m) * delta_v[i])
+        #         crit_2 = (1. + delta_v[i]) / (1. + delta_m)
+                
+        #         for j in range(R.size):
+        #             if (R[j] >= crit_1 and R[j] >= crit_2) or (R[j] <= -crit_1 and R[j] <= -crit_2):
+        #                 delta_p[i,j] = \
+        #                     ((1. + delta_m) * delta_v[i] * R[j] - (1. + delta_v[i]) * delta_m) /\
+        #                     ((1. + delta_m) * R[j] - (1. + delta_v[i]))
+        #     return(delta_p)
         
-        sr_lim = get_sr_lim(delta_v = delta_v, err_v = delta_l[0], err_p = err_p, 
-                            delta_m = delta_m)
+        # delta_p_cor = d_p(delta_m = delta_m, delta_v = delta_v, R = R)
+        # delta_p_off = d_p(delta_m = delta_m, delta_v = delta_v + err_v, R = R)
+        
+        # from matplotlib import pyplot as plt
+        # [X, Y] = np.meshgrid(delta_v, R)
+        # Z = (delta_p_off - delta_p_cor)
+        # plt.pcolormesh(X,Y,Z.T[:-1,:-1], vmin =0, vmax=0.05)
+        # plt.colorbar(label= 'PLDR error')
+        # plt.title(f'VLDR Offset: {np.round(err_v, decimals = 4)} ')
+        # # plt.plot(delta_v, scat_lim_1)
+        # plt.plot(delta_v, sr_lim, c = 'tab:orange')
+        # plt.xlabel('VLDR')
+        # plt.ylabel('Scattering Ratio')
+        # plt.show()
         
         # Create the y axis (calibration)
         y_llim_cal, y_ulim_cal, y_label_cal = \
@@ -589,7 +600,7 @@ def main(args, __version__):
                                                delta_c = delta_c[0],
                                                delta_l = delta_l[0],
                                                epsilon = epsilon[0],
-                                               sr_lim = sr_lim,
+                                               sr_lim = sr_lim[-1],
                                                err_p = err_p,
                                                eta_err = np.std(eta[1:]), 
                                                eta_f_s_err = np.std(eta_f_s[1:]), 
@@ -613,7 +624,6 @@ def main(args, __version__):
                                                y_label_cal = y_label_cal, 
                                                x_label_cal = x_label_cal, 
                                                K = K_ch,
-                                               Kf = Kf_ch,
                                                G_R = G_R_ch,
                                                G_T = G_T_ch,
                                                H_R = H_R_ch,
