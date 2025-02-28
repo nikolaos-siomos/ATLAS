@@ -204,8 +204,8 @@ def check_range_limits(options, key, min_range, max_range):
         if len(options[key]) != 2:
             raise Exception(f"--Error: The key option must be a list of exaclty 2 elements, the lower and the upper limit. A {len(options[key])} element list was provided")
             
-        llim = int(options[key][0])
-        ulim = int(options[key][1])
+        llim = options[key][0]
+        ulim = options[key][1]
             
         if llim < min_range or ulim > max_range or \
             llim > max_range or ulim < min_range:

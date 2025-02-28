@@ -20,17 +20,17 @@ warnings.filterwarnings('ignore')
 parent_folder = os.path.join('/home/nikos/Nextcloud/ACTRIS-CARS-LMU/Instruments (POLIS-6, POLIS-1064)/POLIS-1064/Laser/Interspersion_measurements_APD_flex/',
                              '20250219','50us_pretrigger')
 
-timescale = '10min'#'1h' # Set to None to skip averaging. Use e.g. 10s for 10 second averages, 30min for 30 minute averages, or 1h for 1 hour averages. Use 'all' to average all files. Use None to apply no averaging
+timescale = '10min' # Set to None to skip averaging. Use e.g. 10s for 10 second averages, 30min for 30 minute averages, or 1h for 1 hour averages. Use 'all' to average all files. Use None to apply no averaging
 
-smoothing_window = 1000.#1000. #1. # in meters. Set to None to skip smoothing
+smoothing_window = None#1000.#1000. #1. # in meters. Set to None to skip smoothing
 
-smoothing_range = [9., 60.] #[2, 60] # in km. Set to None to smooth the whole profile. It will be applied only if the smoothing window is not None
+smoothing_range = None#[0., 60.] #[2, 60] # in km. Set to None to smooth the whole profile. It will be applied only if the smoothing window is not None
 
 normalization_range = None#[10., 20.] # in km. Set to None to skip normalization. All profiles will be normalized to their temporal mean
 
-background_range = [9., 60.] # in km. Set to None to skip background correction of each profile. It will be ignored if the signal type is set to 'rangecor'
+background_range = None#[9., 60.] # in km. Set to None to skip background correction of each profile. It will be ignored if the signal type is set to 'rangecor'
 
-statistics_range = [9., 60.] # in km. Select a range to calculate statistics on signals to be displayed on the plots per channel. Statistics are calculated after averaging. Set to None to skip
+statistics_range = [5.7, 7.3] # in km. Select a range to calculate statistics on signals to be displayed on the plots per channel. Statistics are calculated after averaging. Set to None to skip
 
 mtype = 'drk' # set to either 'ray', 'drk', 'tlc', 'pcb' to plot the signals of the corresponding QA test 
 
