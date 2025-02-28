@@ -80,7 +80,7 @@ def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
     ds.createDimension('nchar_filename',n_char_fname)
     if not isinstance(sig_d,list):  
         ds.createDimension('time_bck', n_time_bck)
-        ds.createDimension('nchar_filename_d',n_char_fname)
+        ds.createDimension('nchar_filename_d',n_char_fname_d)
     
 # Adding Global Parameters
     ds.Altitude_meter_asl = float(system_info.altitude);
@@ -165,7 +165,7 @@ def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
     make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = n_char_fname)    
 
     if not isinstance(sig_d,list):
-        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = n_char_fname_d)    
+        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename_d'), length = n_char_fname_d)    
             
     make_nc_var(ds, name = 'id_timescale', value = np.zeros(n_channels), dtype = 'int', dims = ('channels',))
 
@@ -289,7 +289,7 @@ def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path,
     ds.createDimension('nchar_filename',n_char_fname)
     if not isinstance(sig_d,list):  
         ds.createDimension('time_bck', n_time_bck)
-        ds.createDimension('nchar_filename_d',n_char_fname)
+        ds.createDimension('nchar_filename_d',n_char_fname_d)
     
 # Adding Global Parameters
     ds.Altitude_meter_asl = system_info.altitude;
@@ -370,7 +370,7 @@ def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path,
     make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = n_char_fname)    
 
     if not isinstance(sig_d,list):
-        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = n_char_fname_d)    
+        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename_d'), length = n_char_fname_d)    
             
     make_nc_var(ds, name = 'id_timescale', value = np.zeros(n_channels), dtype = 'int', dims = ('channels',))
 
@@ -481,7 +481,7 @@ def polarization_calibration_file(
     ds.createDimension('nchar_filename',n_char_fname)
     if not isinstance(sig_d,list):  
         ds.createDimension('time_bck', n_time_bck)
-        ds.createDimension('nchar_filename_d',n_char_fname)
+        ds.createDimension('nchar_filename_d',n_char_fname_d)
 
 # Adding Global Parameters
     ds.Altitude_meter_asl = system_info.altitude;
@@ -566,7 +566,7 @@ def polarization_calibration_file(
     make_nc_str(ds, name = 'Filename', value = time_info.filename.values, dims = ('time','nchar_filename'), length = n_char_fname)    
 
     if not isinstance(sig_d,list):
-        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename'), length = n_char_fname_d)    
+        make_nc_str(ds, name = 'Filename_Bck', value = time_info_d.filename.values, dims = ('time_bck','nchar_filename_d'), length = n_char_fname_d)    
             
     make_nc_var(ds, name = 'id_timescale', value = np.zeros(n_channels), dtype = 'int', dims = ('channels',))
 
@@ -950,7 +950,6 @@ def make_nc_str(ds, name, value, dims, length):
 
     var = ds.createVariable(name, 'S1', dims)
     
-
     if len(dims) == 1:
         var[:] = value_char
 

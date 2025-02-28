@@ -84,10 +84,6 @@ def call_parser():
                         action = argparse.BooleanOptionalAction,
                         help = 'If set to True an automatic identification of the calibration and Rayleigh regions will be attempted. If the automatic procedure is successful, the calibration_region and rayleigh_region variables will be ignored. If the procedure is not successful or auto_ray is set to False, the manually-provided/default values will be used. Defaults to True')
 
-    parser.add_argument('--calibration_factor_method', metavar = 'calibration_factor_method',
-                        type = int, nargs = "?", default = 0, 
-                        help = 'Select one of (0: geometrical mean, 1: normal mean). If set to 0/1, the calibration factor will be calculated from the geometrical/normal mean of the gain ratios at +45° and -45°. Note that using the geometrical mean is the standard calculation method. Defaults to 0')
-
     parser.add_argument('--calibration_region', metavar = 'calibration_region',
                         type = float, nargs = 2, default = [2., 4.], 
                         help = 'The lower and upper limits of the region used for Δ90 calibration. If use_range is called, the limits correspond to distance. Defaults to: 2., 4. km ')
@@ -157,9 +153,6 @@ def check_parser(args):
     
     if '_pcb_' not in os.path.basename(args['input_file']):
         raise Exception('---- Error: Measurement filename not understood! The filename should contain the _pcb_ field (polarization_calibration)')
-    
-    if args['calibration_factor_method'] not in [0,1] :
-        raise Exception(f"-- Error: The provided calibration_factor_method ({args['calibration_factor_method']}) was not understood. Please select one of: [0, 1]")
     
     if args['color_reduction'] == True:
         if shutil.which('convert') == None:

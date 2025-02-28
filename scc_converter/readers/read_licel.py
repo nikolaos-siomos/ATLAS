@@ -46,7 +46,8 @@ def dtfs(dir_meas):
             channel_info = read_channels(buffer = buffer, sep = sep)
             
             channels = channel_info.index.values
-            bins_arr = np.arange(1., channel_info.bins.max() + 1.)
+            # bins_arr = np.arange(1., channel_info.bins.max() + 1.)
+            bins_arr = np.arange(0., channel_info.bins.max())
 
             # Creating empty signal, shots, and time arrays
             start_time_arr = np.nan*np.zeros(len(mfiles), dtype = object)
@@ -140,7 +141,7 @@ def read_body(channel_info, buffer, sep):
         icount = 0
         for i in range(nbin_s, nbin_e, 4):
             sig_raw_arr[j,icount] = int.from_bytes(data[i:i+4], 
-                                                   byteorder = 'little') # maybe use  sys.byteorder to get the order in the future
+                                                   byteorder = 'little')
             icount = icount + 1
 
         nbin_s = nbin_e + 2
@@ -190,10 +191,7 @@ def read_meas(buffer, sep):
     system_info['longitude'] = np.round(float(metadata[7+shift]), 4)
     
     if len(metadata) > 8:
-        if float(metadata[8+shift]) >= 0:
-            system_info['zenith_angle'] = float(metadata[8+shift])
-        else:
-            system_info['zenith_angle'] = 90. + float(metadata[8+shift])            
+        system_info['zenith_angle'] = float(metadata[8+shift])
 
     if len(metadata) > 9:
         system_info['azimuth_angle'] = float(metadata[9+shift])

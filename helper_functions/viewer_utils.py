@@ -8,124 +8,546 @@ Created on Mon Feb 26 15:41:41 2024
 
 import xarray as xr
 import numpy as np
-from matplotlib import pyplot as plt
+import pandas as pd
 from processor.readers.read_files import short_reader
 import netCDF4 as nc
 import os, glob
-from visualizer.tools.smoothing import sliding_average_2D_fast
-import matplotlib.dates as mdates
-from scipy.stats import linregress
-from bokeh.plotting import figure, show
-from bokeh.models import Panel, Tabs
+from visualizer.tools.smoothing import sliding_average_2D_bin_fast, sliding_average_2D_fast
+from scipy.stats import linregress, shapiro
+from bokeh.plotting import figure, show, output_file, save
+from bokeh.models import TabPanel, Tabs, LinearAxis, Range1d, BoxAnnotation, Label
+from bokeh.palettes import Category10, turbo
+import webbrowser 
 
-def get_fpaths(parent_folders, raw_pattern = '_ray_ATLAS_', 
-               prp_pattern = '_qck_drk_ATLAS_'): 
-    
-    fpath_raw = []
-    fpath_prp = []
-    
-    for folder in parent_folders:
-        raw_files = glob.glob(os.path.join(folder, 'converter', f'*{raw_pattern}*.nc'))
-        fpath_raw.extend(raw_files)
+# https://docs.bokeh.org/en/latest/docs/reference/palettes.html#bokeh-palettes
 
-        prp_files = glob.glob(os.path.join(folder, 'preprocessor', f'*{prp_pattern}*.nc'))
-        fpath_prp.extend(prp_files)
+def check_options(options, ranges = None):
     
-    if len(fpath_raw) == 0:
-        print(f"--Warning: No raw files matching the given patern ({raw_pattern}) were detected!")
+    none_allowed = dict(netcdf_folder = False,
+                        plot_folder = False,
+                        timescale = True,
+                        smoothing_window = True,
+                        background_range = True,
+                        normalization_range = True,
+                        mtype = False,
+                        signal_type = False,
+                        channels = True,
+                        colorscale = False,
+                        statistics_range = True,
+                        custom_label = False)
     
-    if len(fpath_raw) == 0:
-        print(f"--Warning: No precessed files matching the given patern ({prp_pattern}) were detected!")
+    option_type = dict(netcdf_folder = [str],
+                       plot_folder = [str],
+                       timescale = [str],
+                       smoothing_window = [int, float],
+                       background_range =[int, float],
+                       normalization_range = [int, float],
+                       mtype = [str],
+                       signal_type = [str],
+                       channels = [str],
+                       colorscale = [str],
+                       statistics_range = [int, float],
+                       custom_label = [str])
     
-    return(fpath_raw, fpath_prp)
+    option_shape = dict(netcdf_folder = 'scalar',
+                        plot_folder = 'scalar',
+                        timescale = 'scalar',
+                        smoothing_window = 'scalar',
+                        background_range = 'list',
+                        normalization_range = 'list',
+                        mtype = 'scalar',
+                        signal_type = 'scalar',
+                        channels = 'list',
+                        colorscale = 'scalar',
+                        statistics_range = 'list',
+                        custom_label = 'scalar')
+    
+    
+    check_none(options = options, none_allowed = none_allowed)
+    
+    check_list(options = options, option_shape = option_shape)
+    
+    check_option_type(options = options, option_type = option_type)    
+    
+    check_path(options  = options, key = 'netcdf_folder')
+    check_parent_directory(options  = options, key = 'plot_folder')
+            
+    check_channel_format(options)
+        
+    allowed_signal_types = ['raw', 'rangecor']
+    allowed_mtypes = ['ray', 'tlc', 'pcb', 'drk']
+    colorbar = ['sequential', 'discreet']
+    check_allowed_values(options = options,
+                         keys = ['signal_type', 'mtype', 'colorscale'],
+                         allowed_values = [allowed_signal_types, allowed_mtypes, colorbar])
+                         
+    check_conflicts(options = options)
 
-def get_converter_signals(fpath_raw):
-    if len(fpath_raw) > 0 and os.path.exists(fpath_raw):
-        system_info, channel_info, time_info, time_info_d,\
-            sig, sig_d, shots, shots_d = \
-                   short_reader(fpath = fpath_raw, 
+    if not type(ranges) == type(None):
+        check_smoothing_window(options = options, 
+                               max_range = ranges[-1])
+        
+        for key in ['smoothing_range', 'normalization_range', 
+                    'background_range', 'statistics_range']:
+            check_range_limits(options = options, 
+                               key = key, 
+                               min_range = ranges[0], 
+                               max_range = ranges[-1])
+    
+    return()
+
+def check_none(options, none_allowed):
+    
+    for key in none_allowed.keys():
+        if options[key] == None and none_allowed[key] == False:
+            raise Exception(f"--Error: The {key} option cannot be None.")
+
+    return()  
+
+def check_list(options, option_shape):
+    
+    for key in option_shape.keys():
+        if not options[key] == None:
+            if option_shape[key] == 'list' and not isinstance(options[key], list) :
+                raise Exception(f"--Error: The {key} option should be a list")
+            if option_shape[key] == 'scalar' and not np.isscalar(options[key]):
+                raise Exception(f"--Error: The {key} option should be a scalar")
+
+    return()    
+
+def check_option_type(options, option_type):
+    
+    for key in option_type.keys():
+        if not options[key] == None:
+            if isinstance(options[key], list):
+                for opt in options[key]:
+                    if type(opt) not in option_type[key]:
+                        raise Exception(f"--Error: All of the the {key} option elements should be {option_type[key]}. Type detected: {type(opt)}")
+            if np.isscalar(options[key]):
+                if type(options[key]) not in option_type[key]:
+                    raise Exception(f"--Error: The {key} option should be an {option_type[key]}. Type detected: {type(opt)}")
+
+    return()           
+    
+
+def check_scalar_type(option, key):
+    
+    if not np.isscalar(option[key]):
+        raise Exception(f"--Error: The {key} option must be a scalar, not a list or array")
+    
+    return()
+    
+def check_channel_format(options):
+    
+    if options['channels'] != None:
+        if not isinstance(options['channels'], list):
+            raise Exception("--Error: The channels option must always be provided as either list or None. Please provide a list even if a single channel is provided, e.g. ['1064xcar']")
+        
+        for ch in options['channels']:
+            if len(ch) != 8:
+                raise Exception(f"--Error: The provided channel {ch} has a wrong ID. Please use a string with lenght 8 where:\n-- the first 4 letters are wavelength e.g. '0355'\n--the 5th letter is the telescope\n--the 6th letter is the channel type\n--the 7th letter is the channel mode ('a' or 'p')\n--the 8th letter is the channel subtype\nPlease refer to the ATLAS manual for more information about the ATLAS channel ID")
+
+    return()
+
+def check_conflicts(options):
+   
+    if not options['normalization_range'] == None and options['signal_type'] == 'raw':
+        print("--Warning: Normalization is not supported for raw signals. The provided normalization_range will be ignored")
+
+    if not options['background_range'] == None and options['signal_type'] == 'rangecor':
+        print("--Warning: Background correction is not supported for rangecorrected signals. The provided background_range will be ignored")
+    
+    return()
+    
+
+def check_allowed_values(options, keys, allowed_values):
+
+    for key, values in zip(keys, allowed_values):
+        if options[key] not in values:
+            raise Exception(f"--Error: The provided {key} parameter is not supported:\n{options[key]}\nPlease select one of: {values}")
+    
+    return()
+
+def check_path(options, key):
+    
+    if not os.path.exists(options[key]):
+        raise Exception(f"-- Warning: The provided {key} does not exist:\n{options[key]}") 
+
+    return()
+
+def check_parent_directory(options, key):
+    
+    if not options[key] == None and not os.path.exists(os.path.dirname(os.path.normpath(options[key]))):
+        raise Exception(f"-- The provided {key} is not placed in a valid directory:\n{options[key]}\nPlease use a valid directory to create the {key} or use a valid existing path for the ")
+    
+    return()
+
+def check_smoothing_window(options, max_range):
+    
+    if not options['smoothing_window'] == None:
+
+        if options['smoothing_window'] < 0:
+            raise Exception("--Error: The smoothing window must be positive")
+
+        if options['smoothing_window'] < 7.:
+            raise Exception("--Error: The smoothing window must be provided in meters")
+                
+        if options['smoothing_window'] >= 1e3 * max_range:
+            raise Exception(f"--Error: The smoothing window cannot be higher than the maximum range of the channel ({1e-3 * max_range} km). ")      
+        
+    return()
+
+def check_range_limits(options, key, min_range, max_range):
+    
+    if not options[key] == None:
+        
+        if len(options[key]) != 2:
+            raise Exception(f"--Error: The key option must be a list of exaclty 2 elements, the lower and the upper limit. A {len(options[key])} element list was provided")
+            
+        llim = options[key][0]
+        ulim = options[key][1]
+            
+        if llim < min_range or ulim > max_range or \
+            llim > max_range or ulim < min_range:
+            raise Exception(f'--Error: The provided {key} is out of the signal limits:\n{options[key]}\nPlease provide values:\n    between {min_range} and {max_range}\n    or None to smooth over the whole profile')
+    
+        if llim > ulim:
+            raise Exception(f'--Error: The lower limit of the provided {options[key]} is higher than the upper limit: {options[key]}')
+            
+    return()
+
+def get_fpaths(netcdf_folder, signal_type, mtype): 
+        
+    if signal_type == 'raw':   
+        pattern = f"_{mtype}_ATLAS_"
+        files = glob.glob(os.path.join(netcdf_folder, 'converter', f'*{pattern}*.nc'))
+        
+        if len(files) == 0:
+            raise Exception(f"--Warning: No raw files matching the given patern {pattern} were detected!")
+
+    elif signal_type == 'rangecor':   
+        prp_pattern = f"_qck_{mtype}_ATLAS_"
+        files = glob.glob(os.path.join(netcdf_folder, 'preprocessor', f'*{prp_pattern}*.nc'))
+    
+        if len(files) == 0:
+            raise Exception(f"--Warning: No raw files matching the given patern {pattern} were detected!")
+
+    else:
+        raise Exception(f"--Error: The provided mtype parameter ({signal_type}) is not supported. Please select one of: 'raw', 'rangecor'")
+
+
+    return(files)
+
+
+def make_plot_filename(fpath_list, options):
+    
+    smoothing_window = options['smoothing_window']
+    timescale = options['timescale']
+    normalization_range = options['normalization_range']
+    background_range = options['background_range']
+    smoothing_range = options['smoothing_range']
+    signal_type = options['signal_type']
+    
+    if len(fpath_list) > 0:
+        if timescale == None: avg = ''
+        else:
+            avg = f"avg_{timescale}"
+            
+        if smoothing_range == None: sm_range = ''
+        else:
+            sm_range = f"sm_{int(smoothing_range[0])}_{smoothing_range[1]}"
+        
+        if smoothing_window == None: sm_win = ''
+        else:
+            sm_win = f"win_{int(smoothing_window)}"
+        
+        if normalization_range == None or signal_type == 'raw': norm = ''
+        else:
+            norm = f"nrm_{int(normalization_range[0])}_{normalization_range[1]}"
+
+        if background_range == None or signal_type == 'rangecor': bline = ''
+        else:
+            bline = f"bgr_{int(background_range[0])}_{background_range[1]}"
+
+        bname = ['_'.join(filter(None, [f"{os.path.basename(os.path.splitext(path)[0])}", avg, sm_range, sm_win, norm, bline])) for path in fpath_list]
+    else:
+        bname = []
+        
+    return(bname)
+
+def get_converter_signals(fpath, options):
+    
+    channels = options['channels']
+    timescale = options['timescale']
+    smoothing_window = options['smoothing_window']
+    smoothing_range = options['smoothing_range']
+    background_range = options['background_range']
+    statistics_range = options['statistics_range']
+  
+    if os.path.exists(fpath):
+        system_info, channel_info, time_info, _,\
+            sig, _, shots, _ = \
+                   short_reader(fpath = fpath, 
                                 exclude_telescope_type = '', 
                                 exclude_channel_type = '', 
                                 exclude_acquisition_mode = '', 
                                 exclude_channel_subtype = '', 
                                 use_channels = None)
-    else:
-        print("-- Warning: Raw file not found!")
-        
-    return(system_info, channel_info, time_info, time_info_d,\
-           sig, sig_d, shots, shots_d)
 
-def get_prepro_signals(fpath_prp, timescale = '',
-                       smoothing_window = [], smoothing_llim = None, 
-                       smoothing_ulim = None):
-            
-    if len(fpath_prp) > 0 and os.path.exists(fpath_prp):
-        data = xr.open_dataset(fpath_prp)
+        date_info = dict()
+        date_info['start_date'] = system_info.RawData_Start_Date
+        date_info['start_time'] = system_info.RawData_Start_Time_UT
+        date_info['end_time'] = system_info.RawData_Stop_Time_UT
         
-        # heights = data.Height_levels / 1000.
+        all_channels = sig.copy().channel.values
+        
+        channels = check_channels(channels, all_channels)
+        
+        sig = sig.copy().sel({'channel' : channels})
+        channel_info = channel_info.copy().loc[channels,:] 
+        
+        ranges = bin_to_range(sig = sig,
+                              zero_bin = channel_info.DAQ_Trigger_Offset,
+                              range_resolution = channel_info.Raw_Data_Range_Resolution)
+        
+        for ch in channels:
+            check_options(options = options, 
+                          ranges = ranges.loc[ch,:].copy().values)
+
+        stats = calculate_statistics(sig = sig, 
+                                     ranges = ranges, 
+                                     statistics_range = statistics_range)
+       
+        sig = time_averaging(sig = sig, 
+                             timescale = timescale)
+        
+        sig = smoothing(sig = sig, 
+                        ranges = ranges, 
+                        smoothing_window = smoothing_window, 
+                        smoothing_range = smoothing_range)
+        
+        sig = background_correction(sig = sig, 
+                                    ranges = ranges,
+                                    background_range = background_range)
+                     
+    else:
+        raise Exception("-- Warning: No raw files found") 
+        
+    return(sig, ranges, date_info, stats, system_info, channel_info, time_info, shots)
+
+def get_prepro_signals(fpath, options):
+            
+    channels = options['channels']
+    timescale = options['timescale']
+    smoothing_window = options['smoothing_window']
+    smoothing_range = options['smoothing_range']
+    normalization_range = options['normalization_range']
+    statistics_range = options['statistics_range']
+  
+    if os.path.exists(fpath):
+        data = xr.open_dataset(fpath)
+        
         ranges = data.Range_levels / 1000.
         
         # Extract signal
-        sig_rc = data.Range_Corrected_Signals
-        sig_rc = sig_rc.copy().where(sig_rc != nc.default_fillvals['f8'])
+        sig = data.Range_Corrected_Signals
+        sig = sig.copy().where(sig != nc.default_fillvals['f8'])
         
-        start_date = data.RawData_Start_Date
-        start_time = data.RawData_Start_Time_UT
-        end_time = data.RawData_Stop_Time_UT
+        date_info = dict()
+        date_info['start_date'] = data.RawData_Start_Date
+        date_info['start_time'] = data.RawData_Start_Time_UT
+        date_info['end_time'] = data.RawData_Stop_Time_UT
+        
+        all_channels = sig.copy().channel.values
+        
+        channels = check_channels(channels, all_channels)
+            
+        sig = sig.copy().sel({'channel' : channels})
+        ranges = ranges.copy().sel({'channel' : channels})
+        
+        for ch in channels:
+            check_options(options = options, 
+                          ranges = ranges.loc[ch,:].copy().values)
 
-        std_rc = np.nan * sig_rc.copy()
+        stats = calculate_statistics(sig = sig, 
+                                     ranges = ranges, 
+                                     statistics_range = statistics_range)
+       
+        sig = time_averaging(sig = sig, 
+                             timescale = timescale)
         
-        if len(timescale) > 0:
-            sig_rc = sig_rc.copy().resample(time = timescale).mean()
-            std_rc = std_rc.copy().resample(time = timescale).mean()
-    
-        if not isinstance(smoothing_window, list):
-            for j in range(sig_rc.channel.size):
-                if smoothing_llim == None:
-                    smoothing_llim = ranges[j,0].copy().values
-                if smoothing_ulim == None:
-                    smoothing_ulim = ranges[j,-1].copy().values
-                        
-                sig_sm, sig_std = \
-                    sliding_average_2D_fast(z_vals = sig_rc[:,j,:].copy().values, 
-                                            y_vals = ranges[j,:].copy().values,
-                                            y_sm_lims = [smoothing_llim, smoothing_ulim],
-                                            y_sm_win = smoothing_window,
-                                            err_type = 'std')
-                sig_rc[:,j,:] = sig_sm
-                std_rc[:,j,:] = sig_std
-        else:
-            std_rc = np.nan * sig_rc.copy()
+        sig = smoothing(sig = sig, 
+                        ranges = ranges, 
+                        smoothing_window = smoothing_window, 
+                        smoothing_range = smoothing_range)
+        
+        
+        sig = normalize(sig = sig, 
+                        ranges = ranges, 
+                        normalization_range = normalization_range)
+        
+                    
     else:
-        print("-- Warning: Preprocessed file not found!")
+        raise Exception("-- Error: Preprocessed file not found")
 
-    return(sig_rc, std_rc, ranges, start_date, start_time, end_time)
+    return(sig, ranges, date_info, stats)
+
+def bin_to_range(sig, zero_bin, range_resolution):
+    
+    channels = sig.copy().channel.values
+    bins = sig.copy().bins.values.astype(int)
+    
+    ranges = xr.DataArray(dims = sig.dims[1:3], coords = [sig.coords[sig.dims[1]], sig.coords[sig.dims[2]]])
+
+    for ch in channels:
+        ranges.loc[ch,:] = (bins + zero_bin.loc[ch] + 0.5) * range_resolution.loc[ch] * 1E-3 
+
+    return(ranges)
+
+def time_averaging(sig, timescale):
+    
+    sig_avg = sig.copy()
+    
+    if not timescale == None:
+        
+        if timescale == 'all':
+           sig_avg  = sig.copy().mean(dim = 'time', keepdims = True)
+        else:
+            count = sig.copy().resample(time = timescale).count()
+            sig_avg = sig.copy().resample(time = timescale).mean()\
+                .where(count >= 0.7 * count.max()).dropna(dim = 'time', how = 'all')
+        
+    return(sig_avg)
+
+def smoothing(sig, ranges, smoothing_window, smoothing_range):
+    
+    sig_sm = sig.copy()
+    channels = sig.copy().channel.values
+    
+    if not smoothing_window == None:
+        
+        for ch in channels:
+        
+            if smoothing_range == None:
+                smoothing_llim = ranges.loc[ch,:].copy()[0].values
+            else: smoothing_llim = smoothing_range[0]
+
+            if smoothing_range == None:
+                smoothing_ulim =  ranges.loc[ch,:].copy()[-1].values
+            else: smoothing_ulim = smoothing_range[1]
+                  
+            sig_sm_ch, _ = \
+                sliding_average_2D_fast(z_vals = sig.loc[:,ch,:].copy().values, 
+                                        y_vals = ranges.loc[ch,:].copy().values,
+                                        y_sm_lims = [smoothing_llim, smoothing_ulim],
+                                        y_sm_win = smoothing_window,
+                                        err_type = 'std')
+            
+            sig_sm.loc[:, ch, :] = sig_sm_ch
+    
+    return(sig_sm)
+
+def normalize(sig, ranges, normalization_range):
+    
+    sig_nrm = sig.copy()
+    channels = sig.copy().channel.values
+    
+    if not normalization_range == None: 
+        
+        for ch in channels:
+
+            normalization_llim = np.where(ranges.loc[ch,:].values >= normalization_range[0])[0][0]
+            normalization_ulim = np.where(ranges.loc[ch,:].values <= normalization_range[1])[0][-1]
+
+            sig_div = sig.copy().loc[:, ch, :][:, normalization_llim:normalization_ulim].mean(dim = 'bins')
+            sig_mlt = sig_div.copy().mean(dim = 'time')
+
+            sig_nrm.loc[:,ch,:] = (sig.copy().loc[:,ch,:] / sig_div.copy()) * sig_mlt.copy()
+    
+    return(sig_nrm)
+
+def background_correction(sig, ranges, background_range):
+    
+    sig_bgc = sig.copy()
+    channels = sig.copy().channel.values
+
+    if background_range != None:
+
+        for ch in channels:
+            
+            background_llim = np.where(ranges.loc[ch,:].values >= background_range[0])[0][0]
+            background_ulim = np.where(ranges.loc[ch,:].values <= background_range[1])[0][-1]
+
+            if ch[6] == 'a':
+                sig_bgr = sig.copy().loc[:, ch, :][:, background_llim:background_ulim].mean(dim = 'bins')
+                sig_bgc.loc[:, ch, :] = sig.copy().loc[:, ch, :] - sig_bgr.copy()
+            else:
+                sig_bgc.loc[:, ch, :] = sig.copy().loc[:, ch, :]
+    
+    return(sig_bgc)
+
+def calculate_statistics(sig, ranges, statistics_range):
+    
+    time = (sig.copy().time - sig.copy().time[0]).dt.seconds.values + \
+        1e-6 * (sig.copy().time - sig.copy().time[0]).dt.microseconds.values
+    
+    channels = sig.copy().channel.values
+    
+    if not statistics_range == None:
+        stats = pd.DataFrame(index = channels, columns = ['mean', 'sdev', 'sem', 'vert_slope', 'temp_slope', 'gaussian_noise', 'profiles', 'bins', 'points'])
+
+        for ch in channels:
+
+            statistics_llim = np.where(ranges.loc[ch,:].values >= statistics_range[0])[0][0]
+            statistics_ulim = np.where(ranges.loc[ch,:].values <= statistics_range[1])[0][-1]
+                    
+            x_vals = ranges.loc[ch,:][statistics_llim:statistics_ulim]
+            y_vals = sig.loc[:,ch,:][:, statistics_llim:statistics_ulim].copy().mean(dim = 'time').values
+            
+            vert_fit = linregress(x = x_vals, y = y_vals)
+
+            xt_vals = time
+            yt_vals = sig.loc[:,ch,:][:, statistics_llim:statistics_ulim].copy().mean(dim = 'bins').values
+            
+            temp_fit = linregress(x = xt_vals, y = yt_vals)
+            
+            stats.loc[ch, 'profiles'] = time.size
+            stats.loc[ch, 'bins'] = x_vals.size
+            stats.loc[ch, 'points'] = sig.loc[:,ch,:][:, statistics_llim:statistics_ulim].copy().count().values
+            
+            stats.loc[ch, 'mean'] = round_it(sig.loc[:,ch,:][:, statistics_llim:statistics_ulim].copy().mean().values, 5)
+            stats.loc[ch, 'sdev'] = round_it(sig.loc[:,ch,:][:, statistics_llim:statistics_ulim].copy().std().values, 3)
+            stats.loc[ch, 'sem'] = round_it(stats.loc[ch, 'sdev'] / np.sqrt(stats.loc[ch, 'points']), 3)
+
+            stats.loc[ch, 'vert_slope'] = vert_fit[3] <= 0.05
+            stats.loc[ch, 'temp_slope'] = temp_fit[3] <= 0.05
+            stats.loc[ch, 'gaussian_noise'] = shapiro(y_vals - np.mean(y_vals))[1] > 0.05
+            
+    else: stats = None
+    
+    return(stats)
 
 def date_text(start_date, start_time, end_time):
     
-    date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
+    if len(start_date) > 0 and len(start_time) > 0 and len(end_time) > 0:
+        
+        date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
+        
+        start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
     
-    start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
+        end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
+        
+        date_part = f'On {date} from {start} to {end} UTC'.strip()
 
-    end = f'{end_time[:2]}:{end_time[2:4]}:{end_time[4:6]}'
-    
-    date_part = f'On {date} from {start} to {end} UTC'.strip()
-    
+    else:
+        date_part = ''
+        
     return(date_part)
 
-def make_title_mline(mtype, stype, timescale, smoothing_window, channel, date_part):
-    
-    if timescale != '': time_label = f'Avg: {timescale}'
-    else: time_label = ''
-
-    if not isinstance(smoothing_window, list): 
-        sm_label = f'Sm Win: {int(smoothing_window)} m'
-    else: sm_label = ''    
-    
-    ch_label = f'Ch: {channel}'
+def make_title_line(iterables):
     
     label = ''
-    for part in [mtype, stype, time_label, sm_label, ch_label]:
+    for part in iterables:
         if len(part) > 0:
             if len(label) == 0:
                 label = label + part
@@ -134,446 +556,245 @@ def make_title_mline(mtype, stype, timescale, smoothing_window, channel, date_pa
     
     label = str.strip(label)
     
-    if len(date_part) > 0:
-        title = str.strip(f'{label}\n {date_part}')
-        
-    return(title)
+    return(label)
 
-def make_title_tseries(mtype, stype, timescale, smoothing_window, 
-                       channel, date_part, xlims, x_units):
+def make_title_mline(channels, options, date_info):
+
+    smoothing_window = options['smoothing_window']
+    smoothing_range = options['smoothing_range']
+    timescale = options['timescale']
+    normalization_range = options['normalization_range']
+    background_range = options['background_range']
+    signal_type = options['signal_type'].capitalize()
+    mtype = options['mtype'].capitalize()
+    custom_label = options['custom_label'].capitalize()
     
-    if timescale != '': time_label = f'Avg: {timescale}'
+    date_part = date_text(start_date = date_info['start_date'], 
+                          start_time = date_info['start_time'],
+                          end_time = date_info['end_time']) 
+    
+    if not timescale == None: time_label = f'Avg: {timescale}'
     else: time_label = ''
 
-    if not isinstance(smoothing_window, list): 
-        sm_label = f'Sm Win: {int(smoothing_window)} m'
-    else: sm_label = ''   
-    
-    if x_units == 'bins':
-        extension = 'bins'
-    else:
-        extension = 'km'
+    units = 'km'
         
-    if len(xlims) > 0: 
-        sum_label = f'Sum: {xlims[0]} - {xlims[1]} {extension}'
-    else: sum_label = ''   
-    
-    ch_label = f'Ch: {channel}'
-    
-    label = ''
-    for part in [mtype, stype, sum_label, time_label, sm_label, ch_label]:
-        if len(part) > 0:
-            if len(label) == 0:
-                label = label + part
-            else:
-                label = label + ', ' + part
-    
-    label = str.strip(label)
-    
-    if len(date_part) > 0:
-        title = str.strip(f'{label}\n {date_part}')
+    if not smoothing_window == None:
+        sm_win_label = f"Smoothing Window: {int(smoothing_window)} m"
         
-    return(title)
-
-def make_filename(mtype, stype, timescale, smoothing_window, channel, 
-                  start_date, start_time, end_time, ptype):
+        if not smoothing_range == None:
+            sm_label = f"Smoothing Range: {smoothing_range[0]} - {smoothing_range[1]} {units}"
+        else: sm_label = ''
     
-    if not isinstance(smoothing_window, list): 
-        sm_label = f'{int(smoothing_window)}m'
-    else: sm_label = ''    
+    else: 
+        sm_win_label = ''
+        sm_label = ''
         
-    fname = ''
-    for part in [start_date, start_time, end_time, mtype, stype, ptype,
-                 timescale, sm_label, channel]:
-        if len(part) > 0:
-            if len(fname) == 0:
-                fname = fname + part
-            else:
-                fname = fname + '_' + part
+    if not normalization_range == None:
+        nr_label = f"Normalization Range: {normalization_range[0]} - {normalization_range[1]} {units}"
+    else: nr_label = ''
 
-    return(fname)
+    if background_range == None or signal_type == 'rangecor': bl_label = ''
+    else: 
+            bl_label = f"Background Range: {background_range[0]} - {background_range[1]} {units}"
+    
+    options_part_1 = make_title_line(iterables = [time_label, sm_win_label, sm_label])
+    options_part_2 = make_title_line(iterables = [nr_label, bl_label])
 
-def multi_line_plot(signal, ranges = [], channels = None, zero_bins = [],
-                    resol = [], xlims = [], ylims = [],
-                    mtype = '', stype = 'Raw', 
-                    timescale = '', smoothing_window = [],
-                    start_date = '', start_time = '', end_time = '',
-                    exp_dir = '', dpi_val = 300, interactive = False):
+    titles = dict()
     
-    if channels == None:
-        channels = signal.channel.values
-    else:
-        channels = np.array(channels)
-    
-    if len(ranges) == 0:
-        x_units = 'bins'
-    else:
-        x_units = 'range' 
-    
-    if stype not in ['RC','Raw']:
-        raise Exception(f"-- Error: The provided stype ({stype}) was not recognize. Please select one of: ['RC','Raw']")
-            
-    bins = signal.bins.values
-    
-    if len(start_date) > 0 and len(start_time) > 0 and len(end_time) > 0:
-        date_part = date_text(start_date = start_date, 
-                              start_time = start_time,
-                              end_time = end_time) 
-    else:
-        date_part = ''
+    for channel in channels:
+        ch_label = f'Ch: {channel}'
         
-    for j in range(signal.channel.size):
-        ch = signal.channel.values[j]
+        ch_part = make_title_line(iterables = [custom_label, mtype, signal_type, ch_label])
+        
+        if len(date_part) > 0:
+            titles[channel] = str.strip(f'{ch_part}\n{date_part}\n{options_part_1}\n{options_part_2}')
+        
+    return(titles)
 
-        if ch in channels:
-            title = make_title_mline(mtype = mtype, stype = stype,
-                                     timescale = timescale, 
-                                     smoothing_window = smoothing_window, 
-                                     channel = ch, date_part = date_part)
-            
-            fig = plt.figure(figsize=(6. , 3.))
-            ax = fig.add_axes([0.1,0.15,0.86,0.70])
-            
-            ax.set_title(title)
-            
-            if x_units == 'range':
-                x_vals = ranges[j,:].values
-            else:
-                x_vals = bins
-
-            xbins = get_range_lims(x_vals = x_vals, xlims = xlims, 
-                                   x_units = x_units)
-                        
-            if stype == 'Raw' and ch[6] == 'a':
-                y_units = 'mV'
-            elif stype == 'Raw' and ch[6] == 'p':
-                y_units = 'Counts'
-            elif stype == 'RC':
-                y_units = 'AU'
-
-            for i in range(signal.time.size):
-                
-                if x_units == 'bins': 
-                    if len(xlims) > 0:
-                        ax.plot(x_vals[xbins[0]:xbins[1] + 1], 
-                                 signal[i, j, xbins[0]:xbins[1] + 1])
-                        ax.set_xlim([xlims[0], xlims[1]])
-                    else:
-                        ax.set_plot(x_vals, signal[i, j, :])
-
-                else:
-                    if len(xlims) > 0:
-                        ax.plot(x_vals[xbins[0]:xbins[1] + 1], 
-                                 signal[i, j, xbins[0]:xbins[1] + 1])
-                        ax.set_xlim([xlims[0], xlims[1]])
-                    else:
-                        ax.plot(x_vals, signal[i, j, :])
-
-                if len(ylims) > 0:
-                    ax.set_ylim([ylims[0],ylims[1]])
-            
-            if x_units == 'bins':
-                ax.set_xlabel('Bins')                
-                if stype == 'Raw' and not isinstance(zero_bins, list) and \
-                    not isinstance(resol, list):
-                    x_tick_bins = ax.get_xticks()
-                    
-                    x_tick_bins = x_tick_bins[x_tick_bins >= 0]
-                    ax1 = ax.twiny()
-                    
-                    zero_bin = zero_bins.loc[ch]
-                    resol_ch = resol.loc[ch]
-                    
-                    x1_ticks_l = np.round((x_tick_bins + zero_bin) * resol_ch * 1E-3,1)
-
-                    ax1.set_xticks(x_tick_bins-x_tick_bins[0],x1_ticks_l)
-                    ax1.tick_params(direction = "in", pad = -15)
-                    ax1.set_xlabel('Range [km]',labelpad = -23)    
-            else:
-                ax.set_xlabel('Range [km]')    
-                
-            ax.set_ylabel(f'Signal [{y_units}]')                    
-            ax.grid()
-            ax.ticklabel_format(axis = 'y', useMathText = True, style='sci', scilimits=(-1,1))
-                        
-            if len(exp_dir) > 0 and os.path.exists(exp_dir):
-                fname = make_filename(mtype = mtype, stype = stype,
-                                      timescale = timescale, 
-                                      smoothing_window = smoothing_window, 
-                                      channel = ch, 
-                                      start_date = start_date, 
-                                      start_time = start_time, 
-                                      end_time = end_time,
-                                      ptype = 'mline')
-
-                fpath = os.path.join(exp_dir, fname)
-                
-                # plt.tight_layout()
-                
-                fig.savefig(fpath, dpi = dpi_val)
-            
-            if interactive:
-                plt.ion()
-                plt.show()
-            else:
-                plt.show()
-                fig.clf()
-            
-                plt.close()
+def multi_line_plot_bokeh(signal, signal_type, ranges = [], channels = None, 
+                          zero_bins = [], range_resolution = [], 
+                          mtype = '', colorscale = 'sequential',
+                          titles = None, plot_folder = None, filename = None,
+                          stats = None, statistics_range = None):
     
-    return()
-
-def multi_line_plot_bokeh(signal, ranges = [], channels = None, zero_bins = [],
-                          resol = [], xlims = [], ylims = [],
-                          mtype = '', stype = 'Raw', 
-                          timescale = '', smoothing_window = [],
-                          start_date = '', start_time = '', end_time = '',
-                          exp_dir = '', dpi_val = 300, interactive = False):
+    if plot_folder != None and os.path.exists(os.path.dirname(os.path.normpath(plot_folder))) == False:
+        raise Exception(f"-- The provided plot_folder is not placed in a valid directory:\n{plot_folder}\nPlease use a valid directory to create the plot_folder or use a valid existing path for the plot_folder")
     
-    if channels == None:
-        channels = signal.channel.values
-    else:
-        channels = np.array(channels)
+    n_time = signal.copy().time.size
+    n_channel = signal.copy().channel.size
     
-    if stype not in ['RC','Raw']:
-        raise Exception(f"-- Error: The provided stype ({stype}) was not recognize. Please select one of: ['RC','Raw']")
-            
+    bins = signal.copy().bins.values
+    channels = signal.copy().channel.values
+    tabs_obj = np.nan * np.zeros(n_channel, dtype = object)
     
-    n_time = signal.time.size
-    n_channel = signal.channel.size
+    colors = make_colorscale(colorscale = colorscale, 
+                             n_time = n_time) 
     
-    if len(start_date) > 0 and len(start_time) > 0 and len(end_time) > 0:
-        date_part = date_text(start_date = start_date, 
-                              start_time = start_time,
-                              end_time = end_time) 
-    else:
-        date_part = ''
-    
-    tabs = []
     
     for j in range(n_channel):
-        ch = signal.channel.values[j]
+        ch = channels[j]
 
-        if ch in channels:
-            title = make_title_mline(mtype = mtype, stype = stype,
-                                     timescale = timescale, 
-                                     smoothing_window = smoothing_window, 
-                                     channel = ch, date_part = date_part)  
+        ranges_ch = ranges[j,:].copy().values
+        
+        x_label_1, x_label_2, y_label, y_units = \
+            make_labels(signal_type = signal_type, 
+                        channel_mode = ch[6])
             
-            if stype == 'Raw' and ch[6] == 'a':
-                y_units = 'mV'
-            elif stype == 'Raw' and ch[6] == 'p':
-                y_units = 'Counts'
-            elif stype == 'RC':
-                y_units = 'AU'
-                
-            if len(ranges) == 0:
-                x_units = 'bins'
-                x_vals_1 = signal.bins.values
-                x_vals_2 = (x_vals_1 + zero_bins.loc[ch]) * resol.loc[ch] * 1E-3
-                x_label_1 = 'bins'
-                x_label_2 = 'Range [km]'
-                y_label = f'Raw Signal [{y_units}]'
+        x_vals_1, x_range_1, x_range_2 = \
+            find_x_limits(signal_type = signal_type, 
+                          bins = bins, 
+                          ranges = ranges_ch)
+        
+        
+        p = figure(width = 1600, 
+                   height = 800, 
+                   title = titles[ch],
+                   x_axis_label = x_label_1, 
+                   y_axis_label = y_label,
+                   x_range = x_range_1)   
+
+        for i in range(n_time):
+            p.line(x_vals_1, signal[i, j, :].values, line_width = 2, color = colors[i])
+
+        if signal_type == 'raw':
+            p.extra_x_ranges = {"x2": Range1d(start = x_range_2[0], end = x_range_2[1])}
+            p.add_layout(LinearAxis(x_range_name = "x2", axis_label = x_label_2), 'above')
+
+        if not statistics_range == None:
+            if signal_type == 'raw':
+                box_llim = np.where(ranges_ch >= statistics_range[0])[0][0]
+                box_ulim = np.where(ranges_ch <= statistics_range[1])[0][-1]
             else:
-                x_units = 'range' 
-                x_vals_1 = ranges[j,:].values
-                x_vals_2 = np.round(1E3 * x_vals_1 / resol.loc[ch] - zero_bins.loc[ch], decimals = 0)
-                x_label_1 = 'Range [km]'
-                x_label_2 = 'bins'
-                y_label = 'RC Signal'
-
-            p = figure(width = 800, height = 400, title = title,
-                       x_axis_label = x_label_1, 
-                       y_axis_label = y_label)   
-                
-            for i in range(n_time):
-                p.line(x_vals_1, signal[i, j, :].values, alpha=0.5)
-
-            print(p)
-            show(p)
-            raise Exception
-            tab = Panel(child = p, title = title)
-
+                box_llim = statistics_range[0]
+                box_ulim = statistics_range[1]               
             
-            tabs.append(tab)
-                    
-            if len(exp_dir) > 0 and os.path.exists(exp_dir):
-                fname = make_filename(mtype = mtype, stype = stype,
-                                      timescale = timescale, 
-                                      smoothing_window = smoothing_window, 
-                                      channel = ch, 
-                                      start_date = start_date, 
-                                      start_time = start_time, 
-                                      end_time = end_time,
-                                      ptype = 'mline')
+            box = BoxAnnotation(left = box_llim, right = box_ulim, fill_color = 'gray', fill_alpha = 0.3)
+            p.add_layout(box)
+            
+            mean = Label(x = 960, y = 430, text = f"Mean: {stats.loc[ch,'mean']} {y_units}", x_units = 'screen', y_units = 'screen')
+            sdev = Label(x = 960, y = 410, text = f"SDev: {stats.loc[ch,'sdev']} {y_units}", x_units = 'screen', y_units = 'screen')
+            sem = Label(x = 960, y = 390, text = f"SEM: {stats.loc[ch,'sem']} {y_units}", x_units = 'screen', y_units = 'screen')
+            points = Label(x = 960, y = 370, text = f"Points: {stats.loc[ch,'points']}", x_units = 'screen', y_units = 'screen')
 
-                fpath = os.path.join(exp_dir, fname)
-                
-                # plt.tight_layout()
-                            
-            show(Tabs(tabs = tabs))
+            vert_slope = Label(x = 1130, y = 430, text = f"Sign. slope (range): {stats.loc[ch,'vert_slope']}", x_units = 'screen', y_units = 'screen')
+            temp_slope = Label(x = 1130, y = 410, text = f"Sign. slope (time): {stats.loc[ch,'temp_slope']}", x_units = 'screen', y_units = 'screen')
+            noise = Label(x = 1130, y = 390, text = f"Gaussian noise: {stats.loc[ch,'gaussian_noise']}", x_units = 'screen', y_units = 'screen')
+            nums = Label(x = 1130, y = 370, text = f"Bins: {stats.loc[ch,'bins']}, Profiles: {stats.loc[ch,'profiles']}", x_units = 'screen', y_units = 'screen')
+
+            p.add_layout(mean)
+            p.add_layout(sdev)
+            p.add_layout(sem)
+            p.add_layout(points)
+
+            p.add_layout(vert_slope)
+            p.add_layout(temp_slope)
+            p.add_layout(noise)
+            p.add_layout(nums)
+        
+        p.title.text_font_size = '22pt'    
+        p.xaxis.axis_label_text_font_size = '22pt'    
+        p.yaxis.axis_label_text_font_size = '22pt'    
+        p.xaxis.major_label_text_font_size = '22pt'    
+        p.yaxis.major_label_text_font_size = '22pt'  
+        
+        p.ygrid.minor_grid_line_color = 'black'
+        p.ygrid.minor_grid_line_alpha = 0.1
+        p.xgrid.minor_grid_line_color = 'black'
+        p.xgrid.minor_grid_line_alpha = 0.1
+        
+        tabs_obj[j] = TabPanel(child = p, title = ch)
+
+    tabs = Tabs(tabs=list(tabs_obj[tabs_obj == tabs_obj]))
     
-    return(tab)
+    if plot_folder == None:
+        show(tabs)
+    else:
+        os.makedirs(plot_folder, exist_ok = True)
+        fpath = os.path.join(plot_folder, f'{filename}.html')
+        output_file(fpath, mode = 'inline')
+        
+        save(tabs)
+        webbrowser.open_new_tab(fpath) 
 
-def time_series_plot(signal, channels = None, ranges = [], 
-                     xlims = [], ylims = [], mtype = '', stype = 'Raw', 
-                     timescale = '', smoothing_window = [],
-                     start_date = '', start_time = '', end_time = '',
-                     exp_dir = '', dpi_val = 300, interactive = False):
+    return(tabs)
+
+def check_channels(channels, all_channels):
     
     if channels == None:
-        channels = signal.channel.values
+        channels = all_channels
     else:
-        channels = np.array(channels)
-    
-    if len(xlims) == 0:
-        x_units = 'bins'
-    elif max(xlims) > 100:
-        x_units = 'bins'
-    else:
-        x_units = 'range' 
-    
-    t_vals = signal.time.values
-    
-    if len(start_date) > 0 and len(start_time) > 0 and len(end_time) > 0:
-        date_part = date_text(start_date = start_date, 
-                              start_time = start_time,
-                              end_time = end_time) 
-    else:
-        date_part = ''
-        
-    for j in range(signal.channel.size):
-        ch = signal.channel.values[j]
-
-        if ch in channels:
-            title = make_title_tseries(mtype = mtype, stype = stype,
-                                       timescale = timescale, 
-                                       smoothing_window = smoothing_window, 
-                                       channel = ch, date_part = date_part,
-                                       xlims = xlims, x_units = x_units)
-            
-            # if y_units == None and 
-            if x_units == 'range':
-                x_vals = ranges[j,:].values
-            else:
-                x_vals = signal.bins.values
-                
-            if stype == 'Raw' and ch[6] == 'a':
-                y_units = 'mV'
-            elif stype == 'Raw' and ch[6] == 'p':
-                y_units = 'Counts per shot'
-            elif stype == 'RC':
-                y_units = 'AU'
-                
-            xbins = get_range_lims(x_vals = x_vals, xlims = xlims, 
-                                   x_units = x_units)
-            
-            signal_m = signal[:,j,xbins].copy().mean(dim = 'bins')
-            
-            sigma = signal_m.copy().std(dim = 'time').values
-            mean = signal_m.copy().mean(dim = 'time').values
-
-            fig = plt.figure(figsize=(15. , 3.))
-            
-            fig.suptitle(title)
-
-            ax1 = fig.add_axes([0.045,0.15,0.64,0.70])
-            ax2 = fig.add_axes([0.735,0.15,0.25,0.70])
-
-            ax1.plot(t_vals, signal_m)
-            
-            ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-
-            ax1.set_xlabel('Time')        
-            ax1.set_ylabel(f'Signal [{y_units}]')                    
-            
-            if len(ylims) > 0:
-                ax1.set_ylim([ylims[0],ylims[1]])
-                                 
-            ax1.grid()
-            ax1.ticklabel_format(axis = 'y', useMathText = True, style='sci', scilimits=(-1,1))
-            
-            t_vals_sec = (t_vals - t_vals[0])/ np.timedelta64(1, 's')
-            slope, _, _, _, stderr = linregress(t_vals_sec, signal_m)
-            
-            if slope > 2. * stderr:
-                slope_color = 'tab:red'
-            else:
-                slope_color = 'tab:green'
-                
-            ax1.text(0.1, 0.9, f"slope: {round_it(slope,3)} per s",
-                     bbox=dict(facecolor=slope_color, alpha=0.1, zorder = 3),
-                     transform = ax1.transAxes)
-
-            ax2.hist(signal_m)
-            
-            ax2.set_xlabel(f'Signal [{y_units}]')                    
-            ax2.set_ylabel('Counts')        
-            
-            if len(ylims) > 0:
-                ax2.set_xlim([xlims[0],xlims[1]])
-                     
-            ax2.grid()
-            ax2.ticklabel_format(axis = 'y', useMathText = True, style='sci', scilimits=(-1,1))
-            ax2.ticklabel_format(axis = 'x', useMathText = True, style='sci', scilimits=(-1,1))
-            
-            ax2.text(0.1, 0.9, f"μ: {'{:.2E}'.format(mean)}",
-                     bbox=dict(facecolor='tab:green', alpha=0.1, zorder = 3),
-                     transform = ax2.transAxes)
-            
-            ax2.text(0.1, 0.8, f"σ: {'{:.2E}'.format(sigma)}",
-                     bbox=dict(facecolor='tab:green', alpha=0.1, zorder = 3),
-                     transform = ax2.transAxes)
-            
-            if len(exp_dir) > 0 and os.path.exists(exp_dir):
-                fname = make_filename(mtype = mtype, stype = stype,
-                                      timescale = timescale, 
-                                      smoothing_window = smoothing_window, 
-                                      channel = ch, 
-                                      start_date = start_date, 
-                                      start_time = start_time, 
-                                      end_time = end_time,
-                                      ptype = 'tseries')
-
-                fpath = os.path.join(exp_dir, fname)
-                
-                # plt.tight_layout()
-                
-                fig.savefig(fpath, dpi = dpi_val)
-            
-            if interactive:
-                plt.ion()
-                plt.show()
-            else:
-                plt.show()
-                fig.clf()
-            
-                plt.close()
-    
-    return()
-
-def get_range_lims(x_vals, xlims, x_units):
-
-    if len(xlims) > 0 and x_units == 'range':
-        if len(np.where(x_vals < xlims[0])[0]) == 0:
-            lbin = 0
+        ch_exists = [ch in all_channels for ch in channels]
+        if not np.all(ch_exists):
+            raise Exception(f"--Error: The provided channels ({channels}) do not exist. Please use a subset of: {all_channels}")
         else:
-            lbin = np.where(x_vals < xlims[0])[0][-1]
+            channels = np.array(channels)
+        
+    return(channels)
 
-        if len(np.where(x_vals > xlims[1])[0]) == 0:
-            ubin = 0
-        else:
-            ubin = np.where(x_vals > xlims[1])[0][0]
-                                
-        xbins = [lbin, ubin]
-        
-    elif len(xlims) > 0 and x_units == 'bins':
-        xbins = xlims
+def make_colorscale(colorscale, n_time):
     
+    if colorscale == 'discreet':
+        colors = int(np.ceil(n_time / 10)) * Category10[10]
+    elif colorscale == 'sequential':
+        if n_time <= 256:
+            colors = turbo(n_time)
+        else:
+            max_colors = turbo(256)
+            indexes = np.arange(0, n_time)
+            color_index = (np.round(255 * indexes / n_time, decimals = 0)).astype(int)
+            colors = tuple([max_colors[ind] for ind in color_index])
+                
+    return(colors)
+
+def make_labels(signal_type, channel_mode):
+    
+    if signal_type == 'raw' and channel_mode == 'a':
+        y_units = 'mV'
+        y_label = f'Raw Signal [{y_units}]'
+        x_label_1 = 'Bins'
+        x_label_2 = 'Range [km]'
+    elif signal_type == 'raw' and channel_mode == 'p':
+        y_units = 'Counts'
+        y_label = f'Raw Signal [{y_units}]'
+        x_label_1 = 'Bins'
+        x_label_2 = 'Range [km]'
+    elif signal_type == 'rangecor':
+        y_units = 'AU'
+        y_label = 'RC Signal'
+        x_label_1 = 'Range [km]'
+        x_label_2 = ''
     else:
-        xbins = [0, -1]
-        
-    return(xbins)
+        raise Exception(f"-- Error: The provided stype ({signal_type}) was not recognize. Please select one of: ['rangecor','raw']")
+    
+    return(x_label_1, x_label_2, y_label, y_units)
+
+def find_x_limits(signal_type, bins, ranges):
+    
+    n_bins = bins.size
+
+    buffer_bins = np.round(0.05 * n_bins, 0)
+    range_resolution = ranges[1] - ranges[0]
+
+    if signal_type == 'raw':
+        x_vals_1 = bins
+        x_llim_1 = x_vals_1[0] - buffer_bins # in bins
+        x_ulim_1 = x_vals_1[-1] + buffer_bins # in bins
+        x_vals_2 = ranges
+        x_llim_2 = x_vals_2[0] - buffer_bins * range_resolution # in km
+        x_ulim_2 = x_vals_2[-1] + buffer_bins * range_resolution # in km
+        x_range_1 = (x_llim_1, x_ulim_1)
+        x_range_2 = (x_llim_2, x_ulim_2)
+    elif signal_type == 'rangecor':
+        x_vals_1 = ranges
+        x_llim_1 = x_vals_1[0] - buffer_bins * range_resolution # in km
+        x_ulim_1 = x_vals_1[-1] + buffer_bins * range_resolution # in km
+        x_range_1 = (x_llim_1, x_ulim_1)
+        x_range_2 = []
+    else:
+        raise Exception(f"-- Error: The provided stype ({signal_type}) was not recognize. Please select one of: ['rangecor','raw']")
+       
+    return(x_vals_1, x_range_1, x_range_2)
 
 def round_it(x, sig):
     
