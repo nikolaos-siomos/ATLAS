@@ -457,7 +457,7 @@ def height_calculation(bins, resol, zenith_angle):
     
     zenith_angle_rad = np.deg2rad(zenith_angle)
     
-    heights = resolution * bins * np.cos(zenith_angle_rad)
+    heights = resolution * (bins + 0.5) * np.cos(zenith_angle_rad)
     
     return(heights)
 
@@ -489,7 +489,7 @@ def range_calculation(bins, resol):
     resolution = xr.DataArray(resol.values,
                               dims = ['channel'],
                               coords = [resol.index.values]).astype(float)
-    ranges = resolution * bins
+    ranges = resolution * (bins + 0.5)
 
     return(ranges)
 

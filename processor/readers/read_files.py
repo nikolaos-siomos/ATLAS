@@ -142,7 +142,7 @@ def short_reader(fpath, exclude_telescope_type, exclude_channel_type,
         shots_d = shots_d.copy().loc[dict(channel = valid_channels)]
 
     channel_info = channel_info.loc[valid_channels,:]
-    
+
     return(system_info, channel_info, time_info, time_info_d,
            signal, signal_d, shots, shots_d)
 
@@ -516,8 +516,7 @@ def signals(file, time_info, channel_info, isdark = False):
     else:
         signal_arr = file.Background_Profile.values
         
-
-    bins = 1. + np.arange(0, signal_arr.shape[-1])
+    bins = np.arange(0., signal_arr.shape[-1])
     
     channels = channel_info.index.values
 
@@ -563,7 +562,7 @@ def dark(file, time_info, channel_info):
     
     signal_arr = file.Background_Profile.values
 
-    bins = 1. + np.arange(0, signal_arr.shape[-1])
+    bins = np.arange(0., signal_arr.shape[-1])
     
     channels = channel_info.index.values
     

@@ -7,8 +7,6 @@ Created on Wed Aug 31 13:01:51 2022
 """
 
 import numpy as np
-from ..tools.smoothing import sliding_average_1D_fast as smooth_1D
-from ..tools.smoothing import sliding_average_2D_fast as smooth_2D
 
 def quicklook_x(t_lims, t_tick, time):
 

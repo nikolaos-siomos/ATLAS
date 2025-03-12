@@ -313,7 +313,7 @@ def main(args, __version__):
                             cross_check_type = 'both',
                             cross_check_all_points = False,
                             cross_check_crit = 'both',
-                            der_lim = 0.001,
+                            der_fac = 2.,
                             cancel_shp = True)
         # from matplotlib import pyplot as plt
         # msem.plot()
@@ -368,7 +368,7 @@ def main(args, __version__):
                             rsem_lim = 0.05,
                             cross_check_type = 'both',
                             cross_check_all_points = False,
-                            der_lim = 0.001,
+                            der_fac = 2.,
                             cancel_shp = True)    
 
         norm_region_ray, idx_ray, fit_ray = \

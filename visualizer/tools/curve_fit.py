@@ -14,7 +14,7 @@ from scipy.stats import linregress, shapiro
 
 def stats(y1, y2, x, min_win, max_win, step, llim, ulim, 
           cross_check_type = 'back', cross_check_crit = 'min', cross_check_all_points = True, 
-          rsem_lim = 0.02, der_lim = 0.05, shp_lim = 0.05, crc_lim = np.nan, crc_fac = 1., 
+          rsem_lim = 0.02, der_fac = 1., shp_lim = 0.05, crc_lim = np.nan, crc_fac = 1., 
           cancel_sem = False, cancel_der = False, cancel_sec = False,
           cancel_shp = False, cancel_crc = False):
     
@@ -63,11 +63,18 @@ def stats(y1, y2, x, min_win, max_win, step, llim, ulim,
             # Calculate the relative signal standar error derivative
             nder[i,j] = fit[0] / fit[4]
             
+            # # Calculate the derivative mask (pval < 0.05 means the slope is significant)
+            # mder[i,j] = fit[3] > der_lim
+
+            # # Check if the derivatives inside the 2 halves of the window are aslo not significant
+            # msec[i,j] = (fit_lh[3] > der_lim) & (fit_uh[3] > der_lim)
+            
+
             # Calculate the derivative mask (pval < 0.05 means the slope is significant)
-            mder[i,j] = fit[3] > der_lim
+            mder[i,j] = np.abs(fit[0] / fit[4]) <= der_fac
 
             # Check if the derivatives inside the 2 halves of the window are aslo not significant
-            msec[i,j] = (fit_lh[3] > der_lim) & (fit_uh[3] > der_lim)
+            msec[i,j] = np.abs(fit_lh[0] - fit_uh[0]) / (fit_lh[4] + fit_uh[4]) <= der_fac
             
             # Calculate the standard error
             rsem[i,j] = np.nanstd(res_sel) / np.sqrt(res_sel.size) / np.nanmean(y2_sel)

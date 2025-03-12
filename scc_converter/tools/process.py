@@ -368,7 +368,7 @@ def polarization_calibration(args, version):
 
 def dark(args, version):
 
-    path_drk = os.path.join(args['parent_folder'],'drk')
+    path_drk = args['dark_folder']
     path_cfg = args['config_file']
 
     file_format = args['file_format']

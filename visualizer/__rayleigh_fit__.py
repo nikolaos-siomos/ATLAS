@@ -45,6 +45,12 @@ def main(args, __version__):
     ewl = data.Emitted_Wavelength
     bdw = data.Channel_Bandwidth
     
+    dead_time = data.Dead_Time
+    daq_trigger_offset = data.DAQ_Trigger_Offset
+    background_low_bin = data.Background_Low_Bin
+    background_high_bin = data.Background_High_Bin
+    raw_data_range_resolution = data.Raw_Data_Range_Resolution
+    
     # Extract SCC info
     station_id = data.Station_ID.lower()
         
@@ -109,6 +115,19 @@ def main(args, __version__):
         ewl_ch = ewl.copy().loc[ch_d].values
         bdw_ch = bdw.copy().loc[ch_d].values
         scc_id_ch = scc_id.copy().loc[ch_d].values
+        
+        dead_time_ch = dead_time.copy().loc[ch_d].values
+        daq_trigger_offset_ch = daq_trigger_offset.loc[ch_d].values
+        background_low_bin_ch = background_low_bin.loc[ch_d].values
+        background_high_bin_ch = background_high_bin.loc[ch_d].values
+        raw_data_range_resolution_ch = raw_data_range_resolution.loc[ch_d].values
+        
+        background_mode_ch, background_low_ch, background_high_ch, \
+            first_signal_rangebin_ch, trigger_delay_ch =\
+                atlas_to_scc_triggering(background_low_bin = background_low_bin_ch, 
+                                        background_high_bin = background_high_bin_ch, 
+                                        daq_trigger_offset = daq_trigger_offset_ch, 
+                                        raw_data_range_resolution = raw_data_range_resolution_ch)
         
         # Create the y axis (height/range)
         x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label = \
@@ -325,12 +344,11 @@ def main(args, __version__):
         
         # Add metadata to the quicklook plot
         METADATA = {"processing_software" : f"ATLAS_{data.version}",
+                    "measurement_type" : "ray",
                     "station_id" : f"{station_id}",
                     "lidar_id" : f"{lidar_id}",
                     "version_id" : f"{version_id}",
                     "config_id" : f"{config_id}",
-                    "channel" : f"{ch}",
-                    "scc_id" : f"{scc_id_ch}",
                     "smooth" : f"{args['smooth']}",
                     "smoothing_exponential" : f"{args['smooth_exponential']}",
                     "smoothing_range" : f"{args['smoothing_range']}",
@@ -346,9 +364,23 @@ def main(args, __version__):
                     "use_range" : f"{args['use_range']}",
                     "x_lims" : f"{args['x_lims']}",
                     "y_lims" : f"{args['y_lims']}",
-                    "x_tick" : f"{args['x_tick']}"}
+                    "x_tick" : f"{args['x_tick']}",
+                    "emission_wavelength" : f"{ewl_ch}",
+                    "interference_filter_center" : f"{dwl_ch}",
+                    "interference_filter_fwhm" : f"{bdw_ch}",
+                    "atlas_channel_id" : f"{ch}",
+                    "scc_channel_id" : f"{scc_id_ch}",
+                    "dead_time" : f"{dead_time_ch}",
+                    "daq_trigger_offset" : f"{daq_trigger_offset_ch}",
+                    "first_signal_rangebin" : f"{first_signal_rangebin_ch}",
+                    "trigger_delay" : f"{trigger_delay_ch}",
+                    "background_low_bin" : f"{background_low_bin_ch}",
+                    "background_high_bin" : f"{background_high_bin_ch}",
+                    "background_mode" : f"{background_mode_ch}",
+                    "background_low" : f"{background_low_ch}",
+                    "background_high" : f"{background_high_ch}",
+                    "maximum_channel_height" : f"{norm_region[-1]}"}
 
-                
         im = Image.open(fpath)
         meta = PngImagePlugin.PngInfo()
     
@@ -360,6 +392,28 @@ def main(args, __version__):
     print('-----------------------------------------')
     print(' ')
     return()
+
+def atlas_to_scc_triggering(background_low_bin, background_high_bin,
+                            daq_trigger_offset, raw_data_range_resolution):
+
+    if daq_trigger_offset < -50:
+        background_mode = 'Pre-Trigger'
+        background_low = background_low_bin
+        background_high = background_high_bin
+        first_signal_rangebin = -daq_trigger_offset
+        trigger_delay = -999.
+    else:
+        background_mode = 'Far Field'
+        background_mode = raw_data_range_resolution * background_low_bin
+        background_high = raw_data_range_resolution * background_high_bin
+        if daq_trigger_offset <= 0:
+            first_signal_rangebin = -daq_trigger_offset
+            trigger_delay = -999.
+        else:
+            first_signal_rangebin = -999.
+            trigger_delay = daq_trigger_offset * raw_data_range_resolution * 20. / 3.
+
+    return(background_mode, background_low, background_high, first_signal_rangebin, trigger_delay)
 
 if __name__ == '__main__':
     # Get the command line argument information

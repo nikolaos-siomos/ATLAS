@@ -45,7 +45,8 @@ def dtfs(dir_meas):
             channel_info = read_channels(buffer = buffer, sep = sep)
             
             channels = channel_info.index.values
-            bins_arr = np.arange(1., channel_info.bins.max() + 1.)
+            # bins_arr = np.arange(1., channel_info.bins.max() + 1.)
+            bins_arr = np.arange(0., channel_info.bins.max())
 
             # Creating empty signal, shots, and time arrays
             start_time_arr = np.nan*np.zeros(len(mfiles), dtype = object)
