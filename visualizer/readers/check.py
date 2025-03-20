@@ -81,3 +81,27 @@ def check_channels_no_exclude(sel_channels, all_channels):
         channels = all_channels
 
     return(channels)
+
+def find_rt_channels(ch_r, ch_t, channels):
+    
+    if ch_r == None or ch_t == None:
+        channels_r = []
+        channels_t = []
+        ch_r_all = np.array([ch for ch in channels if ch[7] == 'r'])
+        ch_t_all = np.array([ch for ch in channels if ch[7] == 't'])
+        if len(ch_r_all) == 0:
+            print("-- Warning: No relfected channels were detected. Please make sure that the channel_subtype in set correctly in the configuration file")
+        if len(ch_t_all) == 0:
+            print("-- Warning: No transmitted channels were detected. Please make sure that the channel_subtype in set correctly in the configuration file")
+        
+        for ch_r_i in ch_r_all:
+            for ch_t_i in ch_t_all:
+                if ch_r_i[4]  == ch_t_i[4] and ch_r_i[6]  == ch_t_i[6] and \
+                    ch_r_i[:4]  == ch_r_i[:4]:
+                        channels_r.extend([ch_r_i])
+                        channels_t.extend([ch_t_i])
+    else:
+        channels_r = ch_r
+        channels_t = ch_t
+        
+    return(channels_r, channels_t)

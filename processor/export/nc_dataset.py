@@ -143,20 +143,20 @@ def telecover(sig, system_info, channel_info, time_info,
                                        'channel' : sig.channel.values, 
                                        'bins': sig.bins.values})
         
-        nc_file['Range_Corrected_Signals_Inner_Ring'] = \
+        nc_file['Range_Corrected_Signals_Inner_Sector'] = \
             (['time_i','channel','bins'], sig[dict(time = idx_inner)]\
              .fillna(netCDF4.default_fillvals['f8']).values)  
 
-        nc_file['Range_Corrected_Signals_Outer_Ring'] = \
+        nc_file['Range_Corrected_Signals_Outer_Sector'] = \
             (['time_o','channel','bins'], sig[dict(time = idx_outer)]\
              .fillna(netCDF4.default_fillvals['f8']).values)     
         
         for clm in time_info.columns.values:
             if clm not in ['sector']:
-                nc_file[f'{clm}_Inner_Ring'] = \
+                nc_file[f'{clm}_Inner_Sector'] = \
                     (['time_i'], time_info.loc[:,clm].iloc[idx_inner].values)
                     
-                nc_file[f'{clm}_Outer_Ring'] = \
+                nc_file[f'{clm}_Outer_Sector'] = \
                     (['time_o'], time_info.loc[:,clm].iloc[idx_outer].values)
         
 
@@ -194,11 +194,11 @@ def telecover(sig, system_info, channel_info, time_info,
             (['time_w','channel','bins'], sig[dict(time = idx_west)]\
              .fillna(netCDF4.default_fillvals['f8']).values)
                 
-        nc_file['Range_Corrected_Signals_Inner_Ring'] = \
+        nc_file['Range_Corrected_Signals_Inner_Sector'] = \
             (['time_i','channel','bins'], sig[dict(time = idx_inner)]\
              .fillna(netCDF4.default_fillvals['f8']).values)  
 
-        nc_file['Range_Corrected_Signals_Outer_Ring'] = \
+        nc_file['Range_Corrected_Signals_Outer_Sector'] = \
             (['time_o','channel','bins'], sig[dict(time = idx_outer)]\
              .fillna(netCDF4.default_fillvals['f8']).values)     
 
@@ -217,10 +217,10 @@ def telecover(sig, system_info, channel_info, time_info,
                 nc_file[f'{clm}_West_Sector'] = \
                     (['time_w'], time_info.loc[:,clm].iloc[idx_west].values)
     
-                nc_file[f'{clm}_Inner_Ring'] = \
+                nc_file[f'{clm}_Inner_Sector'] = \
                     (['time_i'], time_info.loc[:,clm].iloc[idx_inner].values)
                     
-                nc_file[f'{clm}_Outer_Ring'] = \
+                nc_file[f'{clm}_Outer_Sector'] = \
                     (['time_o'], time_info.loc[:,clm].iloc[idx_outer].values)
         
     for idx in system_info.index.values:
@@ -385,7 +385,8 @@ def calibration(sig, sig_ray, meteo, molec, system_info, system_info_ray,
     return([fpath])
 
 def quicklook(sig, system_info, channel_info, time_info, 
-              heights, ranges, version, meas_type, dir_out):
+              heights, ranges, version, meas_type, dir_out,
+              molec = [], meteo = [], molec_info = []):
 
     print('-----------------------------------------')
     print('Start exporting to a Quicklook ATLAS file...')
@@ -405,6 +406,20 @@ def quicklook(sig, system_info, channel_info, time_info,
         nc_file[clm] = (['time'], time_info.loc[:,clm]\
                         .fillna(netCDF4.default_fillvals['f8']))
             
+    if not len(meteo) == 0: 
+        for prop in meteo.properties.values:
+            nc_file[prop] = (['channel', 'bins'], 
+                             meteo.loc[dict(properties = prop)].values)
+
+    if not len(molec) == 0: 
+        for prop in molec.properties.values:
+            nc_file[prop] = (['channel', 'bins'], 
+                             molec.loc[dict(properties = prop)].values)
+
+    if not len(molec_info) == 0: 
+        for key in molec_info.index.values:
+            nc_file.attrs[key] = molec_info.loc[key]
+                
     nc_file['Height_levels'] = heights   
 
     nc_file['Range_levels'] = ranges

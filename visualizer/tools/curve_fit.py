@@ -18,7 +18,7 @@ def stats(y1, y2, x, min_win, max_win, step, llim, ulim,
           cancel_sem = False, cancel_der = False, cancel_sec = False,
           cancel_shp = False, cancel_crc = False):
     
-    edg = np.arange(llim, ulim + step, step)
+    edg = np.arange(llim - step / 2., ulim + step / 2., step)
     
     win = np.arange(min_win, max_win + step, step)
     

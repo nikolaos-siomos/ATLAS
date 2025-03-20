@@ -16,9 +16,9 @@ warnings.filterwarnings('ignore')
 # A) Inputs
 #------------------------------------------------------------------------------
 # Path to the parent folder fs ATLAS 
-# parent_folder = '/home/nikos/Nextcloud3/ARS-stations/the/179_199_664_20240221'
-parent_folder = os.path.join('/home/nikos/Nextcloud/ACTRIS-CARS-LMU/Instruments (POLIS-6, POLIS-1064)/POLIS-1064/Laser/Interspersion_measurements_APD_flex/',
-                             '20250219','50us_pretrigger')
+parent_folder = '/home/nikos/Nextcloud3/ARS-stations/the/179_199_664_20240221'
+# parent_folder = os.path.join('/home/nikos/Nextcloud/ACTRIS-CARS-LMU/Instruments (POLIS-6, POLIS-1064)/POLIS-1064/Laser/Interspersion_measurements_APD_flex/',
+#                              '20250219','50us_pretrigger')
 
 timescale = '10min' # Set to None to skip averaging. Use e.g. 10s for 10 second averages, 30min for 30 minute averages, or 1h for 1 hour averages. Use 'all' to average all files. Use None to apply no averaging
 
@@ -36,9 +36,9 @@ mtype = 'drk' # set to either 'ray', 'drk', 'tlc', 'pcb' to plot the signals of 
 
 signal_type = 'raw' # select either 'raw' or 'rangecor' to plots the raw or the rangecorrected signals, respectively
 
-channels = ['1064xpat'] # use the ATLAS IDs to plot only specific channels, can be a list or scalar, set to None to plot all channels
+channels = None# ['1064xpat'] # use the ATLAS IDs to plot only specific channels, can be a list or scalar, set to None to plot all channels
     
-colorscale = 'sequential' # select the colorscale ('sequential' or 'discreet') - If discreet is used 4 different colors will be applied iteratively for each measurement. If sequential is used, a colorscale of up to 256 colors will be used with the first/last measurement getting the first/last color repsectively. If there are more measurements than colors then the same colors might be used more than once for adjacent measurements   
+colorscale = 'discrete' # select the colorscale ('sequential' or 'discrete') - If discrete is used 4 different colors will be applied iteratively for each measurement. If sequential is used, a colorscale of up to 256 colors will be used with the first/last measurement getting the first/last color repsectively. If there are more measurements than colors then the same colors might be used more than once for adjacent measurements   
 
 custom_label = 'pretrigger_50us' # provide a label to be added to the plot title. Use '' to skip
 
@@ -93,7 +93,7 @@ if options['signal_type'] == 'rangecor':
 for k in range(len(fpath_list)):
     options['channels'] = channels
 
-    titles = viewer_utils.make_title_mline(channels = options['channels'], 
+    titles = viewer_utils.make_title_mline(channels = sig.channel.values, 
                                            options = options,
                                            date_info = date_info) 
 
@@ -104,7 +104,7 @@ bname = \
 viewer_utils.multi_line_plot_bokeh(signal = sig, 
                                    signal_type = options['signal_type'],
                                    ranges = ranges,
-                                   channels = channels, 
+                                   channels = sig.channel.values, 
                                    colorscale = options['colorscale'],
                                    titles = titles,
                                    plot_folder = plot_folder,
