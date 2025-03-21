@@ -10,12 +10,12 @@ import datetime, os, glob, base64
 import numpy as np
 from PIL import Image
 
-def make_filename(st_id = '', data_identifier = '', expert_analyst = '', extension = 'html'):
+def make_filename(scc_station_id = '', data_identifier = '', expert_analyst = '', extension = 'html'):
     
     time_now = str(datetime.datetime.now())
     time_now_text = time_now[2:4] + time_now[5:7] + time_now[8:10] + '-' + time_now[11:13] + time_now[14:16]
 
-    basename = '_'.join(filter(None, ['QA_report', str(st_id), str(data_identifier), str(expert_analyst), str(time_now_text)]))
+    basename = '_'.join(filter(None, ['QA_report', str(scc_station_id), str(data_identifier), str(expert_analyst), str(time_now_text)]))
 
     filename = f'{basename}.{extension}'
     

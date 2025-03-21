@@ -190,29 +190,36 @@ def export_report(parser_args):
 
     # File format
     file_format = parser_args['options']['file_format']
-
-
-    if 'station_id' in parser_args['autodetect_paths'].keys():
-        html_filename = export_html.make_filename(data_identifier = parser_args['autodetect_paths']['data_identifier'], 
-                                                  expert_analyst = parser_args['options']['expert_analyst'],
-                                                  station_id = parser_args['autodetect_paths']['station_id'])
+    
+    if 'scc_station_id' in parser_args['autodetect_paths'].keys():
+        scc_station_id = parser_args['autodetect_paths']['scc_station_id']
     else:
-        html_filename = export_html.make_filename(data_identifier = parser_args['autodetect_paths']['data_identifier'], 
-                                                  expert_analyst = parser_args['options']['expert_analyst'])
-            
+        scc_station_id = ''
+        
+    if 'expert_analyst' in parser_args['options'].keys():
+        expert_analyst = parser_args['options']['expert_analyst']
+    else:
+        expert_analyst = ''
+        
+    if 'export_all' in parser_args['options'].keys():
+        export_all = parser_args['options']['export_all']
+    else:
+        export_all = False
+        
+    data_identifier = parser_args['autodetect_paths']['data_identifier']
+
+    html_filename = export_html.make_filename(data_identifier = data_identifier, 
+                                              expert_analyst = expert_analyst,
+                                              scc_station_id = scc_station_id)
+
     photon_only = file_format in ['polly_xt', 'polly_xt_first']
 
     reports_folder = os.path.join(parent_folder, 'reports')
     os.makedirs(reports_folder, exist_ok = True)
 
-    if 'export_all' in parser_args['options'].keys():
-        export_html.QA_report(plots_folder = os.path.join(parent_folder, 'plots'), 
-                              html_filename = os.path.join(reports_folder, html_filename),
-                              photon_only = photon_only, 
-                              export_all = parser_args['options']['export_all'])
-    else:
-        export_html.QA_report(plots_folder = os.path.join(parent_folder, 'plots'), 
-                              html_filename = os.path.join(reports_folder, html_filename),
-                              photon_only = photon_only)  
+    export_html.QA_report(plots_folder = os.path.join(parent_folder, 'plots'), 
+                          html_filename = os.path.join(reports_folder, html_filename),
+                          photon_only = photon_only, 
+                          export_all = export_all)
         
     return()
