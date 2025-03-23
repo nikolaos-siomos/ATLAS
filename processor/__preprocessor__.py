@@ -242,16 +242,31 @@ def main(args, __version__):
                                   meas_type = 'qck',
                                   sig_drk = sig_drk)
             
-        output_files['qck'] = \
-            nc_dataset.quicklook(sig = qck, 
-                                 system_info = system_info, 
-                                 channel_info = channel_info, 
-                                 time_info = time_info_qck, 
-                                 heights = qck_pack['heights'], 
-                                 ranges = qck_pack['ranges'],
-                                 version = __version__,
-                                 meas_type = meas_type,
-                                 dir_out = args['output_folder'])
+        if meas_type == 'ray':
+            output_files['qck'] = \
+                nc_dataset.quicklook(sig = qck, 
+                                     system_info = system_info, 
+                                     channel_info = channel_info, 
+                                     time_info = time_info_qck, 
+                                     heights = qck_pack['heights'], 
+                                     ranges = qck_pack['ranges'],
+                                     version = __version__,
+                                     meas_type = meas_type,
+                                     dir_out = args['output_folder'],
+                                     molec = molec,
+                                     meteo = meteo,
+                                     molec_info = molec_info)
+        else:
+            output_files['qck'] = \
+                nc_dataset.quicklook(sig = qck, 
+                                     system_info = system_info, 
+                                     channel_info = channel_info, 
+                                     time_info = time_info_qck, 
+                                     heights = qck_pack['heights'], 
+                                     ranges = qck_pack['ranges'],
+                                     version = __version__,
+                                     meas_type = meas_type,
+                                     dir_out = args['output_folder'])
     
     else:
         output_files['qck'] = []

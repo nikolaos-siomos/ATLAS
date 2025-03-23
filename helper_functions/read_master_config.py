@@ -94,8 +94,6 @@ def read_section(section, dtype=object, skip_vars=[], squeeze = False, exception
     # Reads the whole or part of the section and returns a Pandas Series
     map_info = dict()
     
-    type_map = {}
-
     for key in section:
         if key not in skip_vars:
             arr = [i.strip() for i in re.split(',', section[key]) if i !='']

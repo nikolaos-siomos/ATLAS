@@ -13,6 +13,9 @@ import matplotlib.dates as mdates
 import os
 from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 from subprocess import run
+from xarray import DataArray
+from PIL import Image
+from PIL import PngImagePlugin
 
 def quicklook(dir_out, fname, title, dpi_val, color_reduction, use_log, delta_t,
               t_vals, y_vals, z_vals, 
@@ -224,27 +227,27 @@ def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_regi
 
         ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
                 f'norm. region: {n_llim} - {n_ulim} km',
-                bbox = dict(facecolor = c_norm, alpha = 0.1, zorder = 3))
+                bbox = dict(facecolor = c_norm, alpha = 0.22, zorder = 3))
             
         ax.text(0.55 * x_ulim, 0.30 * y_ulim, 
                 f'rsem: {np.round(rsem, decimals = 4)}',
-                bbox = dict(facecolor = c_rsem, alpha = 0.1, zorder = 3))
+                bbox = dict(facecolor = c_rsem, alpha = 0.22, zorder = 3))
         
         ax.text(0.55 * x_ulim, 0.15 * y_ulim, 
                 f'rslope: {np.round(rslope, decimals = 4)}',
-                bbox = dict(facecolor = c_pval, alpha = 0.1, zorder = 3))
+                bbox = dict(facecolor = c_pval, alpha = 0.22, zorder = 3))
     else:
         ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
                 f'norm. region: {n_llim} - {n_ulim} km',
-                bbox = dict(facecolor = c_norm, alpha = 0.1, zorder = 3))
+                bbox = dict(facecolor = c_norm, alpha = 0.22, zorder = 3))
 
         ax.text(0.55 * x_ulim, 0.82 * y_ulim, 
                 f'rsem: {np.round(rsem, decimals = 4)}',
-                bbox = dict(facecolor = c_rsem, alpha = 0.1, zorder = 3))
+                bbox = dict(facecolor = c_rsem, alpha = 0.22, zorder = 3))
 
         ax.text(0.55 * x_ulim, 0.74 * y_ulim, 
                 f'rslope: {np.round(rslope, decimals = 4)}',
-                bbox = dict(facecolor = c_pval, alpha = 0.1, zorder = 3))
+                bbox = dict(facecolor = c_pval, alpha = 0.22, zorder = 3))
 
     ax2 = fig.add_axes([0.625,0.145,0.36,0.69])
     
@@ -715,7 +718,7 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
                   y1_lvar, y2_lvar, 
                   y1_uvar, y2_uvar,
                   coef_1, coef_2, 
-                  coef_extra_1, coef_extra_2, extra_rin, ranges,
+                  coef_extra_1, coef_extra_2, extra_sec, ranges,
                   x_lbin, x_ubin, x_llim, x_ulim, 
                   y_llim, y_ulim, y_llim_nr, y_ulim_nr, 
                   x_label, x_tick, use_last, iters):
@@ -754,14 +757,14 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     Y_E = np.nan * Y_NM
     Y_O = np.nan * Y_NM
 
-    if extra_rin['O']:
+    if extra_sec['O']:
         Y_E = y1_extr_raw
         Y_E_N = coef_extra_1 * y1_extr
         Y_O = Y1_N
         extra_label = f'outer{iters+1}'
         extra_label_short = f'O{iters+1}'
         extra_exists = True
-    elif extra_rin['I']:
+    elif extra_sec['I']:
         Y_E = y2_extr_raw
         Y_E_N = coef_extra_2 * y2_extr
         Y_O = Y2_N
@@ -1070,16 +1073,16 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
         
     ax.text(0.05 * x_ulim_cal, 0.94 * y_ulim_cal, 
             f'cal. region: {c_llim} - {c_ulim} km',
-            bbox = dict(facecolor = c_cal, alpha = 0.1, zorder = 3))  
+            bbox = dict(facecolor = c_cal, alpha = 0.22, zorder = 3))  
     ax.text(0.05 * x_ulim_cal, 0.85 * y_ulim_cal, 
             f'ε: {round_it(epsilon,2)}' +'${}^o$'+ ' $\pm$ ' + f'{round_it(epsilon_err, 2)}' +'${}^o$' + f', K: {round_it(K, 4)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax.text(0.05 * x_ulim_cal, 0.76 * y_ulim_cal, 
             r'$η^{\star}_{f}$'+f': {round_it(eta_f_s, 3)}' + ' $\pm$ ' + f'{round_it(eta_f_s_err, 2)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax.text(0.05 * x_ulim_cal, 0.67 * y_ulim_cal, 
             r'$η^{\star}$'+f': {round_it(eta_s, 3)}' + ' $\pm$ ' + f'{round_it(eta_s_err, 2)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     if eta_err / eta <= 0.02:
         color_eta = 'tab:green'
     else:
@@ -1087,7 +1090,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
 
     ax.text(0.05 * x_ulim_cal, 0.59 * y_ulim_cal, 
             f'η: {round_it(eta, 3)}' + ' $\pm$ ' + f'{round_it(eta_err, 2)}',
-            bbox = dict(facecolor = color_eta, alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = color_eta, alpha = 0.22, zorder = 3)) 
 
     ax2 = fig.add_axes([0.545,0.14,0.44,0.65])
 
@@ -1147,29 +1150,28 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
         
     ax2.text(0.05 * x_ulim_vdr, 0.90 * y_ulim_vdr, 
              f'mol. cal. region: {m_llim} - {m_ulim} km',
-            bbox = dict(facecolor = c_ray, alpha = 0.1, zorder = 3))  
+            bbox = dict(facecolor = c_ray, alpha = 0.22, zorder = 3))  
     ax2.text(0.05 * x_ulim_vdr, 0.78 * y_ulim_vdr, 
             r'$δ_m$: '+f'{np.round(delta_m,4)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.66 * y_ulim_vdr, 
             r'$δ^{\star}$'+f': {np.round(delta_c_def,4)}' + ' $\pm$ ' + f'{round_it(delta_c_def_err,2)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.54 * y_ulim_vdr, 
             r'$δ_{c}$'+f': {np.round(delta_c,4)}' + ' $\pm$ ' + f'{round_it(delta_c_err,2)}', 
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.42 * y_ulim_vdr, 
             r'$δ_{res}$: '+f'{np.round(delta_l,4)}' + ' $\pm$ ' + f'{round_it(delta_l_err,2)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.30 * y_ulim_vdr, 
             r'$G_R$: '+f'{np.round(G_R,4)}, $G_T$: '+f'{round_it(G_T,4)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.18 * y_ulim_vdr, 
             r'$H_R$: '+f'{np.round(H_R,4)}, $H_T$: '+f'{round_it(H_T,4)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.06 * y_ulim_vdr, 
             r'$SR$ > '+f'{np.round(sr_lim,3)}, ' + r'$Δδ_p$ < ' + f'{np.round(err_p,decimals = 2)}',
-            bbox = dict(facecolor = 'tab:cyan', alpha = 0.1, zorder = 3)) 
-
+            bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
 
     fpath = os.path.join(dir_out, fname)
     
@@ -1182,6 +1184,71 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     perform_color_reduction(color_reduction, fpath)
             
     return(fpath)
+
+def make_filename(metadata, channel, meas_type, version, extra_type = '', extra_channel = None):
+    
+    if extra_channel == None:
+        parts = [str(metadata['station_id']), str(metadata['lidar_id']), str(metadata['version_id']), str(metadata['config_id']), str(metadata['start_date']), str(metadata['start_time']), meas_type, str(channel), str(metadata['scc_channel_id'].loc[channel].values), str(extra_type), 'ATLAS', str(version)]
+    else:
+        parts = [str(metadata['station_id']), str(metadata['lidar_id']), str(metadata['version_id']), str(metadata['config_id']), str(metadata['start_date']), str(metadata['start_time']), meas_type, str(channel), str(metadata['scc_channel_id'].loc[extra_channel].values), str(extra_type), 'ATLAS', str(version)]
+        
+    fname = "_".join([part for part in parts if len(part) > 0])
+    
+    return(fname)
+
+def make_filename_intercomparison(metadata_1, metadata_2, channel_1, channel_2, version, extra_type = ''):
+        
+    parts = [str(metadata_1['meas_id']), str(metadata_2['meas_id']), str(metadata_1['lidar_id']), str(metadata_2['lidar_id']), 'cmp', str(channel_1), str(channel_2), str(extra_type), 'ATLAS', str(version)]        
+
+    fname = "_".join([part for part in parts if len(part) > 0])
+    
+    return(fname)
+
+def get_plot_metadata(metadata, args, channel, meas_type, version, data_source_id = None):
+
+    channel_d = dict(channel = channel)
+    
+    plot_metadata = dict()
+    plot_metadata['processing_software'] = f"ATLAS_{version}"
+    plot_metadata['measurement_type'] = meas_type
+    
+    if data_source_id == None:
+        plot_metadata['atlas_channel_id'] = channel
+    else:
+        plot_metadata[f'atlas_channel_id_{data_source_id}'] = channel
+    
+    for key in metadata.keys():
+        if data_source_id == None:
+            key_new = key
+        else:
+            key_new = f'{key}_{data_source_id}'          
+               
+        if np.isscalar(metadata[key]):
+            plot_metadata[key_new] = f"{metadata[key]}"
+        elif type(metadata[key]) == type(DataArray()):
+            if 'channel' in metadata[key].dims:
+                plot_metadata[key_new] = f"{metadata[key].loc[channel_d].values}"
+            
+    for key in args.keys():
+        plot_metadata[key] = f"{args[key]}"
+    
+    return(plot_metadata)
+        
+def add_plot_metadata(plot_path, plot_metadata, plot_metadata_extra = None):
+
+    im = Image.open(plot_path)
+    meta = PngImagePlugin.PngInfo()
+    
+    for x in plot_metadata.keys():
+        meta.add_text(x, plot_metadata[x])
+    
+    if not plot_metadata_extra == None:
+        for x in plot_metadata_extra.keys():
+            meta.add_text(x, plot_metadata_extra[x])       
+    
+    im.save(plot_path, "png", pnginfo = meta)
+    
+    return()
 
 def round_it(x, sig):
     
@@ -1196,21 +1263,11 @@ def round_it(x, sig):
         
     return x_out
     
-def perform_color_reduction(color_reduction, fpath):
+def perform_color_reduction(color_reduction, plot_path):
     
     if color_reduction == True:
-        if os.name == 'nt':
-            try:
-                run(["magick", "convert", fpath, "-posterize", "8", fpath])
-            except:
-                try:
-                    run(["convert", fpath, "-posterize", "8", fpath])
-                except:
-                    print("-- Imagemagick is not properly installed. Verify that at least one of the following commands: 'magick convert <path_in> -posterize 8 <path_out>' or 'magick convert <path_in> -posterize 8 <path_out>' works. Plots will be produced without color reduction applied. To remove this message set the color_reduction variable to False in the settings file")
-        else:
-            try:
-                run(["convert", fpath, "-posterize", "8", fpath])
-            except:
-                print("-- Imagemagick is not properly installed. Verify that the command: 'magick convert <path_in> -posterize 8 <path_out>' works. Plots will be produced without color reduction applied. To remove this message set the color_reduction variable to False in the settings file")
-        
+        im = Image.open(plot_path)
+        im = im.convert('P', palette = Image.ADAPTIVE, colors = 255) 
+        im.save(plot_path)
+
     return()
