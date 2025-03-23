@@ -14,7 +14,8 @@ from scc_converter.__scc_converter__ import main as __scc_converter__
 from processor.__preprocessor__ import main as __preprocessor__
 from visualizer.__quicklook__ import main as __quicklook__
 from visualizer.__rayleigh_fit__ import main as __rayleigh_fit__
-from visualizer.__telecover__ import main as __telecover__
+from visualizer.__telecover_quadrants__ import main as __telecover_quadrants__
+from visualizer.__telecover_rings__ import main as __telecover_rings__
 from visualizer.__polarization_calibration__ import main as __polarization_calibration__
 from visualizer.__intercomparison__ import main as __intercomparison__
 from scc_converter.readers.parse_args import check_parser as check_cnv
@@ -536,7 +537,9 @@ def tlc_test(mst_cfg, prs_files, tlc_out, processing, reprocess = True):
        
         # Excecute ATLAS visualizer
         view_tlc(tlc_args)
-        __telecover__(tlc_args, __version__)
+        __telecover_quadrants__(tlc_args, __version__)
+
+        __telecover_rings__(tlc_args, __version__)
 
     return()
 

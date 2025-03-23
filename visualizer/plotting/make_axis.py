@@ -127,11 +127,8 @@ def quicklook_y(heights, ranges, y_lims, use_dis):
 
     return(y_lbin, y_ubin, y_llim, y_ulim, y_vals, y_label)
 
-def quicklook_z(sig, y_vals, z_lims, use_log, z_max_zone, z_min_zone):
+def quicklook_z(z_vals, y_vals, z_lims, use_log, z_max_zone, z_min_zone):
 
-    z_vals = sig.values.copy()
-    del sig
-        
     # Get the max signal bin and value
     mask_max_zone = (y_vals >= z_max_zone[0]) & (y_vals <= z_max_zone[1])
 

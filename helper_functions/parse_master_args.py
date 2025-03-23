@@ -13,16 +13,18 @@ Returns:
         
 """
 
-import argparse
-import os
+import argparse, os, sys
 
-def call_parser():
+def call_parser(get_defaults = False):
         
     """Collects the information included as commandline arguments. 
     """
     
     print('Parsing master arguments...')    
     
+    if get_defaults:
+        sys.argv = [sys.argv[0]]
+        
     parser = argparse.ArgumentParser(
     	description='arguments ')
     
