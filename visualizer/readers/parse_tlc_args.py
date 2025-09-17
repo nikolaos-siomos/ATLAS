@@ -89,11 +89,6 @@ def call_parser():
                         type = int, nargs = '?', default = None, 
                         help = 'The x axis finest tick for the near range subplots of the telecover test in km. Defaults to: 0.5 for l, m, n, and x telescope types and: 1. for the rest of the types')
 
-    parser.add_argument('--auto_fit', metavar = 'auto_fit',
-                        type = bool, default = False, 
-                        action = argparse.BooleanOptionalAction,
-                        help = 'If set to True an automatic identification of the normalization region will be attempted. If the automatic procedure is successful, the normalization_region variable will be ignored. If the procedure is not successful or auto_fit is set to False, the manually-provided/default normalization will be used. Defaults to True')
-
     parser.add_argument('--normalization_region', metavar = 'normalization_region',
                         type = float, nargs = 2, default = [1.8, 2.4],
                         help = 'The lower and upper limits of the region used for normalizing the signal in the Telecover test. If use_range is called, the limits correspond to distance. Defaults to: 0., 2.5')

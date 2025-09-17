@@ -134,267 +134,9 @@ def quicklook(dir_out, fname, title, dpi_val, color_reduction, use_log, delta_t,
             
     return(fpath)
 
-def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_region,
-             x_vals, y1_vals, y2_vals, y1_errs, y2_errs, coef, rsem, rslope, pval,
-             rsem_lim, fit, auto_fit, x_lbin, x_ubin, x_llim, x_ulim, y_llim, y_ulim, 
-             x_label, y_label, x_tick, label_1, label_2):
-        
-    # Create the variables to be plotted X, Y
-    X = x_vals[slice(x_lbin, x_ubin)]
-    Y1 = coef * y1_vals[slice(x_lbin, x_ubin)]
-    Y2 = y2_vals[slice(x_lbin, x_ubin)]
-    Y1E = coef * y1_errs[slice(x_lbin, x_ubin)]
-    Y2E = y2_errs[slice(x_lbin, x_ubin)]
-    
-    # Create the figure
-    # fig = plt.figure(figsize=(12. , 4.))
-    fig = plt.figure(figsize=(15 , 3))
-
-    fig.suptitle(title)
-
-    ax = fig.add_axes([0.05,0.145,0.52,0.69])
-        
-    ax.plot(X, Y1, color = 'tab:blue', label = label_1)
-    ax.plot(X, Y2, color = 'tab:red', label = label_2)
-
-    if np.isnan(Y1E).all() == False:
-        ax.fill_between(X, Y1 - Y1E, Y1 + Y1E, color = 'tab:blue', alpha = 0.3)
-
-    if np.isnan(Y2E).all() == False:
-        ax.fill_between(X, Y2 - Y2E, Y2 + Y2E, color = 'tab:red', alpha = 0.3)
-        
-    x_ticks = np.arange(x_tick * np.ceil(x_llim / x_tick), 
-                        x_tick * (np.floor(x_ulim / x_tick) + 1.), 
-                        x_tick)
-    
-    if x_tick >= x_ulim - x_llim:
-        raise Exception(f"The x_tick ({x_tick}) must be smaller than the width of the normalization_region ({norm_region}) for the Rayleigh fit test. Please revise the settings_file.ini ")
-    
-    if norm_region[0] > 20. or norm_region[1] < x_llim:
-        raise Exception(f"The normalization_region ({norm_region}) for the Rayleigh fit is out of the provided x_lims ([{x_llim}, {x_ulim}]). Please revise the settings_file.ini ")
-    
-    
-    if np.abs(x_llim - x_ticks[0]) < x_tick * 0.25:
-        x_ticks[0] = x_llim
-    else:
-        x_ticks = np.hstack((x_llim, x_ticks))
-
-    if np.abs(x_ulim - x_ticks[-1]) < x_tick * 0.25:
-        x_ticks[-1] = x_ulim
-    else:
-        x_ticks = np.hstack((x_ticks, x_ulim))
-
-    x_ticks = np.round(x_ticks, decimals = 2)
-
-    ax.set_xticks(x_ticks, labels = x_ticks)
-    ax.set_xlim([x_llim, x_ulim])
-    ax.set_xlabel(x_label)
-    ax.xaxis.set_minor_locator(MultipleLocator(x_tick / 2.))
-
-    ax.set_ylim([y_llim, y_ulim])
-    ax.set_ylabel(y_label)
-    if use_lin == False:
-        ax.set_yscale('log')
-
-    ax.grid(which = 'both')
-    
-    if ax.get_legend_handles_labels() != ([], []):
-        ax.legend(loc = 'lower left')
-
-    ax.axvspan(norm_region[0], norm_region[1], alpha = 0.2, facecolor = 'tab:grey')
-
-    n_llim = np.round(norm_region[0], decimals = 2)
-    n_ulim = np.round(norm_region[1], decimals = 2)
-    
-    if rsem > rsem_lim:
-        c_rsem = 'tab:red'
-    else:
-        c_rsem = 'tab:green'
-
-    if pval < 0.05:
-        c_pval = 'tab:red'
-    else:
-        c_pval = 'tab:green'
-    
-    if auto_fit == False:
-        c_norm = 'tab:orange'
-    elif fit == False:
-        c_norm = 'tab:red'
-    else:
-        c_norm = 'tab:green'
-        
-    if use_lin == False:
-
-        ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
-                f'norm. region: {n_llim} - {n_ulim} km',
-                bbox = dict(facecolor = c_norm, alpha = 0.22, zorder = 3))
-            
-        ax.text(0.55 * x_ulim, 0.30 * y_ulim, 
-                f'rsem: {np.round(rsem, decimals = 4)}',
-                bbox = dict(facecolor = c_rsem, alpha = 0.22, zorder = 3))
-        
-        ax.text(0.55 * x_ulim, 0.15 * y_ulim, 
-                f'rslope: {np.round(rslope, decimals = 4)}',
-                bbox = dict(facecolor = c_pval, alpha = 0.22, zorder = 3))
-    else:
-        ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
-                f'norm. region: {n_llim} - {n_ulim} km',
-                bbox = dict(facecolor = c_norm, alpha = 0.22, zorder = 3))
-
-        ax.text(0.55 * x_ulim, 0.82 * y_ulim, 
-                f'rsem: {np.round(rsem, decimals = 4)}',
-                bbox = dict(facecolor = c_rsem, alpha = 0.22, zorder = 3))
-
-        ax.text(0.55 * x_ulim, 0.74 * y_ulim, 
-                f'rslope: {np.round(rslope, decimals = 4)}',
-                bbox = dict(facecolor = c_pval, alpha = 0.22, zorder = 3))
-
-    ax2 = fig.add_axes([0.625,0.145,0.36,0.69])
-    
-    if np.isnan(Y1E).all() == False and np.isnan(Y2E).all() == True:
-        ax2.fill_between(X, (Y1 - Y1E - Y2) / Y2, 
-                         (Y1 + Y1E - Y2) / Y2, color = 'tab:blue', 
-                         alpha = 0.3, label = 'sem')
-        ax2.plot(X, (Y1 - Y2) / Y2, color = 'tab:blue',label = 'mean')
-
-    if np.isnan(Y1E).all() == False and np.isnan(Y2E).all() == False:
-        ax2.fill_between(X, (Y1 - Y1E - Y2) / Y2, 
-                         (Y1 + Y1E - Y2) / Y2, color = 'tab:blue', 
-                         alpha = 0.3, label = 'sem1')
-        ax2.plot(X, (Y1 - Y2) / Y2, color = 'tab:blue',label = 'mean')
-        ax2.fill_between(X, (Y1 - Y2E - Y2) / Y2, 
-                         (Y1 + Y2E - Y2) / Y2, color = 'tab:red', 
-                         alpha = 0.3, label = 'sem2')
-        
-        if ax2.get_legend_handles_labels() != ([], []):
-            ax2.legend(loc = 'lower left')
-
-    else:
-        ax2.plot(X, (Y1 - Y2) / Y2, color = 'tab:blue')
-        
-    
-    ax2.axhline(c = 'k')
-
-    x_tick_2 = 2. * x_tick 
-    x_ticks_2 = np.arange(x_tick_2 * np.floor(x_llim / x_tick_2), 
-                          x_tick_2 * (np.ceil(x_ulim / x_tick_2) + 1.), 
-                          x_tick_2)
-    
-    ax2.set_xticks(x_ticks_2, labels = x_ticks_2)
-    ax2.set_xlim([x_llim, x_ulim])
-    ax2.set_xlabel(x_label)
-    ax2.xaxis.set_minor_locator(MultipleLocator(x_tick_2 / 2.))
-
-    y_ticks = np.round(np.arange(-0.40, 0.40 + 0.10, 0.10), decimals = 2)
-    ax2.set_yticks(y_ticks, labels = ["%.2f" % tick for tick in y_ticks])
-    ax2.set_ylim([y_ticks[0], y_ticks[-1]])
-    ax2.set_ylabel('Relative Diff. ')
-    
-    ax2.grid(which = 'both')
-    
-    ax2.axvspan(norm_region[0], norm_region[1], alpha = 0.2, facecolor = 'tab:grey')
-    
-    fpath = os.path.join(dir_out, fname)
-            
-    fig.savefig(fpath, dpi = dpi_val)
-    
-    fig.clf()
-    
-    plt.close()
-    
-    perform_color_reduction(color_reduction, fpath)
-    
-    return(fpath)
-
-def rayleigh_mask(dir_out, fname, title, dpi_val, color_reduction,
-                  mfit, mder, msec, mshp, mcrc, rsem, rsem_lim):
-
-    rgb = color_lib.volkers_rgb()
-    vlk_cmap = make_colormap.custom_rgb(rgb, name = 'volkers')
-
-    [X, Y] = np.meshgrid(mfit.lower_limit.values, mfit.window)
-    fig = plt.figure(figsize=(12. , 8.))
-
-    fig.suptitle(title)
-    
-    x_llim = 0.
-    x_ulim = 16.
-    
-    y_llim = 1.
-    y_ulim = 4.
-    
-    fig_x = 0.44
-    fig_y = 0.23
-    
-    fig_edg1_x = 0.06
-    fig_edg2_x = 0.54
-    
-    fig_edg1_y = 0.07
-    fig_edg2_y = 0.36
-    fig_edg3_y = 0.65
-    
-    ax = fig.add_axes([fig_edg1_x, fig_edg3_y, fig_x, fig_y])
-    ax.pcolormesh(X, Y, mder.values, vmin = 0, vmax = 1)
-    ax.set_title('Derivative mask', pad = 5)
-    ax.set_ylabel('Window [km]')
-    ax.set_ylim([y_llim, y_ulim])
-    ax.set_xlim([x_llim, x_ulim])
-    
-    ax2 = fig.add_axes([fig_edg2_x, fig_edg3_y, fig_x, fig_y])
-    ax2.pcolormesh(X, Y, rsem.values <= rsem_lim, vmin = 0, vmax = 1)
-    ax2.set_title('Relative SEM mask', pad = 5)
-    ax2.set_ylim([y_llim, y_ulim])
-    ax2.set_xlim([x_llim, x_ulim])
-    
-    ax3 = fig.add_axes([fig_edg1_x, fig_edg2_y, fig_x, fig_y])
-    ax3.pcolormesh(X, Y, msec.values, vmin = 0, vmax = 1)
-    ax3.set_title('Curvature mask', pad = 5)
-    ax3.set_ylabel('Window [km]')
-    ax3.set_ylim([y_llim, y_ulim])
-    ax3.set_xlim([x_llim, x_ulim])       
-
-    ax4 = fig.add_axes([fig_edg2_x, fig_edg2_y, fig_x, fig_y])
-    ax4.pcolormesh(X, Y, mshp.values, vmin = 0, vmax = 1)
-    ax4.set_title('Shapiro-Wilk mask', pad = 5)
-    ax4.set_ylim([y_llim, y_ulim])
-    ax4.set_xlim([x_llim, x_ulim])
-
-    ax5 = fig.add_axes([fig_edg1_x, fig_edg1_y, fig_x, fig_y])
-    ax5.pcolormesh(X, Y, mcrc.values, vmin = 0, vmax = 1)
-    ax5.set_title('Cross-check mask', pad = 5)
-    ax5.set_xlabel('Lower Limit [km]')
-    ax5.set_ylabel('Window [km]')
-    ax5.set_ylim([y_llim, y_ulim])
-    ax5.set_xlim([x_llim, x_ulim])
-
-    ax6 = fig.add_axes([fig_edg2_x, fig_edg1_y, fig_x, fig_y])
-    plot6 = ax6.pcolormesh(X, Y, 100. * rsem.where(mfit).values, vmin = 0., vmax = 2., cmap = vlk_cmap)
-    ax6.set_title('Masked Relative SEM (%)', pad = 5)
-    ax6.grid(which = 'both')
-    ax6.axes.xaxis.set_minor_locator(MultipleLocator(1))
-    ax6.set_xlabel('Lower Limit [km]')
-    ax6.set_ylim([y_llim, y_ulim])
-    ax6.set_xlim([x_llim, x_ulim])
-    
-    cax = fig.add_axes([fig_edg2_x + 0.01, fig_edg1_y +0.01, 0.01, fig_y -0.02])
-
-    fig.colorbar(plot6, cax=cax, orientation='vertical')
-    
-    fpath = os.path.join(dir_out, fname)
-
-    fig.savefig(fpath, dpi = dpi_val)
-    
-    fig.clf()
-    
-    plt.close()
-    
-    perform_color_reduction(color_reduction, fpath)
-            
-    return(fpath)
-
 
 def telecover_sec(dir_out, fname, title, dpi_val, color_reduction, 
-                  auto_fit, norm_region, fit,
+                  norm_region,
                   use_nonrc, x_vals, 
                   y1_raw, y2_raw, y3_raw, y4_raw,
                   y1_vals, y2_vals, y3_vals, y4_vals,
@@ -613,12 +355,7 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     n_llim = np.round(norm_region[0], decimals = 2)
     n_ulim = np.round(norm_region[1], decimals = 2)
     
-    if auto_fit == False:
-        c_norm = 'tab:orange'
-    elif fit == False:
-        c_norm = 'tab:red'
-    else:
-        c_norm = 'tab:green'
+    c_norm = 'tab:green'
         
     ax3.text(0.30 * x_ulim, 0.90 * y_ulim_nr, 
              f'norm. region: {n_llim} - {n_ulim} km',
@@ -709,7 +446,7 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
 
 
 def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
-                  auto_fit, norm_region, fit,
+                  norm_region,
                   use_nonrc, x_vals, 
                   y1_raw, y2_raw, 
                   y1_vals, y2_vals,
@@ -892,12 +629,7 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     n_llim = np.round(norm_region[0], decimals = 2)
     n_ulim = np.round(norm_region[1], decimals = 2)
     
-    if auto_fit == False:
-        c_norm = 'tab:orange'
-    elif fit == False:
-        c_norm = 'tab:red'
-    else:
-        c_norm = 'tab:green'
+    c_norm = 'tab:green'
         
     ax3.text(0.30 * x_ulim, 0.90 * y_ulim_nr, 
              f'norm. region: {n_llim} - {n_ulim} km',
@@ -973,9 +705,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
             
     return(fpath)
 
-def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction, 
-                             auto_fit, cal_region, vdr_region,
-                             fit_cal, fit_ray,
+def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
+                             cal_region, vdr_region,
                              x_vals_cal, x_vals_vdr,
                              y1_vals, y2_vals, y3_vals, y4_vals, y5_vals, y6_vals,
                              eta, eta_f_s, eta_s,
@@ -1064,12 +795,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     c_llim = np.round(cal_region[0], decimals = 2)
     c_ulim = np.round(cal_region[1], decimals = 2)
     
-    if auto_fit == False:
-        c_cal = 'tab:orange'
-    elif fit_cal == False:
-        c_cal = 'tab:red'
-    else:
-        c_cal = 'tab:green'
+    c_cal = 'tab:green'
         
     ax.text(0.05 * x_ulim_cal, 0.94 * y_ulim_cal, 
             f'cal. region: {c_llim} - {c_ulim} km',
@@ -1141,12 +867,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
     m_llim = np.round(vdr_region[0], decimals = 2)
     m_ulim = np.round(vdr_region[1], decimals = 2)
 
-    if auto_fit == False:
-        c_ray = 'tab:orange'
-    elif fit_ray == False:
-        c_ray = 'tab:red'
-    else:
-        c_ray = 'tab:green'
+    c_ray = 'tab:green'
         
     ax2.text(0.05 * x_ulim_vdr, 0.90 * y_ulim_vdr, 
              f'mol. cal. region: {m_llim} - {m_ulim} km',
@@ -1170,7 +891,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
             r'$H_R$: '+f'{np.round(H_R,4)}, $H_T$: '+f'{round_it(H_T,4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.06 * y_ulim_vdr, 
-            r'$SR$ > '+f'{np.round(sr_lim,3)}, ' + r'$Δδ_p$ < ' + f'{np.round(err_p,decimals = 2)}',
+            r'$SR$ > '+f'{np.round(sr_lim,3)}, ' + r'$Δδ_p$ < ' + f'{np.round(err_p,decimals = 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
 
     fpath = os.path.join(dir_out, fname)

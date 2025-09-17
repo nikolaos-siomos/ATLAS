@@ -77,7 +77,7 @@ def call_parser():
                         help = 'The y axis limits (lower and upper) of the normalized RC signal. Defaults to 0 (lower) 1.2 (upper) when use_lin_scale is True. If use_lin_scale is true then the lower limit becomes 1E-5 ')
 
     parser.add_argument('--x_lims', metavar = 'x_lims',
-                        type = float, nargs = 2, default = [0., 20.], 
+                        type = float, nargs = 2, default = [0., 30.], 
                         help = 'The x axis limits in km (lower and upper). If use_range is called, the limits correspond to distance. Defaults to 0 km (lower) and 20 km (upper) If values below 0 or above the maximum signal altitude/distance are used, they will be ignored')
 
     parser.add_argument('--x_tick', metavar = 'x_tick',
@@ -85,17 +85,40 @@ def call_parser():
                         help = 'The x axis finest tick in km. Defaults to 2km ')
 
     parser.add_argument('--normalization_region', metavar = 'normalization_region',
-                        type = float, nargs = 2, default = [8.5, 9.5],
-                        help = 'The lower and upper limits of the region used for normalizing the signal in the Rayleigh fit. If use_range is called, the limits correspond to distance. If auto_fit is set to True and the automatic identification is successful for a specific channel, the normalization_region values will e ignored. Defaults to: 8.5, 9.5')
+                        type = float, nargs = 2, default = None,
+                        help = 'The lower and upper limits of the region used for normalizing the signal in the Rayleigh fit in km. If use_range is set to True, the limits correspond to distance. If not provided, the normalization region will be automatically identified (default by CARS)')
 
-    parser.add_argument('--auto_fit', metavar = 'auto_fit',
-                        type = bool, default = True, 
-                        action = argparse.BooleanOptionalAction,
-                        help = 'If set to True an automatic identification of the molecular regions will be attempted. If the automatic procedure is successful, the normalization_region variable will be ignored. If the procedure is not successful or auto_fit is set to False, the manually-provided/default normalization will be used. Defaults to True')
+    parser.add_argument('--fit_mask_region', metavar = 'fit_mask_region',
+                        type = float, nargs = 2, default = [2., 30.], 
+                        help = 'Lower and upper thresholds for the region where the Rayleigh fit mask will be applied in km. The cross criterion might might fail if the lower limit is below the distance of full overlap. Defaults to: 2 to 30 km Example: fit_mask_region = 4., 20. ')
 
-    parser.add_argument('--cross_check_lim', metavar = 'cross_check_lim',
-                        type = float, nargs = '?', default = 2, 
-                        help = 'Lower limit applied for the cross-check criterion for the calculation of the Rayleigh fit mask. Use in case a high distance of full overlap is causing the cross-check test to fail. Defaults to 2km ')
+    parser.add_argument('--fit_mask_window', metavar = 'fit_mask_window',
+                        type = float, nargs = 2, default = [1., 8.], 
+                        help = 'The size limits (min and max) of the window used for Rayleigh fit mask. The mask will be applied for window sizes ranging between the two provided values. Defaults to: 1., 8. km Example: fit_mask_window = 0.5, 4. ')
+
+    parser.add_argument('--fit_mask_window_step', metavar = 'fit_mask_window_step',
+                        type = float, nargs = 1, default = 200, 
+                        help = 'The center of the window used for the Rayleigh fit mask will range between the fit_mask_window with a step equal to the value provided here in m. Keep in mind that smaller values will increase the resolution of the mask but will make processing slower. Defaults to: 200 m. Example: fit_mask_window_step = 100.')
+
+    parser.add_argument('--rsem_threshold', metavar = 'rsem_threshold',
+                        type = float, nargs = '?', default = 1., 
+                        help = 'The relative standard error of the mean threshold that is applied by the Rayleigh fit mask. Regions with relative SEM above this threshold will not be considered molecular. Defaults to 1. (100%). Example: rsem_threshold = 0.02 ')
+
+    parser.add_argument('--first_derivative_threshold', metavar = 'first_derivative_threshold',
+                        type = float, nargs = '?', default = 2., 
+                        help = 'The standard deviation threshold applied by the Rayleigh fit mask. Regions where the first derivative is less than its uncertainty multiplied by the derivative_threshold will not be considered molecular. Defaults to 2. (2 * sigma). Example: first_derivative_threshold = 1.')
+
+    parser.add_argument('--second_derivative_threshold', metavar = 'second_derivative_threshold',
+                        type = float, nargs = '?', default = 2., 
+                        help = 'The standard deviation threshold applied by the Rayleigh fit mask. Regions where the second derivative is less than its uncertainty multiplied by the derivative_threshold will not be considered molecular. Defaults to 2. (2 * sigma). Example: second_derivative_threshold = 1.')
+
+    parser.add_argument('--shapiro_wilk_threshold', metavar = 'shapiro_wilk_threshold',
+                        type = float, nargs = '?', default = 0.05, 
+                        help = 'The p value threshold for the Shapiro-Wilk test applied by the Rayleigh fit mask. Regions where the Shapiro-Wilk test returns p values smaller than this threshold will not be considered molecular because the noise does not follow a Gaussian distribution. Defaults to 0.05. Example: shapiro_wilk_threshold = 0.90 ')
+
+    parser.add_argument('--cross_criterion_threshold', metavar = 'cross_criterion_threshold',
+                        type = float, nargs = '?', default = 1., 
+                        help = 'The cross criterion threshold applied by the Rayleigh fit mask when checking if negative differences of the normalized rangecorrected signal and the molecular attenuated backscatter are significant. If even one region below the normalization region is found where the difference between the normalized rangecorected signal and the molecular profile is smaller than the negative uncertainty of the normalized rangecorrected signal multiplied by the cross_criterion_threshold means that the corresponding normalization region is not molecular. Defaults to 1. (1 * sigma). Example: cross_criterion_threshold = 1.')
 
     parser.add_argument('--smooth', metavar = 'smooth',
                         type = bool, default = True, 
@@ -103,7 +126,7 @@ def call_parser():
                         help = 'Refer to the smooth option in the quicklook section. Defaults to: True')
 
     parser.add_argument('--smoothing_range', metavar = 'smoothing_range',
-                        type = float, nargs = 2, default = [0., 20.], 
+                        type = float, nargs = 2, default = [0., 31.], 
                         help = 'Refer to the smooth option in the quicklook section Defaults to: 0.05, 14.')
 
     parser.add_argument('--smoothing_window', metavar = 'smoothing_window',

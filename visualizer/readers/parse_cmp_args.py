@@ -71,11 +71,6 @@ def call_parser():
                         type = float, nargs = 2, default = [8.5, 9.5],
                         help = 'The lower and upper limits of the region used for normalizing the signal in the Rayleigh fit. If use_range is called, the limits correspond to distance. If auto_ray is set to True and the automatic identification is successful for a specific channel, the normalization_region values will e ignored. Defaults to: 8.5, 9.5')
 
-    parser.add_argument('--auto_fit', metavar = 'auto_fit',
-                        type = bool, default = True, 
-                        action = argparse.BooleanOptionalAction,
-                        help = 'If set to True an automatic identification of the molecular regions will be attempted. If the automatic procedure is successful, the normalization_region variable will be ignored. If the procedure is not successful or auto_ray is set to False, the manually-provided/default normalization will be used. Defaults to True')
-
     parser.add_argument('--smooth', metavar = 'smooth',
                         type = bool, default = True, 
                         action = argparse.BooleanOptionalAction,

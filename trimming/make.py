@@ -50,9 +50,9 @@ def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
     Raw_Start_Time[:,0] = start_t
     Raw_Stop_Time[:,0] = end_t
     
-    mask_delay = channel_info.daq_trigger_offset.values >= 0.
-    Trigger_Delay = channel_info.daq_trigger_offset.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
-    First_Signal_Bin = - channel_info.daq_trigger_offset.values.astype(int)
+    mask_delay = channel_info.zero_bin.values >= 0.
+    Trigger_Delay = channel_info.zero_bin.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
+    First_Signal_Bin = - channel_info.zero_bin.values.astype(int)
     Trigger_Delay[~mask_delay] = 0.
     First_Signal_Bin[mask_delay] = 0
     
@@ -196,7 +196,7 @@ def rayleigh_file(system_info, channel_info, time_info, time_info_d, nc_path,
 
     make_nc_var(ds, name = 'First_Signal_Bin', value = First_Signal_Bin, dtype = 'int', dims = ('channels',))
 
-    make_nc_var(ds, name = 'DAQ_Trigger_Offset', value = channel_info.daq_trigger_offset.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'Zero_Bin', value = channel_info.zero_bin.values, dtype = 'int', dims = ('channels',))
     
     if not isinstance(sig_d,list):
         
@@ -259,9 +259,9 @@ def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path,
     Raw_Start_Time[:,0] = start_t
     Raw_Stop_Time[:,0] = end_t
     
-    mask_delay = channel_info.daq_trigger_offset.values >= 0.
-    Trigger_Delay = channel_info.daq_trigger_offset.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
-    First_Signal_Bin = - channel_info.daq_trigger_offset.values.astype(int)
+    mask_delay = channel_info.zero_bin.values >= 0.
+    Trigger_Delay = channel_info.zero_bin.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
+    First_Signal_Bin = - channel_info.zero_bin.values.astype(int)
     Trigger_Delay[~mask_delay] = 0.
     First_Signal_Bin[mask_delay] = 0
     
@@ -390,7 +390,7 @@ def telecover_file(system_info, channel_info, time_info, time_info_d, nc_path,
 
     make_nc_var(ds, name = 'First_Signal_Bin', value = First_Signal_Bin, dtype = 'int', dims = ('channels',))
 
-    make_nc_var(ds, name = 'DAQ_Trigger_Offset', value = channel_info.daq_trigger_offset.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'Zero_Bin', value = channel_info.zero_bin.values, dtype = 'int', dims = ('channels',))
     
     if not isinstance(sig_d,list):
         make_nc_var(ds, name = 'Background_Shots', value = shots_d.values, dtype = 'int', dims = ('time_bck', 'channels',))
@@ -451,9 +451,9 @@ def polarization_calibration_file(
     Raw_Start_Time[:,0] = start_t
     Raw_Stop_Time[:,0] = end_t
     
-    mask_delay = channel_info.daq_trigger_offset.values >= 0.
-    Trigger_Delay = channel_info.daq_trigger_offset.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
-    First_Signal_Bin = - channel_info.daq_trigger_offset.values.astype(int)
+    mask_delay = channel_info.zero_bin.values >= 0.
+    Trigger_Delay = channel_info.zero_bin.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
+    First_Signal_Bin = - channel_info.zero_bin.values.astype(int)
     Trigger_Delay[~mask_delay] = 0.
     First_Signal_Bin[mask_delay] = 0
     
@@ -597,7 +597,7 @@ def polarization_calibration_file(
 
     make_nc_var(ds, name = 'First_Signal_Bin', value = First_Signal_Bin, dtype = 'int', dims = ('channels',))
 
-    make_nc_var(ds, name = 'DAQ_Trigger_Offset', value = channel_info.daq_trigger_offset.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'Zero_Bin', value = channel_info.zero_bin.values, dtype = 'int', dims = ('channels',))
     
     make_nc_var(ds, name = 'calibrator_position', value = time_info.position.values, dtype = 'int', dims = ('time',))
     
@@ -665,9 +665,9 @@ def dark_file(system_info, channel_info, time_info, nc_path,
     Raw_Start_Time[:,0] = start_t
     Raw_Stop_Time[:,0] = end_t
     
-    mask_delay = channel_info.daq_trigger_offset.values >= 0.
-    Trigger_Delay = channel_info.daq_trigger_offset.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
-    First_Signal_Bin = - channel_info.daq_trigger_offset.values.astype(int)
+    mask_delay = channel_info.zero_bin.values >= 0.
+    Trigger_Delay = channel_info.zero_bin.values.astype(float) * 150. / channel_info.range_resolution.values.astype(float)
+    First_Signal_Bin = - channel_info.zero_bin.values.astype(int)
     Trigger_Delay[~mask_delay] = 0.
     First_Signal_Bin[mask_delay] = 0
     
@@ -771,7 +771,7 @@ def dark_file(system_info, channel_info, time_info, nc_path,
 
     make_nc_var(ds, name = 'First_Signal_Bin', value = First_Signal_Bin, dtype = 'int', dims = ('channels',))
 
-    make_nc_var(ds, name = 'DAQ_Trigger_Offset', value = channel_info.daq_trigger_offset.values, dtype = 'int', dims = ('channels',))
+    make_nc_var(ds, name = 'Zero_Bin', value = channel_info.zero_bin.values, dtype = 'int', dims = ('channels',))
     
     make_nc_var(ds, name = 'Raw_Data_Start_Time', value = Raw_Start_Time, dtype = 'int', dims = ('time', 'nb_of_time_scales',))
     

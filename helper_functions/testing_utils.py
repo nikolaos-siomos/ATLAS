@@ -245,7 +245,7 @@ def get_converter_signals(fpath, options):
         channel_info = channel_info.copy().loc[channels,:] 
         
         ranges = bin_to_range(sig = sig,
-                              zero_bin = channel_info.DAQ_Trigger_Offset,
+                              zero_bin = channel_info.zero_bin,
                               range_resolution = channel_info.Raw_Data_Range_Resolution)
         
         for ch in channels:

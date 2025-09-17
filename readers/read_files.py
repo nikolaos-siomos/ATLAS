@@ -23,23 +23,23 @@ def rayleigh(finput_ray, file_format):
     # Select reader based on the file format
     if file_format == 'polly_xt':
         system_info, channel_info, time_info, sig, shots = \
-            read_polly_xt.dtfs(dir_meas = finput_ray, meas_type = 'ray')
+            read_polly_xt.read_dataset(dir_meas = finput_ray, meas_type = 'ray')
             
     elif file_format == 'polly_xt_first':
         system_info, channel_info, time_info, sig, shots = \
-            read_polly_xt_first.dtfs(dir_meas = finput_ray)
+            read_polly_xt_first.read_dataset(dir_meas = finput_ray)
             
     elif file_format == 'licel':
         system_info, channel_info, time_info, sig, shots = \
-            read_licel.dtfs(dir_meas = finput_ray)
+            read_licel.read_dataset(dir_meas = finput_ray)
             
     elif file_format == 'licel_matlab':
         system_info, channel_info, time_info, sig, shots = \
-            read_licel_matlab.dtfs(dir_meas = finput_ray)
+            read_licel_matlab.read_dataset(dir_meas = finput_ray)
 
     elif file_format == 'licel_old2rack':
         system_info, channel_info, time_info, sig, shots = \
-            read_licel_old2rack.dtfs(dir_meas = finput_ray)
+            read_licel_old2rack.read_dataset(dir_meas = finput_ray)
 
 
     print('Reading Rayleigh signals complete!')
@@ -81,23 +81,23 @@ def telecover(finput_sec, finput_rin, file_format,
                     # Select reader based on the file format
                     if file_format == 'polly_xt':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_polly_xt.dtfs(dir_meas = path, meas_type = 'tlc')
+                            read_polly_xt.read_dataset(dir_meas = path, meas_type = 'tlc')
                     
                     elif file_format == 'polly_xt_first':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_polly_xt_first.dtfs(dir_meas = path)
+                            read_polly_xt_first.read_dataset(dir_meas = path)
                           
                     elif file_format == 'licel':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_licel.dtfs(dir_meas = path)
+                            read_licel.read_dataset(dir_meas = path)
                             
                     elif file_format == 'licel_matlab':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_licel_matlab.dtfs(dir_meas = path)
+                            read_licel_matlab.read_dataset(dir_meas = path)
 
                     elif file_format == 'licel_old2rack':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_licel_old2rack.dtfs(dir_meas = path)
+                            read_licel_old2rack.read_dataset(dir_meas = path)
 
                     sector = folder_to_sector(folder = time_info['folder'].values)
     
@@ -122,23 +122,23 @@ def telecover(finput_sec, finput_rin, file_format,
                 # Select reader based on the file format
                 if file_format == 'polly_xt':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_polly_xt.dtfs(dir_meas = finput_sec, meas_type = 'tlc')
+                        read_polly_xt.read_dataset(dir_meas = finput_sec, meas_type = 'tlc')
                           
                 elif file_format == 'polly_xt_first':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_polly_xt_first.dtfs(dir_meas = finput_sec)
+                        read_polly_xt_first.read_dataset(dir_meas = finput_sec)
                         
                 elif file_format == 'licel':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_licel.dtfs(dir_meas = finput_sec)
+                        read_licel.read_dataset(dir_meas = finput_sec)
                 
                 elif file_format == 'licel_matlab':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_licel_matlab.dtfs(dir_meas = finput_sec)
+                        read_licel_matlab.read_dataset(dir_meas = finput_sec)
                         
                 elif file_format == 'licel_old2rack':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_licel_old2rack.dtfs(dir_meas = finput_sec)
+                        read_licel_old2rack.read_dataset(dir_meas = finput_sec)
                     
                 sector = time_to_sector(folder = time_info['folder'], 
                                         files_per_sector = files_per_sector)
@@ -166,23 +166,23 @@ def telecover(finput_sec, finput_rin, file_format,
                     # Select reader based on the file format
                     if file_format == 'polly_xt':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_polly_xt.dtfs(dir_meas = path, meas_type = 'tlc')
+                            read_polly_xt.read_dataset(dir_meas = path, meas_type = 'tlc')
                           
                     elif file_format == 'polly_xt_first':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_polly_xt_first.dtfs(dir_meas = path)
+                            read_polly_xt_first.read_dataset(dir_meas = path)
                             
                     elif file_format == 'licel':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_licel.dtfs(dir_meas = path)
+                            read_licel.read_dataset(dir_meas = path)
                             
                     elif file_format == 'licel_matlab':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_licel_matlab.dtfs(dir_meas = path)
+                            read_licel_matlab.read_dataset(dir_meas = path)
                             
                     elif file_format == 'licel_old2rack':
                         system_info, channel_info, time_info, sig, shots = \
-                            read_licel_old2rack.dtfs(dir_meas = path)
+                            read_licel_old2rack.read_dataset(dir_meas = path)
                 
                     ring = folder_to_sector(folder = time_info['folder'].values)
                     time_info['sector'] = ring
@@ -205,23 +205,23 @@ def telecover(finput_sec, finput_rin, file_format,
                 
                 if file_format == 'polly_xt':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_polly_xt.dtfs(dir_meas = finput_rin, meas_type = 'tlc')
+                        read_polly_xt.read_dataset(dir_meas = finput_rin, meas_type = 'tlc')
 
                 elif file_format == 'polly_xt_first':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_polly_xt_first.dtfs(dir_meas = finput_rin)
+                        read_polly_xt_first.read_dataset(dir_meas = finput_rin)
                         
                 elif file_format == 'licel':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_licel.dtfs(dir_meas = finput_rin)
+                        read_licel.read_dataset(dir_meas = finput_rin)
                 
                 elif file_format == 'licel_matlab':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_licel_matlab.dtfs(dir_meas = finput_rin)
+                        read_licel_matlab.read_dataset(dir_meas = finput_rin)
                         
                 elif file_format == 'licel_old2rack':
                     system_info, channel_info, time_info, sig, shots = \
-                        read_licel_old2rack.dtfs(dir_meas = finput_rin)                        
+                        read_licel_old2rack.read_dataset(dir_meas = finput_rin)                        
                         
                 ring = time_to_ring(folder = time_info['folder'], 
                                     files_per_ring = files_per_ring)
@@ -274,7 +274,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading static calibration files..')  
                 
                 system_info, channel_info, time_info, sig, shots = \
-                    read_licel.dtfs(dir_meas = finput_stc)
+                    read_licel.read_dataset(dir_meas = finput_stc)
             
                 position = np.array(time_info.index.size * [0])
                 time_info['position'] = position
@@ -290,7 +290,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading -45 files..')  
                 
                 system_info, channel_info, time_info, sig, shots = \
-                    read_licel.dtfs(dir_meas = finput_m45)
+                    read_licel.read_dataset(dir_meas = finput_m45)
     
                 position = np.array(time_info.index.size * [1])
                 time_info['position'] = position
@@ -308,7 +308,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading +45 files..')  
   
                 system_info, channel_info, time_info, sig, shots = \
-                    read_licel.dtfs(dir_meas = finput_p45)
+                    read_licel.read_dataset(dir_meas = finput_p45)
     
                 position = np.array(time_info.index.size * [2])
                 time_info['position'] = position
@@ -330,7 +330,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading static calibration files..')  
                 
                 system_info, channel_info, time_info, sig, shots = \
-                    read_licel_matlab.dtfs(dir_meas = finput_stc)
+                    read_licel_matlab.read_dataset(dir_meas = finput_stc)
             
                 position = np.array(time_info.index.size * [0])
                 time_info['position'] = position
@@ -346,7 +346,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading -45 files..')  
                 
                 system_info, channel_info, time_info, sig, shots = \
-                    read_licel_matlab.dtfs(dir_meas = finput_m45)
+                    read_licel_matlab.read_dataset(dir_meas = finput_m45)
     
                 position = np.array(time_info.index.size * [1])
                 time_info['position'] = position
@@ -364,7 +364,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading +45 files..')  
   
                 system_info, channel_info, time_info, sig, shots = \
-                    read_licel_matlab.dtfs(dir_meas = finput_p45)
+                    read_licel_matlab.read_dataset(dir_meas = finput_p45)
     
                 position = np.array(time_info.index.size * [2])
                 time_info['position'] = position
@@ -387,7 +387,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading static calibration files..')  
                 
                 system_info, channel_info, time_info, sig, shots = \
-                    read_licel_old2rack.dtfs(dir_meas = finput_stc)
+                    read_licel_old2rack.read_dataset(dir_meas = finput_stc)
             
                 position = np.array(time_info.index.size * [0])
                 time_info['position'] = position
@@ -403,7 +403,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading -45 files..')  
                 
                 system_info, channel_info, time_info, sig, shots = \
-                    read_licel_old2rack.dtfs(dir_meas = finput_m45)
+                    read_licel_old2rack.read_dataset(dir_meas = finput_m45)
     
                 position = np.array(time_info.index.size * [1])
                 time_info['position'] = position
@@ -421,7 +421,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading +45 files..')  
     
                 system_info, channel_info, time_info, sig, shots = \
-                    read_licel_old2rack.dtfs(dir_meas = finput_p45)
+                    read_licel_old2rack.read_dataset(dir_meas = finput_p45)
     
                 position = np.array(time_info.index.size * [2])
                 time_info['position'] = position
@@ -444,7 +444,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading static calibration files..')  
                 
                 system_info, channel_info, time_info, sig, shots = \
-                    read_polly_xt_first.dtfs(dir_meas = finput_stc)
+                    read_polly_xt_first.read_dataset(dir_meas = finput_stc)
             
                 position = np.array(time_info.index.size * [0])
                 time_info['position'] = position
@@ -460,7 +460,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading -45 files..')  
                 
                 system_info, channel_info, time_info, sig, shots = \
-                    read_polly_xt_first.dtfs(dir_meas = finput_m45)
+                    read_polly_xt_first.read_dataset(dir_meas = finput_m45)
     
                 position = np.array(time_info.index.size * [1])
                 time_info['position'] = position
@@ -478,7 +478,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
                 print('-- Reading +45 files..')  
   
                 system_info, channel_info, time_info, sig, shots = \
-                    read_polly_xt_first.dtfs(dir_meas = finput_p45)
+                    read_polly_xt_first.read_dataset(dir_meas = finput_p45)
     
                 position = np.array(time_info.index.size * [2])
                 time_info['position'] = position
@@ -500,7 +500,7 @@ def polarization_calibration(finput_ray, finput_p45, finput_m45, finput_stc, fil
         if os.path.exists(finput_ray):
             if os.listdir(finput_ray):
                 system_info, channel_info, time_info, sig, shots = \
-                    read_polly_xt.dtfs(dir_meas = finput_ray, meas_type = 'pcb')
+                    read_polly_xt.read_dataset(dir_meas = finput_ray, meas_type = 'pcb')
             else:
                 print(f'-- Warning: Folder {finput_ray} is empty! No files to read ')
                          
@@ -526,19 +526,19 @@ def dark(finput_drk, file_format):
     # Select reader based on the file format
     if file_format == 'polly_xt':
         system_info, channel_info, time_info, sig, shots = \
-            read_polly_xt.dtfs(dir_meas = finput_drk, meas_type = 'drk')
+            read_polly_xt.read_dataset(dir_meas = finput_drk, meas_type = 'drk')
     elif file_format == 'polly_xt_first':
         system_info, channel_info, time_info, sig, shots = \
-            read_polly_xt_first.dtfs(dir_meas = finput_drk)
+            read_polly_xt_first.read_dataset(dir_meas = finput_drk)
     elif file_format == 'licel':
         system_info, channel_info, time_info, sig, shots = \
-            read_licel.dtfs(dir_meas = finput_drk)
+            read_licel.read_dataset(dir_meas = finput_drk)
     elif file_format == 'licel_matlab':
         system_info, channel_info, time_info, sig, shots = \
-            read_licel_matlab.dtfs(dir_meas = finput_drk)
+            read_licel_matlab.read_dataset(dir_meas = finput_drk)
     elif file_format == 'licel_old2rack':
         system_info, channel_info, time_info, sig, shots = \
-            read_licel_old2rack.dtfs(dir_meas = finput_drk)
+            read_licel_old2rack.read_dataset(dir_meas = finput_drk)
             
     print('Reading dark signals complete!')
     print('-----------------------------------------')

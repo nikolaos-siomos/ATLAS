@@ -16,7 +16,8 @@ dependencies = [
     "scipy>=1.13.0",
     "matplotlib>=3.8.0",
     "bokeh>=3.4.3",
-    "Pillow>=11.1.0"
+    "Pillow>=11.1.0",
+    "dask>=2024.8.0"
     ]
 
 classifiers = [

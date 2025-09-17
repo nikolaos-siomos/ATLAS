@@ -33,7 +33,7 @@ def main(args, __version__):
     
     channels_2 = metadata_2['channels']
     
-    # Relative Stnadard error of the mean upper limit for the auto_fit
+    # Relative Stnadard error of the mean upper limit for the molecular mask
     rsem_lim = 0.02
     
     # Check if the parsed channels exist
@@ -173,8 +173,7 @@ def main(args, __version__):
         
         norm_region, idx, ismol = \
             curve_fit.scan(mfit = mfit,
-                           dflt_region = args['normalization_region'],
-                           auto_fit = args['auto_fit'])
+                           dflt_region = args['normalization_region'])
                 
         coef_c = float(coef[idx].values)
         rsem_c = float(rsem[idx].values)
@@ -231,40 +230,39 @@ def main(args, __version__):
                                            label_1 = ch_1,
                                            label_2 = ch_2)  
         
-        if args['auto_fit']:
-            fname_mask = make_plot.make_filename_intercomparison(metadata_1 = metadata_1, 
-                                                                 metadata_2 = metadata_2, 
-                                                                 channel_1 = ch_1, 
-                                                                 channel_2 = ch_2, 
-                                                                 version = __version__,
-                                                                 extra_type = 'mask')
+        fname_mask = make_plot.make_filename_intercomparison(metadata_1 = metadata_1, 
+                                                             metadata_2 = metadata_2, 
+                                                             channel_1 = ch_1, 
+                                                             channel_2 = ch_2, 
+                                                             version = __version__,
+                                                             extra_type = 'mask')
+
+        make_plot.rayleigh_mask(dir_out = args['output_folder'], 
+                                fname = fname_mask, title = title,
+                                dpi_val = args['dpi'],
+                                color_reduction = args['color_reduction'],
+                                mfit = mfit, mder = mder, msec = msec, 
+                                mshp = mshp, mcrc = mcrc, rsem = rsem,
+                                rsem_lim = rsem_lim)
     
-            make_plot.rayleigh_mask(dir_out = args['output_folder'], 
-                                    fname = fname_mask, title = title,
-                                    dpi_val = args['dpi'],
-                                    color_reduction = args['color_reduction'],
-                                    mfit = mfit, mder = mder, msec = msec, 
-                                    mshp = mshp, mcrc = mcrc, rsem = rsem,
-                                    rsem_lim = rsem_lim)
-        
         # Add metadata to the quicklook plot
-        plot_metadata_1 = get_plot_metadata(metadata = metadata_1, 
-                                            args = args, 
-                                            channel = ch_1,
-                                            meas_type = 'cmp', 
-                                            version = __version__,
-                                            data_source_id = '1')
+        plot_metadata_1 = make_plot.get_plot_metadata(metadata = metadata_1, 
+                                                      args = args, 
+                                                      channel = ch_1,
+                                                      meas_type = 'cmp', 
+                                                      version = __version__,
+                                                      data_source_id = '1')
        
-        plot_metadata_2 = get_plot_metadata(metadata = metadata_2, 
-                                            args = args, 
-                                            channel = ch_2,
-                                            meas_type = 'cmp', 
-                                            version = __version__,
-                                            data_source_id = '2')
+        plot_metadata_2 = make_plot.get_plot_metadata(metadata = metadata_2, 
+                                                      args = args, 
+                                                      channel = ch_2,
+                                                      meas_type = 'cmp', 
+                                                      version = __version__,
+                                                      data_source_id = '2')
         
-        add_plot_metadata(plot_path = plot_path, 
-                          plot_metadata = plot_metadata_1,
-                          plot_metadata_extra = plot_metadata_2)
+        make_plot.add_plot_metadata(plot_path = plot_path, 
+                                    plot_metadata = plot_metadata_1,
+                                    plot_metadata_extra = plot_metadata_2)
         
 
     print('-----------------------------------------')

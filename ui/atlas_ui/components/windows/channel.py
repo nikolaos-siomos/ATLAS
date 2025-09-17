@@ -38,7 +38,7 @@ class ChannelData:
         channel_type,
         channel_subtype,
         dead_time,
-        daq_trigger_offset,
+        zero_bin,
         recorder_channel_id,
         laser,
         scc_channel_id,
@@ -96,8 +96,8 @@ class ChannelWindow (wx.ScrolledWindow):
         self.dead_time = AtlasUIInputField.FromSetting ( self._settings.dead_time, parent = self.panel, label = "Dead time [ns]" )
         self.sizer.Add ( self.dead_time, pos = wx.GBPosition(1, 0), flag = wx.EXPAND )
         
-        self.daq_trigger_offset = AtlasUIInputField.FromSetting ( self._settings.daq_trigger_offset, parent = self.panel, label = "Trigger delay [bins]" )
-        self.sizer.Add ( self.daq_trigger_offset, pos = wx.GBPosition(1, 1), flag = wx.EXPAND )
+        self.zero_bin = AtlasUIInputField.FromSetting ( self._settings.zero_bin, parent = self.panel, label = "Trigger delay [bins]" )
+        self.sizer.Add ( self.zero_bin, pos = wx.GBPosition(1, 1), flag = wx.EXPAND )
         
         self.recorder_channel_id = AtlasUIInputField.FromSetting ( self._settings.recorder_channel_id, parent = self.panel, label = "Channel ID" )
         self.sizer.Add ( self.recorder_channel_id, pos = wx.GBPosition(2, 0), flag = wx.EXPAND )

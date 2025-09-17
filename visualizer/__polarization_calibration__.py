@@ -246,7 +246,6 @@ def main(args, __version__):
         norm_region_cal, idx_cal, fit_cal = \
             curve_fit.scan(mfit = mfit,
                            dflt_region = args['calibration_region'],
-                           auto_fit = args['auto_fit'],
                            prefered_range = "near")
 
         llim = 1.
@@ -282,7 +281,6 @@ def main(args, __version__):
         norm_region_ray, idx_ray, fit_ray = \
             curve_fit.scan(mfit = mfit,
                            dflt_region = args['rayleigh_region'],
-                           auto_fit = args['auto_fit'],
                            prefered_range = "far")
                         
         avg_r_m45, _, sem_r_m45 = \
@@ -385,18 +383,21 @@ def main(args, __version__):
         # delta_l_err = delta_c_err * (1. - delta_m) * (1. + delta_c) / \
         #     (1. - delta_m * delta_c)**2
                       
-        base_delta_v = np.ceil(1E3 * delta_m) / 1E3
-        delta_v = np.hstack((np.arange(base_delta_v, 0.021, 0.001),
-                             np.arange(0.02, 0.31, 0.01)))
+        # base_delta_v = np.ceil(1E3 * delta_m) / 1E3
+        # delta_v = np.hstack((np.arange(base_delta_v, 0.021, 0.001),
+        #                      np.arange(0.02, 0.31, 0.01)))
         
-        err_v = delta_l[0]
-        err_p = 0.05
+        # err_v = delta_l[0]
+        err_p = 0.025
+        delta_p_err, delta_p, R, sr_lim = pldr_error(delta_m = delta_m, 
+                                                     delta_v_err = delta_l[0], 
+                                                     delta_p_err_ulim = err_p)
         
-        alpha = (1. + delta_m)**2 * (err_v - err_p)
-        beta = (1. + delta_m) * (2. * err_p * (1. + delta_v + err_v / 2.) - err_v * (1. + delta_m))
-        gamma = - err_p * (1. + delta_v) * (1. + delta_v + err_v)
+        # alpha = (1. + delta_m)**2 * (err_v - err_p)
+        # beta = (1. + delta_m) * (2. * err_p * (1. + delta_v + err_v / 2.) - err_v * (1. + delta_m))
+        # gamma = - err_p * (1. + delta_v) * (1. + delta_v + err_v)
         
-        sr_lim = (-beta - np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
+        # sr_lim = (-beta - np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
  
         # Create the y axis (calibration)
         y_llim_cal, y_ulim_cal, y_label_cal = \
@@ -428,7 +429,6 @@ def main(args, __version__):
             make_plot.polarization_calibration(dir_out = os.path.join(args['output_folder'],'plots'), 
                                                fname = f"{fname}.png", title = title,
                                                dpi_val = args['dpi'],
-                                               auto_fit = args['auto_fit'],
                                                color_reduction = args['color_reduction'],
                                                cal_region = norm_region_cal,
                                                vdr_region = norm_region_ray,
@@ -483,7 +483,6 @@ def main(args, __version__):
                                                x_label_vdr = x_label_ray, 
                                                x_tick_vdr = args['x_tick_rayleigh'])  
     
-        print(plot_path)
         # Make ascii file header
         header = \
             make_header.polarisation_calibration(channel_r = ch_r,
@@ -531,6 +530,40 @@ def main(args, __version__):
     print(' ')
     
     return()
+
+def pldr_error(delta_m, delta_v_err, delta_p_ulim = 0.3, delta_p_err_ulim = 0.025):
+    
+    R = np.arange(1.01, 3., 0.001)
+    delta_p = np.arange(0., delta_p_ulim + 0.001, 0.001)
+    
+    # delta_p_err = np.zeros((len(delta_p), len(R)))
+    
+    # for i in range(len(delta_p)):
+    sq_term_nom = (delta_v_err + delta_p[:,np.newaxis]) * (1. + delta_m)**2 * np.power(R[np.newaxis,:], 2)
+    sq_term_denom = (1. + delta_m)**2 * np.power(R[np.newaxis,:], 2)
+    
+    lin_term_nom = (1. + delta_m)*(delta_v_err * (delta_p[:,np.newaxis] - 2. * delta_m) - delta_p[:,np.newaxis] * (1. + delta_m)) * R[np.newaxis,:]
+    lin_term_denom = -(1. + delta_m)*(delta_v_err + 1. + delta_m) * R[np.newaxis,:]
+    
+    const_term_nom = -delta_m * (delta_p[:,np.newaxis] - delta_m) * delta_v_err
+    const_term_denom = (delta_p[:,np.newaxis] - delta_m) * delta_v_err
+        
+    delta_p_err = (sq_term_nom + lin_term_nom + const_term_nom) /\
+        (sq_term_denom + lin_term_denom + const_term_denom) - delta_p[:,np.newaxis]
+        
+    delta_p_err[np.abs(delta_p_err) > delta_p_err_ulim] = np.nan
+    
+    if not np.isnan(delta_p_err[-1,:]).all():
+        if delta_v_err > 0.0001:
+            min_bsc_ratio = R[np.nanargmax(delta_p_err[-1,:])]
+        elif delta_v_err < -0.0001:
+            min_bsc_ratio = R[np.nanargmin(delta_p_err[-1,:])]
+        else:
+            min_bsc_ratio = 1.01
+    else:
+        min_bsc_ratio = np.nan
+        
+    return(delta_p_err, delta_p, R, min_bsc_ratio)
 
 if __name__ == '__main__':
     

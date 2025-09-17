@@ -85,8 +85,8 @@ def call_parser():
                         help = 'If called then bins above a certain distance from the laser (20km by default) will be removed. ')
 
     parser.add_argument('--vertical_limit', metavar = 'vertical_limit', 
-                        type = float, nargs = '?', default = 21.,
-                        help = "The maximum distance from the laser in km above which no calculations will be performed. Solar background calculations are performed prior to vertical signal trimming to enable background calculations up to the maximum signal altitude. Defaults to 20km ")                                                                                                        
+                        type = float, nargs = '?', default = 32.,
+                        help = "The maximum distance from the laser in km above which no calculations will be performed. Solar background calculations are performed prior to vertical signal trimming to enable background calculations up to the maximum signal altitude. Defaults to 32 km ")                                                                                                        
     
     args = vars(parser.parse_args())
 

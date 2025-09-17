@@ -6,9 +6,11 @@ from datetime import datetime as dt
 from datetime import timedelta
 import xarray as xr
 import re
+from readers.check_file_format import is_licel_header
+from utils.error_classes import FileReaderError
 
 # Read measurement
-def dtfs(dir_meas):
+def read_dataset(dir_meas, meas_type = None):
     
     """ Reads information from the raw licel files"""
     
@@ -34,10 +36,15 @@ def dtfs(dir_meas):
         
         mfiles = [file for file in mfiles if os.path.basename(file) != 'temp.dat']
         
+        
         # for existing directory and files inside it, starts the reading of files     
         if len(mfiles) > 0:
-            print(f'-- Folder contains {len(mfiles)} file(s)!')
-            
+        
+            print(f'-- Reading {len(mfiles)} file(s)!')
+        
+            if not is_licel_header(mfiles[0]):
+                raise FileReaderError(f"--QA test folder contains non Licel files: {dir_meas}")
+        
             buffer = read_buffer(mfiles[0])
             sep = find_sep(buffer, mfiles[0])
             
@@ -46,7 +53,16 @@ def dtfs(dir_meas):
             channel_info = read_channels(buffer = buffer, sep = sep)
             
             channels = channel_info.index.values
-            # bins_arr = np.arange(1., channel_info.bins.max() + 1.)
+            
+            # Add the repetion rate, that was part of system info, to channel_info
+            for ch in channels:
+                if channel_info.loc[ch,"laser"] == "1" and system_info["laser_A_repetition_rate"] != None:
+                    channel_info.loc[ch,"laser_repetition_rate"]  = system_info["laser_A_repetition_rate"]
+                if channel_info.loc[ch,"laser"] == "2" and system_info["laser_B_repetition_rate"] != None:
+                    channel_info.loc[ch,"laser_repetition_rate"]  = system_info["laser_B_repetition_rate"]
+                if channel_info.loc[ch,"laser"] == "3" and system_info["laser_C_repetition_rate"] != None:
+                    channel_info.loc[ch,"laser_repetition_rate"]  = system_info["laser_C_repetition_rate"]
+
             bins_arr = np.arange(0., channel_info.bins.max())
 
             # Creating empty signal, shots, and time arrays
@@ -57,10 +73,12 @@ def dtfs(dir_meas):
             sig_arr = np.nan*np.zeros((len(mfiles), len(channels), len(bins_arr)), dtype = float)
 
             filename = np.empty(len(mfiles), dtype = object)
-            folder = np.empty(len(mfiles), dtype = object)
 
             # Iterate over the files
             for k in range(len(mfiles)):
+
+                if not is_licel_header(mfiles[k]):
+                    raise FileReaderError(f"--The following file is not in raw Licel format: {mfiles[k]}")
                 
                 filename[k] = os.path.basename(mfiles[k])
 
@@ -79,31 +97,26 @@ def dtfs(dir_meas):
 
                 start_time_arr[k] = stime
                 
-                if stime == etime: #only possible if the files are different by only milliseconds 
+                if stime >= etime: #only possible if the files are different by only milliseconds 
                     end_time_arr[k] = etime + timedelta(milliseconds = 500)
                     # print(f'-- Warning! File {filename[k]} has the same start and end time reported (recording lasted < 1s). Please check it! ')
                 else:
                     end_time_arr[k] = etime
 
-                     
-                if (mfiles[k]).split(os.sep)[-2] in ['north', 'east', 'south', 'west', 'inner', 'outer', '+45', '-45', 'static']:
-                    folder[k] = (mfiles[k]).split(os.sep)[-2]
-            
             sig_raw = xr.DataArray(sig_arr, 
-                                   coords=[end_time_arr, channels, bins_arr],
+                                   coords=[start_time_arr, channels, bins_arr],
                                    dims=['time', 'channel', 'bins']) 
             
             shots = xr.DataArray(shots_arr,  
-                                 coords=[end_time_arr, channels],
+                                 coords=[start_time_arr, channels],
                                  dims=['time', 'channel'])
             
-            tdata = np.array([folder, filename, 
-                              start_time_arr, end_time_arr], dtype = object)
-
-            properties = ['folder', 'filename', 'start_time', 'end_time']
+            tdata = np.array([filename, start_time_arr, end_time_arr], dtype = object)
+ 
+            properties = ['filename', 'start_time', 'end_time']
             
             time_info = pd.DataFrame(tdata.T,  
-                                     index = end_time_arr,
+                                     index = start_time_arr,
                                      columns = properties)  
                         
             # Sort by time
@@ -111,9 +124,11 @@ def dtfs(dir_meas):
             shots = shots.sortby('time').copy()
             time_info = time_info.sort_index()
             
+            # Convert bits to mV relying solely on the raw file header
+            sig_raw = unit_conv_bits_to_mV(signal = sig_raw.copy(), shots = shots, channel_info = channel_info)
+            
         else:
-            print('---- Warning! Folder empty \n'+\
-                  f'---> !! Skip reading measurement files from folder {dir_meas}')  
+            print('---- Warning! No files to read in: {dir_meas}') 
 
     return(system_info, channel_info, time_info, sig_raw, shots)
 
@@ -157,7 +172,7 @@ def find_sep(buffer, fname):
     while buffer[i:i+4] != search_sequence:
         i = i + 1
         if i >= len(buffer):
-            raise Exception(f"Could not find header/data separator. Is {fname} a licel file?")
+            raise FileReaderError(f"Could not find header/data separator. Is {fname} a licel file?")
     sep = i     
     
     return(sep)
@@ -276,12 +291,17 @@ def read_channels(buffer, sep):
     arr_head = pd.DataFrame(header, columns = cols, dtype = object)
 
     # Combine from the recorder channel ID and the laser polarization    
-    recorder_channel_id = []
-    for i in range(len(header[:,-1])):
-        recorder_channel_id.append(f'{arr_head.recorder_channel_id.iloc[i]}_L{str(int(arr_head.laser.iloc[i]))}')  
+    header_channel_id = list(arr_head.recorder_channel_id.values)
+    if len(header_channel_id) == len(set(header_channel_id)):
+        recorder_channel_id = header_channel_id
+    else:
+        laser_id = list(arr_head.laser.values)
+        recorder_channel_id = [(f'{ch_id}_L{lr_id}') 
+                               for ch_id, lr_id in zip(header_channel_id, laser_id)]
+        
     # Check if the defined channels are unique (unique sets of licel id and laser number)   
-        if len(set(recorder_channel_id)) < len(recorder_channel_id):
-            raise Exception('-- Error: At least two of the licel channels have both the same id and laser number. Please correct this in the recorder settings')
+    if len(recorder_channel_id) != len(set(recorder_channel_id)):
+        raise FileReaderError('-- Error: At least two of the licel channels have both the same id and laser number. Please correct this in the recorder settings')
 
     channel_info.index = recorder_channel_id
 
@@ -290,11 +310,15 @@ def read_channels(buffer, sep):
                     'analog_to_digital_resolution']
     
     channel_info.loc[:, 'recorder_channel_id'] = arr_head.loc[:, 'recorder_channel_id'].copy().values
-    channel_info.loc[:, info_columns] = arr_head.loc[:, info_columns].copy().values.astype(float)
+    channel_info.loc[:, info_columns] = arr_head.loc[:, info_columns].copy().values.astype(object)
 
-    mask_an = channel_info.loc[:,'acquisition_mode'].values == 0
-    channel_info.loc[:,'data_acquisition_range'][mask_an] = 1000.*channel_info.loc[:,'data_acquisition_range'][mask_an]
-    channel_info.loc[:,'data_acquisition_range'][~mask_an] = np.nan
+    mask_an = channel_info.loc[:,'acquisition_mode'].values == "0"
+
+    channel_info.loc[mask_an, 'data_acquisition_range'] = (1000. * channel_info.loc[mask_an, 'data_acquisition_range'].astype(float))
+    channel_info.loc[~mask_an, 'data_acquisition_range'] = None
+    
+    # channel_info.loc[:,'data_acquisition_range'][mask_an] = 1000.*channel_info.loc[:,'data_acquisition_range'][mask_an]
+    # channel_info.loc[:,'data_acquisition_range'][~mask_an] = np.nan
 
     wave = np.array(list(np.char.split(arr_head.wave_pol.values.astype('str'),
                                        sep='.')))[:,0].astype(float)
@@ -304,6 +328,12 @@ def read_channels(buffer, sep):
     channel_info.loc[:,'channel_bandwidth'] = 1. # default when not available in the raw files
 
     channel_info.loc[:,'dead_time_correction_type'] = 0. # default for Licel
+
+    channel_info.loc[:,'bins'] = channel_info.loc[:,'bins'].astype(int) # convert to int
+
+    channel_info["acquisition_mode"] = channel_info["acquisition_mode"].astype("object")
+    channel_info.loc[mask_an,'acquisition_mode'] = "a" # convert to atlas nomenclature
+    channel_info.loc[~mask_an,'acquisition_mode'] = "p" # convert to atlas nomenclature
 
     return(channel_info)
 
@@ -344,3 +374,24 @@ def read_buffer(fname):
         buffer = f.read()
         
     return(buffer)
+
+def unit_conv_bits_to_mV(channel_info, signal, shots):
+
+    """Converts analog signals from bits to mV"""
+    
+    if len(signal) > 0:
+        
+        mask_an = channel_info.acquisition_mode.values == "a"
+        
+        channel_id_an = channel_info.index.values[mask_an]
+        
+        data_acquisition_range = channel_info.data_acquisition_range.astype(float)
+        
+        analog_to_digital_resolution = channel_info.analog_to_digital_resolution.astype(float)
+        
+        for ch in channel_id_an:
+            ch_d = dict(channel = ch)
+            # analog conversion (to mV)
+            signal.loc[ch_d] = signal.loc[ch_d]*data_acquisition_range.loc[ch]/(shots.loc[ch_d]*(np.power(2,analog_to_digital_resolution.loc[ch])-1.))
+    
+    return(signal) 

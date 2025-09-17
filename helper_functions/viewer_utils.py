@@ -89,10 +89,10 @@ def check_options(options, ranges = None):
         
         for key in ['smoothing_range', 'normalization_range', 
                     'background_range', 'statistics_range']:
-            check_range_limits(options = options, 
-                               key = key, 
-                               min_range = ranges[0], 
-                               max_range = ranges[-1])
+            options = check_range_limits(options = options, 
+                                         key = key, 
+                                         min_range = ranges[0], 
+                                         max_range = ranges[-1])
     
     return()
 
@@ -207,14 +207,20 @@ def check_range_limits(options, key, min_range, max_range):
         llim = options[key][0]
         ulim = options[key][1]
             
+        if llim < min_range:
+            options[key][0] = min_range
+            
         if llim < min_range or ulim > max_range or \
             llim > max_range or ulim < min_range:
+            options[key][1] = max_range
+
+        if llim > max_range or ulim < min_range:
             raise Exception(f'--Error: The provided {key} is out of the signal limits:\n{options[key]}\nPlease provide values:\n    between {min_range} and {max_range}\n    or None to smooth over the whole profile')
-    
+
         if llim > ulim:
             raise Exception(f'--Error: The lower limit of the provided {options[key]} is higher than the upper limit: {options[key]}')
             
-    return()
+    return(options)
 
 def get_fpaths(netcdf_folder, signal_type, mtype): 
         
@@ -307,7 +313,7 @@ def get_converter_signals(fpath, options):
         channel_info = channel_info.copy().loc[channels,:] 
         
         ranges = bin_to_range(sig = sig,
-                              zero_bin = channel_info.DAQ_Trigger_Offset,
+                              zero_bin = channel_info.zero_bin,
                               range_resolution = channel_info.Raw_Data_Range_Resolution)
         
         for ch in channels:

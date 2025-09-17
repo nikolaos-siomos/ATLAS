@@ -14,6 +14,7 @@ Fucntions
  -- background_correction: Performs the background correction on signals
  -- dark_correction: Removes the dark signals from the normal ananlog signals
  -- dead time correction: Performs the dead time correction onphoton channels
+ -- detect_saturation: Checks if the signals are close to the saturation limit
  -- height_calculation: Calculates the height above the lidar values per bin and channel
  -- range calculation: Calculates the range above the lidar values per bin and channel
  -- range_correction: Performs the range correction on signals
@@ -29,6 +30,73 @@ import numpy as np
 import xarray as xr
 
 import pandas as pd
+
+def detect_saturation(sig, shots, metadata) -> None:
+
+    """
+    General:
+        Detects lidar profiles with photon values close to the
+        maximum allowed countrate or analog values close to the data 
+        acquisition range
+        
+    Input:
+        sig: 
+            A 2D or 3D xarray with the lidar signals, it should include the 
+            following dimensions: (time, channel, ...). 
+
+        shots: 
+            A 2D xarray with the laser shots per channel and timeframe.
+            It should include the following dimensions: (time, channel, ...) 
+            The index should correspond to the channel dimension of sig            
+
+        metadata: A pandas Dataframe with at least the following columns and the 
+        atlas_channel_id as index:
+            
+            resol: 
+                The raw range resolution per channel in meters
+                
+            dead_time: 
+                The dead time per channel in nanoseconds. 
+    
+            DAQ_range: 
+                The data acquisition range of the analog
+                channels.
+            
+    """
+    
+    channels = sig.channel.values
+    
+    resol = metadata["range_resolution"]
+    dead_time = metadata["dead_time"]
+    daq_range = metadata["data_acquisition_range"]
+    
+    sig = unit_conv_counts_to_MHz(sig.copy(), shots.copy(), resol)
+    
+    mask_saturated = xr.full_like(sig.copy(), False, dtype=bool)
+    
+    for ch in channels:
+        
+
+        ch_d = dict(channel = ch)
+        
+        if ch[6] == 'p': #7th digit of channel name is the acquisition mode (a or p)
+        
+            max_countrate = 0.95 * 1000./dead_time[ch]
+
+            mask_saturated.loc[ch_d] = (sig.loc[ch_d].values >= max_countrate)
+            if mask_saturated.any():
+                print(f"-- Warning: Channel {ch} - Photon signal countrate values above the 95% of the maximum allowed value were detected! ")
+
+
+        if ch[6] == 'a': #7th digit of channel name is the acquisition mode (a or p)
+ 
+            max_mV = 0.95*daq_range[ch]
+
+            mask_saturated.loc[ch_d] = (sig.loc[ch_d].values >= max_mV)
+            if mask_saturated.any():
+                print(f"-- Warning: Channel {ch} - Analog signal mV values above the 95% of the data acqusition range were detected! ")   
+
+    return(mask_saturated)
 
 def average_by_group(sig, time_info, grouper, start_time, stop_time):
 
@@ -566,7 +634,7 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
                 
     return(sig_out, std_out)
 
-# def trim_clouds(sig, daq_trigger_offset):
+# def trim_clouds(sig, zero_bin):
 
 #     time = sig.time.values
 #     bins = sig.bins.values    
@@ -586,7 +654,7 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
         
 #         ch_d = dict(channel = ch)
         
-#         zero_bins = daq_trigger_offset.loc[ch]
+#         zero_bins = zero_bin.loc[ch]
         
 #         start = dict(bins = slice(zero_bins + skip_bin ,bins.size - ))
         
@@ -601,7 +669,7 @@ def smoothing(sig, smoothing_window, smoothing_sbin, smoothing_ebin):
                          
 #     return(sig)
 
-def trigger_correction(sig, daq_trigger_offset):
+def trigger_correction(sig, zero_bin):
 
     """
     General:
@@ -614,7 +682,7 @@ def trigger_correction(sig, daq_trigger_offset):
             A 3D xarray with the lidar signals, it should include the 
             following dimensions: (time, channel, bins). 
             
-        daq_trigger_offset: 
+        zero_bin: 
             A pandas series with the trigger delay bins per channel. 
             Negative values correspond to pretriggering --> shift to the left
             The index should correspond to the channel dimension of sig            
@@ -635,7 +703,7 @@ def trigger_correction(sig, daq_trigger_offset):
         
         ch_d = dict(channel = ch)
         
-        shift_bins = daq_trigger_offset.loc[ch]
+        shift_bins = zero_bin.loc[ch]
         
         sig_out.loc[ch_d] = sig.loc[ch_d].shift(bins = shift_bins).values
         
@@ -715,10 +783,8 @@ def unit_conv_counts_to_MHz(sig, shots, resol):
             It should include the following dimensions: (time, channel, ...) 
             The index should correspond to the channel dimension of sig            
 
-        dead_time_cor_type: 
-            A pandas series with the dead time correction type per channel 
-            (0 for non paralyzable or 1 for non paralyzable)
-            The index should correspond to the channel dimension of sig            
+        resol: 
+            A pandas series with the raw range resolution per channel in meters
             
     Returns:
         

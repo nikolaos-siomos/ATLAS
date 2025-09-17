@@ -11,7 +11,7 @@ import numpy as np
 from .readers.parse_ray_args import call_parser, check_parser
 from .readers.check import check_channels
 from .readers.read_prepro import unpack
-from .plotting import make_axis, make_title, make_plot
+from .plotting import make_title, plot_utils, plot_rayleigh, plot_rayleigh_mask
 from .writters import make_header, export_ascii
 from .tools import curve_fit
 import os
@@ -28,7 +28,7 @@ def main(args, __version__):
     print('-----------------------------------------')
     
     profiles, metadata = unpack(args['input_file'])
-        
+
     # Check if the parsed channels exist
     channels = \
         check_channels(sel_channels = args['channels'], 
@@ -42,132 +42,130 @@ def main(args, __version__):
     for ch in channels:
         print(f"-- channel: {ch}")
 
+        # Convert xarrays to numpy arrays - work with numpy arrays for now on
         ch_d = dict(channel = ch)
-        sig_ch = profiles['sig'].loc[ch_d].values
-        atb_ch = profiles['atb'].loc[ch_d].values
+        sig_ch = profiles['sig'].loc[ch_d].copy().values
+        atb_ch = profiles['atb'].loc[ch_d].copy().values
+        
+        ranges_ch = profiles['ranges'].loc[ch_d].copy().values
+        height_ch = profiles['heights'].loc[ch_d].copy().values
 
+        wave_ch = metadata['dwl'].loc[ch_d].copy().values
         
-        ranges_ch = profiles['ranges'].copy().loc[ch_d].values
-        height_ch = profiles['heights'].copy().loc[ch_d].values
-        
-        # Create the y axis (height/range)
-        x_lbin, x_ubin, x_llim, x_ulim, x_vals, x_label = \
-            make_axis.rayleigh_x(heights = height_ch, 
-                                 ranges = ranges_ch,
-                                 x_lims = args['x_lims'], 
-                                 use_dis = args['use_range'])
-    
-        # Smoothing
-        if args['smooth']:
-            if not isinstance(args['smoothing_window'],list):
-                from .tools.smoothing import sliding_average_1D_fast as smooth_1D
-            else:
-                from .tools.smoothing import sliding_average_1D as smooth_1D
+        # Convert the range/height units to km 
+        x_vals = x_unit_conversions(ranges = ranges_ch, 
+                                    heights = height_ch, 
+                                    use_dis = args['use_range'])
 
-            y_vals_sm, y_errs = \
-                smooth_1D(y_vals = sig_ch.copy(), 
-                          x_vals = x_vals,
-                          x_sm_lims = args['smoothing_range'],
-                          x_sm_win = args['smoothing_window'],
-                          expo = args['smooth_exponential'],
-                          err_type = 'std')
+        # Trim the x and y related arrays using the x axis limits
+        x_vals, y1_vals, y2_vals  = \
+            slice_arrays(x_lims = args['x_lims'], 
+                         x_vals = x_vals, 
+                         y1_vals = sig_ch, 
+                         y2_vals = atb_ch)
+        
+        # Check for a Rayleigh fit range
+        stats, masks = \
+            curve_fit.statistics(
+                y1 = y1_vals,
+                y2 = y2_vals, 
+                x  = x_vals,
+                keyw_args = args)
+        
+        # stats['cross_criterion_max'].plot()
+        raise Exception  
 
-            atb_ch, y_errs_mol = \
-                smooth_1D(y_vals = atb_ch.copy(), 
-                          x_vals = x_vals,
-                          x_sm_lims = args['smoothing_range'],
-                          x_sm_win = args['smoothing_window'],
-                          expo = args['smooth_exponential'],
-                          err_type = 'std')
+        # Identify the uppermost range, bin index and related stats there
+        auto_norm_region, idx = \
+            curve_fit.scan(masks)
         
-        else:
-            y_vals_sm = sig_ch.copy()
-            y_errs = np.nan * y_vals_sm   
+        # Select the normalization region by combining the input from the settings file (manual detection, automated detection, or failure to auomatically detect)
+        norm_region, norm_region_flag = \
+            curve_fit.select_norm_region(auto_norm_region = auto_norm_region,
+                                         user_norm_region = args['normalization_region'])
         
-        ulim = 16.
-        min_win = 1.
-        max_win = 4.
-        rsem_lim = 0.02
-        
-        if args['normalization_region'][0] < args['cross_check_lim']:
-            raise Exception(f"The provided cross_check_lim {args['cross_check_lim']} is lower than the lower edge of the normalization region {args['normalization_region'][0]}. Please revise the rayleight_fit section of the settings file")
-        if args['normalization_region'][0] > ulim:
-            ulim = args['normalization_region'][1]
-        if args['normalization_region'][1] - args['normalization_region'][0] < min_win:
-            min_win = args['normalization_region'][1] - args['normalization_region'][0]
-        if args['normalization_region'][1] - args['normalization_region'][0] > max_win:
-            max_win = args['normalization_region'][1] - args['normalization_region'][0]
-        
-        # Check for a fit range
-        rsem, nder, mfit, msem, mder, msec, mshp, mcrc, coef = \
-            curve_fit.stats(y1 = sig_ch.copy(),
-                            y2 = atb_ch.copy(), 
-                            x  = x_vals,
-                            min_win = 1.,
-                            max_win = 4.,
-                            step = 0.1,
-                            llim = args['cross_check_lim'],
-                            ulim = 16.,
-                            rsem_lim = rsem_lim)   
+        # If the normalization region could not be automaticlly identified, calculate the index to which the external/default normalization regions correspond to
+        idx = \
+            curve_fit.norm_region_index(norm_region = norm_region,
+                                        idx = idx,
+                                        masks = masks)
             
-        norm_region, idx, fit = \
-            curve_fit.scan(mfit = mfit,
-                           dflt_region = args['normalization_region'],
-                           auto_fit = args['auto_fit'])
-                
-        nder_c = float(nder[idx].values)
-        mder_c = float(mder[idx].values)
-        rsem_c = float(rsem[idx].values)
-        coef_c = float(coef[idx].values)
+        # Isolate the values of the statistics and masks on the normalization region
+        stats_norm_region, masks_norm_region = \
+            curve_fit.metrics_norm_region(idx = idx, 
+                                          stats = stats, 
+                                          masks = masks)
         
-        # rsem_c = coef_c[0] * sem_c / atb_c
+        # Get the maximum channel height
+        maximum_channel_height = \
+            get_max_channel_height(norm_region= norm_region, 
+                                   norm_region_flag = norm_region_flag)
+            
+        # Smoothing of the y1 array - generates also the corresponding standard deviation
+        y1_vals_sm, y1_errs = smoothing(args = args, 
+                                        x_vals = x_vals, 
+                                        y_vals = y1_vals, 
+                                        err_type = "std")
+            
+        # Smoothing of the y2 array 
+        y2_vals_sm, _ = smoothing(args = args, 
+                                  x_vals = x_vals, 
+                                  y_vals = atb_ch, 
+                                  err_type = "std")
         
-        # Create the y axis (signal)
-        y_llim, y_ulim, y_label = \
-            make_axis.rayleigh_y(sig = coef_c * y_vals_sm[slice(x_lbin,x_ubin+1)], 
-                                 atb = atb_ch.copy()[slice(x_lbin,x_ubin+1)], 
-                                 y_lims = args['y_lims'],
-                                 wave = metadata['dwl'].copy().loc[ch].values,
-                                 use_lin = args['use_lin_scale'])
-        
+        # Normalize y1_vals and y1_errs with the normalization factor from the Rayleigh fit test
+        y1_vals, y1_errs = y_unit_conversions(sig = y1_vals_sm, 
+                                              sig_err = y1_errs, 
+                                              norm_coef = stats_norm_region['normalization_factor'])
+
+        # Get the limits of the y axis in case they are not provided by the user (default)
+        y_lims = get_y_limits(y1_vals = y1_vals, 
+                              y2_vals = y2_vals, 
+                              y_lims = args['y_lims'], 
+                              wave = wave_ch, 
+                              use_lin = args['use_lin_scale'])
+    
         # Make title
         title = make_title.rayleigh(channel = ch, 
                                     metadata = metadata, 
                                     args = args)
         
         # Make plot filename
-        fname = make_plot.make_filename(metadata = metadata, 
+        fname = plot_utils.make_filename(metadata = metadata, 
                                         channel = ch, 
                                         meas_type = 'ray', 
                                         version = __version__)
         
-        # Make the png file
-        plot_path = make_plot.rayleigh(dir_out = os.path.join(args['output_folder'],'plots'), 
-                                       fname = f"{fname}.png", title = title,
-                                       dpi_val = args['dpi'],
-                                       color_reduction = args['color_reduction'],
-                                       use_lin = args['use_lin_scale'],
-                                       norm_region = norm_region,
-                                       x_vals = x_vals, 
-                                       y1_vals = y_vals_sm,
-                                       y2_vals = atb_ch,
-                                       y1_errs = y_errs,
-                                       y2_errs = np.nan * np.zeros(y_errs.shape),
-                                       coef = coef_c,
-                                       rsem = rsem_c,
-                                       rslope = nder_c,
-                                       pval = mder_c,
-                                       rsem_lim = rsem_lim,
-                                       fit = fit,
-                                       auto_fit = args['auto_fit'],
-                                       x_lbin = x_lbin, x_ubin = x_ubin,
-                                       x_llim = x_llim, x_ulim = x_ulim, 
-                                       y_llim = y_llim, y_ulim = y_ulim, 
-                                       x_label = x_label, y_label = y_label,
-                                       x_tick = args['x_tick'],
-                                       label_1 = 'measured',
-                                       label_2 = 'molecular') 
+        # Pass all generated scalar or list parameters relevant to the plots to the args dictionary
+        pass_to_args(args = args,
+                     data_list = [stats_norm_region, 
+                                  masks_norm_region, 
+                                  maximum_channel_height, 
+                                  norm_region, 
+                                  norm_region_flag,
+                                  y_lims,
+                                  title,
+                                  fname],
+                     data_keys = ['stats_norm_region''',
+                                  'masks_norm_region', 
+                                  'maximum_channel_height', 
+                                  'normalization_region', 
+                                  'normalization_flag',
+                                  'y_lims',
+                                  'title',
+                                  'fname'])
         
+        # Generate the Rayleigh fit plot
+        ray_plot_path = plot_rayleigh.generate_plot(X = x_vals, 
+                                                    Y1 = y1_vals_sm,
+                                                    Y2 = y2_vals_sm,
+                                                    Y1E = y1_errs,
+                                                    args = args) 
+
+        # Perform color reduction        
+        plot_utils.perform_color_reduction(color_reduction = args['color_reduction'], 
+                                           fpath = ray_plot_path)
+
         # Make ascii file header
         header = \
             make_header.rayleigh(channel = ch, 
@@ -182,47 +180,196 @@ def main(args, __version__):
                               rcs = sig_ch, 
                               header = header)
         
-        if args['auto_fit']:
+        
+        # Make mask plot filename
+        fname_mask = plot_utils.make_filename(metadata = metadata, 
+                                              channel = ch, 
+                                              meas_type = 'ray', 
+                                              extra_type = 'mask',
+                                              version = __version__)
+    
+        # Make title
+        title_mask = make_title.rayleigh(channel = ch, 
+                                         metadata = metadata, 
+                                         args = args,
+                                         is_mask = True)
+        
+        # Pass all additional scalar or list parameters relevant to the mask plots to the args dictionary
+        pass_to_args(args = args,
+                     data_list = [title_mask,
+                                  fname_mask],
+                     data_keys = ['title_mask',
+                                  'fname_mask'])
+        
+        # Generate the molecular mask plot
+        ray_mask_plot_path = \
+            plot_rayleigh_mask.generate_plot(masks = masks,
+                                             args = args)
+
+        # Perform color reduction        
+        plot_utils.perform_color_reduction(color_reduction = args['color_reduction'], 
+                                           fpath = ray_mask_plot_path)
+
             
-            fname_mask = make_plot.make_filename(metadata = metadata, 
-                                                 channel = ch, 
-                                                 meas_type = 'ray', 
-                                                 extra_type = 'mask',
-                                                 version = __version__)
+        # Gather the metadata that are common for all QA tests in a dictonary
+        plot_metadata = plot_utils.get_plot_metadata(metadata = metadata, 
+                                                     args = args, 
+                                                     channel = ch,
+                                                     meas_type = 'ray', 
+                                                     version = __version__)
         
-            # Make title
-            title_mask = make_title.rayleigh(channel = ch, 
-                                             metadata = metadata, 
-                                             args = args,
-                                             is_mask = True)
-            
-            make_plot.rayleigh_mask(dir_out = os.path.join(args['output_folder'],'plots'), 
-                                    fname = f"{fname_mask}.png", title = title_mask,
-                                    dpi_val = args['dpi'],
-                                    color_reduction = args['color_reduction'],
-                                    mfit = mfit, mder = mder, msec = msec, 
-                                    mshp = mshp, mcrc = mcrc, rsem = rsem,
-                                    rsem_lim = rsem_lim)
-                
-        # Add metadata to the plots
-        plot_metadata = make_plot.get_plot_metadata(metadata = metadata, 
-                                                    args = args, 
-                                                    channel = ch,
-                                                    meas_type = 'ray', 
-                                                    version = __version__)
+        # Add additional metada that are special to the Rayleigh fit test in the dictionary
+        plot_metadata = \
+            add_extra_plot_metadata(plot_metadata = plot_metadata, 
+                                    norm_region_flag = norm_region_flag, 
+                                    stats_norm_region = stats_norm_region, 
+                                    maximum_channel_height = maximum_channel_height)
         
-        plot_metadata['fit'] = f"{fit}"
-        plot_metadata['rsem'] = f"{rsem_c}"
-        plot_metadata['rslope'] = f"{nder_c}"
-        plot_metadata['maximum_channel_height'] = f"{norm_region[-1]}"
-        
-        make_plot.add_plot_metadata(plot_path = plot_path, 
-                                    plot_metadata = plot_metadata)
-        
+        # Add the metadata to the Rayleigh fit plot  
+        plot_utils.add_plot_metadata(plot_path = ray_plot_path, 
+                                     plot_metadata = plot_metadata)
+
+        # Add the metadata to the molecular mask plot 
+        plot_utils.add_plot_metadata(plot_path = ray_plot_path, 
+                                     plot_metadata = plot_metadata)
+    
     print('-----------------------------------------')
     print(' ')
     return()
 
+def pass_to_args(args, data_list, data_keys):
+    
+    for i in range(len(data_keys)):
+        args[data_keys[i]] = data_list[i]
+        
+    return(args)
+    
+def get_max_channel_height(norm_region, norm_region_flag):
+    
+    max_channel_height = np.mean(norm_region)
+    max_channel_height = np.round(max_channel_height, decimals=1)
+    
+    return(max_channel_height)
+    
+def smoothing(args, x_vals, y_vals, err_type = "std"):
+    
+    if args['smooth']:
+        if not isinstance(args['smoothing_window'],list):
+            from .tools.smoothing import sliding_average_1D_fast as smooth_1D
+        else:
+            from .tools.smoothing import sliding_average_1D as smooth_1D
+
+        y_vals_sm, y_errs = \
+            smooth_1D(y_vals = y_vals, 
+                      x_vals = x_vals,
+                      x_sm_lims = args['smoothing_range'],
+                      x_sm_win = args['smoothing_window'],
+                      expo = args['smooth_exponential'],
+                      err_type = err_type)
+    
+    else:
+        y_vals_sm = y_vals.copy()
+        y_errs = np.nan * y_vals.copy()
+        
+    return(y_vals_sm, y_errs)
+
+def get_y_limits(y1_vals, y2_vals, y_lims, wave, use_lin):
+    
+    # Get the max signal bin and value       
+    y_max = np.nanmax(y1_vals)
+    y_min = np.nanmin(y2_vals)
+
+    scale_f = wave / 355.
+    scat_ratio_f = 2.5
+    
+    # Get the signal axis upper limit
+    if use_lin == False:
+        if y_lims[-1] == None:
+            y_ulim = scat_ratio_f * scale_f * y_max
+        else:
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_ulim = 1
+            else:
+                y_ulim =  y_lims[-1]
+    else:
+        if y_lims[-1] == None:
+            y_ulim = scat_ratio_f * scale_f * y_max
+        else:
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_ulim = 1
+            else:
+                y_ulim =  y_lims[-1]
+        
+    # Get the signal axis lower limit
+    if use_lin == False:
+        if y_lims[0] == None:
+            y_llim = y_min / 2.
+        else:
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_llim = 0.
+            else:
+                y_llim =  y_lims[0]
+    else:
+        if y_lims[0] == None:
+            y_llim = y_min / 2.
+        else:
+            if y_lims[0] <= 0:
+                print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
+                y_llim = 0.
+            else:
+                y_llim =  y_lims[0]
+    
+    y_lims = [y_llim, y_ulim]
+    
+    return(y_lims)
+
+def x_unit_conversions(ranges, heights, use_dis):
+   
+    # Convert meters to kilometers and select ranges or heights for the x axis depending on the use_dis value 
+    if use_dis:
+        x_vals = 1E-3 * ranges
+        
+    else:
+        x_vals = 1E-3 * heights      
+
+    return(x_vals)
+
+def y_unit_conversions(sig, sig_err, norm_coef):
+    
+    # Multiply the   
+    y_vals  = norm_coef * sig.copy()
+    
+    y_errs = norm_coef * sig_err.copy()
+    
+    return(y_vals, y_errs)
+
+def slice_arrays(x_lims, x_vals, y1_vals, y2_vals):
+    
+    x_mask = (x_vals >= x_lims[0]) & (x_vals <= x_lims[1])
+    
+    X = x_vals[x_mask]
+
+    Y1  = y1_vals[x_mask]
+    Y2  = y2_vals[x_mask]
+    
+    return(X, Y1, Y2)
+
+def add_extra_plot_metadata(plot_metadata, norm_region_flag, 
+                            stats_norm_region, maximum_channel_height):
+    
+    plot_metadata['norm_region_flag'] = f"{norm_region_flag}"
+    for key in stats_norm_region.keys:
+        plot_metadata[f"stats_{key}"] = f"{stats_norm_region[key]}"
+    for key in stats_norm_region.keys:
+        plot_metadata[f"masks_{key}"] = f"{stats_norm_region[key]}"
+        
+    plot_metadata['maximum_channel_height'] = f"{maximum_channel_height}"
+    
+    return(plot_metadata)
+            
 if __name__ == '__main__':
     # Get the command line argument information
     args = call_parser()

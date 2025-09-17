@@ -1,0 +1,77 @@
+HoiSystems
+id,owner_id_id,lidar_version_id,name,configuration,height_asl,Latitude,Longitude,configuration_from,configuration_to,telecover_test_passed,testxy_passed_at,pi,system_is_transportable,transportation_type,description,sun_photometer_type,sun_photometer_distance,radiosounding_location,radiosounding_distance,radiosounding_frequency,lidar_pointing_angle,scanning_elevation_from,scanning_elevation_to,scanning_azimuth_from,scanning_azimuth_to,unattended_operation,automated_functions,exclude_from_hoi,entry_update_date,enable_quicklook,locked,approved,automatic_upload
+100,mas,59,LMR-Mobile,mi_mo_07,200.0,0.0,0.0,2009-05-01 00:00:00,,,,Anatoli Chaikovsky,False,,,,,,,,,,,,,False,,False,,False,False,False,False
+
+LocationEnvironment
+
+HoiTelescopes
+id,station_id,type,diameter,focal_length,full_overlap_height_m,manufacturer,model,obscuration_diameter,field_of_view,field_stop_type,field_stop_size,optical_fiber_num_aperture,optical_fiber_manufacturer,optical_fiber_type,collimation_focal_length,collimation_type,collimation_model,entry_update_date,locked
+40,mas,"Cassegrain, primary spherical",300.0,1000.0,0.0,,,,,,,,,,,,,,False
+27,mas,"Ritchie-Cretien, hyperbolic",600.0,3000.0,0.0,,,,,,,,,,,,,,False
+
+HoiLaser
+id,station_id,manufacturer,model,repetition_rate,type,seeder_in_use,seeder_bandwidth,seeder_manufacturer,seeder_model,pulse_energy_total,entry_update_date,locked
+35,mas,SOLAR TII,LF-114,10,Nd:YAG,False,,,,0.27,,False
+22,mas,LOTIS TII,LS-2137,10,Nd:YAG,False,,,,0.55,,False
+
+EmissionLines
+id,laser_id_id,wavelength,pulse_energy,pulse_length,polarization_type,polarization_purity_nominal,polarization_purity_measured,polarization_orientation,laser_beam_diameter,laser_beam_divergence,beam_expansion_type,beam_expansion_factor,beam_divergence_post_exp,exclude_from_hoi,entry_update_date,locked
+68,35,1064.0,0.09,,elliptical,,,,7.0,0.7,telescope,8.0,0.1,False,,False
+69,35,532.0,0.075,,linear,0.95,,horizontal,7.0,0.7,telescope,8.0,0.1,False,,False
+70,35,355.0,0.035,,linear,0.95,,vertical,7.0,0.7,telescope,8.0,0.1,False,,False
+71,22,1064.0,0.22,,elliptical,,,,7.0,0.7,telescope,8.0,0.1,False,,False
+72,22,532.0,0.16,,linear,0.95,,horizontal,7.0,0.7,telescope,8.0,0.1,False,,False
+73,22,355.0,0.09,,linear,0.95,,vertical,7.0,0.7,telescope,8.0,0.1,False,,False
+
+GluingOptions
+
+HoiChannels
+id,string_id,name,_telescope_id_id,_laser_id_id,_scat_mechanism_id_id,if_center,if_fwhm,emission_wavelength,fov,raw_range_resolution,_dead_time_corr_type_id_id,dead_time,first_signal_rangebin,trigger_delay,trigger_delay_interpolation_type_id,_background_mode_id_id,_detection_mode_id_id,gluing_options_id,beam_telescope_distance,wavelength_separation,separation_passband_bandwidth,separation_transmission,separation_transm_pol_parallel,separation_transm_pol_cross,out_of_band_suppression,passband_bandwidth,passband_transmission,out_of_band_blocking,polarization_separation,polarization_transmission_parallel,polarization_transmission_cross,neutral_density_filter_OD,detector_type,detector_manufacturer,detector_model,additional_features,daytime_capability,transimpedance_amplifier,transimpedance_gain,transimpedance_bandwidth,output_impedance,analog_sampling_rate,bandwidth,AD_bits,input_termination,max_input_voltage,photon_counting_count_rate,data_acquisition_manufacturer,data_acquisition_model,raw_data_time_resolution,raw_data_altitude_range,pre_trigger_data,description,exclude_from_hoi,entry_update_date,station_id,locked
+301,mi011,407,27,22,vrRH2O,407.0000,6.0000,355.0000,0.7000,15.0000,0,0.0000,0,0.0000,,1,pc,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,False,,mas,False
+302,mi012,387pc,40,35,vrRN2,387.0000,4.0000,355.0000,0.7000,15.0000,0,0.0000,0,0.0000,,1,pc,,,DBS,,,,,IFF,4.0,0.6,> OD 8,,,,0,PMT,Hamamatsu,H-7360-02,,False,True,2000.0,,50.0,,,,,,240000000.0,"BISIP SMO, Minsk",MB-02,0.001,60000.0,True,,False,,mas,False
+304,mi014,1064,40,35,elT,1064.0000,4.0000,1064.0000,0.7000,15.0000,0,0.0000,0,0.0000,,1,an,,,DBS,,,,,IFF,4.0,0.7,> OD 4,,,,2,APD,,C30956E-TC,,True,True,2000.0,,50.0,1000000000.0,10000000.0,14,,5.0,,"BISIP SMO, Minsk",MB-01/C30956E-TC,0.001,30000.0,True,,False,,mas,False
+305,mi015,355an,40,35,elT,355.0000,4.0000,355.0000,0.7000,15.0000,0,0.0000,0,0.0000,,1,an,,,DBS,,,,,IFF,4.0,0.5,> OD 4,,,,2,PMT,,FEU-84,,True,True,2000.0,,50.0,1000000000.0,10000000.0,14,,5.0,,"BISIP SMO, Minsk",MB-01/FEU-84,0.001,30000.0,True,,False,,mas,False
+306,mi016,532an,40,35,elT,532.0000,4.1000,532.0000,0.7000,15.0000,0,0.0000,0,0.0000,,1,an,,,DBS,,,,,IFF,3.0,0.7,> OD 4,,,,2,PMT,,FEU-84,,True,True,2000.0,,50.0,1000000000.0,10000000.0,14,,5.0,,"BISIP SMO, Minsk",MB-01/FEU-84,0.001,30000.0,True,,False,,mas,False
+307,mi017,607pc,40,35,vrRN2,607.0000,6.5000,532.0000,0.7000,15.0000,0,0.0000,0,0.0000,,1,pc,,,DBS,,,,,IFF,3.0,0.6,> OD 8,,,,0,PMT,Hamamatsu,H-7360-03,,False,True,2000.0,,50.0,,,,,,240000000.0,"BISIP SMO, Minsk",MB-02,0.001,60000.0,True,,False,,mas,False
+308,mi018,532an,40,35,elT,532.0000,3.0000,532.0000,0.7000,15.0000,0,0.0000,0,0.0000,,1,an,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,False,,mas,False
+
+PolarizationCrosstalkParameter
+
+Products
+
+PRODUCTSSYSTEMS
+systemID,productID
+
+PRODUCSTCHANNELS
+
+HirelppProductSettings
+
+ProductOptions
+
+BscCalibrOptions
+
+RamanBackscatterOptions
+
+McOptions
+
+PolarizationOption
+
+ExtinctionOptions
+
+IterBackscatterOptions
+
+ElastBackscatterOptions
+
+PolCalibrationCorrectionFactor
+
+DepolBscOptions
+
+ExtBscOptions
+
+PolarizationCalibrationProduct
+
+CHECKSUM 6bf4031bfaf0e6bc17fd5cc92004e17f
+
+Exported from database SCC-OPERATIONAL
+"By  on August 21, 2025 - 15:24:10 UTC"
+

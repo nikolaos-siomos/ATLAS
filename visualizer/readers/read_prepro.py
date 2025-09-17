@@ -105,6 +105,9 @@ def unpack(input_file):
         sig_i = sig_i.copy().where(sig_i != nc.default_fillvals['f8'])
         sig_o = sig_o.copy().where(sig_o != nc.default_fillvals['f8'])
            
+        ranges = data.Range_levels
+        heights = data.Height_levels
+        
         start_time_i_dt = data['Raw_Data_Start_Time_Inner_Sector']
         start_time_o_dt = data['Raw_Data_Start_Time_Outer_Sector']
 
@@ -118,6 +121,9 @@ def unpack(input_file):
         
         profiles['sig_i'] = sig_i
         profiles['sig_o'] = sig_o
+        
+        profiles['ranges'] = ranges
+        profiles['heights'] = heights
 
         metadata['start_date'] = data.RawData_Start_Date
         metadata['start_time'] = data.RawData_Start_Time_UT
@@ -189,7 +195,7 @@ def unpack(input_file):
         metadata['ewl'] = data.Emitted_Wavelength
         metadata['bdw'] = data.Channel_Bandwidth    
         metadata['dead_time'] = data.Dead_Time
-        metadata['daq_trigger_offset'] = data.DAQ_Trigger_Offset
+        metadata['zero_bin'] = data.zero_bin
         metadata['background_low_bin'] = data.Background_Low_Bin
         metadata['background_high_bin'] = data.Background_High_Bin
         metadata['raw_data_range_resolution'] = data.Raw_Data_Range_Resolution
@@ -252,34 +258,34 @@ def unpack(input_file):
 def atlas_to_scc_triggering(metadata):
     background_low_bin = metadata['background_low_bin']
     background_high_bin = metadata['background_high_bin']
-    daq_trigger_offset = metadata['daq_trigger_offset']
+    zero_bin = metadata['zero_bin']
     raw_data_range_resolution = metadata['raw_data_range_resolution']
     
-    background_mode = np.nan * daq_trigger_offset.copy().astype(object)
-    background_low = np.nan * daq_trigger_offset.copy().astype(object)
-    background_high = np.nan * daq_trigger_offset.copy().astype(object)
-    first_signal_rangebin = np.nan * daq_trigger_offset.copy().astype(object)
-    trigger_delay = np.nan * daq_trigger_offset.copy().astype(object)
+    background_mode = np.nan * zero_bin.copy().astype(object)
+    background_low = np.nan * zero_bin.copy().astype(object)
+    background_high = np.nan * zero_bin.copy().astype(object)
+    first_signal_rangebin = np.nan * zero_bin.copy().astype(object)
+    trigger_delay = np.nan * zero_bin.copy().astype(object)
 
-    mask_pretrg = daq_trigger_offset.values < -50
-    mask_isdelay = (daq_trigger_offset.values >= -50) & (daq_trigger_offset.values < 0)
+    mask_pretrg = zero_bin.values < -50
+    mask_isdelay = (zero_bin.values >= -50) & (zero_bin.values < 0)
 
     if mask_pretrg.any():
         background_mode[mask_pretrg] = 'Pre-Trigger'
         background_low[mask_pretrg] = background_low_bin[mask_pretrg]
         background_high[mask_pretrg] = background_high_bin[mask_pretrg]
-        first_signal_rangebin[mask_pretrg] = -daq_trigger_offset[mask_pretrg]
+        first_signal_rangebin[mask_pretrg] = -zero_bin[mask_pretrg]
         trigger_delay[mask_pretrg] = -999.
     if (~mask_pretrg).any():
         background_mode[~mask_pretrg] = 'Far Field'
         background_mode[~mask_pretrg] = raw_data_range_resolution[~mask_pretrg] * background_low_bin[~mask_pretrg]
         background_high[~mask_pretrg] = raw_data_range_resolution[~mask_pretrg] * background_high_bin[~mask_pretrg]
         if mask_isdelay.any():
-            first_signal_rangebin[mask_isdelay] = -daq_trigger_offset[mask_isdelay] 
+            first_signal_rangebin[mask_isdelay] = -zero_bin[mask_isdelay] 
             trigger_delay[mask_isdelay] = -999.
         if (~mask_isdelay).any():
             first_signal_rangebin[~mask_isdelay] = -999.
-            trigger_delay[~mask_isdelay] = daq_trigger_offset[~mask_isdelay] * raw_data_range_resolution[~mask_isdelay] * 20. / 3.
+            trigger_delay[~mask_isdelay] = zero_bin[~mask_isdelay] * raw_data_range_resolution[~mask_isdelay] * 20. / 3.
 
     metadata['background_mode'] = background_mode
     metadata['background_low'] = background_low

@@ -7,8 +7,23 @@ Created on Thu Sep  1 17:41:20 2022
 """
 
 import numpy as np
+import xarray as xr
 
 def sliding_average_2D(z_vals, y_vals, y_sm_lims, y_sm_win, expo = False, err_type = 'sem'):
+    
+    if isinstance(z_vals, xr.DataArray):
+        z_vals = z_vals.copy(deep=True).values
+    elif isinstance(z_vals, np.ndarray):
+        z_vals = np.copy(z_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(z_vals)}")
+        
+    if isinstance(y_vals, xr.DataArray):
+        y_vals = y_vals.copy(deep=True).values
+    elif isinstance(y_vals, np.ndarray):
+        y_vals = np.copy(y_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(y_vals)}")
     
     s_bin = np.where(y_vals >= y_sm_lims[0])[0][0]
     e_bin = np.where(y_vals <= y_sm_lims[-1])[0][-1] + 1
@@ -17,9 +32,9 @@ def sliding_average_2D(z_vals, y_vals, y_sm_lims, y_sm_win, expo = False, err_ty
 
     ihwins = np.zeros(y_vals.size)
 
-    z_vals = z_vals.copy()
-    z_vals_sm = z_vals.copy()
-    z_vals_err = np.nan * z_vals.copy()
+    z_vals = np.copy(z_vals)
+    z_vals_sm = np.copy(z_vals)
+    z_vals_err = np.nan * np.copy(z_vals)
     
     if expo:
         ihwins[s_bin:e_bin] = \
@@ -64,6 +79,20 @@ def sliding_average_2D(z_vals, y_vals, y_sm_lims, y_sm_win, expo = False, err_ty
 
 def sliding_average_2D_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None, err_type = 'sem'):
     
+    if isinstance(z_vals, xr.DataArray):
+        z_vals = z_vals.copy(deep=True).values
+    elif isinstance(z_vals, np.ndarray):
+        z_vals = np.copy(z_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(z_vals)}")
+        
+    if isinstance(y_vals, xr.DataArray):
+        y_vals = y_vals.copy(deep=True).values
+    elif isinstance(y_vals, np.ndarray):
+        y_vals = np.copy(y_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(y_vals)}")
+    
     win = int(1E-3 * y_sm_win  / (y_vals[1] - y_vals[0]))
     if win % 2 == 0: win = win + 1
     
@@ -81,12 +110,9 @@ def sliding_average_2D_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None, er
     if s_buf >= e_buf:
         raise Exception(f"The smoothing region {y_sm_lims} is too narrow set. Please provide a region that is at least as wide as the smoothing windo {win}.")
     
-    z_avg = z_vals.copy()
-    z_err = np.nan * np.zeros(z_vals.copy().shape)
-    z_sqr = np.power(z_vals.copy(), 2)
-
-    # z_vals.copy()
-    # del z_vals
+    z_avg = np.copy(z_vals)
+    z_err = np.nan * np.zeros_like(z_vals)
+    z_sqr = np.power(np.copy(z_vals), 2)
 
     for j in range(z_avg.shape[0]):
         z_avg[j,s_buf:e_buf] = np.convolve(z_vals[j,s_bin:e_bin], np.ones(win), 'valid') / win
@@ -142,6 +168,20 @@ def sliding_average_2D_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None, er
 
 def sliding_average_2D_bin_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None, err_type = 'sem'):
     
+    if isinstance(z_vals, xr.DataArray):
+        z_vals = z_vals.copy(deep=True).values
+    elif isinstance(z_vals, np.ndarray):
+        z_vals = np.copy(z_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(z_vals)}")
+        
+    if isinstance(y_vals, xr.DataArray):
+        y_vals = y_vals.copy(deep=True).values
+    elif isinstance(y_vals, np.ndarray):
+        y_vals = np.copy(y_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(y_vals)}")
+    
     win = int(y_sm_win)
     if win % 2 == 0: win = win + 1
     
@@ -159,10 +199,9 @@ def sliding_average_2D_bin_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None
     if s_buf >= e_buf:
         raise Exception(f"The smoothing region {y_sm_lims} is too narrow set. Please provide a region that is at least as wide as the smoothing windo {win}.")
     
-    z_avg = z_vals.copy()
-    z_err = np.nan * np.zeros(z_vals.copy().shape)
-    z_sqr = np.power(z_vals.copy(), 2)
-
+    z_avg = np.copy(z_vals)
+    z_err = np.nan * np.zeros_like(z_vals)
+    z_sqr = np.power(np.copy(z_vals), 2)
 
     for j in range(z_avg.shape[0]):
         z_avg[j,s_buf:e_buf] = np.convolve(z_vals[j,s_bin:e_bin], np.ones(win), 'valid') / win
@@ -219,6 +258,20 @@ def sliding_average_2D_bin_fast(z_vals, y_vals, y_sm_lims, y_sm_win, expo = None
 def sliding_average_1D(y_vals, x_vals, x_sm_lims, x_sm_win, 
                        expo = False, err_type = 'sem'):
 
+    if isinstance(x_vals, xr.DataArray):
+        x_vals = x_vals.copy(deep=True).values
+    elif isinstance(x_vals, np.ndarray):
+        x_vals = np.copy(x_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(x_vals)}")
+        
+    if isinstance(y_vals, xr.DataArray):
+        y_vals = y_vals.copy(deep=True).values
+    elif isinstance(y_vals, np.ndarray):
+        y_vals = np.copy(y_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(y_vals)}")
+    
     s_bin = np.where(x_vals >= x_sm_lims[0])[0][0]
     e_bin = np.where(x_vals <= x_sm_lims[-1])[0][-1] + 1
     s_ihwin = int(1E-3 * x_sm_win[0]  / (2.*(x_vals[1] - x_vals[0])))
@@ -226,9 +279,9 @@ def sliding_average_1D(y_vals, x_vals, x_sm_lims, x_sm_win,
     
     ihwins = np.zeros(x_vals.size)
     
-    y_vals = y_vals.copy()
-    y_vals_sm = y_vals.copy()
-    y_vals_err = np.nan * np.zeros(y_vals.shape)
+    y_vals = np.copy(y_vals)
+    y_vals_sm = np.copy(y_vals)
+    y_vals_err = np.nan * np.zeros_like(y_vals)
     
     if expo:
         ihwins[s_bin:e_bin] = \
@@ -264,8 +317,23 @@ def sliding_average_1D(y_vals, x_vals, x_sm_lims, x_sm_win,
 
     return(y_vals_sm, y_vals_err)
 
-def sliding_average_1D_fast(y_vals, x_vals, x_sm_lims, x_sm_win, expo = None, err_type = 'sem'):
+def sliding_average_1D_fast(y_vals, x_vals, x_sm_lims, x_sm_win, 
+                            expo = None, err_type = 'sem'):
     
+    if isinstance(x_vals, xr.DataArray):
+        x_vals = x_vals.copy(deep=True).values
+    elif isinstance(x_vals, np.ndarray):
+        x_vals = np.copy(x_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(x_vals)}")
+        
+    if isinstance(y_vals, xr.DataArray):
+        y_vals = y_vals.copy(deep=True).values
+    elif isinstance(y_vals, np.ndarray):
+        y_vals = np.copy(y_vals)
+    else:
+        raise TypeError(f"Unsupported type: {type(y_vals)}")
+        
     win = int(1E-3 * x_sm_win  / (x_vals[1] - x_vals[0]))
     
     if win % 2 == 0: win = win + 1
@@ -286,10 +354,7 @@ def sliding_average_1D_fast(y_vals, x_vals, x_sm_lims, x_sm_win, expo = None, er
     
     y_avg = np.nan * np.zeros(y_vals.shape)
     y_err = np.nan * np.zeros(y_vals.shape)
-    y_sqr = np.power(y_vals.copy(), 2)
-
-    # y_vals.copy()
-    # del y_vals
+    y_sqr = np.power(np.copy(y_vals), 2)
 
     y_avg[s_buf:e_buf] = np.convolve(y_vals[s_bin:e_bin], np.ones(win), 'valid') / win
     y_sqr[s_buf:e_buf] = np.convolve(y_sqr[s_bin:e_bin], np.ones(win), 'valid') / win

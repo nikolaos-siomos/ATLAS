@@ -117,7 +117,6 @@ def main(args, __version__):
             norm_region, idx, fit = \
                 curve_fit.scan(mfit = mfit,
                                dflt_region = args['normalization_region'],
-                               auto_fit = args['auto_fit'],
                                prefered_range = "near")
     
             coef_n, y_m_n, y_sm_n, y_m_sm_n, y_l_sm_n, y_u_sm_n, \
@@ -196,7 +195,6 @@ def main(args, __version__):
                                         title = title,
                                         dpi_val = args['dpi'],
                                         color_reduction = args['color_reduction'],
-                                        auto_fit = args['auto_fit'],
                                         norm_region = norm_region,
                                         fit = fit,
                                         use_nonrc = args['use_non_rangecor'],
