@@ -1,10 +1,19 @@
 [project]
 name = "atlas_actris"
-dynamic = ["version"]
+version = "1.0.0"
+
 authors = [
-    { name="Nikolaos Siomos", email="nikolaos.siomos@lmu.de" },
-    ]
-license = {file = "LICENSE"}
+    { name = "Nikolaos Siomos", email = "nikolaos.siomos@lmu.de" },
+    { name = "Livio Belegante", email = "livio@inoe.ro" },
+    { name = "Georgia Peletidou", email = "gpeletid@auth.gr" },
+    { name = "Peristera Paschou", email = "pepaschou@noa.gr" },
+    { name = "Håvard Buholdt", email = "buholdt@tropos.de" },
+    
+]
+
+# GNU Affero General Public License v3 or later
+license = { text = "AGPL-3.0-or-later" }
+
 readme = "README.md"
 requires-python = ">=3.9"
 
@@ -17,18 +26,47 @@ dependencies = [
     "matplotlib>=3.8.0",
     "bokeh>=3.4.3",
     "Pillow>=11.1.0",
-    "dask>=2024.8.0"
-    ]
+    "dask>=2024.8.0",
+    "requests>=2.0.0",
+]
 
 classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
-    "Operating System :: OS Independent"
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.5,<2.0",
+    "mkdocs-material>=9,<10",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nikolaos-siomos/ATLAS"
 Issues = "https://github.com/nikolaos-siomos/ATLAS/issues"
 
+# ----------------------------------------------------------
+# CLI commands provided by your package
+# ----------------------------------------------------------
+[project.scripts]
+atlas = "atlas_actris.cli:main"
+
+# ----------------------------------------------------------
+# Setuptools configuration for src/atlas_actris layout
+# ----------------------------------------------------------
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["atlas_actris*"]
+namespaces = false
+
+# Include runtime package data
+[tool.setuptools.package-data]
+atlas_actris = [
+    "templates/*.ini",
+]
+
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"

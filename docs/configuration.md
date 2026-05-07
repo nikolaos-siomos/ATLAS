@@ -1,0 +1,218 @@
+# Configuration INI reference (WIP)
+
+*Generated from* `config_file.ini` on 2026-02-11.
+
+> This page is generated from the INI file comments so it stays in sync. Add/edit comments in the INI file and re-run the generator.
+
+## File purpose
+
+_TODO: Add a short narrative description here._
+
+## Sections and options
+
+### [System]
+
+| Key | Default / Example | Help |
+|---|---|---|
+| `station_id` | `` | -------------------------------------------------------------------------------------------------------------<br>Mandatory Variables<br>-------------------------------------------------------------------------------------------------------------<br>station_id: The 3 letter ID of the station according to the EARLINET DB. This field will be displayed in the filenames of the exported files. |
+| `lidar_name` | `` | lidar_name: The full name of the lidar as defined in the SCC. This field will be displayed in the plots. |
+| `station_name` | `` | station_name: The full name of the station as defined in the SCC. This field will be displayed in the plots. |
+| `lidar_id` | `` | -------------------------------------------------------------------------------------------------------------<br>Mandatory Variables when the --operation_mode argument is set to “labeling” (submitting to CARS)<br>-------------------------------------------------------------------------------------------------------------<br>lidar_id: The ID of the lidar as defined in the SCC (integer). This field will be reported in the plots and the filenames of the exported files. |
+| `version_name` | `` | version_name: The full name of the version that corresponds to the SCC configuration ID to be tested (integer). |
+| `version_id` | `` | version_id: The ID of the version that corresponds to the SCC configuration ID to be tested (integer). |
+| `configuration_name` | `` | configuration_name: The full name of the SCC configuration to be tested. |
+| `configuration_id` | `` | configuration_id: The ID of the SCC configuration to be tested (integer) |
+| `altitude` | `` | -------------------------------------------------------------------------------------------------------------<br>Optional Variables (include only to override the raw file metadata)<br>-------------------------------------------------------------------------------------------------------------<br>altitude: The altitude of the station above sea level (in meters). |
+| `latitude` | `` | latitude: The station latitude (in degrees). |
+| `longitude` | `` | longitude: The station latitude (in degrees). |
+| `zenith_angle` | `` | zenith_angle: Zenith angle of the lidar (in degrees, 0 at zenith, 90 at horizon). |
+| `azimuth_angle` | `` | azimuth_angle: Azimuth angle of the lidar (in degrees, North = 0, E = 90). |
+
+### [Channels]
+
+| Key | Default / Example | Help |
+|---|---|---|
+| `recorder_channel_id` | `` | All variables provided for this section should include exactly as many channels as the recorder_channel_id variable.<br>If a variable is not relevant for a specific channel (e.g. dead_time for analog channels) fill with “_”.<br>-------------------------------------------------------------------------------------------------------------<br>Mandatory Variables<br>-------------------------------------------------------------------------------------------------------------<br>recorder_channel_id: IDs of each channel according to the raw file header.<br>• For licel systems: provide the licel id per channel that is going to be include. Currently only BT and BC channels are supported.<br>• For PollyXT systems provide an ascending number per channel starting at 1 and following the order of the channels in the raw PollyXT files.<br>A subset of the recorder channels can be provided. Only the channels provided here will be processed |
+| `scc_channel_id` | `` | scc_channel_id: Mandatory only if submitting to CARS for an evaluation of a configuration. IDs of each channel according to the SCC configuration. In the future, linking with the HOI will be done through the scc_channel_id (currently optional). |
+| `laser` | `` | laser: mandatory only for licel systems. The ascending laser number according to the licel manual. Provide it to link with the licel file. The recorder_channel_id is not a unique identifier for licel channels. A single channel can synchronize with more than one lasers. This variable is ignored when processing PollYXT files |
+| `telescope_type` | `` | telescope_type: The telescope configuration. Choose among:<br>•n: near range<br>• f: far range<br>• x: single telescope |
+| `channel_type` | `` | channel_type: The channel type. Choose one among:<br>• p: co-polar<br>• c: cross-polar<br>• t: total (no depolarization)<br>• v: vibrational Raman<br>• r: rotational Raman<br>• a: Cabannes<br>• f: fluorescence |
+| `channel_subtype` | `` | channel_subtype: The channel subtype. Choose among:<br>• r: Signal Reflected from a PBS<br>• t: Signal Transmitted through a PBS<br>• n: N2 Ramal line<br>• o: O2 Ramal line<br>• w: H2O Ramal line<br>• c: CH4 Ramal line<br>• h: High Rotational Raman<br>• l: Low Rotational Raman<br>• a: Mie (aerosol) HSRL signal<br>• m: Molecular HSRL signal<br>• b: Broadband Fluorescence<br>• s: Spectral Fluorescence<br>• x: No specific subtype |
+| `daq_trigger_offset` | `` | -------------------------------------------------------------------------------------------------------------<br>Partly Optional Variables -- These variables take default values. It is highly recommended though to fill<br>them in because  might not be valid for the system.<br>-------------------------------------------------------------------------------------------------------------<br>daq_trigger_offset: Provide only if known, otherwise it defaults to 0. The offset of the data acquisition trigger with respect to the Q-switch per channel in bins. Provide negative values if the acquisition starts before the Q-switch (pre-triggering) and positive values if the acquisition starts after the Q-switch |
+| `dead_time` | `` | dead_time: The dead time of the photon counting channels (in ns). (for analog channels set _). Defaults to 3.7ns for the non-paralyzable case |
+| `background_low_bin` | `` | background_low_bin: Starting bin of the background correction averaging range. Defaults to:<br>• The 600th bin before the end of the profile if the daq_trigger_offset < 400<br>• The 100th bin if the daq_trigger_offset >= 400<br>Using default values is currently risky. Please make sure that no spikes are appearing in the pretrigger range that would affect the background correction or manually provide this variable. |
+| `background_high_bin` | `` | background_high_bin: ending bin of the background correction averaging range. Defaults to:<br>• The 100th bin before the end of the profile if the daq_trigger_offset < 400<br>• The 300th bin if the daq_trigger_offset >= 400<br>Using default values is currently risky. Please make sure that no spikes are appearing in the pretrigger range that would affect the background correction or manually provide this variable. |
+| `acquisition_mode` | `` | -------------------------------------------------------------------------------------------------------------<br>Optional Variables (include only to override the raw file metadata)<br>-------------------------------------------------------------------------------------------------------------<br>acquisition_mode: The mode of the recorded signals per channel. Choose among:<br>• 0: analog<br>• 1: photon counting |
+| `detected_wavelength` | `` | detected_wavelength:  The wavelength of the detected signal according to the applied Interference Filter of each channel (in nm). This variable is provided by default from the raw file metadata but if accuracy is required for molecular calculations the exact central wavelength should be provided. |
+| `emitted_wavelength` | `` | emitted_wavelength: The wavelength of the originally emitted laser beam per channel. A very rough guess process is applied by default using that detected channel information that it is valid ONLY for Nd:Yag lasers with elastic and vibrational Raman channels. Please provide the values explicitly if your system does not fall in this category. Defaults to:<br>• 355 for channels with detected wavelength <520nm<br>• 532 for channels with detected wavelength <1000nm<br>• 1064 for channels with detected wavelength >=1000nm<br>If accurate molecular depolarization ratio calculations are required this variable should be filled in with the actual emitted wavelength with sub-nanometer accuracy. |
+| `channel_bandwidth` | `` | channel_bandwidth: Interference filter Bandwidth (in nm, Defaults to: 1nm). The default value is a very rough guess and it can easily lead to high uncertainty in the molecular depolarization value. Exact values provided from the manufacturers should be used instead. Note that this is an optional field when the file_format argument is set to polly_xt. |
+| `bins` | `` | bins:  The total bins of the recorded signals per channel. |
+| `data_acquisition_range` | `` | data_acquisition_range: The Data Acquisition Range of each analog channel [mV]. Use _ for photon channels |
+| `analog_to_digital_resolution` | `` | analog_to_digital_resolution: The analog to digital resolution (in bits) of each analog channel. Use _ for photon channels. |
+| `range_resolution` | `` | range_resolution: The range resolution of each channel [m]. It will be used to calculate the Sampling Rate. |
+| `laser_repetition_rate` | `` | laser_repetition_rate: The Laser Repetition Rate [Hz] |
+
+## Full file (verbatim)
+
+```ini
+[System]
+#-------------------------------------------------------------------------------------------------------------
+#Mandatory Variables
+#-------------------------------------------------------------------------------------------------------------
+#station_id: The 3 letter ID of the station according to the EARLINET DB. This field will be displayed in the filenames of the exported files. 
+station_id = 
+ 
+#lidar_name: The full name of the lidar as defined in the SCC. This field will be displayed in the plots. 
+lidar_name = 
+
+#station_name: The full name of the station as defined in the SCC. This field will be displayed in the plots.
+station_name =
+
+#-------------------------------------------------------------------------------------------------------------
+#Mandatory Variables when the --operation_mode argument is set to “labeling” (submitting to CARS)
+#-------------------------------------------------------------------------------------------------------------
+#lidar_id: The ID of the lidar as defined in the SCC (integer). This field will be reported in the plots and the filenames of the exported files.
+lidar_id =
+
+#version_name: The full name of the version that corresponds to the SCC configuration ID to be tested (integer).
+version_name = 
+
+#version_id: The ID of the version that corresponds to the SCC configuration ID to be tested (integer). 
+version_id =
+
+#configuration_name: The full name of the SCC configuration to be tested.
+configuration_name =  
+
+#configuration_id: The ID of the SCC configuration to be tested (integer)
+configuration_id =
+
+#-------------------------------------------------------------------------------------------------------------
+#Optional Variables (include only to override the raw file metadata)
+#-------------------------------------------------------------------------------------------------------------
+
+#altitude: The altitude of the station above sea level (in meters). 
+altitude =
+
+#latitude: The station latitude (in degrees). 
+latitude =
+
+#longitude: The station latitude (in degrees). 
+longitude =
+
+#zenith_angle: Zenith angle of the lidar (in degrees, 0 at zenith, 90 at horizon). 
+zenith_angle =
+
+#azimuth_angle: Azimuth angle of the lidar (in degrees, North = 0, E = 90).
+azimuth_angle = 
+
+
+[Channels]
+# All variables provided for this section should include exactly as many channels as the recorder_channel_id variable. 
+# If a variable is not relevant for a specific channel (e.g. dead_time for analog channels) fill with “_”. 
+#-------------------------------------------------------------------------------------------------------------
+#Mandatory Variables
+#-------------------------------------------------------------------------------------------------------------
+
+#recorder_channel_id: IDs of each channel according to the raw file header. 
+#    • For licel systems: provide the licel id per channel that is going to be include. Currently only BT and BC channels are supported.
+#    • For PollyXT systems provide an ascending number per channel starting at 1 and following the order of the channels in the raw PollyXT files. 
+# A subset of the recorder channels can be provided. Only the channels provided here will be processed
+recorder_channel_id = 
+
+#scc_channel_id: Mandatory only if submitting to CARS for an evaluation of a configuration. IDs of each channel according to the SCC configuration. In the future, linking with the HOI will be done through the scc_channel_id (currently optional). 
+scc_channel_id = 
+
+#laser: mandatory only for licel systems. The ascending laser number according to the licel manual. Provide it to link with the licel file. The recorder_channel_id is not a unique identifier for licel channels. A single channel can synchronize with more than one lasers. This variable is ignored when processing PollYXT files
+laser = 
+
+#telescope_type: The telescope configuration. Choose among:
+#    •n: near range
+#    • f: far range
+#    • x: single telescope 
+telescope_type = 
+
+#channel_type: The channel type. Choose one among:
+#    • p: co-polar
+#    • c: cross-polar
+#    • t: total (no depolarization)
+#    • v: vibrational Raman
+#    • r: rotational Raman
+#    • a: Cabannes
+#    • f: fluorescence 
+channel_type = 
+
+#channel_subtype: The channel subtype. Choose among:
+#    • r: Signal Reflected from a PBS
+#    • t: Signal Transmitted through a PBS
+#    • n: N2 Ramal line
+#    • o: O2 Ramal line
+#    • w: H2O Ramal line
+#    • c: CH4 Ramal line
+#    • h: High Rotational Raman
+#    • l: Low Rotational Raman
+#    • a: Mie (aerosol) HSRL signal
+#    • m: Molecular HSRL signal
+#    • b: Broadband Fluorescence
+#    • s: Spectral Fluorescence
+#    • x: No specific subtype 
+channel_subtype = 
+
+#-------------------------------------------------------------------------------------------------------------
+#Partly Optional Variables -- These variables take default values. It is highly recommended though to fill
+#them in because  might not be valid for the system.
+#-------------------------------------------------------------------------------------------------------------
+
+#daq_trigger_offset: Provide only if known, otherwise it defaults to 0. The offset of the data acquisition trigger with respect to the Q-switch per channel in bins. Provide negative values if the acquisition starts before the Q-switch (pre-triggering) and positive values if the acquisition starts after the Q-switch
+daq_trigger_offset = 
+
+#dead_time: The dead time of the photon counting channels (in ns). (for analog channels set _). Defaults to 3.7ns for the non-paralyzable case
+dead_time = 
+
+#background_low_bin: Starting bin of the background correction averaging range. Defaults to:
+#    • The 600th bin before the end of the profile if the daq_trigger_offset < 400
+#    • The 100th bin if the daq_trigger_offset >= 400 
+#Using default values is currently risky. Please make sure that no spikes are appearing in the pretrigger range that would affect the background correction or manually provide this variable.
+background_low_bin = 
+
+#background_high_bin: ending bin of the background correction averaging range. Defaults to:
+#    • The 100th bin before the end of the profile if the daq_trigger_offset < 400
+#    • The 300th bin if the daq_trigger_offset >= 400 
+#Using default values is currently risky. Please make sure that no spikes are appearing in the pretrigger range that would affect the background correction or manually provide this variable.
+background_high_bin = 
+
+#-------------------------------------------------------------------------------------------------------------
+#Optional Variables (include only to override the raw file metadata)
+#-------------------------------------------------------------------------------------------------------------
+#acquisition_mode: The mode of the recorded signals per channel. Choose among:
+#    • 0: analog
+#    • 1: photon counting
+acquisition_mode = 
+
+#detected_wavelength:  The wavelength of the detected signal according to the applied Interference Filter of each channel (in nm). This variable is provided by default from the raw file metadata but if accuracy is required for molecular calculations the exact central wavelength should be provided.
+detected_wavelength =
+
+#emitted_wavelength: The wavelength of the originally emitted laser beam per channel. A very rough guess process is applied by default using that detected channel information that it is valid ONLY for Nd:Yag lasers with elastic and vibrational Raman channels. Please provide the values explicitly if your system does not fall in this category. Defaults to:
+#    • 355 for channels with detected wavelength <520nm
+#    • 532 for channels with detected wavelength <1000nm 
+#    • 1064 for channels with detected wavelength >=1000nm
+#If accurate molecular depolarization ratio calculations are required this variable should be filled in with the actual emitted wavelength with sub-nanometer accuracy.
+emitted_wavelength = 
+
+#channel_bandwidth: Interference filter Bandwidth (in nm, Defaults to: 1nm). The default value is a very rough guess and it can easily lead to high uncertainty in the molecular depolarization value. Exact values provided from the manufacturers should be used instead. Note that this is an optional field when the file_format argument is set to polly_xt.
+channel_bandwidth = 
+
+#bins:  The total bins of the recorded signals per channel. 
+bins = 
+
+#data_acquisition_range: The Data Acquisition Range of each analog channel [mV]. Use _ for photon channels
+data_acquisition_range = 
+
+#analog_to_digital_resolution: The analog to digital resolution (in bits) of each analog channel. Use _ for photon channels.
+analog_to_digital_resolution = 
+
+#range_resolution: The range resolution of each channel [m]. It will be used to calculate the Sampling Rate.
+range_resolution = 
+
+#laser_repetition_rate: The Laser Repetition Rate [Hz]
+laser_repetition_rate =
+```

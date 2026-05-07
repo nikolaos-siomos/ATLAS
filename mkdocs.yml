@@ -1,0 +1,22 @@
+site_name: ATLAS ACTRIS
+site_description: Documentation for the ATLAS ACTRIS processing package
+repo_url: https://github.com/nikolaos-siomos/ATLAS
+
+theme:
+  name: material
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Initialization: initialization.md
+  - Configuration: configuration.md
+  - Settings: settings.md
+  - CLI Documentation: atlas_actris_cli_documentation.md
+  - Extra tools:
+      - Get config files from SCC HOI: get_config_files_from_scc_hoi/README.md
+      - Get T/P profiles from Cloudnet: get_T_P_profiles_from_cloudnet/README_Cloudnet_Profile_Library_v11.txt
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
