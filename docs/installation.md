@@ -1,197 +1,310 @@
 # ATLAS Installation
 
-This part covers in detail the installation process of ATLAS for users not already familiar with creating python environments
+This page describes the current developer installation procedure for ATLAS.
 
-## Introduction
-The **recommended way to install ATLAS** is by creating a conda environment: 
-
-[Installing ATLAS with conda](#installing-atlas-with-conda) 
-
-**Expert python users** that don’t want to install conda and know what they are doing can alternatively try one of these approaches:
-
-[Installing ATLAS without conda](#installing-atlas-without-conda) 
-	
-##  Installing ATLAS without conda
-ATLAS can be installed by using the following command in a python 3.9 environment:
+ATLAS is currently intended to be installed from a local Git checkout. The recommended installation mode is an editable pip installation:
 
 ```bash
-pip install atlas_actris 
+python -m pip install -e .
 ```
 
-Currently using python 3.9 is mandatory because other versions might lead to dependency issues.
+Editable mode keeps the installed package connected to the source code in your local working tree. When you edit files under `src/atlas_actris/`, the changes are immediately used by Python without reinstalling the package.
 
-Linux users that happen to have python 3.9 installed in their system and have admin rights can install pip on the system and create a virtual environment with venv. Please note that venv uses the system’s python, so this approach will probably fail to work if the system is using something other than python 3.9. 
+## Current package status
 
-In the future ATLAS support will be added for a range of python versions. 
+The Python distribution/package name is:
 
-Windows users can install python 3.9 e.g. from here:
-https://www.python.org/downloads/release/python-390/
-and then use venv to create a virtual environment. 
+```text
+atlas_actris
+```
 
-Please make sure that pip is installed and available in the environment. 
-After the environment is installed, activate it and install ATLAS with pip by typing:
+The current project version is:
+
+```text
+1.0.0
+```
+
+The project requires:
+
+```text
+Python >= 3.9
+```
+
+The source code uses the `src` package layout:
+
+```text
+ATLAS/
+├── pyproject.toml
+├── README.md
+├── docs/
+├── tests/
+├── tools/
+└── src/
+    └── atlas_actris/
+        ├── __init__.py
+        ├── cli.py
+        ├── __call_atlas_interactive__.py
+        ├── helper_functions/
+        ├── processor/
+        ├── readers/
+        ├── templates/
+        └── ...
+```
+
+The main installed command-line command is:
 
 ```bash
-pip install atlas_actris 
+atlas
 ```
 
-The ATLAS source code will be installed in a folder named atlas_dev within your environment folder. The quickest and easiest way to find it is to just search for it. However, users are strongly discouraged of making changes directly on the source code installed by pip. 
+The command expects an initialization file argument:
 
-**Important note for ATLAS developers**: Upgrading ATLAS through pip will delete any local changes in the scripts of the ATLAS source folder, which is installed within the conda environment. Please avoid making any changes to that folder. Users that are interested in developing their own scripts or want to contribute to the development of ATLAS are strongly encouraged to still install ATLAS through pip (so that the dependencies are correctly installed) but download and work on the source code from the ATLAS Github repository: https://github.com/nikolaos-siomos/ATLAS 
+```bash
+atlas -i /path/to/call_atlas.ini
+```
 
-If changes must be made then it is recommended to download and work on the ATLAS source from Github (https://github.com/nikolaos-siomos/ATLAS) within the created environment, so that the dependencies are met. The source code installed by pip should be used only for executing the main scripts using configuration and setting ascii files stored out of the python environment.
+or equivalently:
 
-## Installing ATLAS with conda
-The recommended way to install ATLAS is through conda, because it is possible to create environments with a specific python version installed. 
-Users with any form of conda already installed (e.g. through anaconda, miniconda, or miniforge) can skip steps 1 and 2.
-In this tutorial we will use miniforge (see: What is the difference between miniconda and miniforge?),
-but the process of installing conda through anaconda or miniconda is very similar. Please follow the steps below.
+```bash
+atlas --ini_file /path/to/call_atlas.ini
+```
 
-### Step 1: Download the miniforge installer
-The installer for different operating systems is provided in the following link:
+The command is configured in `pyproject.toml` as an entry point to the package CLI wrapper. The wrapper runs the main interactive ATLAS script while still allowing developers to open and run `src/atlas_actris/__call_atlas_interactive__.py` directly in Spyder.
+
+## Runtime dependencies
+
+The runtime dependencies are installed automatically from `pyproject.toml` when running `python -m pip install -e .`.
+
+Current runtime dependencies include:
+
+- `numpy>=2.0.0`
+- `pandas>=2.2.3`
+- `xarray>=2023.6.0`
+- `netCDF4>=1.6.3`
+- `scipy>=1.13.0`
+- `matplotlib>=3.8.0`
+- `bokeh>=3.4.3`
+- `Pillow>=11.1.0`
+- `dask>=2024.8.0`
+- `requests>=2.0.0`
+
+## Recommended installation with conda or miniforge
+
+Using conda or miniforge is recommended because it makes it easy to create a clean environment with a specific Python version.
+
+Users with an existing conda, miniconda, anaconda, or miniforge installation can skip directly to [Create a new environment](#create-a-new-environment).
+
+### Step 1: Download miniforge
+
+Download the installer for your operating system from:
+
 https://conda-forge.org/download/
 
 ### Step 2: Install miniforge
-Please follow the instructions on the webpage to execute the installer.
 
-**Linux:** 
+Follow the installation instructions from the miniforge webpage.
 
-At the last stage of installation, users will be asked if they want to have the base environment activated by default on their shell (terminal). 
+On Linux, the installer may ask whether the base environment should be activated automatically when opening a new terminal. Selecting yes is convenient for most users. If you already have another conda installation, be aware that enabling this option may make the new miniforge base environment the default one in your terminal.
 
-Selecting yes in most cases will make life easier. Linux users should keep in mind that if you already have enabled this option (e.g. from a previous anaconda installation) the new base environment from miniforge will supersede the old base environment that was used until now in the terminal by default. If this is not what you want then please select no at this stage.
-
-**Windows 10:**
- 
- <img src="images/minforge_1.jpg" alt="miniforge_win_1" width="600" style="display:block; margin-bottom:20px;"/>
- <img src="images/minforge_2.jpg" alt="miniforge_win_2" width="600" style="display:block; margin-bottom:20px;"/>
- <img src="images/minforge_3.jpg" alt="miniforge_win_3" width="600" style="display:block; margin-bottom:20px;"/>
+On Windows, open the **Miniforge Prompt** from the Start Menu after installation. This opens a terminal with the base environment activated.
 
 ### Step 3: Activate the base environment
 
-**Linux:**
+If your base environment is not already active, activate it manually.
 
-People that selected yes at the end of the previous step should already have an activated base environment next time they open a new terminal.
-
-People that selected no at the end of the previous step can activate the base environment in the terminal by typing: source <path to the activate script inside the miniforge folder>
-
-For example:
+Example on Linux:
 
 ```bash
-source /home/nikos/miniforge3/bin/activate
+source /home/your_user/miniforge3/bin/activate
 ```
 
-**Windows 10:**
+You should see something like this at the beginning of your terminal prompt:
 
-In the Start Menu there is a new item "Miniforge Prompt". If you click on it, you open a Windows command prompt (terminal) with the (base) environment already activated.
-
-No matter which approach was selected, the users should see “(base)” written on their terminal like in the example below:
-
-**Linux:**
-
- <img src="images/terminal.png" alt="terminal" width="600"/>
-
-**Windows:** 
-
- <img src="images/cm_windows.png" alt="terminal" width="400"/>
-
-To verify that you are using the right base environment please type the following command while being inside the base environment:
-
-**Linux:**
-
- <img src="images/which_conda.png" alt="which-conda" width="600"/>
-
-
-**Windows:**
-
-<img src="images/conda_info_windows.png" alt="conda-info-windows" width="600"/>
-
-
-It should return a path within the miniforge folder (or your expected conda installation folder). 
-
-For example:
-|   |   |
-|---|---|
-|Linux| /home/nikos/miniforge3/bin/conda |
-|Windows| active env location: C:\Users\YourUserName\miniforge3|
-|   |   |
-
-### Step 4: Create a new environment
-
-First make sure that you are working in the base environment.
-If you are unsure which is your current active environment, look at your terminal. The environement should be mentioned in the beginning of the cursor line (see images of [Step 3](#step-3-activate-the-base-environment)).
-
-The line should start with:
-|   |   |
-|---|---|
-|Linux| (base) user@linux_distro:|
-|Windows| (base) C:\Users\YourUserName>|
-|   |   |  
-
-In the base environment type:
+```text
+(base)
 ```
+
+To verify that the expected conda installation is being used, run:
+
+```bash
+conda info
+```
+
+or on Linux/macOS:
+
+```bash
+which conda
+```
+
+The returned path should point to your expected conda or miniforge installation.
+
+## Create a new environment
+
+From the base environment, create a dedicated ATLAS development environment:
+
+```bash
 conda create -n atlas_box python=3.9 pip
 ```
 
-This will create a new environment called “atlas_box” with python 3.9 and pip installed. The users can also select a different name for their environment. 
+Activate it:
 
-Please note that if the name “atlas_box” is already assigned to an existing environment, a new name must be selected. This is relevant to users that are using an existing conda installation with an atlas_box environment.
-
-### Step 5: Activate the new environment
-
-The environment can be activated by typing:
-```
+```bash
 conda activate atlas_box
 ```
-For example:
-<img src="images/activate_env.png" alt="activate-env" width="600"/>
 
+You can choose a different environment name if you prefer.
 
-### Step 6: Install or update ATLAS
-Install ATLAS from the pip repository (https://pypi.org/project/atlas-actris/) by typing the following command in the activated atlas_box environment:
-```
-pip install atlas_actris
-```
-For example:
-<img src="images/install.png" alt="install" width="600"/>
+## Get the source code
 
-To install a specific version of ATLAS (not recommended) you can type instead:
-```
-pip install atlas_actris==0.4.9
-```
-This will install version 0.4.9 (if it still available in PyPI)
-The ATLAS source code will be installed in a folder named atlas_dev within your environment folder. The quickest and easiest way to find it is to just search for it. However, users are strongly discouraged of making changes directly on the source code installed by pip. 
+Clone the repository, or use your existing local checkout.
 
-If changes must be made then it is recommended to download and work on the ATLAS source from Github (https://github.com/nikolaos-siomos/ATLAS) within the created environment, so that the dependencies are met. 
+Example:
 
-The source code installed by pip should be used only for executing the main scripts using configuration and setting ascii files stored out of the python environment.
-
-### Step 7 (optional): Update ATLAS
-If ATLAS is already installed and a new update came out, it is possible to update through pip by typing:
-```
-pip install atlas_actris --upgrade
-```
-For example:
-
-<img src="images/upgrade.png" alt="upgrade" width="600"/>
-
-Please note that it is not possible to install/update ATLAS using conda. Conda is used only for the creating of the environment and the installation of pip and python3.9.
-
-### Step 7: Install an IDE (optional)
-
-It is convenient to install an integrated development environment (IDE) to better edit and view scripts (optional). To avoid dependency issues it is recomended to install itin the new environment (e.g. atlas_box) with pip.
-```
-pip install spyder
+```bash
+git clone <repository-url>
+cd ATLAS
 ```
 
-Windows users should be carefull and make sure they are using the correct Spyder IDE since Spyder is usually installed by default in the base environment and it visible in the Windows startup menu.
+If you already have the repository locally, go to the project root, where `pyproject.toml` is located:
 
-The safest way to make usre that the correct Spyder is used is to run it from the correct environment:
-
-#### 1) Activate environment
+```bash
+cd path/to/ATLAS
 ```
+
+The project root should contain files and folders similar to:
+
+```text
+pyproject.toml
+README.md
+docs/
+src/
+tests/
+tools/
+```
+
+## Install ATLAS in editable mode
+
+From the project root, with the `atlas_box` environment activated, run:
+
+```bash
+python -m pip install -e .
+```
+
+This installs ATLAS and its runtime dependencies from `pyproject.toml`.
+
+Editable mode is important for development: changes made in the local source files are used immediately without reinstalling the package.
+
+## Verify the installation
+
+Check that the package can be imported:
+
+```bash
+python -c "import atlas_actris; print(atlas_actris.__file__)"
+```
+
+The printed path should point to your local repository, typically somewhere under:
+
+```text
+src/atlas_actris/
+```
+
+Check that the command-line entry point is available:
+
+```bash
+atlas -h
+```
+
+The help output should look similar to:
+
+```text
+usage: __call_atlas_interactive__.py [-h] [-i [ini_file]]
+
+arguments
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i [ini_file], --ini_file [ini_file]
+                        The path to the initialization file of the calling
+                        script
+```
+
+To run ATLAS, provide the initialization file:
+
+```bash
+atlas -i /path/to/call_atlas.ini
+```
+
+or:
+
+```bash
+atlas --ini_file /path/to/call_atlas.ini
+```
+
+Example:
+
+```bash
+atlas -i ./docs/templates/call_atlas.ini
+```
+
+Adjust the example path to point to an existing initialization file in your local checkout.
+
+> **Note:** The current help output displays the `-i/--ini_file` option as optional because of the argparse configuration. In practice, the main workflow expects an initialization file path to run correctly.
+
+## Install documentation dependencies
+
+The documentation dependencies are optional and are defined in `pyproject.toml` under the `docs` extra.
+
+To install ATLAS together with the documentation tools, run:
+
+```bash
+python -m pip install -e ".[docs]"
+```
+
+Then serve the documentation locally:
+
+```bash
+mkdocs serve
+```
+
+## Spyder development workflow
+
+For development, it is useful to run the main script directly in Spyder so that variables remain visible in Spyder's Variable Explorer.
+
+Install Spyder in the same environment if needed:
+
+```bash
+python -m pip install spyder
+```
+
+Start Spyder from the activated ATLAS environment:
+
+```bash
 conda activate atlas_box
-```
-#### 2) Run spyder
-```
 spyder
 ```
+
+Open and run:
+
+```text
+src/atlas_actris/__call_atlas_interactive__.py
+```
+
+When running from Spyder, configure the script arguments to provide the initialization file, for example:
+
+```text
+-i /path/to/call_atlas.ini
+```
+
+This keeps the terminal workflow and the Spyder workflow aligned:
+
+```bash
+atlas -i /path/to/call_atlas.ini
+```
+
+and:
+
+```text
+Spyder run arguments: -i /path/to/call_atlas.ini
+```
+
+should execute the same underlying script.
