@@ -58,6 +58,8 @@ from processor.signal_gluing import (
     compute_gluing,
     )
 
+from processor.molecular_calculations import compute_molecular_calculations
+
 from processor.selectors import (
     get_from_selector,
     set_from_selector,
@@ -157,6 +159,10 @@ class Processor():
             "gluing":{
                 "function":compute_gluing,
                 "header":"Gluing signals"
+                },
+            "molecular_calculations":{
+                "function":compute_molecular_calculations,
+                "header":"Molecular calculations"
                 },
             # "pol_calibration_factor":{
             #     "function":,
@@ -287,6 +293,35 @@ class Processor():
         # Make a copy of input data
         output_data = copy.deepcopy(input_data)
 
+        # Save output entries
+        self.save_output(output_data, output_map)
+        
+        
+    def checkout(self, output_id, input_id):
+    
+        # Print process header
+        print_header(f"Calculating stage {input_id} and save to stage {output_id}")
+            
+        # Get input data and output map
+        input_data = self.load_input_data(input_id)
+        
+        # Get output map and register
+        output_map = self.prepare_output(output_id, stage_name = "copy")
+
+        # Make a 2-level copy
+        output_data = {
+            key_1: input_data[key_1].copy()
+            for key_1 in input_data.keys()
+        }
+    
+        # Persist everything that can be persisted
+        for key_1 in output_data.keys():
+            for key_2 in output_data[key_1].keys():
+                value = output_data[key_1][key_2]
+    
+                if hasattr(value, "persist"):
+                    output_data[key_1][key_2] = value.persist()
+    
         # Save output entries
         self.save_output(output_data, output_map)
 

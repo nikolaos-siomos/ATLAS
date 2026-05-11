@@ -33,11 +33,39 @@ reader_menu: dict[str, Callable[[str], object]] = {
     "polly_xt_first": reader_polly_xt_first,
 }
 
-def downcast_float_safe(da: xr.DataArray, tol=1e-6) -> xr.DataArray:
-    """
-    Downcast a float64 DataArray to float32 if conversion
-    error is within tolerance. Otherwise return unchanged.
+# def downcast_float_safe(da: xr.DataArray, tol=1e-6) -> xr.DataArray:
+#     """
+#     Downcast a float64 DataArray to float32 if conversion
+#     error is within tolerance. Otherwise return unchanged.
 
+#     Parameters
+#     ----------
+#     da : xr.DataArray
+#         Input DataArray.
+#     tol : float
+#         Relative/absolute tolerance for allclose comparison.
+
+#     Returns
+#     -------
+#     xr.DataArray
+#         Downcasted DataArray (float32) if safe, else original.
+#     """
+#     if np.issubdtype(da.dtype, np.floating) and da.dtype == np.float64:
+#         arr = da.values
+#         arr32 = arr.astype(np.float32)
+#         if np.allclose(arr, arr32.astype(np.float64), rtol=tol, atol=tol, equal_nan=True):
+#             return da.astype(np.float32)
+        
+#     return da
+
+def downcast_float_safe(da: xr.DataArray, tol: float = 1e-6) -> xr.DataArray:
+    """
+    Downcast float64 DataArray to float32 only if the full-array conversion
+    error is within tolerance.
+
+    For Dask-backed arrays, this performs one full lazy computation to check
+    safety, but the returned astype operation remains lazy.
+    
     Parameters
     ----------
     da : xr.DataArray
@@ -50,11 +78,29 @@ def downcast_float_safe(da: xr.DataArray, tol=1e-6) -> xr.DataArray:
     xr.DataArray
         Downcasted DataArray (float32) if safe, else original.
     """
-    if np.issubdtype(da.dtype, np.floating) and da.dtype == np.float64:
-        arr = da.values
-        arr32 = arr.astype(np.float32)
-        if np.allclose(arr, arr32.astype(np.float64), rtol=tol, atol=tol, equal_nan=True):
-            return da.astype(np.float32)
+
+    if not (np.issubdtype(da.dtype, np.floating) and da.dtype == np.float64):
+        return da
+
+    da32 = da.astype(np.float32)
+
+    close = xr.apply_ufunc(
+        np.isclose,
+        da,
+        da32.astype(np.float64),
+        kwargs={
+            "rtol": tol,
+            "atol": tol,
+            "equal_nan": True,
+        },
+        dask="allowed",
+    )
+
+    is_safe = bool(close.all().compute())
+
+    if is_safe:
+        return da32
+
     return da
 
 def infer_format(d: Dict[str, Any], station_id: str, debug: bool = False) -> str:
@@ -160,14 +206,18 @@ def flexible_reader(d: Dict[str, Any], downscale = True, chunk = True) -> Tuple[
 
             if not isinstance(sig_raw, list):            
                 if chunk:
-                    time_chunks = 10
-                    profiles[meas_key] = sig_raw.chunk({"time": time_chunks, "channel": -1, "bins": -1})
+                    time_chunks = min(50, max(10, sig_raw.sizes["time"]))
+                    bin_chunks = 4096
+
+                    profiles[meas_key] = sig_raw.chunk({
+                        "time": time_chunks,
+                        "channel": -1,
+                        "bins": bin_chunks,
+                    })
                 else:
                     profiles[meas_key] = sig_raw               
                 
                 if downscale:
-                    profiles[meas_key] = downcast_float_safe(profiles[meas_key])
-                else:
                     profiles[meas_key] = downcast_float_safe(profiles[meas_key])
                 
                 metadata["system_info"][meas_key] = system_info

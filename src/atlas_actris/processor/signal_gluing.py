@@ -30,6 +30,7 @@ import numpy as np
 import xarray as xr
 
 from typing import Any, Dict
+from utils.dataarray_utils import shallow_copy
 from helper_functions.printouts import print_entry
 
 def compute_gluing_region(
@@ -37,7 +38,7 @@ def compute_gluing_region(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
         
-    output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
             
     ranges = output_data['range']
     

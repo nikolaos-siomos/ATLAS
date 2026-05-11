@@ -131,7 +131,7 @@ def get_atlas_channel_id(config_info: Dict[str, Any], profiles: Dict[str, Any],
     wvl = [str(round(float(w))).zfill(4) for w in dtw]
     
     atlas_channel_id = [f"{w}{t}{c}{a}{s}" for w, t, c, a, s in 
-                        zip(wvl, tel_type, ch_type, ch_stype, acq_mode)]
+                        zip(wvl, tel_type, ch_type, acq_mode, ch_stype)]
     
     config_info["atlas_channel_id"] = atlas_channel_id
     

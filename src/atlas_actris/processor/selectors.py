@@ -49,7 +49,10 @@ def set_from_selector(processor, selector, value):
 def get_source_map(io_id):
     source_map = {
         'profile':{'db':'profile_db', 'item_id':io_id},
+        'profile_error':{'db':'profile_error_db', 'item_id':io_id},
         'profile_mask':{'db':'profile_mask_db', 'item_id':io_id},
+        'meteo':{'db':'meteo_db', 'item_id':io_id},
+        'molecular':{'db':'molecular_db', 'item_id':io_id},
         'background':{'db':'background_db', 'item_id':io_id},
         'background_error':{'db':'background_error_db', 'item_id':io_id},
         'time_mask':{'db':'time_mask_db', 'item_id':io_id},

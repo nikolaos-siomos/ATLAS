@@ -35,53 +35,70 @@ from helper_functions.printouts import print_header, print_subsection, print_ent
 from helper_functions.signal_utils import temporal_averaging
 
 from utils.error_classes import CustomWarning
+from utils.dataarray_utils import shallow_copy
+
 
 def compute_height_and_range_calculation(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
 
-    output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
     
-    system_info = output_data['system_info']
-    channel_info = output_data['channel_info']
+    system_info = output_data["system_info"]
+    channel_info = output_data["channel_info"]
         
     qa_tests = list(channel_info.keys())
     
     for key in qa_tests:
         
-        max_bins = channel_info[key].loc["bins",:].max().values
-        resolution = channel_info[key].loc["range_resolution",:].astype(float)
-        zero_bin = channel_info[key].loc["zero_bin"].astype(float)
-        
-        # channels = channel_info[key].channel.values
+        max_bins = int(channel_info[key].loc["bins", :].max().values)
+
+        resolution = (
+            channel_info[key]
+            .loc["range_resolution", :]
+            .astype("float32")
+            .reset_coords(drop=True)
+        )
+
+        zero_bin = (
+            channel_info[key]
+            .loc["zero_bin", :]
+            .astype("float32")
+            .reset_coords(drop=True)
+        )
 
         zenith_angle = float(system_info[key].loc["zenith_angle"].values)
         station_altitude = system_info[key].loc["station_altitude"].values
         
-        bin_arr = np.arange(max_bins)
-        bins = xr.DataArray(bin_arr, 
-                            dims = ['bins'], 
-                            coords = [bin_arr]).astype(float)
+        bin_arr = np.arange(max_bins, dtype=np.int32)
+
+        bins = xr.DataArray(
+            bin_arr.astype(np.float32),
+            dims=["bins"],
+            coords={"bins": bin_arr},
+            name="bins",
+        )
         
-        # resolution = xr.DataArray(resol,
-        #                           dims = ['channel'],
-        #                           coords = [channels]).astype(float)
+        zenith_angle_rad = np.pi * zenith_angle / 180.0
         
-        zenith_angle_rad = np.pi * zenith_angle / 180.
-        
-        heights_agl = resolution * (bins + 0.5 + zero_bin) * \
-            np.cos(zenith_angle_rad)
-        ranges = resolution * (bins + 0.5 + zero_bin)
+        ranges = (
+            resolution * (bins + 0.5 + zero_bin)
+        ).reset_coords(drop=True)
+
+        heights_agl = (
+            ranges * np.cos(zenith_angle_rad)
+        ).reset_coords(drop=True)
 
         output_data["range"][key] = ranges
         output_data["height_agl"][key] = heights_agl
         
         if station_altitude is not None:
-            output_data["height_asl"][key] = \
+            output_data["height_asl"][key] = (
                 heights_agl + float(station_altitude)
+            ).reset_coords(drop=True)
     
-    print_entry('Ranges/heights calculated sucessfully')
+    print_entry("Ranges/heights calculated sucessfully")
     
     return output_data
 
@@ -90,77 +107,76 @@ def compute_unit_conv_counts_to_MHz(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
     
-    output_data = copy.deepcopy(input_data)
-    
-    channel_info = output_data['channel_info']
-    shots = output_data['shots']
-        
-    profiles = output_data['profile']
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
 
-    qa_tests = list(channel_info.keys())
-    
-    for key in qa_tests:
+    channel_info = output_data["channel_info"]
+    shots = output_data["shots"]
+    profiles = output_data["profile"]
 
-        # Convert photon units from total counts to countrate
-        
-        acquisition_mode = channel_info[key]\
-            .sel(parameters = 'acquisition_mode')
-            
-        range_resolution = channel_info[key]\
-            .sel(parameters = 'range_resolution')
-            
+    for key in channel_info:
+        ci = channel_info[key]
         sig = profiles[key]
 
-        mask_p = (acquisition_mode == "p")
-        
-        sampling_rate = 150. / range_resolution
-                            
-        factor = sampling_rate / shots[key]
-                
-        sig_cnv = xr.where(mask_p, factor *  sig, sig)
+        acquisition_mode = ci.sel(parameters="acquisition_mode")
+        range_resolution = ci.sel(parameters="range_resolution").astype(sig.dtype)
 
-        output_data['profile'][key] = sig_cnv.transpose('time','channel','bins').astype(float)
+        photon_channels = acquisition_mode.channel.values[
+            acquisition_mode.values == "p"
+        ]
 
-    print_entry('Unit conversion (counts to countrate in MHz) for photon channels complete!')
-        
+        if len(photon_channels) == 0:
+            output_data["profile"][key] = sig
+            continue
+
+        factor = (150.0 / range_resolution.sel(channel=photon_channels)) / shots[key]
+
+        sig_out = sig.copy()
+        sig_out.loc[dict(channel=photon_channels)] = (
+            sig.sel(channel=photon_channels) * factor
+        )
+
+        output_data["profile"][key] = sig_out
+
+    print_entry("Unit conversion (counts to countrate in MHz) for photon channels complete!")
     return output_data
 
-def compute_dead_time_correction(
-    processing_info: Dict[str, Any],
-    input_data: Dict[str, Dict[str, Any]],
-) -> Dict[str, Dict[str, Any]]:
+def compute_dead_time_correction(processing_info, input_data):
     
-    output_data = copy.deepcopy(input_data)
-    
-    channel_info = output_data['channel_info']
-        
-    profiles = output_data['profile']
+    output_data = shallow_copy(input_data)
 
-    qa_tests = list(channel_info.keys())
-    
-    for key in qa_tests:
-        
-        acquisition_mode = channel_info[key]\
-            .sel(parameters = 'acquisition_mode')
-            
-        dead_time = channel_info[key]\
-            .sel(parameters = 'dead_time')
-                            
+    channel_info = output_data["channel_info"]
+    profiles = output_data["profile"]
+
+    for key in channel_info:
+        ci = channel_info[key]
         sig = profiles[key]
 
-        mask_p = (acquisition_mode == "p")
-                    
-        denom = 1.0 - sig * dead_time * 1e-3
-        
-        sig_temp = xr.where(denom != 0, sig / denom, np.nan)
+        acquisition_mode = ci.sel(parameters="acquisition_mode")
+        dead_time = ci.sel(parameters="dead_time").astype(sig.dtype)
 
-        sig_dtc = xr.where(mask_p, sig_temp, sig)
-        
-        output_data['profile'][key] = sig_dtc.transpose('time','channel','bins').astype(float)
+        photon_channels = acquisition_mode.channel.values[
+            acquisition_mode.values == "p"
+        ]
 
-            
-    print_entry('Dead time correction succesfully performed!')
+        if len(photon_channels) == 0:
+            output_data["profile"][key] = sig
+            continue
 
+        sig_p = sig.sel(channel=photon_channels)
+        dt_p = dead_time.sel(channel=photon_channels)
+
+        denom = 1.0 - sig_p * dt_p * 1e-3
+        sig_p_corr = sig_p / denom
+        sig_p_corr = sig_p_corr.where(denom != 0)
+
+        sig_out = sig.copy()
+        sig_out.loc[dict(channel=photon_channels)] = sig_p_corr
+
+        output_data["profile"][key] = sig_out
+
+    print_entry("Dead time correction succesfully performed!")
+    
     return output_data
 
 def compute_background_calculation(
@@ -168,8 +184,9 @@ def compute_background_calculation(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
     
-    output_data = copy.deepcopy(input_data)
-    
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
+
     channel_info = output_data['channel_info']
         
     profiles = output_data['profile']
@@ -208,7 +225,8 @@ def compute_averaging_by_time_single(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
     
-    output_data = copy.deepcopy(input_data)
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
             
     profiles = output_data['profile']
     
@@ -237,8 +255,9 @@ def compute_averaging_by_time_low_res(
     ray_averaging_rate = processing_info['caller_info']["ray_averaging_rate"]
     ray_averaging_threshold = processing_info['caller_info']["ray_averaging_threshold"]
     
-    output_data = copy.deepcopy(input_data)
-            
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
+
     profiles = output_data['profile']
     
     qa_tests = list(profiles.keys())
@@ -282,8 +301,9 @@ def compute_averaging_by_time_high_res(
     ray_qck_averaging_rate = processing_info['caller_info']["ray_qck_averaging_rate"]
     ray_qck_averaging_threshold = processing_info['caller_info']["ray_qck_averaging_threshold"]
     
-    output_data = copy.deepcopy(input_data)
-            
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
+
     profiles = output_data['profile']
     
     qa_tests = list(profiles.keys())
@@ -324,8 +344,9 @@ def compute_trim_vertically(
 
     max_height_agl = 1E3 * processing_info['caller_info']['max_height_agl']
     
-    output_data = copy.deepcopy(input_data)
-            
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
+
     heights_agl = output_data['height_agl']
     heights_asl = output_data['height_asl']
     ranges = output_data['range']
@@ -361,11 +382,11 @@ def compute_trim_vertically(
             z_asl_trm = z_asl.where(mask_bins, drop = True)
             z_rng_trm = z_rng.where(mask_bins, drop = True)
             
-            output_data['profile'][key] = sig_trm
+            output_data['profile'][key] = sig_trm.reset_coords(drop=True)
             
-            output_data['height_agl'][key] = z_agl_trm
-            output_data['height_asl'][key] = z_asl_trm
-            output_data['range'][key] = z_rng_trm
+            output_data['height_agl'][key] = z_agl_trm.reset_coords(drop=True)
+            output_data['height_asl'][key] = z_asl_trm.reset_coords(drop=True)
+            output_data['range'][key] = z_rng_trm.reset_coords(drop=True)
     
         print_entry('Vertical trimming succesfully performed!')
         
@@ -379,8 +400,9 @@ def compute_background_correction(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
         
-    output_data = copy.deepcopy(input_data)
-            
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
+
     profiles = output_data['profile']
 
     background = output_data['background']
@@ -410,8 +432,9 @@ def compute_range_correction(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
 
-    output_data = copy.deepcopy(input_data)
-            
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
+
     profiles = output_data['profile']
 
     ranges = output_data['range']
@@ -422,7 +445,7 @@ def compute_range_correction(
 
         for key in qa_tests:
     
-            z_rng = ranges[key].astype(float)
+            z_rng = ranges[key]#.astype("float32")
     
             sig = profiles[key]
             
@@ -467,8 +490,9 @@ def compute_dark_correction(
         'cam':'drk_cam',
         }
     
-    output_data = copy.deepcopy(input_data)
-         
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
+
     loading_map = processing_info["loading_map"]
 
     profiles = output_data['profile']
@@ -485,7 +509,6 @@ def compute_dark_correction(
         
             drk = profiles[drk_key].mean(dim='time', skipna = True)
             
-            print(key,drk_key)
             acquisition_mode = channel_info[key]\
                 .sel(parameters = 'acquisition_mode')
                                 

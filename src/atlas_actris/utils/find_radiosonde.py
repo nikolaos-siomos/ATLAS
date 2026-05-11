@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sun May 10 21:21:21 2026
+
+@author: nikos
+"""
+
+
+from __get_T_P_profiles_from_cloudnet__ import _download_from_cloudnet  
+from __get_T_P_profiles_from_wyoming__ import _download_wyoming
+from utils.select_radiosonde import select_radiosonde_filename
+from helper_functions.printouts import print_header, print_entry
+from utils.error_classes import CustomWarning
+import pandas as pd
+import os
+
+def find_radiosonde(caller_info, metadata):
+    
+    print_header("Selecting radiosonde file")
+    
+    radiosonde_folder = caller_info['radiosonde_folder']
+    rsonde_wmo_number = caller_info['rsonde_station_wmo_id']
+    cloudnet_station_name = caller_info['cloudnet_station_name']
+    
+    qa_tests = metadata['time_info'].keys()
+    
+    allowed_tests = ['ray','ray_pcb']
+    
+    metadata['radiosonde_info'] = {}
+    
+    for key in qa_tests:
+        
+        metadata['radiosonde_info'][key] = {}
+        
+        if key in allowed_tests:
+            print_entry(key)
+            print()
+            
+            time = metadata['time_info'][key].time.values
+            mid_time_dt64 = time[0] + (time[-1] - time[0]) / 2.
+        
+            mid_stamp = pd.Timestamp(mid_time_dt64)
+            mid_date = mid_stamp.strftime("%d.%m.%Y")
+            mid_time = mid_stamp.strftime("%H:%M:%S")
+            
+            radiosonde_metadata, status = select_radiosonde_filename(
+                mid_time_dt64, 
+                folder = radiosonde_folder
+                )
+            
+            if status == 0:
+                print(f"Radiosonde file detected: {radiosonde_metadata['radiosonde_file']}")
+                print()
+    
+            else:
+                print("Dowloading will be attempted")
+                print()
+                
+                if rsonde_wmo_number:
+                    try:
+                        dl_status = _download_wyoming(
+                            wmo_id = rsonde_wmo_number,
+                            date = mid_date,
+                            time_utc = mid_time,
+                            save_dir = radiosonde_folder,
+                            )
+                        
+                    except Exception as e:
+                        CustomWarning(f"Downloading radiosonde from Wyoming failed:\n{e}")
+                        print()
+        
+                    if dl_status.ok:
+                        print(f"Downloading status from Wyoming: Downloaded {os.path.basename(dl_status.path)}")
+                        print()
+                        
+                    else:
+                        CustomWarning(f"Downloading radiosonde from Wyoming failed: {dl_status.message}")
+                        print()
+                    
+                if cloudnet_station_name:
+                    rs_path = None
+
+                    try:
+                        rs_path = _download_from_cloudnet(
+                            station_name=cloudnet_station_name,
+                            date=mid_date,
+                            time_utc=mid_time,
+                            save_dir=radiosonde_folder,
+                        )
+                    
+                    except Exception as e:
+                        CustomWarning(f"Downloading radiosonde from Cloudnet failed:\n{e}")
+                        print()
+                    
+                    else:
+                        if rs_path:
+                            print(
+                                f"Downloading status from Cloudnet: "
+                                f"Downloaded {os.path.basename(rs_path)}"
+                            )
+                            print()
+                        else:
+                            CustomWarning(
+                                "Downloading radiosonde from Cloudnet failed: "
+                                "no file path was returned."
+                            )
+                            print()
+        
+                if dl_status.ok or rs_path:
+                    radiosonde_metadata, status = select_radiosonde_filename(
+                        mid_time_dt64, 
+                        folder = radiosonde_folder
+                        )
+                    
+                if status == 0:
+                    print(f"Radiosonde file detected: {radiosonde_metadata['radiosonde_file']}")
+                    print()
+    
+                else:
+                    CustomWarning("Radiosonde not found and could not be downloaded. Computations which need molecular profiles will not be performed")
+                 
+            if status == 0:
+                metadata['radiosonde_info'][key] = \
+                    radiosonde_metadata | {'measurement_time':mid_time_dt64}
+                    
+            caller_info['rsonde_status'] = status
+    
+    return caller_info, metadata
+                    
+                

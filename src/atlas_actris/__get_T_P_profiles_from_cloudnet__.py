@@ -85,7 +85,7 @@ def _ensure_1d(arr, name: str) -> np.ndarray:
 def _expected_name(date_obj: _date, time_obj: _time, station: str) -> str:
     """Build the cache filename YYYYMMDDHHMM_station_ecmwf.nc."""
     hhmm = f"{time_obj.hour:02d}{time_obj.minute:02d}"
-    return f"{date_obj.strftime('%Y%m%d')}{hhmm}_{station.lower()}_ecmwf.nc"
+    return f"{date_obj.strftime('%Y%m%d')}_{hhmm}_ecmwf_{station.lower()}.nc"
 
 
 def _ensure_dir(path: str) -> str:
@@ -93,6 +93,65 @@ def _ensure_dir(path: str) -> str:
     os.makedirs(path, exist_ok=True)
     return os.path.abspath(path)
 
+def _download_from_cloudnet(
+    station_name: str,
+    date: str,
+    time_utc: str,
+    save_dir: str,
+) -> str:
+    """
+    Download or reuse a Cloudnet ECMWF NetCDF file.
+
+    Parameters
+    ----------
+    station_name : str
+        Cloudnet station/site name, e.g. "bucharest".
+    date : str
+        Date in "dd.mm.yyyy" format.
+    time_utc : str
+        Time in "hh:mm:ss" UTC format.
+    save_dir : str
+        Folder where the NetCDF file will be saved.
+
+    Returns
+    -------
+    str
+        Absolute path to the saved/reused NetCDF file.
+
+    Notes
+    -----
+    The saved filename follows the existing convention:
+
+        <yyyymmdd>_<hhmm>_ecmwf_<station>.nc
+
+    Example:
+
+        20231221_1603_ecmwf_heraklion.nc
+    """
+    station = str(station_name).strip()
+
+    if not station:
+        raise ValueError("station_name is empty")
+
+    try:
+        req_date = datetime.strptime(date, "%d.%m.%Y").date()
+    except ValueError as exc:
+        raise ValueError("date must be dd.mm.yyyy") from exc
+
+    try:
+        req_time = datetime.strptime(time_utc, "%H:%M:%S").time()
+    except ValueError as exc:
+        raise ValueError("time_utc must be hh:mm:ss") from exc
+
+    return _ensure_nc_saved(
+        date_obj=req_date,
+        time_obj=req_time,
+        station=station,
+        save_dir=save_dir,
+        src_path=None,
+        nc_path=None,
+        try_download=True,
+    )
 
 # ---------------- Cloudnet downloader ----------------
 def _download_cloudnet_ecmwf(station: str, date_obj: _date, out_path: str) -> str:

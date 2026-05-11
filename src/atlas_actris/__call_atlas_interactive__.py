@@ -7,18 +7,28 @@ Created on Tue Sep 19 17:43:26 2023
 """
 
 # from __master__ import main as atlas_master
+from utils.find_radiosonde import find_radiosonde
 from utils.__get_scc_config__ import export_scc_config
 from utils.__parse_init_file__ import parse_call_atlas_ini
 from utils.__parse_config_file__ import parse_atlas_config_file
 from utils.__parse_settings_file__ import parse_atlas_settings_file
-from readers.read_raw_lidar_files import infer_format, flexible_reader
-from helper_functions.parse_caller_args import call_parser
-from readers.reader_utils import special_path_rules
-from trimming.modify import load_metadata, remove_unrecognised_channels, \
-    get_atlas_channel_id, load_pol_cal_defaults, \
-        bring_to_correct_type, special_config_checks, store_updated_metadata
+
 from helper_functions.printouts import endpoint
 from processor.pipeline import Context, Processor
+from readers.reader_utils import special_path_rules
+from readers.read_radiosondes import load_radiosonde
+from helper_functions.parse_caller_args import call_parser
+from readers.read_raw_lidar_files import infer_format, flexible_reader
+
+from trimming.modify import (
+    load_metadata, 
+    remove_unrecognised_channels,
+    get_atlas_channel_id, 
+    load_pol_cal_defaults,
+    bring_to_correct_type, 
+    special_config_checks, 
+    store_updated_metadata
+    )
 
 # from helper_functions.caller_utils import autodetect_paths, prepare_master_args, export_report
 
@@ -69,12 +79,18 @@ config_info = bring_to_correct_type(config_info)
 
 # Replace all system_info, channel_info, and pol_cal_info metadata with the common updated ones
 metadata = store_updated_metadata(config_info, metadata)
-    
+
+# Find radiosonde - Download if file does not exist
+caller_info, metadata = find_radiosonde(caller_info, metadata)
+
+# Load radiosonde files
+meteo, metadata = load_radiosonde(caller_info, metadata)
+
 # Load all data needed for processing in a data class
 ctx = Context(
     processing_info = {'caller_info':caller_info, 'loading_map':loading_map},
     settings_info = settings_info,
-    starting_dataset = {'profile':profiles} | metadata,
+    starting_dataset = {'profile' : profiles, 'meteo' : meteo} | metadata,
     )
 
 # Initialize the Processor class
@@ -93,7 +109,7 @@ processor.run(output_id = 'shots_screened', input_id = 'sliced', stage_name = "s
 processor.run(output_id = 'overflows_checked', input_id = 'shots_screened', stage_name = "handling_overflows")
 
 # Checkpoint: End of filtering data 
-processor.copy(output_id = 'screening_complete', input_id = 'overflows_checked')
+processor.checkout(output_id = 'screening_complete', input_id = 'overflows_checked')
 
 # Detect saturation and clipping
 processor.run(output_id = 'saturation_detected', input_id = 'screening_complete', stage_name = "check_saturation")
@@ -138,9 +154,14 @@ processor.run(output_id = 'dark_corrected_low_res', input_id = 'vert_trimmed_low
 processor.run(output_id = 'dark_corrected_high_res', input_id = 'vert_trimmed_high_res', stage_name = "dark_correction")
 
 # Checkpoint: End of preprocessing
-processor.copy(output_id = 'preprocessing_complete', input_id = 'dark_corrected')
-processor.copy(output_id = 'preprocessing_complete_low_res', input_id = 'dark_corrected_low_res')
-processor.copy(output_id = 'preprocessing_complete_high_res', input_id = 'dark_corrected_high_res')
+processor.checkout(output_id = 'preprocessing_complete', input_id = 'dark_corrected')
+processor.checkout(output_id = 'preprocessing_complete_low_res', input_id = 'dark_corrected_low_res')
+processor.checkout(output_id = 'preprocessing_complete_high_res', input_id = 'dark_corrected_high_res')
+
+# Calculate molecular profiles
+processor.run(output_id = 'molecular', input_id = 'preprocessing_complete', stage_name = "molecular_calculations")
+processor.run(output_id = 'molecular_low_res', input_id = 'preprocessing_complete_low_res', stage_name = "molecular_calculations")
+processor.run(output_id = 'molecular_high_res', input_id = 'preprocessing_complete_high_res', stage_name = "molecular_calculations")
 
 # Identify gluing region
 processor.run(output_id = 'gluing_region', input_id = 'preprocessing_complete', stage_name = 'gluing_region')
@@ -152,82 +173,3 @@ processor.run(output_id = 'glued', input_id = 'gluing_region', stage_name = 'glu
 processor.run(output_id = 'glued_low_res', input_id = 'gluing_region_low_res', stage_name = 'gluing')
 processor.run(output_id = 'glued_high_res', input_id = 'gluing_region_high_res', stage_name = 'gluing')
 
-raise Exception
-
-# 3.a) Reading meteorological profiles from ECMWF (cloudnet)
-meteo, metadata = select_radiosonde_ecmwf(
-    input_folder = ecmwf_rsonde_folder, 
-    signal_times = sig.time.values, 
-    metadata = metadata
-    )
-
-# 3.b) Reading meteorological profiles from Wyoming if cloudnet data are not available
-if metadata['file_validity_flag'] == 'empty':
-    meteo, metadata = select_radiosonde_wyoming(
-        input_folder = wyoming_rsonde_folder, 
-        signal_times = sig.time.values, 
-        metadata = metadata
-        )
-
-    if metadata['file_validity_flag'] in ['empty', 'unusable']:
-        endpoint(1)
-
-
-import numpy as np
-window = 10
-input_stage = "raw"
- 
-for key in profile_db[input_stage].keys():
-
-    zero_bin = metadata["channel_info"][key].loc["zero_bin"]
-    
-    max_zero_bin = zero_bin.max().values
-    
-    if max_zero_bin < -240:
-
-        sig = profile_db[input_stage][key][:,:,:abs(max_zero_bin)]#.sel({"bins": slice(abs(max_zero_bin)-1)})
-        
-        roll = sig.rolling(bins = window)
-        sig_wv = roll.mean()
-        sig_wv_err = roll.std() / np.sqrt(window)
-        err = sig_wv_err.min(dim="bins")
-        
-        wct_err = 4. * np.sqrt(2) * err
-        
-        wct = sig_wv.shift(bins=window) - sig_wv[:,:,-window]#.sel({"bins": slice(-window)})
-        
-        
-        
-        
-
-
-    
-    # sig = signal.dead_time_correction(sig = sig.copy(), 
-    #                                   dead_time = dead_time, 
-    #                                   dead_time_cor_type = dead_time_cor_type)
-    
-        
-    # bgr = signal.background_calculation(sig = sig.copy(), 
-    #                                     lower_bin = bg_low,
-    #                                     upper_bin = bg_high)
-    
-    # sig = signal.trigger_correction(sig = sig.copy(), 
-    #                            daq_trigger_offset = trd_bins)
-    
-    # sig = signal.trim_vertically(sig = sig.copy(), 
-    #                              ground_alt = ground_alt,
-    #                              zenith_angle = zenith_angle, 
-    #                              alt_lim = 1E3 * alt_lim,
-    #                              resol = resol)
-    
-    # ranges = signal.range_calculation(bins = sig.copy().bins.values, 
-    #                                   resol = resol)
-    
-    # heights = signal.height_calculation(bins = sig.copy().bins.values, 
-    #                                     resol = resol,
-    #                                     zenith_angle = zenith_angle)
-    
-    # sig = signal.background_correction(sig = sig.copy(), bgr = bgr.copy())
-    # sig = signal.dark_correction(sig = sig.copy(), 
-    #                              drk = sig_drk.copy())
-    # sig = signal.range_correction(sig = sig, ranges = ranges)
