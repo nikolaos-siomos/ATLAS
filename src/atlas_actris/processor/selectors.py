@@ -55,6 +55,7 @@ def get_source_map(io_id):
         'molecular':{'db':'molecular_db', 'item_id':io_id},
         'background':{'db':'background_db', 'item_id':io_id},
         'background_error':{'db':'background_error_db', 'item_id':io_id},
+        'background_mask':{'db':'background_mask_db', 'item_id':io_id},
         'time_mask':{'db':'time_mask_db', 'item_id':io_id},
         'channel_mask':{'db':'channel_mask_db', 'item_id':io_id},
         'range':{'db':'range_db', 'item_id':io_id},

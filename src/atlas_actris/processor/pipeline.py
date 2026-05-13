@@ -51,6 +51,7 @@ from processor.signal_processing import (
     compute_background_correction,
     compute_range_correction,
     compute_dark_correction,
+    compute_signal_noise,
     )
 
 from processor.signal_gluing import (
@@ -151,6 +152,10 @@ class Processor():
             "dark_correction":{
                 "function":compute_dark_correction,
                 "header":"Dark correction"
+                },
+            "signal_noise_calculation":{
+                "function":compute_signal_noise,
+                "header":"Signal noise calculation"
                 },
             "gluing_region":{
                 "function":compute_gluing_region,

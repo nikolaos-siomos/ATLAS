@@ -6,24 +6,69 @@ Created on Tue Aug 30 20:19:58 2022
 @author: nick
 """
 
+import xarray as xr
 import warnings, os, sys
-from .readers.parse_qck_args import call_parser, check_parser
-from .readers.check import check_channels
-from .readers.read_prepro import unpack
-from .plotting import make_axis, make_title, make_plot
-       
+from visualizer.readers.check import check_channels
+from visualizer.readers.read_prepro import unpack
+from visualizer.plotting import make_axis, make_title, make_plot
+from helper_functions.printouts import print_header
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
-def main(args, __version__, meas_type):
-    # Check the command line argument information
-    args = check_parser(args)
-    
-    print('-----------------------------------------')
-    print(f'Start generating Quicklooks ({meas_type})...')
-    print('-----------------------------------------')
+tlc_sector = {
+    'tlc_north',
+    'tlc_east',
+    'tlc_south',
+    'tlc_west',
+    }
 
-    profiles, metadata = unpack(args['input_file'])
+tlc_ring = {
+    'tlc_outer',
+    'tlc_inner',
+    }
+
+pcb = {
+    'pcb_p45',
+    'pcb_m45',
+    }
+
+def unpack(processor_stage, meas_type):
+    
+    if meas_type == 'ray':
+        profiles = processor_stage['ray']
+    
+    elif meas_type == 'drk':
+        profiles = processor_stage['drk']
+    
+    elif meas_type == 'tlc':
+        
+        tlc_sec_list = []
+        
+        for sec in tlc_sector:
+            for key in processor_stage:
+                tlc_sec_list.appen(processor_stage[key])
+                
+            profiles = xr.concat(tlc_sec_list, dim="time")
+    
+    elif meas_type == 'tlc_rin':
+        
+        tlc_rin_list = []
+        
+        for sec in tlc_sector:
+            for key in processor_stage:
+                tlc_rin_list.appen(processor_stage[key])
+                
+            profiles = xr.concat(tlc_rin_list, dim="time")
+    
+
+def generate_quicklooks(data_pack, meas_type):
+    
+    print_header(f'Start generating Quicklooks ({meas_type})...')
+
+    profiles = data_pack['profiles']
+    channel_info = data_pack['time_info']
+    
+    profiles, metadata = unpack(processor)
     
     # # Extract signal time, channels, and bins
     time = profiles['sig'].time.values

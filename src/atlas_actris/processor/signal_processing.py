@@ -32,11 +32,14 @@ import xarray as xr
 from typing import Any, Dict
 from helper_functions.printouts import print_header, print_subsection, print_entry
 
-from helper_functions.signal_utils import temporal_averaging
-
+from helper_functions.signal_utils import (
+    temporal_averaging, 
+    temporal_averaging_error, 
+    rolling_noise,
+    rolling_noise_savgol
+    )
 from utils.error_classes import CustomWarning
 from utils.dataarray_utils import shallow_copy
-
 
 def compute_height_and_range_calculation(
     processing_info: Dict[str, Any],
@@ -86,16 +89,16 @@ def compute_height_and_range_calculation(
             resolution * (bins + 0.5 + zero_bin)
         ).reset_coords(drop=True)
 
-        heights_agl = (
+        height_agl = (
             ranges * np.cos(zenith_angle_rad)
         ).reset_coords(drop=True)
 
         output_data["range"][key] = ranges
-        output_data["height_agl"][key] = heights_agl
+        output_data["height_agl"][key] = height_agl
         
         if station_altitude is not None:
             output_data["height_asl"][key] = (
-                heights_agl + float(station_altitude)
+                height_agl + float(station_altitude)
             ).reset_coords(drop=True)
     
     print_entry("Ranges/heights calculated sucessfully")
@@ -211,9 +214,10 @@ def compute_background_calculation(
         
         bg_mean_bins = sig_masked.mean("bins", skipna = True)
         bg_sdev_bins = sig_masked.std("bins", skipna = True)
+        n_bins = sig_masked.sum("bins")
                     
         output_data['background'][key] = bg_mean_bins
-        output_data['background_error'][key] = bg_sdev_bins
+        output_data['background_error'][key] = bg_sdev_bins / np.sqrt(n_bins)
 
     print_entry('Background calculated sucessfully')
     
@@ -228,23 +232,47 @@ def compute_averaging_by_time_single(
     # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
             
-    profiles = output_data['profile']
+    profile = output_data['profile']
+    profile_error = output_data['profile_error']
+    background = output_data['background']
+    background_error = output_data['background_error']
     
-    qa_tests = list(profiles.keys())
+    qa_tests = list(profile.keys())
     
     for key in qa_tests:
         
-        sig = profiles[key]
-            
+        sig = profile[key]            
         sig_avg = sig.mean(dim="time", keepdims = True)
         
         output_data['profile'][key] = sig_avg
+        
+        if key in background:
+            bgd = background[key]
+            
+            bgd_avg = bgd.mean(dim="time", keepdims = True)
+
+            output_data['background'][key] = bgd_avg
+        
+        if key in profile_error:
+            sig_err = profile_error[key]
+
+            N = sig_err.notnull().sum(dim="time")
+            sig_avg_err = sig_err.mean(dim="time", keepdims = True) / np.sqrt(N) 
+
+            output_data['profile_error'][key] = sig_avg_err
+
+        if key in background_error:
+            bgd_err = background_error[key]
+
+            N = bgd_err.notnull().sum(dim="time")
+            bgd_avg_err = bgd_err.mean(dim="time", keepdims = True) / np.sqrt(N) 
+
+            output_data['background_error'][key] = bgd_avg_err        
 
     print_entry('Single mean profile per QA test produced!')
 
     return output_data
 
-    
 def compute_averaging_by_time_low_res(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
@@ -255,37 +283,76 @@ def compute_averaging_by_time_low_res(
     ray_averaging_rate = processing_info['caller_info']["ray_averaging_rate"]
     ray_averaging_threshold = processing_info['caller_info']["ray_averaging_threshold"]
     
-    # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
 
-    profiles = output_data['profile']
+    profile = output_data['profile']
+    background = output_data['background']
     
-    qa_tests = list(profiles.keys())
+    profile_error = output_data['profile_error']
+    background_error = output_data['background_error']
+    
+    profile_mask = output_data['profile_mask']
+    background_mask = output_data['background_mask']
+    
+                
+    qa_tests = list(profile.keys())
     
     for key in qa_tests:
         # Change the temporal resolution average from all measurements for each QA test
 
         if key in allowed_qa_tests:
             
-            sig = profiles[key]
-                
+            sig = profile[key]
+                                
             # Averaging the measurement
-            if ray_averaging_rate == None:
-                sig_avg = sig.mean(dim="time", keepdims = True)
-                mask_incomplete_avg = xr.full_like(
-                    sig_avg, 
-                    fill_value = False, 
-                    dtype=bool
-                    )
-            else:           
-                sig_avg, mask_incomplete_avg = temporal_averaging(
+            if ray_averaging_rate:       
+                sig_avg, sig_avg_mask = temporal_averaging(
                     sig = sig, 
                     averaging_rate = ray_averaging_rate, 
                     averaging_threshold = ray_averaging_threshold
                     )
-               
-            output_data['profile'][key] = sig_avg
-            output_data['profile_mask'][key] = mask_incomplete_avg
+
+                output_data['profile'][key] = sig_avg
+                
+                if key in background:
+                    bgd = background[key]
+
+                    bgd_avg, bgd_avg_mask = temporal_averaging(
+                        sig = bgd, 
+                        averaging_rate = ray_averaging_rate, 
+                        averaging_threshold = ray_averaging_threshold
+                        )
+                    
+                    output_data['background'][key] = bgd_avg
+                
+                if key in profile_error:
+                    sig_err = profile_error[key]
+
+                    sig_avg_err, _ = temporal_averaging_error(
+                        sig_err = sig_err, 
+                        averaging_rate = ray_averaging_rate, 
+                        averaging_threshold = ray_averaging_threshold
+                        )
+
+                    output_data['profile_error'][key] = sig_avg_err
+
+                if key in background_error:
+                    bgd_err = background_error[key]
+
+                    bgd_avg_err, _ = temporal_averaging_error(
+                        sig_err = bgd_err, 
+                        averaging_rate = ray_averaging_rate, 
+                        averaging_threshold = ray_averaging_threshold
+                        )
+           
+            
+                    output_data['background_error'][key] = bgd_avg_err
+                
+                if key in profile_mask:    
+                    output_data['profile_mask'][key] = sig_avg_mask
+                                        
+                if key in background_mask:    
+                    output_data['background_mask'][key] = bgd_avg_mask
 
     print_entry('Low resolution averaging for the rayleigh measurement complete!')
 
@@ -301,37 +368,80 @@ def compute_averaging_by_time_high_res(
     ray_qck_averaging_rate = processing_info['caller_info']["ray_qck_averaging_rate"]
     ray_qck_averaging_threshold = processing_info['caller_info']["ray_qck_averaging_threshold"]
     
-    # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
 
-    profiles = output_data['profile']
+    profile = output_data['profile']
+    background = output_data['background']
     
-    qa_tests = list(profiles.keys())
+    profile_error = output_data['profile_error']
+    background_error = output_data['background_error']
+    
+    profile_mask = output_data['profile_mask']
+    background_mask = output_data['background_mask']
+    
+                
+    qa_tests = list(profile.keys())
     
     for key in qa_tests:
         # Change the temporal resolution average from all measurements for each QA test
 
         if key in allowed_qa_tests:
             
-            sig = profiles[key]
-                
+            sig = profile[key]
+                                
             # Averaging the measurement
-            if ray_qck_averaging_rate == None:
-                sig_avg = sig.mean(dim="time", keepdims = True)
-                mask_incomplete_avg = xr.full_like(
-                    sig_avg, 
-                    fill_value = False, 
-                    dtype=bool
-                    )
-            else:           
-                sig_avg, mask_incomplete_avg = temporal_averaging(
+            if ray_qck_averaging_rate:       
+                sig_avg, sig_avg_mask = temporal_averaging(
                     sig = sig, 
                     averaging_rate = ray_qck_averaging_rate, 
                     averaging_threshold = ray_qck_averaging_threshold
                     )
+
+                output_data['profile'][key] = sig_avg
+                
+                if key in background:
+                    bgd = background[key]
+
+                    if bgd:
+                        bgd_avg, bgd_avg_mask = temporal_averaging(
+                            sig = bgd, 
+                            averaging_rate = ray_qck_averaging_rate, 
+                            averaging_threshold = ray_qck_averaging_threshold
+                            )
+                        
+                        output_data['background'][key] = bgd_avg
+                
+                if key in profile_error:
+                    sig_err = profile_error[key]
+
+                    if sig_err:
+                        sig_avg_err, _ = temporal_averaging_error(
+                            sig_err = sig_err, 
+                            averaging_rate = ray_qck_averaging_rate, 
+                            averaging_threshold = ray_qck_averaging_threshold
+                            )
+
+                        output_data['profile_error'][key] = sig_avg_err
+                
+
+                if key in background_error:
+                    bgd_err = background_error[key]
+
+                    if bgd_err:
+                        bgd_avg_err, _ = temporal_averaging_error(
+                            sig_err = bgd_err, 
+                            averaging_rate = ray_qck_averaging_rate, 
+                            averaging_threshold = ray_qck_averaging_threshold
+                            )
                
-            output_data['profile'][key] = sig_avg
-            output_data['profile_mask'][key] = mask_incomplete_avg
+                
+                        output_data['background_error'][key] = bgd_avg_err
+                
+                if key in profile_mask:    
+                    output_data['profile_mask'][key] = sig_avg_mask
+                                        
+                if key in background_mask:    
+                    output_data['background_mask'][key] = bgd_avg_mask
 
     print_entry('High resolution averaging for quicklooks complete!')
 
@@ -347,17 +457,19 @@ def compute_trim_vertically(
     # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
 
-    heights_agl = output_data['height_agl']
-    heights_asl = output_data['height_asl']
+    height_agl = output_data['height_agl']
+    height_asl = output_data['height_asl']
     ranges = output_data['range']
 
     profiles = output_data['profile']
+
+    # profile_error = output_data['profile_error'] trim error
     
     channel_info = output_data['channel_info']
     
     qa_tests = list(profiles.keys())
     
-    if heights_agl:
+    if height_agl:
 
         for key in qa_tests:
          
@@ -365,8 +477,8 @@ def compute_trim_vertically(
 
             bins = sig.bins
             
-            z_agl = heights_agl[key]
-            z_asl = heights_asl[key]
+            z_agl = height_agl[key]
+            z_asl = height_asl[key]
             z_rng = ranges[key]
             
             zero_bin = channel_info[key]\
@@ -498,6 +610,9 @@ def compute_dark_correction(
     profiles = output_data['profile']
 
     channel_info = output_data['channel_info']
+    
+    # add dark correction to background
+    # add error increase
             
     for key in assign_drk:
         
@@ -522,6 +637,30 @@ def compute_dark_correction(
 
     print_entry('Dark correction succesfully performed!')
 
+    return output_data
+
+def compute_signal_noise(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+
+    # output_data = copy.deepcopy(input_data)
+    output_data = shallow_copy(input_data)
+
+    profiles = output_data['profile']
+    
+    qa_tests = list(profiles.keys())
+
+    for key in qa_tests:
+
+        sig = profiles[key]
+        
+        sig_err = rolling_noise(sig, noise_window = 21)
+        
+        output_data['profile_error'][key] = sig_err
+
+    print_entry('Signal error calculation succesfully performed!')
+    
     return output_data
 
 
@@ -608,7 +747,7 @@ def slice_signal_by_range(sig, ranges, region, drop=False, min_bins=10):
     sig_slice : xarray.DataArray
         Signal array restricted to the specified range region.
 
-    ranges_slice : xarray.DataArray
+    range_slice : xarray.DataArray
         Corresponding range coordinate after applying the same selection.
     """
 
@@ -631,7 +770,7 @@ def slice_signal_by_range(sig, ranges, region, drop=False, min_bins=10):
 
     # apply mask
     sig_slice = sig.where(mask, drop=drop)
-    ranges_slice = ranges.where(mask, drop=drop)
+    range_slice = ranges.where(mask, drop=drop)
 
-    return sig_slice, ranges_slice
+    return sig_slice, range_slice
     

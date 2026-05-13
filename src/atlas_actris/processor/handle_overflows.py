@@ -132,7 +132,7 @@ def overflow_method_0(mask, filename):
             bins_ovf = bins[mask.sel({"time": t, "channel": ch}).values]
             print(f"    file: {filename.loc[t].values} | ch: {ch} | bins: {bins_ovf}")
     
-    DataOverflowError("trim_overflows = 0 -> Overflows detected! In order to continue with an automated overflow removal use the trim_overflow argument with value 1 or 2 (default is 0) ")
+    raise DataOverflowError("trim_overflows = 0 -> Overflows detected! In order to continue with an automated overflow removal use the trim_overflow argument with value 1 or 2 (default is 0) ")
     
     return mask_time
 
@@ -194,13 +194,29 @@ def overflow_method_2(sig, shots, time_info, mask, filename, max_adjacent_overfl
     
     if (ovfs > 100).any():
         print("")
-        DataOverflowError("More that 100 overflowed bins encountered in single profiles. Interpolation is too risky, please revise the input files or consider setting trim_overflows = 1")
+        raise DataOverflowError("More that 100 overflowed bins encountered in single profiles. Interpolation is too risky, please revise the input files or consider setting trim_overflows = 1")
     
     print("")
     print(f"-- Warning: trim_overflows = 2 -> Replacing overflows in {time_ovf.size} profiles: ")
             
-    sig = sig.where(~mask).interpolate_na(dim = "bins", method = "linear")
+    original_chunks = sig.chunksizes if hasattr(sig.data, "chunks") else None
+    
+    sig = sig.chunk({"bins": -1})
+    mask = mask.chunk({"bins": -1})
+    
+    sig = (
+        sig
+        .where(~mask)
+        .interpolate_na(
+            dim="bins",
+            method="linear",
+        )
+    )
 
+    
+    if original_chunks is not None:
+        sig = sig.chunk(original_chunks)
+        
     print(f"{np.sum(mask).values} overflows have been replaced by interpolating across the bins\n")
     
     return(sig, mask_time)

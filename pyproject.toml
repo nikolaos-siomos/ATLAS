@@ -15,25 +15,28 @@ authors = [
 license = { text = "AGPL-3.0-or-later" }
 
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.14"
 
 dependencies = [
-    "numpy>=2.0.0",
-    "pandas>=2.2.3",
-    "xarray>=2023.6.0",
-    "netCDF4>=1.6.3",
-    "scipy>=1.13.0",
-    "matplotlib>=3.8.0",
-    "bokeh>=3.4.3",
-    "Pillow>=11.1.0",
-    "dask>=2024.8.0",
-    "requests>=2.0.0",
+    "numpy>=1.26.4; python_version < '3.13'",
+    "numpy>=2.1.3; python_version >= '3.13'",
+    "scipy>=1.13.0; python_version < '3.13'",
+    "scipy>=1.14.1; python_version >= '3.13'",
+    "netCDF4>=1.6.3; python_version < '3.12'",
+    "netCDF4>=1.7.2; python_version >= '3.12'",
+    "dask>=2024.8.0; python_version < '3.13'",
+    "dask>=2024.12.0; python_version >= '3.13'",
+    "arc-actris>=1.1.0",
 ]
 
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
 ]
 

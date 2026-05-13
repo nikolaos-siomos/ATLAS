@@ -13,6 +13,7 @@ from utils.__parse_init_file__ import parse_call_atlas_ini
 from utils.__parse_config_file__ import parse_atlas_config_file
 from utils.__parse_settings_file__ import parse_atlas_settings_file
 
+from utils.cookbook import run_linear_recipe
 from helper_functions.printouts import endpoint
 from processor.pipeline import Context, Processor
 from readers.reader_utils import special_path_rules
@@ -96,80 +97,84 @@ ctx = Context(
 # Initialize the Processor class
 processor = Processor(ctx)
 
-# Calculate the profiles of ranges and heights per bin
-processor.run(output_id = 'ranges_and_heights', input_id = 'init', stage_name = "height_and_range_calculation")
+screening_recipe = [
+    ("ranges_and_heights", "height_and_range_calculation"),
+    ("sliced", "slice_and_exclude"),
+    ("shots_screened", "screen_low_shots"),
+    ("overflows_checked", "handling_overflows"),
+    ("saturation_detected", "check_saturation"),
+]
 
-# Slice and exclude parts of the measurements
-processor.run(output_id = 'sliced', input_id = 'ranges_and_heights', stage_name = "slice_and_exclude")
+preprocessing_recipe = [
+    ("photon_units_converted", "photon_units_conversion"),
+    ("dead_time_corrected", "dead_time_correction"),
+    ("background_calculated", "background_calculation"),
+    ("background_corrected", "background_correction"),
+    ("range_corrected", "range_correction"),
+    ("dark_corrected", "dark_correction"),
+    ("vert_trimmed", "trim_vertically"),
+    ("gluing_region_found", "gluing_region"),
+    ("glued", "gluing"),
+    ("noise_calculated", "signal_noise_calculation"),
+    ("molecular_calculated", "molecular_calculations"),
+]
 
-# Remove "incomplete" profiles with shots less than a certain percentage of the max shots
-processor.run(output_id = 'shots_screened', input_id = 'sliced', stage_name = "screen_low_shots")
+# Apply screening recipe
+run_linear_recipe(
+    processor, 
+    recipe = screening_recipe, 
+    initial_input = "init",
+    checkout_id = "screening_complete",
+    )
 
-# Handle overflow data (detect, interpolate, ignore)
-processor.run(output_id = 'overflows_checked', input_id = 'shots_screened', stage_name = "handling_overflows")
-
-# Checkpoint: End of filtering data 
-processor.checkout(output_id = 'screening_complete', input_id = 'overflows_checked')
-
-# Detect saturation and clipping
-processor.run(output_id = 'saturation_detected', input_id = 'screening_complete', stage_name = "check_saturation")
-
-# Unit conversion - raw counts to MHz for the photon channels
-processor.run(output_id = 'photon_units_converted', input_id = 'screening_complete', stage_name = "photon_units_conversion")
-
-# Dead time correction for photon channels
-processor.run(output_id = 'dead_time_corrected', input_id = 'photon_units_converted', stage_name = "dead_time_correction")
-
-# Solar background calculation - full temporal resolution
-processor.run(output_id = 'background_raw_res', input_id = 'dead_time_corrected', stage_name = "background_calculation")
+# Apply preprocessing recipe
+run_linear_recipe(
+    processor, 
+    recipe = preprocessing_recipe, 
+    initial_input = "screening_complete",
+    checkout_id = "preprocessing_complete",
+    )
 
 # Averaging profiles - single averages for all datasets and special handling for ray
-processor.run(output_id = 'averaged', input_id = 'dead_time_corrected', stage_name = "averaging_by_time")
-processor.run(output_id = 'averaged_low_res', input_id = 'dead_time_corrected', stage_name = "averaging_by_time_low_res")
-processor.run(output_id = 'averaged_high_res', input_id = 'dead_time_corrected', stage_name = "averaging_by_time_high_res")
+processor.run(output_id = 'averaged', input_id = 'preprocessing_complete', stage_name = "averaging_by_time")
+processor.run(output_id = 'averaged_low_res', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_low_res")
+processor.run(output_id = 'averaged_high_res', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_high_res")
 
-# Solar background calculation
-processor.run(output_id = 'background', input_id = 'averaged', stage_name = "background_calculation")
-processor.run(output_id = 'background_low_res', input_id = 'averaged_low_res', stage_name = "background_calculation")
-processor.run(output_id = 'background_high_res', input_id = 'averaged_high_res', stage_name = "background_calculation")
+# QA tests
 
-# Background correction
-processor.run(output_id = 'background_corrected', input_id = 'background', stage_name = "background_correction")
-processor.run(output_id = 'background_corrected_low_res', input_id = 'background_low_res', stage_name = "background_correction")
-processor.run(output_id = 'background_corrected_high_res', input_id = 'background_high_res', stage_name = "background_correction")
+# tlc_sector_pack = {
+#     'tlc_north',
+#     'tlc_east',
+#     'tlc_south',
+#     'tlc_west',
+#     }
 
-# Range correction
-processor.run(output_id = 'range_corrected', input_id = 'background_corrected', stage_name = "range_correction")
-processor.run(output_id = 'range_corrected_low_res', input_id = 'background_corrected_low_res', stage_name = "range_correction")
-processor.run(output_id = 'range_corrected_high_res', input_id = 'background_corrected_high_res', stage_name = "range_correction")
+# tlc_ring_pack = {
+#     'tlc_outer',
+#     'tlc_inner',
+#     }
 
-# Trim signals and ranges/heights vertically
-processor.run(output_id = 'vert_trimmed', input_id = 'range_corrected', stage_name = "trim_vertically")
-processor.run(output_id = 'vert_trimmed_low_res', input_id = 'range_corrected_low_res', stage_name = "trim_vertically")
-processor.run(output_id = 'vert_trimmed_high_res', input_id = 'range_corrected_high_res', stage_name = "trim_vertically")
+# pcb_pack = {
+#     'pcb_p45',
+#     'pcb_m45',
+#     }
 
-# Dark correction
-processor.run(output_id = 'dark_corrected', input_id = 'vert_trimmed', stage_name = "dark_correction")
-processor.run(output_id = 'dark_corrected_low_res', input_id = 'vert_trimmed_low_res', stage_name = "dark_correction")
-processor.run(output_id = 'dark_corrected_high_res', input_id = 'vert_trimmed_high_res', stage_name = "dark_correction")
 
-# Checkpoint: End of preprocessing
-processor.checkout(output_id = 'preprocessing_complete', input_id = 'dark_corrected')
-processor.checkout(output_id = 'preprocessing_complete_low_res', input_id = 'dark_corrected_low_res')
-processor.checkout(output_id = 'preprocessing_complete_high_res', input_id = 'dark_corrected_high_res')
 
-# Calculate molecular profiles
-processor.run(output_id = 'molecular', input_id = 'preprocessing_complete', stage_name = "molecular_calculations")
-processor.run(output_id = 'molecular_low_res', input_id = 'preprocessing_complete_low_res', stage_name = "molecular_calculations")
-processor.run(output_id = 'molecular_high_res', input_id = 'preprocessing_complete_high_res', stage_name = "molecular_calculations")
+# if meas_type == 'ray':
+#     profiles = processor_stage['ray']
 
-# Identify gluing region
-processor.run(output_id = 'gluing_region', input_id = 'preprocessing_complete', stage_name = 'gluing_region')
-processor.run(output_id = 'gluing_region_low_res', input_id = 'preprocessing_complete_low_res', stage_name = 'gluing_region')
-processor.run(output_id = 'gluing_region_high_res', input_id = 'preprocessing_complete_high_res', stage_name = 'gluing_region')
+# elif meas_type == 'drk':
+#     profiles = processor_stage['drk']
 
-# Glue
-processor.run(output_id = 'glued', input_id = 'gluing_region', stage_name = 'gluing')
-processor.run(output_id = 'glued_low_res', input_id = 'gluing_region_low_res', stage_name = 'gluing')
-processor.run(output_id = 'glued_high_res', input_id = 'gluing_region_high_res', stage_name = 'gluing')
+# elif meas_type == 'tlc':
+    
+#     tlc_sec_list = []
+    
+#     for sec in tlc_sector:
+#         for key in processor_stage:
+#             tlc_sec_list.appen(processor_stage[key])
+            
+#         profiles = xr.concat(tlc_sec_list, dim="time")
 
+# elif meas_type == 'tlc_rin':

@@ -69,8 +69,8 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "data_acquisition_range":      {"dtype": float, "default": None, "is_list": True, "category": "optional", "allowed": [20., 100., 500.]},
     "range_resolution":            {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 1.,  "max": 30.},
     "laser_repetition_rate":       {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 10., "max": 200.},
-    "analog_noise_per_bin":        {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 0.},
-    "analog_noise_scaling_factor": {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 0.},
+    "analog_noise_per_bin":        {"dtype": float, "default": 0.22, "is_list": True, "category": "optional", "min": 0.},
+    "analog_noise_scaling_factor": {"dtype": float, "default": 0.7,  "is_list": True, "category": "optional", "min": 0.},
     # "analog_to_digital_resolution": {"dtype": int, "default": None, "is_list": True, "category": "optional", "allowed": [12, 14, 16]},
 
     # -------------------- [polarization_calibration] --------------------

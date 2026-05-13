@@ -189,7 +189,7 @@ def main(args, __version__):
                                             version = __version__)
             
             # Make the plot
-            plot_path = \
+            plot_path, dofl_x = \
                 make_plot.telecover_sec(dir_out = os.path.join(args['output_folder'],'plots'), 
                                         fname = f"{fname}.png", 
                                         title = title,
@@ -241,6 +241,8 @@ def main(args, __version__):
                                         x_tick = x_tick,
                                         use_last = args['use_last'],
                                         iters = iters)
+            if dofl_x == dofl_x:
+                metadata['minimum_channel_height'] = str(int(np.round(1E3 * dofl_x, -1)))
             
             sectors = {'N' : y_m_n,
                        'E' : y_m_e,

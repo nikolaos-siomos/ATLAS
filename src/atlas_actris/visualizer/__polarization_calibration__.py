@@ -12,7 +12,7 @@ from .readers.parse_pcb_args import call_parser, check_parser
 from .readers.check import check_channels_no_exclude as check_channels
 from .readers.check import find_rt_channels
 from .readers.read_prepro import unpack
-from .plotting import make_axis, make_title, make_plot
+from .plotting import make_axis, make_title, make_plot, plot_utils
 from .tools import average, curve_fit
 from .writters import make_header, export_ascii 
 import os
@@ -429,7 +429,33 @@ def main(args, __version__):
                                         extra_channel = ch_t,
                                         meas_type = 'pcb', 
                                         version = __version__)
-                
+        
+        pol_cal_metadata = dict(
+            eta = eta[0], 
+            eta_f_s = eta_f_s[0], 
+            eta_s = eta_s[0], 
+            mldr = delta_m,
+            calibrated_ratio = delta_c_def[0],
+            vldr = delta_c[0],
+            vldr_offset = delta_l[0],
+            epsilon_angle = epsilon[0],
+            min_bsc_ratio = sr_lim,
+            err_p = err_p,
+            eta_err = np.std(eta[1:]), 
+            eta_f_s_err = np.std(eta_f_s[1:]), 
+            eta_s_err = np.std(eta_s[1:]), 
+            calibrated_ratio_err = np.std(delta_c_def[1:]),
+            vldr_err = np.std(delta_c[1:]),
+            vldr_offset_err = np.std(delta_l[1:]),
+            epsilon_angle_err = np.std(epsilon[1:]),
+            K_ch = K_ch,
+            G_R_ch = G_R_ch,
+            G_T_ch = G_T_ch,
+            H_R_ch = H_R_ch,
+            H_T_ch = H_T_ch,
+            TR_to_TT_ch = TR_to_TT_ch
+            )
+        
         # Make filename
         plot_path = \
             make_plot.polarization_calibration(dir_out = os.path.join(args['output_folder'],'plots'), 
@@ -446,23 +472,7 @@ def main(args, __version__):
                                                y4_vals = delta_c_def_prf,
                                                y5_vals = delta_c_prf,
                                                y6_vals = delta_m_prf,
-                                               eta = eta[0], 
-                                               eta_f_s = eta_f_s[0], 
-                                               eta_s = eta_s[0], 
-                                               delta_m = delta_m,
-                                               delta_c_def = delta_c_def[0],
-                                               delta_c = delta_c[0],
-                                               delta_l = delta_l[0],
-                                               epsilon = epsilon[0],
-                                               sr_lim = sr_lim,
-                                               err_p = err_p,
-                                               eta_err = np.std(eta[1:]), 
-                                               eta_f_s_err = np.std(eta_f_s[1:]), 
-                                               eta_s_err = np.std(eta_s[1:]), 
-                                               delta_c_def_err = np.std(delta_c_def[1:]),
-                                               delta_c_err = np.std(delta_c[1:]),
-                                               delta_l_err = np.std(delta_l[1:]),
-                                               epsilon_err = np.std(epsilon[1:]),
+                                               metadata = pol_cal_metadata,
                                                x_lbin_cal = x_lbin_cal,
                                                x_ubin_cal = x_ubin_cal, 
                                                x_llim_cal = x_llim_cal,
@@ -477,11 +487,6 @@ def main(args, __version__):
                                                y_ulim_vdr = y_ulim_ray, 
                                                y_label_cal = y_label_cal, 
                                                x_label_cal = x_label_cal, 
-                                               K = K_ch,
-                                               G_R = G_R_ch,
-                                               G_T = G_T_ch,
-                                               H_R = H_R_ch,
-                                               H_T = H_T_ch,
                                                x_tick_cal = args['x_tick_calibration'],
                                                y_label_vdr = y_label_ray, 
                                                x_label_vdr = x_label_ray, 
@@ -511,7 +516,11 @@ def main(args, __version__):
                                               ray_t = sig_t_ray_ch,
                                               header = header)
         
-        # Add metadata to the plot
+        
+        
+
+            
+        # Combine metadata to add to the plot
         plot_metadata_r = make_plot.get_plot_metadata(metadata = metadata, 
                                                       args = args, 
                                                       channel = ch_r,
@@ -526,14 +535,33 @@ def main(args, __version__):
                                                       version = __version__,
                                                       data_source_id = 't')
         
-        make_plot.add_plot_metadata(plot_path = plot_path, 
-                                    plot_metadata = plot_metadata_r,
-                                    plot_metadata_extra = plot_metadata_t)
+        pol_cal_metadata = make_plot.prepare_png_text_metadata(pol_cal_metadata)
+
+        # Add metadata to the plot
+        make_plot.add_plot_metadata(
+            plot_path = plot_path, 
+            plot_metadata = plot_metadata_r,
+            plot_metadata_extra = plot_metadata_t,
+            plot_metadata_extra_2 = pol_cal_metadata
+            )
         
     print('-----------------------------------------')
     print(' ')
     
     return()
+
+def add_extra_plot_metadata(plot_metadata, norm_region_flag, 
+                            stats_norm_region, maximum_channel_height):
+    
+    plot_metadata['norm_region_flag'] = f"{norm_region_flag}"
+    for key in stats_norm_region.keys():
+        plot_metadata[f"stats_{key}"] = f"{stats_norm_region[key]}"
+    for key in stats_norm_region.keys():
+        plot_metadata[f"masks_{key}"] = f"{stats_norm_region[key]}"
+        
+    plot_metadata['maximum_channel_height'] = f"{maximum_channel_height}"
+    
+    return(plot_metadata)
 
 def pldr_error(delta_m, delta_v_err, delta_p_ulim = 0.3, delta_p_err_ulim = 0.025):
     

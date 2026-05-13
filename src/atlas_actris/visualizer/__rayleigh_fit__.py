@@ -97,7 +97,9 @@ def main(args, __version__):
             curve_fit.scan(
                 masks, 
                 user_norm_region = args_ch['normalization_region'],
-                auto_fit = args_ch['auto_fit'])
+                auto_fit = args_ch['auto_fit'],
+                prefered_range = 'far')
+            
 
         # Isolate the values of the statistics and masks on the normalization region
         stats_norm_region, masks_norm_region = \
@@ -248,7 +250,7 @@ def pass_to_args(args, data_list, data_keys):
 def get_max_channel_height(norm_region, norm_region_flag):
     
     max_channel_height = np.mean(norm_region)
-    max_channel_height = np.round(max_channel_height, decimals=1)
+    max_channel_height = str(int(np.round(1E3*max_channel_height, decimals=-2)))
     
     return(max_channel_height)
     
