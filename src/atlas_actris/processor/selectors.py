@@ -39,13 +39,6 @@ def set_from_selector(processor, selector, value):
     container = getattr(processor, selector['db'])
     container.setdefault(selector['item_id'], value)
 
-# def validate_selector_keys(io_map:str, sources:list = None):
-#     if sources is not None:
-#         missing = [key for key in sources if key not in io_map]
-        
-#         if missing:
-#             raise KeyError(f"Missing required selector keys: {missing}")
-        
 def get_source_map(io_id):
     source_map = {
         'profile':{'db':'profile_db', 'item_id':io_id},

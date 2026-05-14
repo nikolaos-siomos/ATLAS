@@ -7,22 +7,29 @@ Created on Wed Aug 31 22:34:11 2022
 """
 
 import numpy as np
+import pandas as pd
 
-def quicklook(channel, metadata, args):
+def quicklook(channel, system_info, channel_info, time_info, settings):
+        
+    start_timestamp = time_info.isel({'time':0}).sel({'parameters':'start_time'})
+    stop_timestamp = time_info.isel({'time':-1}).sel({'parameters':'stop_time'})
+
+    start_date = pd.to_datetime(start_timestamp.item()).strftime("%d.%m.%Y")
+    start_time = pd.to_datetime(start_timestamp.item()).strftime("%H.%M.%S") 
+    stop_time = pd.to_datetime(stop_timestamp.item()).strftime("%H.%M.%S") 
     
-    start_date = metadata['start_date']
-    start_time = metadata['start_time'] 
-    stop_time = metadata['stop_time'] 
-    lidar_name = metadata['lidar_name'] 
-    config_id = metadata['config_id']
-    config_name = metadata['config_name']
-    scc_channel_id = metadata['scc_channel_id'].copy().loc[channel].values
-    laser_pointing_angle = metadata['laser_pointing_angle']
-    station_name = metadata['station_name']
-    smooth = args['smooth']
-    sm_lims = args['smoothing_range']
-    sm_win = args['smoothing_window']
-    sm_expo = args['smooth_exponential']
+    scc_channel_id = channel_info.sel({'parameters':'scc_channel_id','channel':channel}).values
+
+    station_name = system_info.loc['station_name']
+    config_id = system_info.loc['configuration_id']
+    config_name = system_info.loc['configuration_name']
+    lidar_name = system_info.loc['lidar_name'] 
+    laser_pointing_angle = system_info.loc['zenith_angle']
+    
+    smooth = settings['smooth']
+    sm_lims = settings['smoothing_range']
+    sm_win = settings['smoothing_window']
+    sm_expo = settings['smooth_exponential']
 
     laser_pointing_angle = np.round(float(laser_pointing_angle), decimals = 1)
     

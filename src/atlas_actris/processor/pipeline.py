@@ -54,6 +54,8 @@ from processor.signal_processing import (
     compute_signal_noise,
     )
 
+from processor.packaging import combine_QA_pack
+
 from processor.signal_gluing import (
     compute_gluing_region, 
     compute_gluing,
@@ -222,15 +224,15 @@ class Processor():
     
         self.stage_info[item_id] = stage_info
                
-    def load_input_data(self, input_id):
+    def export_stage(self, input_id):
 
         input_map = get_io_map(input_id)
         
         # Gather input data
-        input_data = {s: get_from_selector(self, input_map[s]) 
-                      for s in input_map.keys()}
+        exported_data = {s: get_from_selector(self, input_map[s]) 
+                         for s in input_map.keys()}
         
-        return input_data
+        return exported_data
              
     def prepare_output(self, output_id, stage_name):
         output_map = get_io_map(output_id)
@@ -273,7 +275,7 @@ class Processor():
         print_header(header)
             
         # Get input data and output map
-        input_data = self.load_input_data(input_id)
+        input_data = self.export_stage(input_id)
         
         # Get output map and register
         output_map = self.prepare_output(output_id, stage_name = stage_name)
@@ -290,7 +292,7 @@ class Processor():
         print_header(f"Copying stages: {input_id} to {output_id}")
             
         # Get input data and output map
-        input_data = self.load_input_data(input_id)
+        input_data = self.export_stage(input_id)
         
         # Get output map and register
         output_map = self.prepare_output(output_id, stage_name = "copy")
@@ -301,6 +303,22 @@ class Processor():
         # Save output entries
         self.save_output(output_data, output_map)
         
+    def package(self, output_id, input_id):
+
+        # Print process header
+        print_header(f"Packaging stage: {input_id} to {output_id}")
+            
+        # Get input data and output map
+        input_data = self.export_stage(input_id)
+        
+        # Get output map and register
+        output_map = self.prepare_output(output_id, stage_name = "packaging")
+    
+        # Processing
+        output_data = combine_QA_pack(input_data)
+        
+        # Save output entries
+        self.save_output(output_data, output_map)
         
     def checkout(self, output_id, input_id):
     
@@ -308,7 +326,7 @@ class Processor():
         print_header(f"Calculating stage {input_id} and save to stage {output_id}")
             
         # Get input data and output map
-        input_data = self.load_input_data(input_id)
+        input_data = self.export_stage(input_id)
         
         # Get output map and register
         output_map = self.prepare_output(output_id, stage_name = "copy")
@@ -329,6 +347,5 @@ class Processor():
     
         # Save output entries
         self.save_output(output_data, output_map)
-
 
               

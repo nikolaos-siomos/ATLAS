@@ -137,44 +137,14 @@ run_linear_recipe(
 
 # Averaging profiles - single averages for all datasets and special handling for ray
 processor.run(output_id = 'averaged', input_id = 'preprocessing_complete', stage_name = "averaging_by_time")
-processor.run(output_id = 'averaged_low_res', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_low_res")
-processor.run(output_id = 'averaged_high_res', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_high_res")
+processor.run(output_id = 'averaged_lr', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_low_res")
+processor.run(output_id = 'averaged_hr', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_high_res")
 
-# QA tests
+# Packging profiles - use for quicklooks
+processor.package(output_id = 'averaged_hr_qck', input_id = 'averaged_hr')
 
-# tlc_sector_pack = {
-#     'tlc_north',
-#     'tlc_east',
-#     'tlc_south',
-#     'tlc_west',
-#     }
-
-# tlc_ring_pack = {
-#     'tlc_outer',
-#     'tlc_inner',
-#     }
-
-# pcb_pack = {
-#     'pcb_p45',
-#     'pcb_m45',
-#     }
-
-
-
-# if meas_type == 'ray':
-#     profiles = processor_stage['ray']
-
-# elif meas_type == 'drk':
-#     profiles = processor_stage['drk']
-
-# elif meas_type == 'tlc':
-    
-#     tlc_sec_list = []
-    
-#     for sec in tlc_sector:
-#         for key in processor_stage:
-#             tlc_sec_list.appen(processor_stage[key])
-            
-#         profiles = xr.concat(tlc_sec_list, dim="time")
-
-# elif meas_type == 'tlc_rin':
+from visualizer.__quicklook__ import generate_quicklooks
+generate_quicklooks(
+    data_pack = processor.export_stage('averaged_hr_qck'),
+    caller_info = processor.processing_info['caller_info'],
+    settings = processor.settings_info['qck'])

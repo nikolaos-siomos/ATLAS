@@ -291,43 +291,70 @@ def bring_to_correct_type(config_info):
     
     return(config_info)
                 
-def store_updated_metadata(config_info: Dict[str, Any], 
-                           metadata: Dict[str, Any]) -> Dict[str, Any]:
-    
-    system_info  = pd.Series()
-    channel_info = pd.DataFrame(index = config_info["atlas_channel_id"])
-    pol_cal_info = pd.DataFrame(index = config_info["pol_cal_pairs"])
+def store_updated_metadata(
+    config_info: Dict[str, Any],
+    metadata: Dict[str, Any],
+) -> Dict[str, Any]:
+
+    system_info = {}
+    channel_info = pd.DataFrame(index=config_info["atlas_channel_id"])
+    pol_cal_info = pd.DataFrame(index=config_info["pol_cal_pairs"])
 
     metadata["pol_cal_info"] = {}
-    
+
     for key in config_info:
+
         if key in SYSTEM_KEYS:
-            system_info.loc[key] = config_info[key]
+            system_info[key] = config_info[key]
+
         elif key in CHANNEL_KEYS:
-            channel_info.loc[:,key] = [v for v in config_info[key]]
+            channel_info.loc[:, key] = [v for v in config_info[key]]
+
         elif key in POL_CAL_KEYS:
-            pol_cal_info.loc[:,key] = [v for v in config_info[key]]
-        
+            pol_cal_info.loc[:, key] = [v for v in config_info[key]]
+
+    system_parameters = list(system_info.keys())
+    system_values = np.array(
+        list(system_info.values()),
+        dtype=object,
+    )
+
     for key in metadata["time_info"].keys():
 
         time_info = metadata["time_info"][key]
-        
-        metadata["system_info"][key] = xr.DataArray(system_info.values,
-                                                    dims = ["parameters"],
-                                                    coords = [system_info.index.values])
-        metadata["channel_info"][key] = xr.DataArray(channel_info.T.values,
-                                                     dims = ["parameters", "channel"],
-                                                     coords = [channel_info.columns.values, channel_info.index.values])
-        
-        metadata["time_info"][key] = xr.DataArray(time_info.T.values,
-                                                  dims = ["parameters", "time"],
-                                                  coords = [time_info.columns.values, time_info.index.values])
-        
-        metadata["pol_cal_info"][key] = xr.DataArray(pol_cal_info.T.values,
-                                                     dims = ["parameters", "pairs"],
-                                                     coords = [pol_cal_info.columns.values, pol_cal_info.index.values])
-        
-        
-    return(metadata)
 
+        metadata["system_info"][key] = xr.DataArray(
+            system_values,
+            dims=["parameters"],
+            coords={"parameters": system_parameters},
+        )
+
+        metadata["channel_info"][key] = xr.DataArray(
+            channel_info.T.values,
+            dims=["parameters", "channel"],
+            coords={
+                "parameters": channel_info.columns.values,
+                "channel": channel_info.index.values,
+            },
+        )
+
+        metadata["time_info"][key] = xr.DataArray(
+            time_info.T.values,
+            dims=["parameters", "time"],
+            coords={
+                "parameters": time_info.columns.values,
+                "time": time_info.index.values,
+            },
+        )
+
+        metadata["pol_cal_info"][key] = xr.DataArray(
+            pol_cal_info.T.values,
+            dims=["parameters", "pairs"],
+            coords={
+                "parameters": pol_cal_info.columns.values,
+                "pairs": pol_cal_info.index.values,
+            },
+        )
+
+    return metadata
     

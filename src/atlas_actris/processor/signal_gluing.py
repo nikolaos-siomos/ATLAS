@@ -41,6 +41,8 @@ def compute_gluing_region(
     output_data = shallow_copy(input_data)
             
     ranges = output_data['range']
+
+    background = output_data['background']
     
     profiles = output_data['profile']
     

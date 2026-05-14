@@ -45,6 +45,16 @@ qa_tests = [
     'pcb_aux', 
     'cam'
     ]
+
+qck_tests = [
+    'ray', 
+    'pcb', 
+    'tlc', 
+    'tlc_rin', 
+    'drk', 
+    'ray_pcb', 
+    'pcb_aux', 
+    ]
 recognised_slicers = [
     'ray', 
     'pcb_p45', 
@@ -92,7 +102,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
 
     "quick_run":           {"dtype": bool, "default": False,    "is_list": False, "category": "optional"},
     "process":             {"dtype": str,  "default": qa_tests, "is_list": True,  "category": "optional", "allowed": qa_tests + ['off']},
-    "process_qck":         {"dtype": str,  "default": qa_tests, "is_list": True,  "category": "optional", "allowed": qa_tests + ['off']},
+    "process_qck":         {"dtype": str,  "default": qck_tests,"is_list": True,  "category": "optional", "allowed": qa_tests + ['off']},
     "use_range":           {"dtype": bool, "default": True,     "is_list": False, "category": "optional"},
     "dpi":                 {"dtype": int,  "default": 300,      "is_list": False, "category": "optional"},
     "output_folder":       {"dtype": str,  "default": None,     "is_list": False, "category": "optional"},

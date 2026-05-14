@@ -32,7 +32,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "lidar_name":         {"dtype": str,   "default": None, "is_list": False, "category": "optional"},
     "station_name":       {"dtype": str,   "default": None, "is_list": False, "category": "optional"},
 
-    "lidar_id":           {"dtype": int,   "default": 1,    "is_list": False, "category": "optional"},
+    "lidar_id":           {"dtype": int,   "default": None, "is_list": False, "category": "optional"},
     "version_name":       {"dtype": str,   "default": "",   "is_list": False, "category": "optional"},
     "version_id":         {"dtype": int,   "default": None, "is_list": False, "category": "optional"},
     "configuration_name": {"dtype": str,   "default": "",   "is_list": False, "category": "optional"},

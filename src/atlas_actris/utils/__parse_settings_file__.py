@@ -36,6 +36,7 @@ SCHEMA_QCK: Dict[str, Dict[str, Any]] = {
     "y_tick":      {"dtype": float, "default": 1.,        "is_list": False, "min": 0., "max": 10},   
     "z_lims":      {"dtype": float, "default": [],        "is_list": True, "size": 2}, 
     "z_max_zone":  {"dtype": float, "default": [0.1, 2.], "is_list": True, "min": 0., "max": 30., "size": 2},
+    "z_min_zone":  {"dtype": float, "default": [2., 10.], "is_list": True, "min": 0., "max": 30., "size": 2},
 
     "smooth":                           {"dtype": bool,  "default": False,       "is_list": False},
     "smoothing_range":                  {"dtype": float, "default": [0.05, 15.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},

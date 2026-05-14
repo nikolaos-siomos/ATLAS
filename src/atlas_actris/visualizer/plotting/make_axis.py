@@ -10,64 +10,75 @@ import numpy as np
 
 def quicklook_x(t_lims, t_tick, time):
 
-    # # Identify bins where temporal gaps are encountered (10% acceptance)
-    # nodes = np.where(time[1:]-time[:-1] > 1.50 * np.nanmin(time[1:]-time[:-1]))[0]
-    # print(nodes)
-    # if nodes > 0:
-    #     print('-- Warning: The quicklook will contain gaps as the dataset is not continuous. The ascending number of timeframes will not be display as a secondary x_axis')
-    
-    # Get the lowest time based on the t-lims
-    if t_lims[0] == None:
+    # Treat None or [] as "use full time range"
+    if t_lims is None or len(t_lims) == 0:
+        t_lims = [None, None]
+
+    # If only one limit is provided, complete the pair
+    if len(t_lims) == 1:
+        t_lims = [t_lims[0], None]
+
+    # Get the lowest time based on t_lims
+    if t_lims[0] is None:
         ltime = time[0]
     else:
         lmins = int(str(t_lims[0])[:2]) * 60 + int(str(t_lims[0])[2:])
-        ltime = time.astype('datetime64[D]')[0] + np.timedelta64(lmins, 'm')
+        ltime = time.astype("datetime64[D]")[0] + np.timedelta64(lmins, "m")
 
-    if t_lims[-1] == None:
+    # Get the highest time based on t_lims
+    if t_lims[-1] is None:
         utime = time[-1]
     else:
         umins = int(str(t_lims[-1])[:2]) * 60 + int(str(t_lims[-1])[2:])
-        utime = time.astype('datetime64[D]')[-1] + np.timedelta64(umins, 'm')
+        utime = time.astype("datetime64[D]")[-1] + np.timedelta64(umins, "m")
 
-    t_vals = time[(time >= ltime) & (time <= utime)]
+    # Get indices inside selected time range
+    valid = np.where((time >= ltime) & (time <= utime))[0]
 
-    # Get the x lower limit
-    x_lbin = np.where((time >= ltime))[0][0]
-    
-    # Get the x upper limit
-    x_ubin = np.where((time >= utime))[0][0]
-    
-    # Calculate the x_tick (number of timeframes) if not provided
-    if time.size / 15. > 10.:
-        x_tick = np.round(time.size / 15., decimals = -1)
-    else:
-        x_tick = np.round(time.size / 15., decimals = 0)
-    if x_tick == 0:
-        x_tick = 1.
-            
-    # Get the timeframe levels
+    if len(valid) == 0:
+        raise ValueError(
+            f"No time values found within t_lims={t_lims}. "
+            "Check that t_lims uses HHMM format."
+        )
+
+    x_lbin = valid[0]
+    x_ubin = valid[-1]
+
+    # Keep full time axis for plotting
     t_vals = time
 
-    # Calculate the t_tick (in minutes) if not provided
-    if t_tick == None:
-        mins = \
-            (t_vals[x_ubin]-t_vals[x_lbin]).astype('timedelta64[m]') / np.timedelta64(1,'m') 
+    # Calculate x_tick if not provided
+    if time.size / 15. > 10.:
+        x_tick = np.round(time.size / 15., decimals=-1)
+    else:
+        x_tick = np.round(time.size / 15., decimals=0)
+
+    if x_tick == 0:
+        x_tick = 1.
+
+    # Calculate t_tick in minutes if not provided
+    if t_tick is None:
+        mins = (
+            (t_vals[x_ubin] - t_vals[x_lbin]).astype("timedelta64[m]")
+            / np.timedelta64(1, "m")
+        )
+
         if mins < 5:
             t_tick = 1.
-        elif mins >= 5 and mins < 20:
+        elif mins < 20:
             t_tick = 2.
-        elif mins >= 20 and mins < 40.:
+        elif mins < 40.:
             t_tick = 4.
-        elif mins >= 40 and mins < 120.:
+        elif mins < 120.:
             t_tick = 10.
-        elif mins >= 120 and mins < 240.:
+        elif mins < 240.:
             t_tick = 20.
-        elif mins >= 240 and mins < 480.:
+        elif mins < 480.:
             t_tick = 30.
         else:
             t_tick = 60.
-    
-    return(x_lbin, x_ubin, x_tick, t_vals, t_tick)
+
+    return x_lbin, x_ubin, x_tick, t_vals, t_tick
 
 def quicklook_y(heights, ranges, y_lims, use_dis):
 
@@ -129,34 +140,48 @@ def quicklook_y(heights, ranges, y_lims, use_dis):
 
 def quicklook_z(z_vals, y_vals, z_lims, use_log, z_max_zone, z_min_zone):
 
+    # Treat None or [] as "auto limits"
+    if z_lims is None or len(z_lims) == 0:
+        z_lims = [None, None]
+
+    if len(z_lims) == 1:
+        z_lims = [z_lims[0], None]
+
     # Get the max signal bin and value
     mask_max_zone = (y_vals >= z_max_zone[0]) & (y_vals <= z_max_zone[1])
 
-    z_vals_sm = np.nanmean(z_vals[:,mask_max_zone],axis = 0)
-        
-    z_max = round_it(np.nanmax(z_vals_sm),1)
-    
+    z_vals_sm = np.nanmean(z_vals[:, mask_max_zone], axis=0)
+
+    z_max = round_it(np.nanmax(z_vals_sm), 1)
+
+    # Avoid division by zero
+    if z_max == 0 or np.isnan(z_max):
+        z_max = 1.0
+
     # Normalize with the max
     z_vals = z_vals / z_max
 
     # Get the signal upper and lower limits
-    z_ulim = z_lims[-1]
     z_llim = z_lims[0]
+    z_ulim = z_lims[-1]
 
-    # Get the vertical lower limit
-    if use_log and z_llim == None:
+    # Get lower limit automatically
+    if use_log and z_llim is None:
 
-        # Get the min signal bin and value
         mask_min_zone = (y_vals >= z_min_zone[0]) & (y_vals <= z_min_zone[1])
 
-        z_vals_sm = np.nanmean(z_vals[:,mask_min_zone],axis = 0)
-        
-        z_llim = round_it(np.nanmin(z_vals_sm),2)
-        
-    elif use_log == False and z_llim == None:
-        z_llim = 0.
+        z_vals_sm = np.nanmean(z_vals[:, mask_min_zone], axis=0)
 
-    return(z_llim, z_ulim, z_vals)
+        z_llim = round_it(np.nanmin(z_vals_sm), 2)
+
+    elif not use_log and z_llim is None:
+        z_llim = 0.0
+
+    # Get upper limit automatically
+    if z_ulim is None:
+        z_ulim = round_it(np.nanmax(z_vals), 1)
+
+    return z_llim, z_ulim, z_vals
 
 
 def rayleigh_x(heights, ranges, x_lims, use_dis):
