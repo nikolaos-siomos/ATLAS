@@ -6,14 +6,15 @@ Created on Sun May 10 21:21:21 2026
 @author: nikos
 """
 
+import os
+import pandas as pd
+import xarray as xr
 
 from __get_T_P_profiles_from_cloudnet__ import _download_from_cloudnet  
 from __get_T_P_profiles_from_wyoming__ import _download_wyoming
 from utils.select_radiosonde import select_radiosonde_filename
-from helper_functions.printouts import print_header, print_entry
+from utils.printouts import print_header, print_entry
 from utils.error_classes import CustomWarning
-import pandas as pd
-import os
 
 def find_radiosonde(caller_info, metadata):
     
@@ -31,8 +32,6 @@ def find_radiosonde(caller_info, metadata):
     
     for key in qa_tests:
         
-        metadata['radiosonde_info'][key] = {}
-        
         if key in allowed_tests:
             print_entry(key)
             print()
@@ -44,13 +43,13 @@ def find_radiosonde(caller_info, metadata):
             mid_date = mid_stamp.strftime("%d.%m.%Y")
             mid_time = mid_stamp.strftime("%H:%M:%S")
             
-            radiosonde_metadata, status = select_radiosonde_filename(
+            radiosonde_info, status = select_radiosonde_filename(
                 mid_time_dt64, 
                 folder = radiosonde_folder
                 )
             
             if status == 0:
-                print(f"Radiosonde file detected: {radiosonde_metadata['radiosonde_file']}")
+                print(f"Radiosonde file detected: {radiosonde_info['radiosonde_file']}")
                 print()
     
             else:
@@ -108,24 +107,29 @@ def find_radiosonde(caller_info, metadata):
                             print()
         
                 if dl_status.ok or rs_path:
-                    radiosonde_metadata, status = select_radiosonde_filename(
+                    radiosonde_info, status = select_radiosonde_filename(
                         mid_time_dt64, 
                         folder = radiosonde_folder
                         )
                     
                 if status == 0:
-                    print(f"Radiosonde file detected: {radiosonde_metadata['radiosonde_file']}")
+                    print(f"Radiosonde file detected: {radiosonde_info['radiosonde_file']}")
                     print()
     
                 else:
                     CustomWarning("Radiosonde not found and could not be downloaded. Computations which need molecular profiles will not be performed")
                  
             if status == 0:
-                metadata['radiosonde_info'][key] = \
-                    radiosonde_metadata | {'measurement_time':mid_time_dt64}
-                    
-            caller_info['rsonde_status'] = status
-    
-    return caller_info, metadata
+                
+                caller_info['radiosonde_status'] = status
+                radiosonde_info['measurement_mid_time'] = mid_time_dt64
+                
+                metadata['radiosonde_info'][key] = xr.DataArray(
+                    data=list(radiosonde_info.values()),
+                    dims=["parameters"],
+                    coords={"parameters": list(radiosonde_info.keys())},
+                    )
+                        
+    return metadata
                     
                 

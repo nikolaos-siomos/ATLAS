@@ -6,83 +6,64 @@ Created on Tue Aug 30 20:19:58 2022
 @author: nick
 """
 
-import pandas as pd
-import warnings, os
-from visualizer.readers.check import check_channels
-from helper_functions.printouts import print_header
-from visualizer.plotting import make_axis
+import warnings
+from version import __version__
+from collections import defaultdict
+from utils.printouts import print_header
+from visualizer.check import check_channels
+from processor.packaging import collect_metadata
+from visualizer.plot_quicklook import generate_plot
 from visualizer.make_text import GenerateText, Libraries
-from visualizer.plotting.plot_utils import perform_color_reduction
-from visualizer.plotting.plot_quicklook import generate_plot
+from visualizer.plot_utils import (
+    prepare_folder, slice_by_vertical_scale, smoothing_2D, collect_dict,
+    convert_m_to_km, perform_color_reduction, 
+    add_plot_metadata, insert_nan_time_gaps, slice_time
+    )
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
-
-def clean_quicklook_plots(plot_dir,pattern):
-    if not os.path.isdir(plot_dir):
-        return
-
-    for filename in os.listdir(plot_dir):
-        if "pattern" not in filename:
-            continue
-
-        file_path = os.path.join(plot_dir, filename)
-
-        if os.path.isfile(file_path):
-            os.remove(file_path)
             
-def generate_quicklooks(data_pack, caller_info, settings):
+def generate_quicklooks(data_pack, caller_info, settings_info):
     
     process_qck = caller_info['process_qck']
     
+    qa_test_info = defaultdict(dict)
+
     for key in process_qck:
-        if key in data_pack['time_info'].keys():
+        if key in data_pack.keys():
     
-            print_header(f"Start generating {key} quicklooks...")
+            print_header(f"Start generating quicklooks ({key})")
             
-            plot_dir = os.path.join(caller_info["output_folder"], "plots")
-            os.makedirs(plot_dir, exist_ok=True)
+            # Prepare folders
+            prepare_folder(caller_info, pattern = f"qck_{key}")
+
+            # Load arrays
+            profiles = data_pack[key]['profile']
+            vertical_scale = data_pack[key][caller_info['vertical_scale']]
+
+            # Load settings
+            settings = settings_info.copy()
+                        
+            # Slice time
+            profiles, time_sliced = slice_time(profiles, t_lims = settings['t_lims'])
             
-            clean_quicklook_plots(plot_dir, pattern = f"_qck_{key}")  
+            # Add nan values in time gaps
+            profiles, _, has_time_gap = insert_nan_time_gaps(profiles, gap_factor = 1.5)
 
-            profiles = data_pack['profile'][key]
-
-            ranges = data_pack['range'][key]
-            height_asl = data_pack['height_asl'][key]
-
-            system_info = data_pack['system_info'][key]
-            channel_info = data_pack['channel_info'][key]
-            time_info = data_pack['time_info'][key]
-                
-            # # Extract signal time, channels, and bins
+            # Load time after slicing and icluding time gaps
             time = profiles.time.values
-            start_time = pd.to_datetime(time_info.sel(parameters="start_time").values)
-            
-            end_time = pd.to_datetime(time_info.sel(parameters="end_time").values)
 
-            delta_t = (end_time - start_time).total_seconds()
-            
+            # Convert the range/height units to km 
+            vertical_scale = convert_m_to_km(vertical_scale)
+
             # Check if the parsed channels exist
-            channels = \
-                check_channels(sel_channels = settings['channels'], 
-                               all_channels = profiles.channel.values,
-                               exclude_telescope_type = settings['exclude_telescope_type'], 
-                               exclude_channel_type = settings['exclude_channel_type'], 
-                               exclude_acquisition_mode = settings['exclude_acquisition_mode'], 
-                               exclude_channel_subtype = settings['exclude_channel_subtype'])
-        
-            # Create the x axis (time)
-            x_lbin, x_ubin, x_tick, t_vals, t_tick, = \
-                make_axis.quicklook_x(t_lims = settings['t_lims'],
-                                      t_tick = settings['t_tick'], 
-                                      time = time)
-        
-            lib = Libraries(
-                system_info=system_info,
-                channel_info=channel_info,
-                time_info=time_info,
-                settings=settings,
+            channels = check_channels(
+                all_channels = profiles.channel.values,
+                settings = settings
                 )
+            
+            if len(channels) > 0:
+                qa_test_info[key] = {}
             
             # iterate over the channels
             for ch in channels:
@@ -91,90 +72,93 @@ def generate_quicklooks(data_pack, caller_info, settings):
         
                 ch_d = dict(channel = ch)
                 
-                sig_ch = profiles.loc[ch_d].values
+                sig_ch = profiles.sel(ch_d)
+                vertical_scale_ch = vertical_scale.sel(ch_d)
                 
-                ranges_ch = ranges.copy().loc[ch_d].values
-                heights_ch = height_asl.copy().loc[ch_d].values
-                    
-                # Create the y axis (height/range)
-                y_lbin, y_ubin, y_llim, y_ulim, y_vals, y_label = \
-                    make_axis.quicklook_y(
-                        heights = heights_ch, 
-                        ranges = ranges_ch,  
-                        y_lims = settings['y_lims'], 
-                        use_dis = caller_info['use_range']
-                        )
-        
+                # Trim the x and y using the x axis limits                
+                sig_ch, vertical_scale_ch, _  = slice_by_vertical_scale(
+                    da = sig_ch,
+                    vertical_scale = vertical_scale_ch,
+                    x_lims = settings['x_lims'], 
+                    )
+                y_vals = sig_ch.values
+                x_vals = vertical_scale_ch.values
+
                 # Smoothing
-                if settings['smooth']:
-                    if not isinstance(settings['smoothing_window'],list):
-                        from visualizer.tools.smoothing import sliding_average_2D_fast as smooth_2D
-                    else:
-                        from visualizer.tools.smoothing import sliding_average_2D as smooth_2D
-        
-                    z_vals, _ = smooth_2D(
-                        z_vals = sig_ch, 
-                        y_vals = y_vals,
-                        y_sm_lims = settings['smoothing_range'],
-                        y_sm_win = settings['smoothing_window'],
-                        expo = settings['smooth_exponential']
-                        )
-                else:
-                    z_vals = sig_ch
-        
-                # Create the z axis (signal)
-                z_llim, z_ulim, z_vals = \
-                    make_axis.quicklook_z(z_vals = z_vals, 
-                                          y_vals = y_vals,
-                                          z_lims = settings['z_lims'] , 
-                                          use_log = False,
-                                          z_max_zone = settings['z_max_zone'],
-                                          z_min_zone = settings['z_min_zone'])
+                y_vals_sm, _ = smoothing_2D(
+                    args = settings, 
+                    x_vals = x_vals, 
+                    y_vals = y_vals, 
+                    err_type = "std"
+                    )
 
-                text_generator = GenerateText(lib = lib, atlas_channel_id = ch)
+                # Gather the metadata that are common for all QA tests in a dictonary
+                metadata = collect_metadata(data_pack[key], atlas_channel_id = ch)
                 
-                # Make title
-                title = text_generator.make_quicklook_title()
-          
-                # Make filename
-                filename = text_generator.make_filename(qa_test=f'qck_{key}')              
+                # Initialise qa_test_info dictionary
+                qa_test_info[key][ch] = {
+                    'time_sliced': time_sliced,
+                    'has_time_gap': has_time_gap
+                    }
+                
+                # Collect metadata to be added in the plot files
+                plot_metadata = collect_dict(
+                    data_list = [
+                        time_sliced,
+                        has_time_gap,
+                        __version__,
+                        f'qck_{key}'
+                        ],
+                    data_keys = [
+                        'time_sliced',
+                        'has_time_gap',
+                        'ATLAS_version',
+                        'QA_test_ID'
+                        ],
+                    add_dicts = [settings, metadata]
+                    )
 
+                # Load libraris
+                lib = Libraries(
+                    caller_info = caller_info,
+                    metadata = metadata,
+                    extra_metadata = {},
+                    settings = settings,
+                    qa_test_info = {}
+                    )
+                
+                
+                # Call GenerateText class
+                text_generator = GenerateText(lib = lib)
+                
+                # Make titles
+                qa_test_info[key][ch]['title'] = \
+                    text_generator.make_quicklook_title()
+                
+                # Make filenames
+                qa_test_info[key][ch]['filename'] = text_generator.make_filename(
+                    qa_test = f'qck_{key}'
+                    )
+            
                 # Make the plot
-                plot_path = generate_plot(
-                    dir_out = os.path.join(
-                    caller_info['output_folder'],'plots'), 
-                    fname = f"{filename}.png",
-                    title = title,
-                    dpi_val = caller_info['dpi'],
-                    use_log = False,
-                    delta_t = delta_t,
-                    t_vals = t_vals, y_vals = y_vals, 
-                    z_vals = z_vals, 
-                    x_lbin = x_lbin, x_ubin = x_ubin, 
-                    y_lbin = y_lbin, y_ubin = y_ubin, 
-                    y_llim = y_llim, y_ulim = y_ulim, 
-                    z_llim = z_llim, z_ulim = z_ulim,
-                    y_label = y_label, 
-                    t_tick = t_tick, x_tick = x_tick,
-                    y_tick = settings['y_tick']
+                qa_test_info[key][ch]['qck_plot_path'] = generate_plot(
+                    T = time,
+                    X = x_vals,
+                    Y = y_vals,
+                    args = settings | qa_test_info[key][ch] | caller_info
                     )  
             
                 # Perform color reduction        
                 perform_color_reduction(
                     color_reduction = True, 
-                    plot_path = plot_path
+                    plot_path = qa_test_info[key][ch]['qck_plot_path']
                     )
 
-             
-                # # Add metadata to the quicklook plot
-                # plot_metadata = make_plot.get_plot_metadata(metadata = metadata, 
-                #                                             args = args, 
-                #                                             channel = ch,
-                #                                             meas_type = f'qck_{key}', 
-                #                                             version = __version__)
-                
-                # make_plot.add_plot_metadata(plot_path = plot_path, 
-                #                             plot_metadata = plot_metadata)
+                # Add the metadata to the plot 
+                add_plot_metadata(
+                    plot_path = qa_test_info[key][ch]['qck_plot_path'], 
+                    plot_metadata = plot_metadata
+                    )
 
             print('-----------------------------------------')
             print(' ')

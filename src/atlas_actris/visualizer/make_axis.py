@@ -91,33 +91,6 @@ def quicklook_y(heights, ranges, y_lims, use_dis):
     else:
         y_vals = 1E-3 * heights       
         y_label = 'Height above the lidar [km]'
-
-    # # Get the altitude/distance lower limit and bin
-    # if y_lims[0] == None or y_lims[0] < y_vals[0]:
-    #     y_lbin = 0
-    #     y_llim = np.round(y_vals[y_lbin], decimals = 2)
-
-    # else:
-    #     y_lbin = np.where(y_vals >= y_lims[0])[0][0]
-        
-    #     if y_lbin > 0:
-    #         y_lbin = y_lbin - 1
-        
-    #     y_llim = y_lims[0]
-
-
-    # # Get the altitude/distance upper limit and bin
-    # if y_lims[-1] == None or y_lims[-1] > y_vals[-1]:
-    #     y_ubin = y_vals.size - 1
-    #     y_ulim = np.round(y_vals[y_ubin], decimals = 2)
-
-    # else:
-    #     y_ubin = np.where(y_vals <= y_lims[-1])[0][-1] 
-        
-    #     if y_ubin < y_vals.size:
-    #         y_ubin = y_ubin + 1
-
-    #     y_ulim = y_lims[-1]
         
     # Get the altitude/distance lower limit and bin
     y_lbin = np.where(y_vals >= y_lims[0])[0][0]

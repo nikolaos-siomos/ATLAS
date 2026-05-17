@@ -107,13 +107,14 @@ def temporal_averaging_error(
 
 def rolling_noise(
     sig: xr.DataArray,
+    smooth_window: int = 5,
     noise_window: int = 31,
     dim: str = "bins",
 ):
     # 1. Local smooth signal estimate
     sig_sm = (
         sig
-        .rolling({dim: noise_window}, center=True, min_periods=noise_window)
+        .rolling({dim: smooth_window}, center=True, min_periods=smooth_window)
         .mean()
     )
 

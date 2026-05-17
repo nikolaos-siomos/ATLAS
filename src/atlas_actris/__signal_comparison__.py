@@ -7,13 +7,13 @@ Created on Mon Feb 12 12:23:31 2024
 """
 
 import os, glob, warnings
-from helper_functions import comparison_utils
+from utils import comparison_utils
 import matplotlib
 import numpy as np
 from version import __version__
 from visualizer.plotting.make_plot import make_filename_intercomparison
 from visualizer.plotting.make_title import intercomparison
-from helper_functions.time_conversions import iso_to_datetimes, datetimes_to_iso
+from utils.time_conversions import iso_to_datetimes, datetimes_to_iso
 import pandas as pd
 warnings.filterwarnings('ignore')
 

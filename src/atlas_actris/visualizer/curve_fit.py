@@ -9,41 +9,48 @@ Created on Sat Sep  3 13:34:47 2022
 import numpy as np
 import xarray as xr
 from scipy.stats import linregress, shapiro
-from ..tools.smoothing import sliding_average_1D_fast as smooth_1D
+from visualizer.smoothing import sliding_average_1D_fast as smooth_1D
 from utils.error_classes import CustomWarning
 
 default_norm_region = [4., 10.]
 
-needed_keys = ['fit_mask_window', 
-               'fit_mask_window_step',
-               'fit_mask_region',
-               'rsem_threshold',
-               'first_derivative_threshold',
-               'second_derivative_threshold',
-               'shapiro_wilk_threshold',
-               'cross_criterion_threshold',
-               'durbin_watson_threshold',
-               'residual_extinction_threshold']
+needed_keys = [
+    'fit_mask_window', 
+    'fit_mask_window_step',
+    'fit_mask_region',
+    'rsem_threshold',
+    'first_derivative_threshold',
+    'second_derivative_threshold',
+    'shapiro_wilk_threshold',
+    'cross_criterion_threshold',
+    'durbin_watson_threshold',
+    'residual_extinction_threshold'
+    ]
 
-default_values = {'fit_mask_window': [1., 8.], 
-                  'fit_mask_window_step': 0.2,
-                  'fit_mask_region': [4., 30.],
-                  'rsem_threshold': 0.02,
-                  'first_derivative_threshold': 2.,
-                  'second_derivative_threshold': 2.,
-                  'shapiro_wilk_threshold': 0.05,
-                  'cross_criterion_threshold': 1,
-                  'durbin_watson_threshold': 0.5,
-                  'residual_extinction_threshold': 10.
-                  }
+default_values = {
+    'fit_mask_window': [1., 8.], 
+    'fit_mask_window_step': 0.2,
+    'fit_mask_region': [4., 30.],
+    'rsem_threshold': 0.02,
+    'first_derivative_threshold': 2.,
+    'second_derivative_threshold': 2.,
+    'shapiro_wilk_threshold': 0.05,
+    'cross_criterion_threshold': 1,
+    'durbin_watson_threshold': 0.5,
+    'residual_extinction_threshold': 10.
+    }
 
-allowed_ccr_directions = ["apply_backwards",
-                          "apply_forwards",
-                          "apply_everywhere"]
+allowed_ccr_directions = [
+    "apply_backwards",
+    "apply_forwards",
+    "apply_everywhere"
+    ]
 
-allowed_ccr_types = ["above_negative_threshold",
-                     "below_positive_threshold",
-                     "between_both_thresholds"]
+allowed_ccr_types = [
+    "above_negative_threshold",
+    "below_positive_threshold",
+    "between_both_thresholds"
+    ]
 
 def norm_region_index(norm_region, idx, masks):
     
@@ -589,16 +596,18 @@ def create_masks(stats, keyw_args, cancel_stats, ccr_type,):
     
     mfit = (msem) & (mder) & (msec) & (mshp) & (mccr) & (mpos) & (mdbw) & (mext)
 
-    masks = {'relative_sem' : msem,
-             'first_derivative' : mder,
-             'second_derivative' : msec,
-             'shapiro_wilk' : mshp,
-             'cross_criterion' : mccr,
-             'durbin_watson' : mdbw,
-             'is_positive' : mpos,
-             'residual_extinction' : mext,
-             'total' : mfit}
-    
+    masks = {
+        'relative_sem' : msem,
+        'first_derivative' : mder,
+        'second_derivative' : msec,
+        'shapiro_wilk' : mshp,
+        'cross_criterion' : mccr,
+        'durbin_watson' : mdbw,
+        'is_positive' : mpos,
+        'residual_extinction' : mext,
+        'total' : mfit
+        }
+   
     for key in masks.keys():
         masks[key] = xr.DataArray(masks[key], dims = ['window', 'middle_point'],
                                   coords = [win, mid])

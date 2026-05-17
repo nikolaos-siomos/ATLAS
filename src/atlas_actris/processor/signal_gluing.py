@@ -31,7 +31,7 @@ import xarray as xr
 
 from typing import Any, Dict
 from utils.dataarray_utils import shallow_copy
-from helper_functions.printouts import print_entry
+from utils.printouts import print_entry
 
 def compute_gluing_region(
     processing_info: Dict[str, Any],

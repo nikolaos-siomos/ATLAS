@@ -23,7 +23,7 @@ from scipy.stats import linregress, shapiro
 from bokeh.palettes import Category10, turbo
 from .tools import curve_fit
 from matplotlib import pyplot as plt
-
+from utils.toolbox import round_it
 
 # from .processor.lidar_processing.signal import dark_correction
 
@@ -1258,19 +1258,6 @@ def block_mean_by_duration(
     N = max(N, 1)
 
     return (block_mean_fixed_samples(da, N=N, dim=dim, label=label), N)
-
-def round_it(x, sig):
-    
-    if not np.isfinite(x) or np.isnan(x):
-        x = -999.
-        sig = 3
-        
-    if x != 0.:
-        x_out = np.round(x, sig-int(np.floor(np.log10(abs(x))))-1)
-    else:
-        x_out = 0.
-        
-    return x_out
 
 def make_colorscale(colorscale, n_time):
     

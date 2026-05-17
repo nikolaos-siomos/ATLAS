@@ -28,9 +28,10 @@ Fucntions
 import copy
 from typing import Any, Dict
 from utils.error_classes import OverwriteError
-from helper_functions.printouts import print_header
+from utils.printouts import print_header
 
 from dataclasses import dataclass
+from collections import defaultdict
 
 from processor.handle_overflows import compute_check_for_overflows
 from processor.signal_flagging import compute_detect_saturation
@@ -233,6 +234,25 @@ class Processor():
                          for s in input_map.keys()}
         
         return exported_data
+    
+
+    def export_test_from_stage(self, input_id):
+
+        input_map = get_io_map(input_id)
+        
+        # Gather input data
+        exported_data = {s: get_from_selector(self, input_map[s]) 
+                         for s in input_map.keys()}
+        
+        exported_data_swapped = defaultdict(dict)
+        
+        for k1, inner in exported_data.items():
+            for k2, value in inner.items():
+                exported_data_swapped[k2][k1] = value
+        
+        exported_data_swapped = dict(exported_data_swapped)
+        
+        return exported_data_swapped
              
     def prepare_output(self, output_id, stage_name):
         output_map = get_io_map(output_id)

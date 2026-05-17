@@ -7,12 +7,12 @@ Created on Wed Sep 21 10:21:48 2022
 """
 
 import os, warnings, glob, sys
-from helper_functions import processing_chain
-from helper_functions import parse_intercomparison_args
-from helper_functions.parse_intercomparison_args import call_parser as parse_mst
-from helper_functions.parse_intercomparison_args import check_parser as check_mst
+from utils import processing_chain
+from utils import parse_intercomparison_args
+from utils.parse_intercomparison_args import call_parser as parse_mst
+from utils.parse_intercomparison_args import check_parser as check_mst
 from visualizer.readers.parse_cmp_args import call_parser as parse_cmp
-from helper_functions import read_intercomparison_config
+from utils import read_intercomparison_config
 
 warnings.filterwarnings('ignore')
 

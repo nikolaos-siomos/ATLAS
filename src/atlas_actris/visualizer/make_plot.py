@@ -16,132 +16,196 @@ from subprocess import run
 from xarray import DataArray
 from PIL import Image
 from PIL import PngImagePlugin
+from utils.toolbox import round_it
 
-def quicklook(dir_out, fname, title, dpi_val, color_reduction, use_log, delta_t,
-              t_vals, y_vals, z_vals, 
-              x_lbin, x_ubin, y_lbin, y_ubin, 
-              y_llim, y_ulim, z_llim, z_ulim,
-              y_label, t_tick, x_tick, y_tick):
-    
-    z_vals = z_vals.T
-
-    # Define the colorscale
-    rgb = color_lib.volkers_rgb()
-    my_cmap = make_colormap.custom_rgb(rgb, name = 'volkers')
-
-    # Identify bins where temporal gaps are encountered (50% acceptance)
-    dt_min = np.nanmin(t_vals[1:]-t_vals[:-1])
-    t_bin = np.timedelta64(np.nanmax(delta_t), 's')
-    
-    if dt_min > t_bin or dt_min <= 1.2 * t_bin:
-        t_resol = 1.2 * dt_min        
-    else:
-        t_resol = 1.2 * t_bin
-
-    nodes = np.where(t_vals[1:]-t_vals[:-1] > t_resol)[0] + 1
-    
-    if len(nodes) > 0:
-        t_nodes = t_vals[nodes-1] + t_resol
-        z_vals = np.insert(z_vals, nodes, np.nan, axis = 1)
-        t_vals = np.insert(t_vals, nodes, t_nodes)
-        x_ubin = x_ubin+ len(nodes)
-    
-    t_vals = np.hstack((t_vals,[t_vals[-1] + t_resol]))
-    y_vals = np.hstack((y_vals,[y_vals[-1] + y_vals[1] - y_vals[0]]))
-                        
-    #     # print('-- Warning: The quicklook will contain gaps as the dataset is not continuous. The ascending number of timeframes will not be display as a secondary x_axis')
-    # Create the variables to be plotted X, Y, Z
-    [X, Y] = np.meshgrid(t_vals[slice(x_lbin, x_ubin+2)], 
-                         y_vals[slice(y_lbin, y_ubin+2)])
-    Z = z_vals[slice(y_lbin, y_ubin+1), slice(x_lbin, x_ubin+1)]
+def rayleigh(dir_out, fname, title, dpi_val, color_reduction, use_lin, norm_region,
+             x_vals, y1_vals, y2_vals, y1_errs, y2_errs, coef, rsem, rslope, pval,
+             rsem_lim, fit, auto_fit, x_lbin, x_ubin, x_llim, x_ulim, y_llim, y_ulim, 
+             x_label, y_label, x_tick, label_1, label_2):
+        
+    # Create the variables to be plotted X, Y
+    X = x_vals[slice(x_lbin, x_ubin)]
+    Y1 = coef * y1_vals[slice(x_lbin, x_ubin)]
+    Y2 = y2_vals[slice(x_lbin, x_ubin)]
+    Y1E = coef * y1_errs[slice(x_lbin, x_ubin)]
+    Y2E = y2_errs[slice(x_lbin, x_ubin)]
     
     # Create the figure
-    fig = plt.figure(figsize=(10. , 5.))
-    ax = fig.add_axes([0.07,0.13,0.99,0.74])
-    
-    ax.set_title(title, pad = 5) 
-    
-    ax.set_xlabel('Time UTC')
-    ax.set_ylabel(y_label)
+    # fig = plt.figure(figsize=(12. , 4.))
+    fig = plt.figure(figsize=(15 , 3))
 
-    y_ticks = np.arange(y_tick * np.ceil(y_llim / y_tick), 
-                        y_tick * (np.floor(y_ulim / y_tick) + 1.), 
-                        y_tick)
-    
-    if np.abs(y_llim - y_ticks[0]) < y_tick * 0.25:
-        y_ticks[0] = y_llim
-    else:
-        y_ticks = np.hstack((y_llim, y_ticks))
+    fig.suptitle(title)
 
-    if np.abs(y_ulim - y_ticks[-1]) < y_tick * 0.25:
-        y_ticks[-1] = y_ulim
-    else:
-        y_ticks = np.hstack((y_ticks, y_ulim))
+    ax = fig.add_axes([0.05,0.145,0.52,0.69])
         
-    y_ticks = np.round(y_ticks, decimals = 2)
+    ax.plot(X, Y1, color = 'tab:blue', label = label_1)
+    ax.plot(X, Y2, color = 'tab:red', label = label_2)
+
+    if np.isnan(Y1E).all() == False:
+        ax.fill_between(X, Y1 - Y1E, Y1 + Y1E, color = 'tab:blue', alpha = 0.3)
+
+    if np.isnan(Y2E).all() == False:
+        ax.fill_between(X, Y2 - Y2E, Y2 + Y2E, color = 'tab:red', alpha = 0.3)
+        
+    x_ticks = np.arange(x_tick * np.ceil(x_llim / x_tick), 
+                        x_tick * (np.floor(x_ulim / x_tick) + 1.), 
+                        x_tick)
     
-    ax.set_yticks(y_ticks, labels = y_ticks)
+    if x_tick >= x_ulim - x_llim:
+        raise Exception(f"The x_tick ({x_tick}) must be smaller than the width of the normalization_region ({norm_region}) for the Rayleigh fit test. Please revise the settings_file.ini ")
+    
+    if norm_region[0] > 20. or norm_region[1] < x_llim:
+        raise Exception(f"The normalization_region ({norm_region}) for the Rayleigh fit is out of the provided x_lims ([{x_llim}, {x_ulim}]). Please revise the settings_file.ini ")
+    
+    
+    if np.abs(x_llim - x_ticks[0]) < x_tick * 0.25:
+        x_ticks[0] = x_llim
+    else:
+        x_ticks = np.hstack((x_llim, x_ticks))
+
+    if np.abs(x_ulim - x_ticks[-1]) < x_tick * 0.25:
+        x_ticks[-1] = x_ulim
+    else:
+        x_ticks = np.hstack((x_ticks, x_ulim))
+
+    x_ticks = np.round(x_ticks, decimals = 2)
+
+    ax.set_xticks(x_ticks, labels = x_ticks)
+    ax.set_xlim([x_llim, x_ulim])
+    ax.set_xlabel(x_label)
+    ax.xaxis.set_minor_locator(MultipleLocator(x_tick / 2.))
+
     ax.set_ylim([y_llim, y_ulim])
+    ax.set_ylabel(y_label)
+    if use_lin == False:
+        ax.set_yscale('log')
 
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-
-    major_locator = mdates.SecondLocator(interval = 60 * int(t_tick))
-    major_locator.MAXTICKS = 10000
+    ax.grid(which = 'both')
     
-    ax.xaxis.set_major_locator(major_locator)
-    
-    minor_locator = mdates.SecondLocator(interval = 15 * int(t_tick))
+    if ax.get_legend_handles_labels() != ([], []):
+        ax.legend(loc = 'lower left')
 
-    # print(t_tick)
-    # if t_tick < 4:
-    #     minor_locator = mdates.SecondLocator(bysecond = np.arange(0, 60. * t_tick, 60. * t_tick/4.).astype(int))
-    # elif t_tick >= 4 and t_tick < 240:
-    #     minor_locator = mdates.MinuteLocator(byminute = np.arange(0, 60., t_tick/4.).astype(int))
-    # else:
-    #     minor_locator = mdates.HourLocator(byhour = np.arange(0, 24., t_tick/240.))
-        
-        
-    minor_locator.MAXTICKS = 10000
-    
-    ax.xaxis.set_minor_locator(minor_locator)
+    ax.axvspan(norm_region[0], norm_region[1], alpha = 0.2, facecolor = 'tab:grey')
 
-
-    plt.xticks(rotation = 35)
-
-    if len(nodes) == 0:
-        ax1 = ax.twiny()
+    n_llim = np.round(norm_region[0], decimals = 2)
+    n_ulim = np.round(norm_region[1], decimals = 2)
     
-        x_ticks = np.arange(x_lbin, x_ubin + x_tick, x_tick).astype(int)
-        ax1.set_xticks(x_ticks, labels = x_ticks)
-    
-    if use_log == False:
-        qck = ax.pcolormesh(X, Y, Z, vmin = z_llim, vmax = z_ulim, cmap = my_cmap)
+    if rsem > rsem_lim:
+        c_rsem = 'tab:red'
     else:
-        qck = ax.pcolormesh(X, Y, Z, vmin = z_llim, vmax = z_ulim, cmap = my_cmap, norm = 'log')
+        c_rsem = 'tab:green'
+
+    if pval < 0.05:
+        c_pval = 'tab:red'
+    else:
+        c_pval = 'tab:green'
     
-    fig.colorbar(qck, label = 'Range-corrected Signal [A.U.]', 
-                 extend = 'both', pad = 0.02)
+    if auto_fit == False:
+        c_norm = 'tab:orange'
+    elif fit == False:
+        c_norm = 'tab:red'
+    else:
+        c_norm = 'tab:green'
+        
+    if use_lin == False:
+
+        ax.text(0.55 * x_ulim, 0.60 * y_ulim, 
+                f'norm. region: {n_llim} - {n_ulim} km',
+                bbox = dict(facecolor = c_norm, alpha = 0.22, zorder = 3))
+            
+        ax.text(0.55 * x_ulim, 0.30 * y_ulim, 
+                f'rsem: {np.round(rsem, decimals = 4)}',
+                bbox = dict(facecolor = c_rsem, alpha = 0.22, zorder = 3))
+        
+        ax.text(0.55 * x_ulim, 0.15 * y_ulim, 
+                f'rslope: {np.round(rslope, decimals = 4)}',
+                bbox = dict(facecolor = c_pval, alpha = 0.22, zorder = 3))
+    else:
+        ax.text(0.55 * x_ulim, 0.9 * y_ulim, 
+                f'norm. region: {n_llim} - {n_ulim} km',
+                bbox = dict(facecolor = c_norm, alpha = 0.22, zorder = 3))
+
+        ax.text(0.55 * x_ulim, 0.82 * y_ulim, 
+                f'rsem: {np.round(rsem, decimals = 4)}',
+                bbox = dict(facecolor = c_rsem, alpha = 0.22, zorder = 3))
+
+        ax.text(0.55 * x_ulim, 0.74 * y_ulim, 
+                f'rslope: {np.round(rslope, decimals = 4)}',
+                bbox = dict(facecolor = c_pval, alpha = 0.22, zorder = 3))
+
+    ax2 = fig.add_axes([0.625,0.145,0.36,0.69])
+    
+    if np.isnan(Y1E).all() == False and np.isnan(Y2E).all() == True:
+        ax2.fill_between(X, (Y1 - Y1E - Y2) / Y2, 
+                         (Y1 + Y1E - Y2) / Y2, color = 'tab:blue', 
+                         alpha = 0.3, label = 'sem')
+        ax2.plot(X, (Y1 - Y2) / Y2, color = 'tab:blue',label = 'mean')
+
+    if np.isnan(Y1E).all() == False and np.isnan(Y2E).all() == False:
+        ax2.fill_between(X, (Y1 - Y1E - Y2) / Y2, 
+                         (Y1 + Y1E - Y2) / Y2, color = 'tab:blue', 
+                         alpha = 0.3, label = 'sem1')
+        ax2.plot(X, (Y1 - Y2) / Y2, color = 'tab:blue',label = 'mean')
+        ax2.fill_between(X, (Y1 - Y2E - Y2) / Y2, 
+                         (Y1 + Y2E - Y2) / Y2, color = 'tab:red', 
+                         alpha = 0.3, label = 'sem2')
+        
+        if ax2.get_legend_handles_labels() != ([], []):
+            ax2.legend(loc = 'lower left')
+
+    else:
+        ax2.plot(X, (Y1 - Y2) / Y2, color = 'tab:blue')
+        
+    
+    ax2.axhline(c = 'k')
+
+    x_tick_2 = 2. * x_tick 
+    x_ticks_2 = np.arange(x_tick_2 * np.floor(x_llim / x_tick_2), 
+                          x_tick_2 * (np.ceil(x_ulim / x_tick_2) + 1.), 
+                          x_tick_2)
+    
+    ax2.set_xticks(x_ticks_2, labels = x_ticks_2)
+    ax2.set_xlim([x_llim, x_ulim])
+    ax2.set_xlabel(x_label)
+    ax2.xaxis.set_minor_locator(MultipleLocator(x_tick_2 / 2.))
+
+    y_ticks = np.round(np.arange(-0.40, 0.40 + 0.10, 0.10), decimals = 2)
+    ax2.set_yticks(y_ticks, labels = ["%.2f" % tick for tick in y_ticks])
+    ax2.set_ylim([y_ticks[0], y_ticks[-1]])
+    ax2.set_ylabel('Relative Diff. ')
+    
+    ax2.grid(which = 'both')
+    
+    ax2.axvspan(norm_region[0], norm_region[1], alpha = 0.2, facecolor = 'tab:grey')
     
     fpath = os.path.join(dir_out, fname)
-    
+            
     fig.savefig(fpath, dpi = dpi_val)
     
     fig.clf()
     
     plt.close()
-
+    
     perform_color_reduction(color_reduction, fpath)
-            
+    
     return(fpath)
 
 def rayleigh_mask(dir_out, fname, title, dpi_val, color_reduction,
-                  mfit, mder, msec, mshp, mcrc, msem,
-                  x_llim, x_ulim, y_llim, y_ulim):
+                  mfit, mder, msec, mshp, mcrc, rsem, rsem_lim):
+
+    rgb = color_lib.volkers_rgb()
+    vlk_cmap = make_colormap.custom_rgb(rgb, name = 'volkers')
 
     [X, Y] = np.meshgrid(mfit.lower_limit.values, mfit.window)
     fig = plt.figure(figsize=(12. , 8.))
 
     fig.suptitle(title)
+    
+    x_llim = 0.
+    x_ulim = 16.
+    
+    y_llim = 1.
+    y_ulim = 4.
     
     fig_x = 0.44
     fig_y = 0.23
@@ -161,7 +225,7 @@ def rayleigh_mask(dir_out, fname, title, dpi_val, color_reduction,
     ax.set_xlim([x_llim, x_ulim])
     
     ax2 = fig.add_axes([fig_edg2_x, fig_edg3_y, fig_x, fig_y])
-    ax2.pcolormesh(X, Y, msem, vmin = 0, vmax = 1)
+    ax2.pcolormesh(X, Y, rsem.values <= rsem_lim, vmin = 0, vmax = 1)
     ax2.set_title('Relative SEM mask', pad = 5)
     ax2.set_ylim([y_llim, y_ulim])
     ax2.set_xlim([x_llim, x_ulim])
@@ -188,15 +252,17 @@ def rayleigh_mask(dir_out, fname, title, dpi_val, color_reduction,
     ax5.set_xlim([x_llim, x_ulim])
 
     ax6 = fig.add_axes([fig_edg2_x, fig_edg1_y, fig_x, fig_y])
-    ax6.pcolormesh(X, Y, mfit, vmin = 0., vmax = 1.)
-    ax6.set_title('Combined Mask', pad = 5)
-    # ax6.grid(which = 'both')
-    # ax6.axes.xaxis.set_minor_locator(MultipleLocator(1))
+    plot6 = ax6.pcolormesh(X, Y, 100. * rsem.where(mfit).values, vmin = 0., vmax = 2., cmap = vlk_cmap)
+    ax6.set_title('Masked Relative SEM (%)', pad = 5)
+    ax6.grid(which = 'both')
+    ax6.axes.xaxis.set_minor_locator(MultipleLocator(1))
     ax6.set_xlabel('Lower Limit [km]')
     ax6.set_ylim([y_llim, y_ulim])
     ax6.set_xlim([x_llim, x_ulim])
     
-    # cax = fig.add_axes([fig_edg2_x + 0.01, fig_edg1_y +0.01, 0.01, fig_y -0.02])
+    cax = fig.add_axes([fig_edg2_x + 0.01, fig_edg1_y +0.01, 0.01, fig_y -0.02])
+
+    fig.colorbar(plot6, cax=cax, orientation='vertical')
     
     fpath = os.path.join(dir_out, fname)
 
@@ -494,6 +560,8 @@ def telecover_sec(dir_out, fname, title, dpi_val, color_reduction,
     ax5.plot(X, 0.05 * np.ones(X.shape), '--', 
              color = 'black', zorder = 10, alpha = 0.7)
 
+    ax5.axvspan(norm_region[0], norm_region[1], alpha = 0.2, facecolor = 'tab:grey')
+
     ax5.set_xticks(x_ticks, labels = x_ticks)
     ax5.set_xlim([x_llim, x_ulim])
     ax5.set_xlabel(x_label)
@@ -724,6 +792,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     
     ax4.plot([X[0], X[-1]], [0., 0.], color = 'black')
 
+    ax4.axvspan(norm_region[0], norm_region[1], alpha = 0.2, facecolor = 'tab:grey')
+
     ax4.set_xlim([x_ulim, 20.])
     # ax4.set_xlabel(x_label)
     ax4.xaxis.set_minor_locator(MultipleLocator(2.))
@@ -755,6 +825,8 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
     ax5.plot(X, 0.05 * np.ones(X.shape), '--', 
              color = 'black', zorder = 10, alpha = 0.7)
 
+    ax5.axvspan(norm_region[0], norm_region[1], alpha = 0.2, facecolor = 'tab:grey')
+
     ax5.set_xticks(x_ticks, labels = x_ticks)
     ax5.set_xlim([x_llim, x_ulim])
     ax5.set_xlabel(x_label)
@@ -781,7 +853,7 @@ def telecover_rin(dir_out, fname, title, dpi_val, color_reduction,
             
     return(fpath)
 
-def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
+def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction, 
                              cal_region, vdr_region,
                              x_vals_cal, x_vals_vdr,
                              y1_vals, y2_vals, y3_vals, y4_vals, y5_vals, y6_vals,
@@ -967,7 +1039,7 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
             r'$H_R$: '+f'{np.round(H_R,4)}, $H_T$: '+f'{round_it(H_T,4)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
     ax2.text(0.05 * x_ulim_vdr, 0.06 * y_ulim_vdr, 
-            r'$SR$ > '+f'{np.round(sr_lim,3)}, ' + r'$Δδ_p$ < ' + f'{np.round(err_p,decimals = 2)}',
+            r'$SR$ > '+f'{np.round(sr_lim,3)}, ' + r'$Δδ_p$ < ' + f'{np.round(err_p,decimals = 3)}',
             bbox = dict(facecolor = 'tab:cyan', alpha = 0.22, zorder = 3)) 
 
     fpath = os.path.join(dir_out, fname)
@@ -993,9 +1065,19 @@ def make_filename(metadata, channel, meas_type, version, extra_type = '', extra_
     
     return(fname)
 
-def make_filename_intercomparison(metadata_1, metadata_2, channel_1, channel_2, version, extra_type = ''):
+def make_filename_intercomparison(metadata_1, metadata_2, channel_1, channel_2,
+                                  slice_time, smoothing_window, normalization_range,
+                                  version, extra_type = ''):
         
-    parts = [str(metadata_1['meas_id']), str(metadata_2['meas_id']), str(metadata_1['lidar_id']), str(metadata_2['lidar_id']), 'cmp', str(channel_1), str(channel_2), str(extra_type), 'ATLAS', str(version)]        
+    if slice_time == None: slice_time = ""
+    else: slice_time = f"{slice_time[0]}_{slice_time[1]}"
+
+    if smoothing_window == None: smoothing_window = ""
+    else: smoothing_window = f"win_{smoothing_window}"
+    if normalization_range == None: normalization_range = ""
+    else: normalization_range = f"nrm_{normalization_range[0]}_{normalization_range[1]}"
+    
+    parts = [str(metadata_1['meas_id']), str(metadata_2['meas_id']), str(metadata_1['lidar_name']), str(metadata_1['config_id']), str(metadata_2['lidar_name']), str(metadata_2['config_id']), 'cmp', str(channel_1), str(channel_2), str(slice_time), str(smoothing_window), str(normalization_range), str(extra_type), 'ATLAS', str(version)]        
 
     fname = "_".join([part for part in parts if len(part) > 0])
     

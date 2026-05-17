@@ -35,7 +35,7 @@ from arc_actris import arc
 
 from typing import Any, Dict
 from utils.dataarray_utils import shallow_copy
-from helper_functions.printouts import print_entry
+from utils.printouts import print_entry
 
 def compute_molecular_calculations(
     processing_info: Dict[str, Any],
@@ -50,7 +50,7 @@ def compute_molecular_calculations(
 
     temperature_scale = np.arange(180.0, 330.0, 10.0)
 
-    parameters = ["c_ext", "c_bsc", "ext", "bsc", "OD", "atten_bsc"]
+    opto_parameters = ["c_ext", "c_bsc", "ext", "bsc", "OD", "atten_bsc"]
     bin_chunk_size = 4096
 
     molecular = {}
@@ -66,7 +66,7 @@ def compute_molecular_calculations(
         meteo_on_bins = (
             meteo[key]
             .interp(height_asl=height_asl[key])
-            .transpose("channel", "parameters", "bins")
+            .transpose("channel", "atmo_parameters", "bins")
         )
 
         emitted_wavelength = channel_info[key].loc["emitted_wavelength"]
@@ -87,13 +87,13 @@ def compute_molecular_calculations(
 
             T_on_bins = (
                 meteo_on_bins
-                .sel(channel=ch, parameters="T")
+                .sel(channel=ch, atmo_parameters="T")
                 .reset_coords(drop=True)
             )
 
             N_on_bins = (
                 meteo_on_bins
-                .sel(channel=ch, parameters="N")
+                .sel(channel=ch, atmo_parameters="N")
                 .reset_coords(drop=True)
             )
 
@@ -164,9 +164,9 @@ def compute_molecular_calculations(
                     atten_bsc_on_bins,
                 ],
                 dim=xr.DataArray(
-                    parameters,
-                    dims="parameters",
-                    name="parameters",
+                    opto_parameters,
+                    dims="opto_parameters",
+                    name="atmo_parameters",
                 ),
             )
 
@@ -176,10 +176,10 @@ def compute_molecular_calculations(
 
         molecular[key] = (
             xr.concat(molecular_channels, dim="channel")
-            .transpose("channel", "parameters", "bins")
+            .transpose("channel", "opto_parameters", "bins")
             .chunk({
                 "channel": 1,
-                "parameters": -1,
+                "opto_parameters": -1,
                 "bins": bin_chunk_size,
             })
         )

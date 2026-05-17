@@ -8,9 +8,12 @@ Created on Tue Jun 10 18:39:28 2025
 
 
 import numpy as np
+from utils.toolbox import round_it
 from matplotlib import pyplot as plt
-from ..plotting.plot_utils import round_it, export_plot
+from visualizer.plot_utils import export_plot
 from matplotlib.ticker import MultipleLocator
+from visualizer.generate_rayleigh_fit_axis import get_rayleigh_fit_y_limits
+from visualizer.plot_utils import get_vertical_axis_label
 
 def generate_plot(X, Y1, Y2, Y1E, args):
 
@@ -54,16 +57,29 @@ def left_panel(fig, ax1_coords, X, Y1, Y1E, Y2, args):
 
 
     ax.set_xticks(x_ticks_1, labels = x_tick_labels_1)
+    
     ax.set_xlim([args["x_lims"][0], args["x_lims"][1]])
-    ax.set_xlabel(args['x_label'])
+    
+    # Get the x axis label depending on use_dis
+    x_label = get_vertical_axis_label(args['vertical_scale'])
+    ax.set_xlabel(x_label)
     
     x_tick = args['x_tick']
     ax.xaxis.set_minor_locator(MultipleLocator(x_tick / 2.))
 
-    ax.set_ylim([args['y_lims'][0], args['y_lims'][1]])
+    # Get the limits of the y axis in case they are not provided by the user (default)
+    y_lims = get_rayleigh_fit_y_limits(
+        y1_vals = Y1, 
+        y2_vals = Y2, 
+        y_lims = args['y_lims'], 
+        wavelength = args['detected_wavelength'], 
+        use_lin_scale = args['use_lin_y_scale']
+        )
+    
+    ax.set_ylim([y_lims[0], y_lims[1]])
     ax.set_ylabel(y1_label)
     
-    use_lin_scale = args['use_lin_scale']
+    use_lin_scale = args['use_lin_y_scale']
     
     if use_lin_scale == False:
         ax.set_yscale('log')
@@ -73,19 +89,19 @@ def left_panel(fig, ax1_coords, X, Y1, Y1E, Y2, args):
     if ax.get_legend_handles_labels() != ([], []):
         ax.legend(loc = 'lower left')
 
-    ax.axvspan(args['normalization_region'][0], 
-               args['normalization_region'][1], 
+    ax.axvspan(args['norm_region'][0], 
+               args['norm_region'][1], 
                alpha = 0.2, facecolor = 'tab:grey')
     
     box_colors = \
         mask_to_color(masks_norm_region = args["masks_norm_region"],
-                      norm_region_flag = args['normalization_flag'])
+                      norm_region_flag = args['norm_flag'])
         
     box_edge_x, box_edge_y = box_edges(x_ulim = args['x_lims'][1], 
-                                       y_ulim = args['y_lims'][1], 
+                                       y_ulim = y_lims[1], 
                                        use_lin_scale = use_lin_scale)
     
-    box_text = get_box_text(norm_region = args['normalization_region'], 
+    box_text = get_box_text(norm_region = args['norm_region'], 
                             stats_norm_region = args["stats_norm_region"])
     
     ax = add_text_ax1(ax, 
@@ -116,7 +132,10 @@ def right_panel(fig, ax2_coords, X, Y1, Y1E, Y2, args):
     
     ax2.set_xticks(x_ticks_2, labels = x_tick_labels_2)
     ax2.set_xlim([args['x_lims'][0], args['x_lims'][1]])
-    ax2.set_xlabel(args['x_label'])
+    
+    # Get the x axis label depending on use_dis
+    x_label = get_vertical_axis_label(args['vertical_scale'])
+    ax2.set_xlabel(x_label)
     ax2.xaxis.set_minor_locator(MultipleLocator(args['x_tick']))
     
     y_ticks = np.round(np.arange(-0.40, 0.40 + 0.10, 0.10), decimals = 2)
@@ -126,22 +145,11 @@ def right_panel(fig, ax2_coords, X, Y1, Y1E, Y2, args):
     
     ax2.grid(which = 'both')
     
-    ax2.axvspan(args['normalization_region'][0], 
-                args['normalization_region'][1], 
+    ax2.axvspan(args['norm_region'][0], 
+                args['norm_region'][1], 
                 alpha = 0.2, facecolor = 'tab:grey')
     
     return(ax2)
-
-def get_x_label(use_dis):
-
-    # Get the x axis label
-    if use_dis:
-        x_label = 'Range above the lidar [km]'
-        
-    else:
-        x_label = 'Height above the lidar [km]'
-    
-    return(x_label)
 
 def get_y1_label():
     
@@ -214,7 +222,7 @@ def add_text_ax1(ax, box_colors, box_edge_x, box_edge_y, box_text):
  
 
 
-    for key in ["normalization_region", "max_channel_height"]:
+    for key in ["norm_region", "max_channel_height"]:
         ax.text(box_edge_x['low_mid'], box_edge_y[key], 
                 box_text[key],
                 transform = ax.transAxes,
@@ -299,7 +307,7 @@ def mask_to_color(masks_norm_region, norm_region_flag):
     else: 
         c_mext = 'tab:red'
         
-    box_colors = {'normalization_region': c_nrmg,
+    box_colors = {'norm_region': c_nrmg,
                   'max_channel_height': c_maxh,
                   'relative_sem':c_msem,
                   'first_derivative':c_mder,
@@ -324,7 +332,7 @@ def get_box_text(norm_region, stats_norm_region):
     rslope = stats_norm_region['first_derivative']
     
     box_text = {
-        'normalization_region':f'norm. window: {n_llim} - {n_ulim} km',
+        'norm_region':f'norm. window: {n_llim} - {n_ulim} km',
         'max_channel_height':f'max ch height: {max_ch_h} km',
         'relative_sem':f'rsem: {round_it(rsem, 3)}',
         'first_derivative':f'rslope: {round_it(rslope, 3)}',
@@ -348,7 +356,7 @@ def box_edges(x_ulim, y_ulim, use_lin_scale):
         }
     
     # box_edge_y = {
-    #     'normalization_region':0.90,
+    #     'norm_region':0.90,
     #     'max_channel_height':0.77,
     #     'relative_sem':0.64,
     #     'first_derivative':0.90,
@@ -361,7 +369,7 @@ def box_edges(x_ulim, y_ulim, use_lin_scale):
     #     }   
 
     box_edge_y = {
-        'normalization_region':0.06,
+        'norm_region':0.06,
         'max_channel_height':0.20,
         'relative_sem':0.90,
         'first_derivative':0.77,

@@ -8,7 +8,7 @@ Created on Tue Jul 26 15:22:31 2022
 
 import numpy as np
 import xarray as xr
-from helper_functions.printouts import print_header, endpoint
+from utils.printouts import print_header, endpoint
 from itertools import combinations
 import pandas as pd
 from typing import Any, Dict, Tuple

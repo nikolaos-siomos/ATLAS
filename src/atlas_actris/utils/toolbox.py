@@ -76,3 +76,16 @@ def find_nearest_file(mtime, bnames, filetype = 'ecmwf'):
         rsonde_flag = "usable"
         
     return(selected_file, rsonde_flag)
+
+def round_it(x, sig):
+    
+    if not np.isfinite(x):
+        x = -999.
+        sig = 3
+        
+    if x != 0.:
+        x_out = np.round(x, sig-int(np.floor(np.log10(abs(x))))-1)
+    else:
+        x_out = 0.
+        
+    return x_out

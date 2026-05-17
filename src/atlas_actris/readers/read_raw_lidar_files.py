@@ -14,7 +14,7 @@ from datetime import datetime
 import re
 from typing import Callable, Optional
 from typing import Any, Dict, List, Tuple
-from helper_functions.printouts import print_header, print_subsection, endpoint
+from utils.printouts import print_header, print_subsection, endpoint
 import contextlib, io
 from utils.error_classes import FileReaderError
 

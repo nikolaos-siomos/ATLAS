@@ -55,10 +55,11 @@ def get_source_map(io_id):
         'height_agl':{'db':'height_agl_db', 'item_id':io_id},
         'height_asl':{'db':'height_asl_db', 'item_id':io_id},
         'system_info':{'db':'system_info_db', 'item_id':io_id},
+        'time_info':{'db':'time_info_db', 'item_id':io_id},
         'channel_info':{'db':'channel_info_db', 'item_id':io_id},
         'pol_cal_info':{'db':'pol_cal_info_db', 'item_id':io_id},
+        'radiosonde_info':{'db':'radiosonde_info_db', 'item_id':io_id},
         'gluing_info':{'db':'gluing_info_db', 'item_id':io_id},
-        'time_info':{'db':'time_info_db', 'item_id':io_id},
         'shots':{'db':'shots_db', 'item_id':io_id},
         }
 

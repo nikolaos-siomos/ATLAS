@@ -18,6 +18,8 @@ def rayleigh(dir_out, fname, header, alt, atb, rcs):
     body = body[~mask,:]
     
     fpath = os.path.join(dir_out, 'ascii', fname)
+    
+    os.makedirs(os.path.join(dir_out, "ascii"), exist_ok=True)
 
     np.savetxt(fpath, body, header = header, comments = '', 
                delimiter = ',', fmt = '%.6e')

@@ -9,7 +9,7 @@ import copy
 
 from typing import Any, Dict
 from utils.error_classes import CustomWarning
-from helper_functions.printouts import print_subsection
+from utils.printouts import print_subsection
 
 def compute_detect_saturation(
     caller_info: Dict[str, Any],

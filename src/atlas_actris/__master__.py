@@ -9,11 +9,11 @@ Created on Wed Sep 21 10:21:48 2022
 from version import __version__
 import os, warnings, glob, sys
 from utils.error_classes import CustomWarning
-from helper_functions import running_options
-from helper_functions import processing_chain
-from helper_functions import read_master_config
-from helper_functions.parse_master_args import call_parser as parse_mst
-from helper_functions.parse_master_args import check_parser as check_mst
+from utils import running_options
+from utils import processing_chain
+from utils import read_master_config
+from utils.parse_master_args import call_parser as parse_mst
+from utils.parse_master_args import check_parser as check_mst
 import numpy as np
 
 def main(mst_args):

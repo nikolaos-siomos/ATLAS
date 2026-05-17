@@ -8,8 +8,8 @@ Created on Thu Mar 20 21:43:45 2025
 
 import os, glob
 import numpy as np
-from helper_functions.parse_master_args import call_parser as parse_mst
-from helper_functions.parse_master_args import check_parser as check_mst
+from utils.parse_master_args import call_parser as parse_mst
+from utils.parse_master_args import check_parser as check_mst
 from visualizer.writters import export_html
 
 def autodetect_paths(parser_args):

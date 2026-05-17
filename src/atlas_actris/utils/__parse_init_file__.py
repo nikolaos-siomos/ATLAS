@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import os, sys
 from utils.caller_utils import autodetect_paths
-from helper_functions.printouts import print_header, endpoint
+from utils.printouts import print_header, endpoint
 from pprint import pprint
 from utils.error_classes import ConfigError, CustomWarning
 from datetime import datetime
@@ -103,8 +103,9 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "quick_run":           {"dtype": bool, "default": False,    "is_list": False, "category": "optional"},
     "process":             {"dtype": str,  "default": qa_tests, "is_list": True,  "category": "optional", "allowed": qa_tests + ['off']},
     "process_qck":         {"dtype": str,  "default": qck_tests,"is_list": True,  "category": "optional", "allowed": qa_tests + ['off']},
-    "use_range":           {"dtype": bool, "default": True,     "is_list": False, "category": "optional"},
+    "vertical_scale":      {"dtype": str,  "default": 'range',  "is_list": False, "category": "optional", "allowed": ['range', 'height_agl', 'height_asl']},
     "dpi":                 {"dtype": int,  "default": 300,      "is_list": False, "category": "optional"},
+    "color_reduction":     {"dtype": bool, "default": False,    "is_list": False, "category": "optional"},
     "output_folder":       {"dtype": str,  "default": None,     "is_list": False, "category": "optional"},
     "expert_analyst":      {"dtype": str,  "default": None,     "is_list": False, "category": "optional"},
     "debug_signals":       {"dtype": bool, "default": False,    "is_list": False, "category": "optional"},

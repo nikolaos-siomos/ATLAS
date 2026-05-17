@@ -12,7 +12,7 @@ import xarray as xr
 import re
 import netCDF4 as nc
 from utils.error_classes import CustomWarning
-from helper_functions.printouts import print_header, print_subsection, print_entry
+from utils.printouts import print_header, print_subsection, print_entry
 from utils.toolbox import get_mid_time, find_nearest_file
 from molecular.utilities import number_density_at_pt, saturation_vapour_pressure
 from utils.unit_conversions import km_asl_to_m_asl, m_agl_to_m_asl, \
@@ -178,12 +178,12 @@ def export_radiosonde_scc(nc_path, st_name, wmo_id, wban_id,
 # Adding Variables
     make_nc_var(ds, name = 'Altitude', value = meteo.height.values, dtype = 'float', dims = ('points',))
 
-    make_nc_var(ds, name = 'Pressure', value = meteo.loc[dict(parameters = 'P')].values, dtype = 'float', dims = ('points',))
+    make_nc_var(ds, name = 'Pressure', value = meteo.loc[dict(atmo_parameters = 'P')].values, dtype = 'float', dims = ('points',))
 
-    make_nc_var(ds, name = 'Temperature', value = meteo.loc[dict(parameters = 'T')].values, dtype = 'float', dims = ('points',))
+    make_nc_var(ds, name = 'Temperature', value = meteo.loc[dict(atmo_parameters = 'T')].values, dtype = 'float', dims = ('points',))
 
-    if 'RH' in meteo.parameters.values:
-        make_nc_var(ds, name = 'RelativeHumidity', value = meteo.loc[dict(parameters = 'RH')].values, dtype = 'float', dims = ('points',))
+    if 'RH' in meteo.atmo_parameters.values:
+        make_nc_var(ds, name = 'RelativeHumidity', value = meteo.loc[dict(atmo_parameters = 'RH')].values, dtype = 'float', dims = ('points',))
 
     ds.close()
     
@@ -261,9 +261,9 @@ def add_number_density(meteo):
     
     number_density = xr.DataArray([number_density], 
                                   coords = [['N'], height_asl], 
-                                  dims = ['parameters', 'height_asl'])
+                                  dims = ['atmo_parameters', 'height_asl'])
     
-    meteo = xr.concat([meteo, number_density], dim="parameters")
+    meteo = xr.concat([meteo, number_density], dim="atmo_parameters")
     
     return(meteo)
 
@@ -280,33 +280,30 @@ def add_saturation_vapour_pressure(meteo):
     
     sat_vap_pressure = xr.DataArray([sat_vap_pressure], 
                                   coords = [['e_s'], height_asl], 
-                                  dims = ['parameters', 'height_asl'])
+                                  dims = ['atmo_parameters', 'height_asl'])
     
-    meteo = xr.concat([meteo, sat_vap_pressure], dim="parameters")
+    meteo = xr.concat([meteo, sat_vap_pressure], dim="atmo_parameters")
     
     return(meteo)
 
 def read_radiosonde_ecmwf(station_altitude, radiosonde_info):
     
-    radiosonde_file = radiosonde_info['radiosonde_file']
-    mtime = radiosonde_info['measurement_time']
+    radiosonde_file = radiosonde_info.loc['radiosonde_file'].item()
+    mtime = radiosonde_info.loc['measurement_time'].item()
     
     data = xr.open_dataset(radiosonde_file)
-    
-    radiosonde_info['latitude'] = data.latitude.values
-    radiosonde_info['longitude'] = data.longitude.values
-    
+
     height = data.height.interp(time = mtime)
     pressure = data.pressure.interp(time = mtime)
     temperature = data.temperature.interp(time = mtime)
     relative_humidity = data.rh.interp(time = mtime)
     
     meteo = xr.concat([pressure, temperature, relative_humidity],
-                     dim="parameters")
+                     dim="atmo_parameters")
     
     meteo.attrs = {}
     
-    meteo = meteo.assign_coords(parameters = ['P', 'T', 'RH'])
+    meteo = meteo.assign_coords(atmo_parameters = ['P', 'T', 'RH'])
     meteo = meteo.rename(level='height')
     meteo = meteo.assign_coords(height = height.values + station_altitude).sortby("height")
     
@@ -318,7 +315,7 @@ def read_radiosonde_ecmwf(station_altitude, radiosonde_info):
 
 def read_radiosonde_wyoming(radiosonde_info):
 
-    radiosonde_file = radiosonde_info['radiosonde_file']
+    radiosonde_file = radiosonde_info.loc['radiosonde_file'].item()
     
     data = np.genfromtxt(radiosonde_file,
                          skip_header = 1, 
@@ -327,13 +324,13 @@ def read_radiosonde_wyoming(radiosonde_info):
                          autostrip = True,
                          usecols = np.array([1,0,2,5]), dtype = float)
     
-    parameters = ['P', 'T', 'RH']         
+    atmo_parameters = ['P', 'T', 'RH']         
         
     height = data[:,0]
     
     meteo = xr.DataArray(data[:,1:].T, 
-                        coords = [parameters, height], 
-                        dims = ['parameters', 'height_asl'])
+                        coords = [atmo_parameters, height], 
+                        dims = ['atmo_parameters', 'height_asl'])
     
         
     meteo = convert_units(meteo, units = ['m_asl','hPa','C','percent'])
@@ -346,7 +343,7 @@ def read_radiosonde_wyoming(radiosonde_info):
 
 def read_radiosonde_scc(radiosonde_info):
     
-    radiosonde_file = radiosonde_info['radiosonde_file']
+    radiosonde_file = radiosonde_info.loc['radiosonde_file']
     
     file = xr.open_dataset(radiosonde_file)
     
@@ -360,12 +357,12 @@ def read_radiosonde_scc(radiosonde_info):
     else:
         RH = np.nan * np.zeros(height.size)
         
-    parameters = ['P', 'T', 'RH']         
+    atmo_parameters = ['P', 'T', 'RH']         
 
     meteo = xr.DataArray(
         np.stack([P, T, RH], axis = 0), 
-        coords = [parameters, height], 
-        dims = ['parameters', 'height_asl']
+        coords = [atmo_parameters, height], 
+        dims = ['atmo_parameters', 'height_asl']
         )
     
     meteo = convert_units(meteo, units = ['m_asl','hPa','K','percent'])
@@ -384,7 +381,7 @@ def read_radiosonde_scc(radiosonde_info):
 
 def read_radiosonde_ascii(caller_info, radiosonde_info):
     
-    radiosonde_file = radiosonde_info['radiosonde_file']
+    radiosonde_file = radiosonde_info.loc['radiosonde_file'].item()
     
     # Unpack parsing options
     rsonde_skip_header = caller_info['rsonde_skip_header']
@@ -407,13 +404,13 @@ def read_radiosonde_ascii(caller_info, radiosonde_info):
     if len(rsonde_column_units) == 3:
         data = np.vstack([data, np.nan * np.zeros(data.shape[0])])
         
-    parameters = ['P', 'T', 'RH']         
+    atmo_parameters = ['P', 'T', 'RH']         
         
     height = data[:,0]
     
     meteo = xr.DataArray(data[:,1:].T, 
-                        coords = [parameters, height], 
-                        dims = ['parameters', 'height_asl'])
+                        coords = [atmo_parameters, height], 
+                        dims = ['atmo_parameters', 'height_asl'])
     
     meteo = convert_units(
         meteo, 
@@ -429,49 +426,45 @@ def read_radiosonde_ascii(caller_info, radiosonde_info):
 
 def load_radiosonde(caller_info, metadata):
     
-    if caller_info['rsonde_status'] == 0:
+    if caller_info['radiosonde_status'] == 0:
         
         print_header("Parsing radiosonde file")
 
         radiosonde_info = metadata['radiosonde_info']
         
         meteo = {}
-    
-        qa_tests = radiosonde_info.keys()    
-        
-        for key in qa_tests:
             
-            if radiosonde_info[key]:
+        for key in radiosonde_info:
+                        
+            radiosonde_format = radiosonde_info[key].loc['radiosonde_format'].item()
+            
+            if radiosonde_format == 'ecmwf':
+                print_entry("Parsing downloaded Cloudnet meteorological files")
+                station_altitude = float(metadata['system_info'][key].loc['station_altitude'].values)
+                da = read_radiosonde_ecmwf(station_altitude, radiosonde_info[key])
+
+            elif radiosonde_format == 'wyoming':
+                print_entry("Parsing downloaded Wyoming radiosonde")
+                da = read_radiosonde_wyoming(radiosonde_info[key])
                 
-                radiosonde_format = radiosonde_info[key]['radiosonde_format']
+            elif radiosonde_format == 'ascii':
+                print_entry("Parsing manually provided ASCII radiosonde")
+                da = read_radiosonde_ascii(caller_info, radiosonde_info[key])
                 
-                if radiosonde_format == 'ecmwf':
-                    print_entry("Parsing downloaded Cloudnet meteorological files")
-                    station_altitude = float(metadata['system_info'][key].loc['station_altitude'].values)
-                    da = read_radiosonde_ecmwf(station_altitude, radiosonde_info[key])
-    
-                elif radiosonde_format == 'wyoming':
-                    print_entry("Parsing downloaded Wyoming radiosonde")
-                    da = read_radiosonde_wyoming(radiosonde_info[key])
-                    
-                elif radiosonde_format == 'ascii':
-                    print_entry("Parsing manually provided ASCII radiosonde")
-                    da = read_radiosonde_ascii(caller_info, radiosonde_info[key])
-                    
-                elif radiosonde_format == 'scc':
-                    print_entry("Parsing manually provided SCC radiosonde")
-                    da = read_radiosonde_scc(radiosonde_info[key])
-                
-                else:
-                    da = None
-                    CustomWarning(f"Radiosonde format {radiosonde_format} not understood. Radiosonde was not parsed")
-                
-                if da is not None:
-                    meteo[key] = da.chunk({
-                        "parameters": -1,
-                        "height_asl": -1,
-                    })
-                
+            elif radiosonde_format == 'scc':
+                print_entry("Parsing manually provided SCC radiosonde")
+                da = read_radiosonde_scc(radiosonde_info[key])
+            
+            else:
+                da = None
+                CustomWarning(f"Radiosonde format {radiosonde_format} not understood. Radiosonde was not parsed")
+            
+            if da is not None:
+                meteo[key] = da.chunk({
+                    "atmo_parameters": -1,
+                    "height_asl": -1,
+                })
+            
     return(meteo, metadata)
 
     

@@ -12,7 +12,7 @@ import warnings
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import os
-from helper_functions.printouts import print_header
+from utils.printouts import print_header
 from pprint import pprint
 from utils.error_classes import ConfigError, CustomWarning
 
@@ -32,19 +32,21 @@ SCHEMA_QCK: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
     "t_lims":      {"dtype": str,   "default": [],        "is_list": True},
     "t_tick":      {"dtype": int,   "default": None,      "is_list": False, "min": 5},
-    "y_lims":      {"dtype": float, "default": [0., 14.], "is_list": True,  "min": 0., "max": 100., "size": 2},
-    "y_tick":      {"dtype": float, "default": 1.,        "is_list": False, "min": 0., "max": 10},   
-    "z_lims":      {"dtype": float, "default": [],        "is_list": True, "size": 2}, 
-    "z_max_zone":  {"dtype": float, "default": [0.1, 2.], "is_list": True, "min": 0., "max": 30., "size": 2},
-    "z_min_zone":  {"dtype": float, "default": [2., 10.], "is_list": True, "min": 0., "max": 30., "size": 2},
+    "x_lims":      {"dtype": float, "default": [0., 14.], "is_list": True,  "min": 0., "max": 100., "size": 2},
+    "x_tick":      {"dtype": float, "default": 1.,        "is_list": False, "min": 0., "max": 10},   
+    "y_lims":      {"dtype": float, "default": [],        "is_list": True, "size": 2}, 
+    "y_max_zone":  {"dtype": float, "default": [0.2, 2.], "is_list": True, "min": 0., "max": 30., "size": 2},
 
-    "smooth":                           {"dtype": bool,  "default": False,       "is_list": False},
-    "smoothing_range":                  {"dtype": float, "default": [0.05, 15.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},
-    "smoothing_constant_window":        {"dtype": float, "default": None,        "is_list": False, "min": 0.05, "max": 10.},
-    "smoothing_progressive_window":     {"dtype": float, "default": [0.05, 0.5], "is_list": True,  "min": 0.05, "max": 10.,  "size": 2},
-    "smoothing_exponential":            {"dtype": bool,  "default": False,       "is_list": False},
+    "use_log_y_scale":          {"dtype": bool,    "default": False,     "is_list": False},
 
-    "channels":                 {"dtype": str,"default": [], "is_list": True},
+    "smooth":                   {"dtype": bool,  "default": False,       "is_list": False},
+    "smoothing_range":          {"dtype": float, "default": [0.05, 15.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},
+    "smoothing_window":         {"dtype": float, "default": [0.05, 0.5], "is_list": True,  "min": 0.05, "max": 10.,  "size": 2},
+    "smoothing_exponential":    {"dtype": bool,  "default": False,       "is_list": False},
+
+
+    "include_channels":         {"dtype": str,"default": [], "is_list": True},
+    "exclude_wavelength":       {"dtype": str,"default": [], "is_list": True},
     "exclude_telescope_type":   {"dtype": str,"default": [], "is_list": True,"allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str,"default": [], "is_list": True,"allowed": ["p", "c", "t", "v", "r", "a", "f"]},
     "exclude_acquisition_mode": {"dtype": str,"default": [], "is_list": True,"allowed": ["a", "p", "g"]},
@@ -57,7 +59,7 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "x_tick":      {"dtype": float,   "default": 2.,       "is_list": False, "min": 0.1, "max": 10.},   
     "y_lims":      {"dtype": float,   "default": [],       "is_list": True},
 
-    "use_lin_scale":               {"dtype": bool,    "default": True,      "is_list": False},
+    "use_lin_y_scale":             {"dtype": bool,    "default": False,     "is_list": False},
     "cross_check_lower_limit":     {"dtype": float,   "default": None,      "is_list": False},
     "normalization_region":        {"dtype": float,   "default": [6.,8.],   "is_list": True,  "min": 0.,   "max": 50.},
     
@@ -69,14 +71,15 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "second_derivative_threshold": {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
     "shapiro_wilk_threshold":      {"dtype": float,   "default": 0.05,      "is_list": False, "min": 0.,    "max": 1.},
     "cross_criterium_threshold":   {"dtype": float,   "default": 1.,        "is_list": False, "min": 0.5,   "max": 5.},
+    "durbin_watson_threshold":     {"dtype": float,   "default": [1., 3.],  "is_list": True,  "min": 0.,    "max": 4.},
     
     "smooth":                           {"dtype": bool,  "default": True,        "is_list": False},
     "smoothing_range":                  {"dtype": float, "default": [0.05, 31.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},
-    "smoothing_constant_window":        {"dtype": float, "default": 0.5,         "is_list": False, "min": 0.05, "max": 10.},
-    "smoothing_progressive_window":     {"dtype": float, "default": [],          "is_list": True,  "min": 0.05, "max": 10.,  "size": 2},
+    "smoothing_window":                 {"dtype": float, "default": 0.5,         "is_list": False, "min": 0.05, "max": 10.},
     "smoothing_exponential":            {"dtype": bool,  "default": False,       "is_list": False},
 
-    "channels":                 {"dtype": str,"default": [], "is_list": True},
+    "include_channels":         {"dtype": str,"default": [], "is_list": True},
+    "exclude_wavelength":       {"dtype": str,"default": [], "is_list": True},
     "exclude_telescope_type":   {"dtype": str,"default": [], "is_list": True,"allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str,"default": ["a","f"], "is_list": True,"allowed": ["p", "c", "t", "v", "r", "a", "f"]},
     "exclude_acquisition_mode": {"dtype": str,"default": [], "is_list": True,"allowed": ["a", "p", "g"]},
@@ -93,10 +96,11 @@ SCHEMA_TLC: Dict[str, Dict[str, Any]] = {
     "normalization_region":   {"dtype": float,   "default": [1.8, 2.2], "is_list": True},
     
     "smooth":                           {"dtype": bool,  "default": False,       "is_list": False},
-    "smoothing_constant_window":        {"dtype": float, "default": 0.1,         "is_list": False, "min": 0.05, "max": 10.},
+    "smoothing_window":                 {"dtype": float, "default": 0.1,         "is_list": False, "min": 0.05, "max": 10.},
     "smoothing_exponential":            {"dtype": bool,  "default": False,       "is_list": False},
 
-    "channels":                 {"dtype": str,"default": [], "is_list": True},
+    "include_channels":         {"dtype": str,"default": [], "is_list": True},
+    "exclude_wavelength":       {"dtype": str,"default": [], "is_list": True},
     "exclude_telescope_type":   {"dtype": str,"default": [], "is_list": True,"allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str,"default": [], "is_list": True,"allowed": ["p", "c", "t", "v", "r", "a", "f"]},
     "exclude_acquisition_mode": {"dtype": str,"default": [], "is_list": True,"allowed": ["a", "p", "g"]},
@@ -114,10 +118,11 @@ SCHEMA_TLC_RIN: Dict[str, Dict[str, Any]] = {
     "normalization_region":   {"dtype": float,   "default": [1.8, 2.2], "is_list": True},
     
     "smooth":                           {"dtype": bool,  "default": False,       "is_list": False},
-    "smoothing_constant_window":        {"dtype": float, "default": 0.1,         "is_list": False, "min": 0.05, "max": 10.},
+    "smoothing_window":                 {"dtype": float, "default": 0.1,         "is_list": False, "min": 0.05, "max": 10.},
     "smoothing_exponential":            {"dtype": bool,  "default": False,       "is_list": False},
 
-    "channels":                 {"dtype": str,"default": [], "is_list": True},
+    "include_channels":         {"dtype": str,"default": [], "is_list": True},
+    "exclude_wavelength":       {"dtype": str,"default": [], "is_list": True},
     "exclude_telescope_type":   {"dtype": str,"default": [], "is_list": True,"allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str,"default": [], "is_list": True,"allowed": ["p", "c", "t", "v", "r", "a", "f"]},
     "exclude_acquisition_mode": {"dtype": str,"default": [], "is_list": True,"allowed": ["a", "p", "g"]},
@@ -138,8 +143,7 @@ SCHEMA_PCB: Dict[str, Dict[str, Any]] = {
     
     "smooth":                           {"dtype": bool,  "default": True,        "is_list": False},
     "smoothing_range":                  {"dtype": float, "default": [0.05, 31.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},
-    "smoothing_constant_window":        {"dtype": float, "default": 0.5,         "is_list": False, "min": 0.05, "max": 10.},
-    "smoothing_progressive_window":     {"dtype": float, "default": [],          "is_list": True,  "min": 0.05, "max": 10.,  "size": 2},
+    "smoothing_window":                 {"dtype": float, "default": 0.5,         "is_list": False, "min": 0.05, "max": 10.},
     "smoothing_exponential":            {"dtype": bool,  "default": False,       "is_list": False},
 
 }

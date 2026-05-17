@@ -13,50 +13,133 @@ from typing import Any, Dict
 from version import __version__
 from dataclasses import dataclass
 
+label = {
+    'ray' : "Rayleigh",
+    'tlc' : "Telecover",
+    'pcb' : "Polarization Calibration"
+    }
+
+telescope_map = {
+    'n' : 'Near Range',
+    'f' : 'Far Range',
+    'x' : ''
+    }
+
+mode_map = {
+    'a' : 'analog',
+    'p' : 'photon'
+    }
+
+type_map = {
+    'p' : 'Co-polar',
+    'c' : 'Cross-polar',
+    't' : 'Total',
+    'v' : 'Vibrational Raman',
+    'r' : 'Rotational Raman',
+    'a' : 'Cabannes',
+    'f' : 'Fluorescence'
+    }
+
+subtype_map = {
+    'r' : 'Reflected',
+    't' : 'Transmitted',
+    'n' : 'N2',
+    'o' : 'O2',
+    'w' : 'H20',
+    'c' : 'CH4',
+    'l' : 'Low hat',
+    'h' : 'High hat',
+    'a' : 'Mie',
+    'm' : 'Molecular',
+    'b' : 'Broadband',
+    's' : 'Spectral',
+    'x' : ''
+    }
+
+
 @dataclass(frozen=True)
 class Libraries:
-    system_info: xr.DataArray
-    channel_info: xr.DataArray
-    time_info: xr.DataArray
+    caller_info: Dict[str, Any]
+    metadata: Dict[str, Any]
+    extra_metadata: Dict[str, Any]
     settings: Dict[str, Any]
+    qa_test_info: Dict[str, Any]
     
 class GenerateText:
     
-    def __init__(self, lib: Libraries, atlas_channel_id):
+    def __init__(self, lib: Libraries):
         
-        self.system_info = lib.system_info
-        self.channel_info = lib.channel_info
-        self.time_info = lib.time_info
-        
+        self.caller_info = lib.caller_info
+        self.metadata = lib.metadata
+        self.extra_metadata = lib.extra_metadata
         self.settings = lib.settings
+        self.qa_test_info = lib.qa_test_info
         
-        start_timestamp = lib.time_info.isel({'time': 0}).sel({'parameters': 'start_time'}).item()
-        stop_timestamp = lib.time_info.isel({'time': -1}).sel({'parameters': 'end_time'}).item()
+        self.metadata['start_timestamp'] = pd.Timestamp(self.metadata['start_time_first'])
+        self.metadata['stop_timestamp'] = pd.Timestamp(self.metadata['end_time_last'])
         
-        self.start_datetime = pd.to_datetime(start_timestamp)
-        self.stop_datetime = pd.to_datetime(stop_timestamp)
+        if 'radiosonde_time' in self.metadata:
+            self.metadata['radiosonde_timestamp'] = pd.Timestamp(self.metadata['radiosonde_time'])
         
-        self.atlas_channel_id = atlas_channel_id
+        if self.extra_metadata:
+            self.extra_metadata['start_timestamp'] = pd.Timestamp(self.extra_metadata['start_time_first'])
+            self.extra_metadata['stop_timestamp'] = pd.Timestamp(self.extra_metadata['end_time_last'])
+
+            if 'radiosonde_time' in self.extra_metadata:
+                self.extra_metadata['radiosonde_timestamp'] = pd.Timestamp(self.extra_metadata['radiosonde_time'])
         
-        self.scc_channel_ids = lib.channel_info.sel({'parameters':'scc_channel_id'})
-    
-        self.station_id = lib.system_info.loc["station_id"].item()
-        self.lidar_id = lib.system_info.loc["lidar_id"].item()
-        self.version_id = lib.system_info.loc["version_id"].item()
-        self.configuration_id = lib.system_info.loc["configuration_id"].item()
+        self.sm_part = sm_text(
+            smooth = self.settings['smooth'], 
+            sm_lims = self.settings['smoothing_range'], 
+            sm_win = self.settings['smoothing_window'], 
+            sm_expo = self.settings['smoothing_exponential']
+            )
+
+        self.dateloc_part = dateloc_text(
+            start_timestamp = self.metadata['start_timestamp'], 
+            stop_timestamp = self.metadata['stop_timestamp'], 
+            laser_pointing_angle = self.metadata['zenith_angle']
+            )
+        
+        self.channel_part = channel_text(
+            lidar_name = self.metadata['lidar_name'], 
+            station_name = self.metadata['station_name'], 
+            atlas_channel_id = self.metadata['atlas_channel_id'], 
+            scc_channel_id = self.metadata['scc_channel_id']
+            )
+
+        self.config_part =  config_text(
+            config_id = self.metadata['configuration_id'], 
+            config_name = self.metadata['configuration_name']
+            )
+        
+        self.if_part = if_text(
+            self.metadata['emitted_wavelength'], 
+            self.metadata['detected_wavelength'], 
+            self.metadata['channel_bandwidth']
+            )
+        
+        if 'radiosonde_time' in self.metadata:
+            self.mol_part = mol_text(
+                rs_format = self.metadata['radiosonde_format'], 
+                rs_station_name = self.caller_info['rsonde_station_name'], 
+                wmo_id = self.caller_info['rsonde_station_wmo_id'], 
+                rs_start_timestamp = self.metadata['radiosonde_timestamp']
+                )
         
     def make_filename(self, qa_test, extra_type = '', extra_channel = None):
-        
-        scc_channel_id = self.scc_channel_ids.sel({'channel':self.atlas_channel_id}).item()
+               
+        start_date = self.metadata['start_timestamp'].strftime("%Y%m%d")
+        start_time = self.metadata['start_timestamp'].strftime("%H%M%S")
         
         common_parts = [
-            self.station_id, 
-            self.configuration_id, 
-            self.start_datetime.strftime("%Y%m%d"), 
-            self.start_datetime.strftime("%H%M%S"), 
+            self.metadata['station_id'], 
+            self.metadata['configuration_id'], 
+            start_date, 
+            start_time, 
             qa_test, 
-            self.atlas_channel_id, 
-            scc_channel_id
+            self.metadata['atlas_channel_id'], 
+            self.metadata['scc_channel_id']
             ]
         
         final_parts = [
@@ -77,48 +160,271 @@ class GenerateText:
             extra_parts = []
         
         parts = common_parts + extra_parts + final_parts
+        
         filename = "_".join(
             str(part) for part in parts
             if part is not None and str(part) != ""
             )   
         
         return filename
-
+                
     def make_quicklook_title(self):
-            
-        scc_channel_id = self.scc_channel_ids.sel({'channel':self.atlas_channel_id}).item()
 
-        start_date = self.start_datetime.strftime("%Y%m%d")
-        start_time = self.start_datetime.strftime("%H%M%S")
-        stop_time = self.stop_datetime.strftime("%H%M%S")
-        
-        station_name = self.system_info.loc['station_name'].item()
-        config_id = self.system_info.loc['configuration_id'].item()
-        config_name = self.system_info.loc['configuration_name'].item()
-        lidar_name = self.system_info.loc['lidar_name'].item()
-        laser_pointing_angle = self.system_info.loc['zenith_angle'].item()
-        
-        smooth = self.settings['smooth']
-        sm_lims = self.settings['smoothing_range']
-        sm_win = self.settings['smoothing_constant_window']
-        sm_expo = self.settings['smoothing_exponential']
-
-        laser_pointing_angle = np.round(float(laser_pointing_angle), decimals = 1)
-        
-        sm_part = sm_text(smooth, sm_lims, sm_win, sm_expo)
-
-        dateloc_part = dateloc_text(start_date, start_time, stop_time, laser_pointing_angle)
-        
-        channel_part = channel_text(lidar_name, station_name, self.atlas_channel_id, scc_channel_id)
-
-        config_part =  config_text(config_id, config_name)
-
-        title = channel_part + ' - ' + sm_part + '\n'+\
-            config_part + ' - ' + dateloc_part
+        title = self.channel_part + ' - ' + self.sm_part + '\n'+\
+            self.config_part + ' - ' + self.dateloc_part
                             
         return title 
     
+    def make_rayleigh_fit_title(self):
+                        
+        title = self.channel_part + ' - ' + self.dateloc_part + ' - ' + self.sm_part + '\n'+\
+                    self.config_part + ' - ' + self.mol_part + ' - ' + self.if_part 
 
+        return title 
+
+    def make_rayleigh_fit_mask_title(self):
+        
+        title = self.channel_part + ' - ' + self.sm_part + '\n'+\
+                    self.config_part + ' - ' + self.dateloc_part + '\n'+\
+                        self.mol_part+ ' - ' + self.if_part
+
+        return title 
+    
+    def make_header_rayleigh_fit(self):
+                
+        parts = []
+        
+        parts.append(
+            header_system_text(
+                station_id = self.metadata['station_id'],
+                station_name = self.metadata['station_name'],
+                lidar_name = self.metadata['lidar_name']
+                )
+            )
+
+        parts.append(
+            header_signal_text(self.metadata['atlas_channel_id'])
+            )
+        
+        parts.append(
+            header_time_text(
+                start_timestamp = self.metadata['start_timestamp'], 
+                stop_timestamp = self.metadata['stop_timestamp'], 
+                label = label['ray']
+                )
+            )
+        
+        parts.append(
+            header_radiosonde_text(
+                rs_station_name = self.caller_info['rsonde_station_name'], 
+                wmo_id = self.caller_info['rsonde_station_wmo_id'], 
+                rs_start_timestamp = self.metadata['radiosonde_timestamp'], 
+                )
+            )
+        
+        parts.append(
+            header_rayleigh_fit_text(self.qa_test_info['norm_region'])
+            )
+        
+        header = '\n'.join(parts)
+        
+        return header
+    
+    def make_header_telecover(self):
+                
+        parts = []
+        
+        parts.append(
+            header_system_text(
+                station_id = self.metadata['station_id'],
+                station_name = self.metadata['station_name'],
+                lidar_name = self.metadata['lidar_name']
+                )
+            )
+
+        parts.append(
+            header_signal_text(self.metadata['atlas_channel_id'])
+            )
+        
+        parts.append(
+            header_time_text(
+                start_timestamp = self.extra_metadata['start_timestamp'], 
+                stop_timestamp = self.extra_metadata['stop_timestamp'], 
+                label = label['tlc']
+                )
+            )
+        
+        parts.append(
+            header_telecover_text(
+                iters = self.qa_test_info['iters'], 
+                secs = self.qa_test_info['sectors'], 
+                extra_sec = self.qa_test_info['extra_sec']
+                )
+            )
+        
+        header = '\n'.join(parts)
+        
+        return header
+
+    def make_header_polcal(self):
+                
+        parts = []
+        
+        parts.append(
+            header_system_text(
+                station_id = self.metadata['station_id'],
+                station_name = self.metadata['station_name'],
+                lidar_name = self.metadata['lidar_name']
+                )
+            )
+
+        parts.append(
+            header_signal_text_polcal(
+                atlas_channel_id_r = self.metadata['atlas_channel_id'], 
+                atlas_channel_id_t = self.extra_metadata['atlas_channel_id'])
+            )
+        
+        parts.append(
+            header_time_text(
+                start_timestamp = self.metadata['start_timestamp'], 
+                stop_timestamp = self.metadata['stop_timestamp'], 
+                label = label['pcb']
+                )
+            )
+        
+        parts.append(
+            header_time_text(
+                start_timestamp = self.extra_metadata['start_timestamp'], 
+                stop_timestamp = self.extra_metadata['stop_timestamp'], 
+                label = label['ray']
+                )
+            )
+        
+        parts.append(
+            header_polcal_text(
+                G_R = self.qa_test_info['G_R'], 
+                G_T = self.qa_test_info['G_T'], 
+                H_R = self.qa_test_info['G_R'], 
+                H_T = self.qa_test_info['G_T'], 
+                K = self.qa_test_info['K']
+                )
+            )
+        
+        header = '\n'.join(parts)
+    
+        return header                     
+    
+
+def header_system_text(station_id, station_name, lidar_name):
+    
+    if not station_id:
+        station_id = ""
+        
+    if not station_name:
+        station_name = ""
+    
+    if not lidar_name:
+        lidar_name = ""
+        
+    line_1 = f"station ID = {station_id}"
+    
+    line_2 = f"system = {lidar_name} - {station_name}"
+    
+    text = f"{line_1}\n{line_2}"
+
+    return text 
+
+def header_signal_text(atlas_channel_id):
+         
+    if telescope_map:
+        telescope_text = telescope_map[atlas_channel_id[4]]
+    else:
+        telescope_text = ''
+        
+    expression = f"{telescope_text} {subtype_map[atlas_channel_id[7]]} {type_map[atlas_channel_id[5]]}"
+
+    text = f"signal = {atlas_channel_id[:4].lstrip('0')}, {expression}, {mode_map[atlas_channel_id[6]]}, dark-subtracted"
+    
+    return text
+
+def header_signal_text_polcal(atlas_channel_id_r, atlas_channel_id_t):
+    
+    if telescope_map:
+        telescope_text_r = telescope_map[atlas_channel_id_r[4]]
+        telescope_text_t = telescope_map[atlas_channel_id_t[4]]
+    
+    else:
+        telescope_text_r = ''
+        telescope_text_t = ''
+        
+    expression_r = f'R: {telescope_text_r} {type_map[atlas_channel_id_r[5]]} {mode_map[atlas_channel_id_r[6]]}'
+    
+    expression_t = f'T: {telescope_text_t} {type_map[atlas_channel_id_t[5]]} {mode_map[atlas_channel_id_t[6]]}'
+            
+    text = f"signal = {atlas_channel_id_r[:4].lstrip('0')}, {expression_r}, {expression_t}, {mode_map[atlas_channel_id_r[6]]}, dark-subtracted"
+    
+    return text
+
+def header_time_text(start_timestamp, stop_timestamp, label = ""):
+    
+    start_date = start_timestamp.strftime("%d.%m.%Y")
+    start_time = start_timestamp.strftime("%H:%M:%S")
+    
+    duration = (stop_timestamp - start_timestamp).total_seconds
+
+    text = f"date of {label} measurement, time, duration of measurement = {start_date}, {start_time}UTC, {duration} s"
+
+    return text
+
+def header_radiosonde_text(rs_station_name, wmo_id, rs_start_timestamp):
+
+    start_date = rs_start_timestamp.strftime("%d.%m.%Y")
+    start_time = rs_start_timestamp.strftime("%H:%M:%S")
+    
+    text = f"location, WMO radiosonde station ID, date of radiosonde = {rs_station_name}, {wmo_id}, {start_date}, {start_time}UT"
+
+    return text
+
+def header_rayleigh_fit_text(norm_region):
+    
+    ray_l = np.round(norm_region[0], decimals = 1)
+    ray_u = np.round(norm_region[1], decimals = 1)
+    
+    line_1 = f"lower and upper Rayleigh height limits = {ray_l}, {ray_u}"
+    
+    line_2 = "range, attnRayleighBSC, RangeCorrectedSignal"
+    
+    text = f"{line_1}\n{line_2}"
+    
+    return text
+
+def header_telecover_text(iters, secs, extra_sec):
+    
+    extra = [f'{key}{iters+1}' for key in extra_sec.keys() if extra_sec[key]]
+    
+    iter_num = np.arange(1,iters+1,1)
+    
+    combo = []
+    for num in iter_num:
+        for sec in secs:
+            combo.append(f'{sec}{num}')
+    
+    sec_text = ', '.join(combo+extra) 
+    
+    text = f"range, {sec_text}"
+    
+    return text
+
+def header_polcal_text(G_R, G_T, H_R, H_T, K):
+    
+    line_1 = f"GR, GT, HR, HT, K = {G_R} {G_T} {H_R} {H_T} {K}"
+    
+    line_2 = "range, ITplus45, IRplus45, ITminus45, IRminus45, ITRayleigh, IRRayleigh"
+    
+    text = f"{line_1}\n{line_2}"
+
+    return text
+    
 def sm_text(smooth, sm_lims, sm_win, sm_expo):
 
     if smooth != True:
@@ -128,45 +434,91 @@ def sm_text(smooth, sm_lims, sm_win, sm_expo):
     sm_ulim = np.round(float(sm_lims[-1]), decimals=3)
 
     if isinstance(sm_win, (list, tuple, np.ndarray)):
-        sm_lwin = np.round(float(sm_win[0]), decimals=0)
-        sm_uwin = np.round(float(sm_win[-1]), decimals=0)
-
-        if sm_lwin > sm_uwin:
-            change = "Decrease"
+        if len(sm_win):
+            sm_lwin = np.round(float(sm_win[0]), decimals=3)
+            sm_uwin = np.round(float(sm_win[-1]), decimals=3)
+    
+            if sm_lwin > sm_uwin:
+                change = "Decrease"
+            else:
+                change = "Increase"
+    
+            if sm_expo == True:
+                sm_type = "Exp"
+            else:
+                sm_type = "Lin"
+    
+            sm_part = (
+                f"Smoothing: {sm_llim} to {sm_ulim} km, "
+                f"Win: {sm_lwin} km to {sm_uwin} km, "
+                f"{change}: {sm_type}"
+            )
+        
         else:
-            change = "Increase"
-
-        if sm_expo == True:
-            sm_type = "Exp"
-        else:
-            sm_type = "Lin"
-
-        sm_part = (
-            f"Smoothing: {sm_llim} to {sm_ulim} km, "
-            f"Win: {sm_lwin}m to {sm_uwin}m, "
-            f"{change}: {sm_type}"
-        )
+            sm_part = "No Smoothing"
 
     else:
-        sm_win = np.round(float(sm_win), decimals=0)
-        sm_part = f"Smoothing: {sm_llim} to {sm_ulim} km, Win: {sm_win}m"
+        if sm_win:
+            sm_win = np.round(float(sm_win), decimals=3)
+            sm_part = f"Smoothing: {sm_llim} to {sm_ulim} km, Win: {sm_win} km"
+       
+        else:
+            sm_part = "No Smoothing"
 
     return sm_part
 
-def channel_text(lidar_name, station, channel, scc_channel_id = ''):
+def channel_text(lidar_name, station_name, atlas_channel_id, scc_channel_id=""):
     
-    if scc_channel_id != '':
-        channel_part = f'{lidar_name} {station} {channel} ({scc_channel_id})'.strip()
-    else:
-        channel_part = f'{lidar_name} {station} {channel}'.strip()
+    parts = []
+
+    if lidar_name:
+        parts.append(str(lidar_name))
+
+    if station_name:
+        parts.append(str(station_name))
+
+    parts.append(str(atlas_channel_id))
+
+    channel_part = " ".join(parts)
+
+    if scc_channel_id:
+        channel_part = f"{channel_part} ({scc_channel_id})"
 
     return channel_part
 
-def channel_text_ratio(lidar_name, station, channel_r, channel_t, scc_channel_id_r, scc_channel_id_t):
-    
-    channel_part = f'{lidar_name} {station} {channel_r} ({scc_channel_id_r}) to {channel_t} ({scc_channel_id_t})'.strip()
+def channel_text_ratio(
+    lidar_name,
+    station,
+    channel_r,
+    channel_t,
+    scc_channel_id_r="",
+    scc_channel_id_t="",
+):
+    parts = []
 
-    return channel_part
+    if lidar_name:
+        parts.append(str(lidar_name))
+
+    if station:
+        parts.append(str(station))
+
+    channel_part = " ".join(parts)
+
+    channel_r_text = str(channel_r)
+    channel_t_text = str(channel_t)
+
+    if scc_channel_id_r:
+        channel_r_text = f"{channel_r_text} ({scc_channel_id_r})"
+
+    if scc_channel_id_t:
+        channel_t_text = f"{channel_t_text} ({scc_channel_id_t})"
+
+    ratio_part = f"{channel_r_text} to {channel_t_text}"
+
+    if channel_part:
+        return f"{channel_part} {ratio_part}"
+
+    return ratio_part
 
 def config_text(config_id, config_name):
     
@@ -187,18 +539,16 @@ def if_text(ewl, dwl, bdw, label=""):
 
     return if_part.strip()
 
-def dateloc_text(start_date, start_time, stop_time, laser_pointing_angle):
+def dateloc_text(start_timestamp, stop_timestamp, laser_pointing_angle):
+    
+    start_date = start_timestamp.strftime("%d.%m.%Y")
+    start_time = start_timestamp.strftime("%H:%M:%S")
+    stop_time = stop_timestamp.strftime("%H:%M:%S")
     
     laser_pointing_angle = np.round(float(laser_pointing_angle), decimals = 1)
 
-    date = f'{start_date[6:]}.{start_date[4:6]}.{start_date[:4]}'
-    
-    start = f'{start_time[:2]}:{start_time[2:4]}:{start_time[4:6]}'
-
-    end = f'{stop_time[:2]}:{stop_time[2:4]}:{stop_time[4:6]}'
-    
     dateloc_part = (
-        f"On {date} from {start} to {end} UTC, "
+        f"On {start_date} from {start_time} to {stop_time} UTC, "
         + r"$\nearrow$"
         + f"{laser_pointing_angle}"
         + r"$^{o}$ ZA"
@@ -212,14 +562,11 @@ def iter_text(iters, sampling_time_per_sector):
     
     return(iter_part)
 
-def mol_text(mol_method, rs_station_name, wmo_id, wban_id, rs_start_date, rs_start_time):
+def mol_text(rs_format, rs_station_name, wmo_id, rs_start_timestamp):
+        
+    start_date = rs_start_timestamp.strftime("%d.%m.%Y")
+    start_time = rs_start_timestamp.strftime("%H:%M:%S")
     
-    rs_date = f'{rs_start_date[6:]}.{rs_start_date[4:6]}.{rs_start_date[:4]}'
-    
-    rs_start = f'{rs_start_time[:2]}:{rs_start_time[2:4]}'    
-    
-    if mol_method == 'Radiosonde': 
-        mol_part = f'{mol_method} {rs_station_name} {rs_date} {rs_start}UT {wmo_id} {wban_id}'.strip()
-    else: mol_part = f'{mol_method}'
+    mol_part = f'{rs_format.capitalize()} {rs_station_name} {start_date} {start_time}UT {wmo_id}'.strip()
     
     return mol_part

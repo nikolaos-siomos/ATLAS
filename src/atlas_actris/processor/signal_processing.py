@@ -30,9 +30,9 @@ import numpy as np
 import xarray as xr
 
 from typing import Any, Dict
-from helper_functions.printouts import print_header, print_subsection, print_entry
+from utils.printouts import print_header, print_subsection, print_entry
 
-from helper_functions.signal_utils import (
+from utils.signal_utils import (
     temporal_averaging, 
     temporal_averaging_error, 
     rolling_noise,
@@ -655,7 +655,13 @@ def compute_signal_noise(
 
         sig = profiles[key]
         
-        sig_err = rolling_noise(sig, noise_window = 21)
+        sig_m = sig.mean('time')
+        
+        N = sig.count('time')
+        
+        sig_m_err = rolling_noise(sig_m, smooth_window = 7, noise_window = 31)
+                
+        sig_err = sig_m_err.broadcast_like(sig) * np.sqrt(N)
         
         output_data['profile_error'][key] = sig_err
 

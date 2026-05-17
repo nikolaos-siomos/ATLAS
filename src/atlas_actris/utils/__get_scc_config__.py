@@ -14,7 +14,7 @@ from datetime import datetime
 import numpy as np
 import argparse
 import requests
-from helper_functions.printouts import print_header
+from utils.printouts import print_header
 from pprint import pprint
 from utils.error_classes import ConfigError, CustomWarning
 

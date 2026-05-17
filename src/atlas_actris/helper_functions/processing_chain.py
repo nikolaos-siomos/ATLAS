@@ -8,8 +8,8 @@ Created on Wed Sep 21 10:21:48 2022
 
 from version import __version__
 import os, warnings, glob
-from helper_functions import cleaner
-from helper_functions import parse_master_args
+from utils import cleaner
+from utils import parse_master_args
 from scc_converter.__scc_converter__ import main as __scc_converter__
 from processor.__preprocessor__ import main as __preprocessor__
 from visualizer.__quicklook__ import main as __quicklook__

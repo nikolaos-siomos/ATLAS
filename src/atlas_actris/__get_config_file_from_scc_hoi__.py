@@ -7,7 +7,7 @@ Created on Tue Sep 19 17:43:26 2023
 """
 
 import sys
-from .helper_functions.get_scc_config import parse_args, export_scc_config
+from .utils.get_scc_config import parse_args, export_scc_config
 from pprint import pprint
 
 def main(argv=None):

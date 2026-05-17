@@ -13,12 +13,14 @@ from utils.__parse_init_file__ import parse_call_atlas_ini
 from utils.__parse_config_file__ import parse_atlas_config_file
 from utils.__parse_settings_file__ import parse_atlas_settings_file
 
+from visualizer.__quicklook__ import generate_quicklooks
+from visualizer.__rayleigh_fit__ import generate_rayleigh_fit
+
 from utils.cookbook import run_linear_recipe
-from helper_functions.printouts import endpoint
+from utils.parse_caller_args import call_parser
 from processor.pipeline import Context, Processor
 from readers.reader_utils import special_path_rules
 from readers.read_radiosondes import load_radiosonde
-from helper_functions.parse_caller_args import call_parser
 from readers.read_raw_lidar_files import infer_format, flexible_reader
 
 from trimming.modify import (
@@ -30,8 +32,6 @@ from trimming.modify import (
     special_config_checks, 
     store_updated_metadata
     )
-
-# from helper_functions.caller_utils import autodetect_paths, prepare_master_args, export_report
 
 # Get the input .ini file path of the ATLAS caller
 cmd_args = call_parser()
@@ -82,7 +82,7 @@ config_info = bring_to_correct_type(config_info)
 metadata = store_updated_metadata(config_info, metadata)
 
 # Find radiosonde - Download if file does not exist
-caller_info, metadata = find_radiosonde(caller_info, metadata)
+metadata = find_radiosonde(caller_info, metadata)
 
 # Load radiosonde files
 meteo, metadata = load_radiosonde(caller_info, metadata)
@@ -140,11 +140,18 @@ processor.run(output_id = 'averaged', input_id = 'preprocessing_complete', stage
 processor.run(output_id = 'averaged_lr', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_low_res")
 processor.run(output_id = 'averaged_hr', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_high_res")
 
-# Packging profiles - use for quicklooks
+# Package the measurements for quicklooks
 processor.package(output_id = 'averaged_hr_qck', input_id = 'averaged_hr')
 
-from visualizer.__quicklook__ import generate_quicklooks
-generate_quicklooks(
-    data_pack = processor.export_stage('averaged_hr_qck'),
+# Rayleigh fit test
+rayleigh_fit__metadata = generate_rayleigh_fit(
+    data_pack = processor.export_test_from_stage('averaged'),
     caller_info = processor.processing_info['caller_info'],
-    settings = processor.settings_info['qck'])
+    settings_info = processor.settings_info)
+
+
+# Quicklooks
+generate_quicklooks(
+    data_pack = processor.export_test_from_stage('averaged_hr_qck'),
+    caller_info = processor.processing_info['caller_info'],
+    settings_info = processor.settings_info['qck'])

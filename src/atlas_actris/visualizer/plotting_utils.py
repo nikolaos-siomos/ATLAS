@@ -16,6 +16,7 @@ from subprocess import run
 from xarray import DataArray
 from PIL import Image
 from PIL import PngImagePlugin
+from version import __version__ as atlas_version
 
 def quicklook(dir_out, fname, title, dpi_val, color_reduction, use_log, delta_t,
               t_vals, y_vals, z_vals, 
@@ -982,31 +983,31 @@ def polarization_calibration(dir_out, fname, title, dpi_val, color_reduction,
             
     return(fpath)
 
-def make_filename(metadata, channel, meas_type, version, extra_type = '', extra_channel = None):
+def make_filename(metadata, channel, meas_type, extra_type = '', extra_channel = None):
     
     if extra_channel == None:
-        parts = [str(metadata['station_id']), str(metadata['lidar_id']), str(metadata['version_id']), str(metadata['config_id']), str(metadata['start_date']), str(metadata['start_time']), meas_type, str(channel), str(metadata['scc_channel_id'].loc[channel].values), str(extra_type), 'ATLAS', str(version)]
+        parts = [str(metadata['station_id']), str(metadata['lidar_id']), str(metadata['version_id']), str(metadata['config_id']), str(metadata['start_date']), str(metadata['start_time']), meas_type, str(channel), str(metadata['scc_channel_id'].loc[channel].values), str(extra_type), 'ATLAS', str(atlas_version)]
     else:
-        parts = [str(metadata['station_id']), str(metadata['lidar_id']), str(metadata['version_id']), str(metadata['config_id']), str(metadata['start_date']), str(metadata['start_time']), meas_type, str(channel), str(metadata['scc_channel_id'].loc[extra_channel].values), str(extra_type), 'ATLAS', str(version)]
+        parts = [str(metadata['station_id']), str(metadata['lidar_id']), str(metadata['version_id']), str(metadata['config_id']), str(metadata['start_date']), str(metadata['start_time']), meas_type, str(channel), str(metadata['scc_channel_id'].loc[extra_channel].values), str(extra_type), 'ATLAS', str(atlas_version)]
         
     fname = "_".join([part for part in parts if len(part) > 0])
     
     return(fname)
 
-def make_filename_intercomparison(metadata_1, metadata_2, channel_1, channel_2, version, extra_type = ''):
+def make_filename_intercomparison(metadata_1, metadata_2, channel_1, channel_2, extra_type = ''):
         
-    parts = [str(metadata_1['meas_id']), str(metadata_2['meas_id']), str(metadata_1['lidar_id']), str(metadata_2['lidar_id']), 'cmp', str(channel_1), str(channel_2), str(extra_type), 'ATLAS', str(version)]        
+    parts = [str(metadata_1['meas_id']), str(metadata_2['meas_id']), str(metadata_1['lidar_id']), str(metadata_2['lidar_id']), 'cmp', str(channel_1), str(channel_2), str(extra_type), 'ATLAS', str(atlas_version)]        
 
     fname = "_".join([part for part in parts if len(part) > 0])
     
     return(fname)
 
-def get_plot_metadata(metadata, args, channel, meas_type, version, data_source_id = None):
+def get_plot_metadata(metadata, args, channel, meas_type, data_source_id = None):
 
     channel_d = dict(channel = channel)
     
     plot_metadata = dict()
-    plot_metadata['processing_software'] = f"ATLAS_{version}"
+    plot_metadata['processing_software'] = f"ATLAS_{atlas_version}"
     plot_metadata['measurement_type'] = meas_type
     
     if data_source_id == None:
@@ -1068,19 +1069,3 @@ def perform_color_reduction(color_reduction, plot_path):
         im.save(plot_path)
 
     return()
-
-def export_plot(fig, args):
-    
-    dpi_val = args['dpi']
-
-    dir_out = os.path.join(args['output_folder'],'plots') 
-
-    fpath = os.path.join(dir_out, f"{args['fname']}.png")
-            
-    fig.savefig(fpath, dpi = dpi_val)
-    
-    fig.clf()
-    
-    plt.close()
-    
-    return(fpath)
