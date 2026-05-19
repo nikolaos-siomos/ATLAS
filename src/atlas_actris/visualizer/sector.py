@@ -7,9 +7,9 @@ Created on Mon Mar 27 13:37:48 2023
 """
 
 import numpy as np
-from . import normalize
-from ..tools.smoothing import sliding_average_1D_fast as smooth_1D_fast
-from ..tools.smoothing import sliding_average_2D_fast as smooth_2D_fast            
+from visualizer import normalize
+from visualizer.smoothing import sliding_average_1D_fast as smooth_1D_fast
+from visualizer.tools.smoothing import sliding_average_2D_fast as smooth_2D_fast            
 
 def process(x, y, iters, smooth, x_sm_lims, x_sm_win, expo, region):
 

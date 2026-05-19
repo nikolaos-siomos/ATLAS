@@ -13,7 +13,7 @@ from utils.dataarray_utils import shallow_copy
 from utils.printouts import print_entry
 
 packing_map = {
-    "tlc": [
+    "tlc_qua": [
         "tlc_north",
         "tlc_east",
         "tlc_south",

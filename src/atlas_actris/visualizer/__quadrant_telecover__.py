@@ -22,7 +22,7 @@ from collections import defaultdict
 import numpy as np
 
 from version import __version__
-from visualizer import export_ascii, plot_telecover
+from visualizer import export_ascii, plot_quadrant_telecover
 from utils.printouts import print_header
 from visualizer.check import check_channels
 from processor.packaging import collect_metadata
@@ -37,16 +37,10 @@ from visualizer.plot_utils import (
     add_plot_metadata,
 )
 
-# External modern axis helpers assumed to exist.
-from visualizer.generate_telecover_axis import (
-    get_telecover_x_axis,
-    get_telecover_y_limits,
-)
-
 warnings.filterwarnings("ignore")
 
 
-QA_KEY = "tlc"
+QA_KEY = "tlc_qua"
 
 SECTOR_KEYS = {
     "N": "tlc_north",
@@ -146,7 +140,7 @@ def _sector_iters(sector_profiles_ch):
     )
 
 
-def generate_telecover_quadrants(data_pack, caller_info, settings_info):
+def generate_quadrant_telecover(data_pack, caller_info, settings_info):
     """
     Generate telecover quadrant QA outputs.
 
@@ -178,12 +172,12 @@ def generate_telecover_quadrants(data_pack, caller_info, settings_info):
     if len(available_sectors) == 0:
         return qa_test_info
 
-    print_header("Initializing the Telecover quadrants test")
+    print_header("Initializing the quadrant Telecover test")
 
     # Telecover is one QA test, not a loop over multiple QA keys.
-    prepare_folder(caller_info, pattern="_tlc_")
+    prepare_folder(caller_info, pattern="_tlc_qua_")
 
-    settings = settings_info.get(QA_KEY, settings_info).copy()
+    settings = settings_info.copy()
 
     # Collect available sector DataArrays into one explicit dictionary:
     # {'N': data_pack['tlc_north']['profile'], ...}
@@ -195,6 +189,13 @@ def generate_telecover_quadrants(data_pack, caller_info, settings_info):
     vertical_scales = {
         sector_id: convert_m_to_km(
             data_pack[data_key][caller_info["vertical_scale"]]
+        )
+        for sector_id, data_key in available_sectors.items()
+    }
+    
+    ranges = {
+        sector_id: convert_m_to_km(
+            data_pack[data_key]['range']
         )
         for sector_id, data_key in available_sectors.items()
     }
@@ -215,7 +216,6 @@ def generate_telecover_quadrants(data_pack, caller_info, settings_info):
         print(f"-- channel: {ch}")
 
         ch_d = dict(channel=ch)
-        ch_key = str(ch)
 
         metadata = collect_metadata(data_pack[ref_key], atlas_channel_id=ch)
 
@@ -224,36 +224,13 @@ def generate_telecover_quadrants(data_pack, caller_info, settings_info):
             for sector_id, da in sector_profiles.items()
         }
 
-        vertical_scale_ch = vertical_scales[ref_sector].sel(ch_d)
-
-        sector_profiles_ch, vertical_scale_ch, sl_mask = _slice_sector_profiles(
-            sector_profiles_ch=sector_profiles_ch,
-            vertical_scale_ch=vertical_scale_ch,
-            settings=settings,
-            ref_sector=ref_sector,
-        )
-
-        x_vals = vertical_scale_ch.values
-
-        # Axis creation is delegated to your modern telecover-axis helper.
-        x_axis_info = get_telecover_x_axis(
-            x_vals=x_vals,
-            x_lims=settings["x_lims"],
-            x_tick=settings["x_tick"],
-            vertical_scale=caller_info["vertical_scale"],
-            telescope_type=ch_key[4] if len(ch_key) > 4 else None,
-        )
-
-        x_lbin = x_axis_info.get("x_lbin", 0)
-        x_ubin = x_axis_info.get("x_ubin", len(x_vals) - 1)
-        x_llim = x_axis_info.get("x_llim", settings["x_lims"][0])
-        x_ulim = x_axis_info.get("x_ulim", settings["x_lims"][1])
+        x_vals = vertical_scales[ref_sector].sel(ch_d)
+        ranges = vertical_scales[ref_sector].sel(ch_d)
 
         # Keep channel-specific modifications local.
         channel_settings = settings.copy()
-        channel_settings["smoothing_range"] = [x_llim, x_ulim]
         channel_settings["available_sectors"] = list(sector_profiles_ch.keys())
-
+        
         iters = _sector_iters(sector_profiles_ch)
 
         sector_processor = TelecoverSectorProcessor(
@@ -268,24 +245,10 @@ def generate_telecover_quadrants(data_pack, caller_info, settings_info):
                 x=x_vals,
                 y=da.values.copy(),
                 iters=iters,
-                x_sm_lims=[x_llim, x_ulim],
                 region=channel_settings["normalization_region"],
             )
 
             extra_sec[sector_id] = processed[sector_id]["has_extra"]
-
-        y_axis_info = get_telecover_y_limits(
-            sig=[
-                processed[sector_id]["y_m_sm"][slice(x_lbin, x_ubin + 1)]
-                for sector_id in processed
-            ],
-            sig_nr=[
-                processed[sector_id]["coef"]
-                * processed[sector_id]["y_m_sm"][slice(x_lbin, x_ubin + 1)]
-                for sector_id in processed
-            ],
-            y_lims=channel_settings["y_lims"],
-        )
 
         # Metadata returned by the QA test.
         qa_test_info[QA_KEY][ch] = collect_dict(
@@ -293,16 +256,12 @@ def generate_telecover_quadrants(data_pack, caller_info, settings_info):
                 iters,
                 list(processed.keys()),
                 extra_sec,
-                x_axis_info,
-                y_axis_info,
                 channel_settings["normalization_region"],
             ],
             data_keys=[
                 "iters",
                 "available_sectors",
                 "extra_sec",
-                "x_axis_info",
-                "y_axis_info",
                 "norm_region",
             ],
         )
@@ -349,11 +308,13 @@ def generate_telecover_quadrants(data_pack, caller_info, settings_info):
 
 #------------------------------------------------------------------------------
 # Plot
-        qa_test_info[QA_KEY][ch]["tlc_plot_path"], dofl_x = plot_telecover.generate_plot(
-            X=x_vals,
-            sectors=processed,
-            args=metadata | channel_settings | qa_test_info[QA_KEY][ch] | caller_info,
-        )
+        qa_test_info[QA_KEY][ch]["tlc_qua_plot_path"], dofl_x = \
+            plot_quadrant_telecover.generate_quadrant_telecover(
+                X=x_vals,
+                sectors=processed,
+                ranges=ranges,
+                args=metadata | channel_settings | qa_test_info[QA_KEY][ch] | caller_info,
+            )
 
         if dofl_x == dofl_x:
             qa_test_info[QA_KEY][ch]["minimum_channel_height"] = str(
@@ -365,11 +326,11 @@ def generate_telecover_quadrants(data_pack, caller_info, settings_info):
 
         perform_color_reduction(
             color_reduction=caller_info["color_reduction"],
-            plot_path=qa_test_info[QA_KEY][ch]["tlc_plot_path"],
+            plot_path=qa_test_info[QA_KEY][ch]["tlc_qua_plot_path"],
         )
 
         add_plot_metadata(
-            plot_path=qa_test_info[QA_KEY][ch]["tlc_plot_path"],
+            plot_path=qa_test_info[QA_KEY][ch]["tlc_qua_plot_path"],
             plot_metadata=plot_metadata,
         )
 

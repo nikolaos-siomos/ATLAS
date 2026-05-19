@@ -183,6 +183,7 @@ def get_quicklook_y_axis(heights, ranges, y_lims, use_dis):
         
     else:
         y_vals = 1E-3 * heights       
+        
         y_label = 'Height above the lidar [km]'
 
     # Get the altitude/distance lower limit and bin

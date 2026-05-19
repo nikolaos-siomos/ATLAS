@@ -52,7 +52,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
             vertical_scale = data_pack[key][caller_info['vertical_scale']]
                                        
             # Load settings
-            settings = settings_info['ray']
+            settings = settings_info['ray'].copy()
             
             # Convert the range/height units to km 
             vertical_scale = convert_m_to_km(vertical_scale)
@@ -68,6 +68,8 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 print(f"-- channel: {ch}")
         
                 ch_d = dict(channel = ch)
+                
+                channel_settings = settings.copy()
                                         
                 sig_ch = profiles.mean('time').sel(ch_d)
                 atb_ch = atten_bsc.sel(ch_d)
@@ -77,7 +79,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 sig_ch, vertical_scale_ch, sl_mask  = slice_by_vertical_scale(
                     da = sig_ch, 
                     vertical_scale = vertical_scale_ch, 
-                    x_lims = settings['x_lims'], 
+                    x_lims = channel_settings['x_lims'], 
                     )
                 
                 y1_vals = sig_ch.values
@@ -88,7 +90,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
         
                 # Smoothing of the y1 array - generates also the corresponding standard deviation
                 y1_vals_sm, y1_errs = smoothing(
-                    args = settings, 
+                    args = channel_settings, 
                     x_vals = x_vals, 
                     y_vals = y1_vals, 
                     err_type = "std"
@@ -96,7 +98,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                     
                 # Smoothing of the y2 array 
                 y2_vals_sm, y1_sems = smoothing(
-                    args = settings, 
+                    args = channel_settings, 
                     x_vals = x_vals, 
                     y_vals = y2_vals, 
                     err_type = "sem"
@@ -110,7 +112,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                         y1_err = y1_errs,
                         y1_avg = y1_vals_sm,
                         x = x_vals,
-                        keyw_args = settings
+                        keyw_args = channel_settings
                         )
         
         
@@ -118,7 +120,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 norm_region, norm_region_flag, idx = \
                     curve_fit.scan(
                         masks, 
-                        user_norm_region = settings['normalization_region'],
+                        user_norm_region = channel_settings['normalization_region'],
                         auto_fit = True,
                         prefered_range = 'far'
                         )
@@ -182,7 +184,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                         'ATLAS_version',
                         'QA_test_ID'
                         ],
-                    add_dicts = [settings, metadata]
+                    add_dicts = [channel_settings, metadata]
                     )
 
 #------------------------------------------------------------------------------
@@ -196,7 +198,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                     caller_info = caller_info,
                     metadata = metadata,
                     extra_metadata = {},
-                    settings = settings,
+                    settings = channel_settings,
                     qa_test_info = qa_test_info[key][ch]
                     )
                 
@@ -223,7 +225,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                     Y1 = y1_vals_nrm,
                     Y2 = y2_vals_sm,
                     Y1E = y1_errs_nrm,
-                    args = metadata | settings | qa_test_info[key][ch] | caller_info
+                    args = metadata | channel_settings | qa_test_info[key][ch] | caller_info
                     ) 
         
                 # Perform color reduction        
@@ -270,7 +272,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 qa_test_info[key][ch]['ray_mask_plot_path'] = \
                     plot_rayleigh_mask.generate_plot(
                         masks = masks,
-                        args = settings | mask_metadata | caller_info
+                        args = channel_settings | mask_metadata | caller_info
                         )
         
                 # Perform color reduction        

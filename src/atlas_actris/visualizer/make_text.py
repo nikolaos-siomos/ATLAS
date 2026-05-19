@@ -16,7 +16,7 @@ from dataclasses import dataclass
 label = {
     'ray' : "Rayleigh",
     'tlc' : "Telecover",
-    'pcb' : "Polarization Calibration"
+    'pcb' : "Polarization Calibration",
     }
 
 telescope_map = {
@@ -77,24 +77,14 @@ class GenerateText:
         
         self.metadata['start_timestamp'] = pd.Timestamp(self.metadata['start_time_first'])
         self.metadata['stop_timestamp'] = pd.Timestamp(self.metadata['end_time_last'])
-        
-        if 'radiosonde_time' in self.metadata:
-            self.metadata['radiosonde_timestamp'] = pd.Timestamp(self.metadata['radiosonde_time'])
-        
+                
         if self.extra_metadata:
             self.extra_metadata['start_timestamp'] = pd.Timestamp(self.extra_metadata['start_time_first'])
             self.extra_metadata['stop_timestamp'] = pd.Timestamp(self.extra_metadata['end_time_last'])
 
-            if 'radiosonde_time' in self.extra_metadata:
-                self.extra_metadata['radiosonde_timestamp'] = pd.Timestamp(self.extra_metadata['radiosonde_time'])
-        
-        self.sm_part = sm_text(
-            smooth = self.settings['smooth'], 
-            sm_lims = self.settings['smoothing_range'], 
-            sm_win = self.settings['smoothing_window'], 
-            sm_expo = self.settings['smoothing_exponential']
-            )
-
+        if 'radiosonde_time' in self.extra_metadata:
+            self.extra_metadata['radiosonde_timestamp'] = pd.Timestamp(self.extra_metadata['radiosonde_time'])
+    
         self.dateloc_part = dateloc_text(
             start_timestamp = self.metadata['start_timestamp'], 
             stop_timestamp = self.metadata['stop_timestamp'], 
@@ -118,14 +108,6 @@ class GenerateText:
             self.metadata['detected_wavelength'], 
             self.metadata['channel_bandwidth']
             )
-        
-        if 'radiosonde_time' in self.metadata:
-            self.mol_part = mol_text(
-                rs_format = self.metadata['radiosonde_format'], 
-                rs_station_name = self.caller_info['rsonde_station_name'], 
-                wmo_id = self.caller_info['rsonde_station_wmo_id'], 
-                rs_start_timestamp = self.metadata['radiosonde_timestamp']
-                )
         
     def make_filename(self, qa_test, extra_type = '', extra_channel = None):
                
@@ -170,30 +152,84 @@ class GenerateText:
                 
     def make_quicklook_title(self):
 
-        title = self.channel_part + ' - ' + self.sm_part + '\n'+\
+        sm_part = sm_text(
+            smooth = self.settings['smooth'], 
+            sm_lims = self.settings['smoothing_range'], 
+            sm_win = self.settings['smoothing_window'], 
+            sm_expo = self.settings['smoothing_exponential']
+            )
+        
+        title = self.channel_part + ' - ' + sm_part + '\n'+\
             self.config_part + ' - ' + self.dateloc_part
                             
         return title 
     
     def make_rayleigh_fit_title(self):
-                        
-        title = self.channel_part + ' - ' + self.dateloc_part + ' - ' + self.sm_part + '\n'+\
-                    self.config_part + ' - ' + self.mol_part + ' - ' + self.if_part 
+               
+        radiosonde_timestamp = pd.Timestamp(self.metadata['radiosonde_time'])
+         
+        mol_part = mol_text(
+            rs_format = self.metadata['radiosonde_format'], 
+            rs_station_name = self.caller_info['rsonde_station_name'], 
+            wmo_id = self.caller_info['rsonde_station_wmo_id'], 
+            rs_start_timestamp = radiosonde_timestamp
+            )
+        
+        sm_part = sm_text(
+            smooth = self.settings['smooth'], 
+            sm_lims = self.settings['smoothing_range'], 
+            sm_win = self.settings['smoothing_window'], 
+            sm_expo = False
+            )
+        
+        title = self.channel_part + ' - ' + self.dateloc_part + ' - ' + sm_part + '\n'+\
+                    self.config_part + ' - ' + mol_part + ' - ' + self.if_part 
 
         return title 
 
     def make_rayleigh_fit_mask_title(self):
         
-        title = self.channel_part + ' - ' + self.sm_part + '\n'+\
+        radiosonde_timestamp = pd.Timestamp(self.metadata['radiosonde_time'])
+         
+        mol_part = mol_text(
+            rs_format = self.metadata['radiosonde_format'], 
+            rs_station_name = self.caller_info['rsonde_station_name'], 
+            wmo_id = self.caller_info['rsonde_station_wmo_id'], 
+            rs_start_timestamp = radiosonde_timestamp
+            )
+        
+        sm_part = sm_text(
+            smooth = self.settings['smooth'], 
+            sm_lims = self.settings['smoothing_range'], 
+            sm_win = self.settings['smoothing_window'], 
+            sm_expo = False
+            )
+        
+        title = self.channel_part + ' - ' + sm_part + '\n'+\
                     self.config_part + ' - ' + self.dateloc_part + '\n'+\
-                        self.mol_part+ ' - ' + self.if_part
+                        mol_part+ ' - ' + self.if_part
 
+        return title 
+    
+    def make_telecover_title(self):
+        
+        sm_part = sm_text_tlc(
+            smooth = self.settings['smooth'], 
+            sm_win = self.settings['smoothing_window'], 
+            nr_ulim = self.settings['near_range_upper_limit']
+            )
+
+        title = self.channel_part + ' - ' + sm_part + ' - ' + self.if_part + '\n'+\
+            self.config_part + ' - ' + self.dateloc_part
+                        
         return title 
     
     def make_header_rayleigh_fit(self):
                 
         parts = []
         
+        radiosonde_timestamp = pd.Timestamp(self.metadata['radiosonde_time'])
+
         parts.append(
             header_system_text(
                 station_id = self.metadata['station_id'],
@@ -218,7 +254,7 @@ class GenerateText:
             header_radiosonde_text(
                 rs_station_name = self.caller_info['rsonde_station_name'], 
                 wmo_id = self.caller_info['rsonde_station_wmo_id'], 
-                rs_start_timestamp = self.metadata['radiosonde_timestamp'], 
+                rs_start_timestamp = radiosonde_timestamp, 
                 )
             )
         
@@ -248,8 +284,8 @@ class GenerateText:
         
         parts.append(
             header_time_text(
-                start_timestamp = self.extra_metadata['start_timestamp'], 
-                stop_timestamp = self.extra_metadata['stop_timestamp'], 
+                start_timestamp = self.metadata['start_timestamp'], 
+                stop_timestamp = self.metadata['stop_timestamp'], 
                 label = label['tlc']
                 )
             )
@@ -257,7 +293,7 @@ class GenerateText:
         parts.append(
             header_telecover_text(
                 iters = self.qa_test_info['iters'], 
-                secs = self.qa_test_info['sectors'], 
+                secs = self.qa_test_info['available_sectors'], 
                 extra_sec = self.qa_test_info['extra_sec']
                 )
             )
@@ -464,6 +500,23 @@ def sm_text(smooth, sm_lims, sm_win, sm_expo):
        
         else:
             sm_part = "No Smoothing"
+
+    return sm_part
+
+def sm_text_tlc(smooth, sm_win, nr_ulim):
+
+    if smooth != True:
+        return "No Smoothing"
+
+    if sm_win:
+        sm_win = np.round(float(sm_win), decimals=3)
+        sm_part = (
+            f"Smoothing: 0 to {nr_ulim} km, "
+            f"Win: {sm_win} km - Win above: 0.5 km"
+            )
+   
+    else:
+        sm_part = "No Smoothing"
 
     return sm_part
 

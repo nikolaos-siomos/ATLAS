@@ -582,24 +582,28 @@ def compute_dark_correction(
 ) -> Dict[str, Dict[str, Any]]:
 
     assign_drk = {
-        'ray':'drk_ray',
-        'ray_pcb':'drk_ray_pcb',
-        'pcb_p45':'drk_pcb',
-        'pcb_m45':'drk_pcb',
-        'pcb_aux_p45':'drk_pcb_aux',
-        'pcb_aux_m45':'drk_pcb_aux',
-        'tlc_north':'drk_tlc',
-        'tlc_east':'drk_tlc',
-        'tlc_south':'drk_tlc',
-        'tlc_west':'drk_tlc',
-        'tlc_inner':'drk_tlc',
-        'tlc_outer':'drk_tlc',
-        'trg':'drk_trg',
-        'dtm_fi':'drk_dtm',
-        'dtm_fo':'drk_dtm',
-        'dtm':'drk_dtm',
-        'nsf':'drk_nsf',
-        'cam':'drk_cam',
+        "ray": "drk_ray",
+        "ray_pcb": "drk_ray_pcb",
+    
+        "pcb_p45": "drk_pcb",
+        "pcb_m45": "drk_pcb",
+        "pcb_aux_p45": "drk_pcb_aux",
+        "pcb_aux_m45": "drk_pcb_aux",
+    
+        "tlc_north": "drk_tlc_qua",
+        "tlc_east": "drk_tlc_qua",
+        "tlc_south": "drk_tlc_qua",
+        "tlc_west": "drk_tlc_qua",
+    
+        "tlc_inner": "drk_tlc_rin",
+        "tlc_outer": "drk_tlc_rin",
+    
+        "trg": "drk_trg",
+        "dtm_fi": "drk_dtm",
+        "dtm_fo": "drk_dtm",
+        "dtm": "drk_dtm",
+        "nsf": "drk_nsf",
+        "cam": "drk_cam",
         }
     
     # output_data = copy.deepcopy(input_data)
@@ -614,26 +618,29 @@ def compute_dark_correction(
     # add dark correction to background
     # add error increase
             
-    for key in assign_drk:
-        
-        drk_key_alias = assign_drk[key]
-        
-        if drk_key_alias in loading_map and key in profiles:
-        
+    for key, drk_key_alias in assign_drk.items():
+
+        if key not in profiles:
+            continue
+    
+        if drk_key_alias in loading_map:
             drk_key = loading_map[drk_key_alias]
-        
-            drk = profiles[drk_key].mean(dim='time', skipna = True)
-            
-            acquisition_mode = channel_info[key]\
-                .sel(parameters = 'acquisition_mode')
-                                
-            mask_p = (acquisition_mode == "a")
-                        
-            drk = xr.where(mask_p, drk, 0.)
-            
-            sig_drc = profiles[key] - drk
-            
-            output_data['profile'][key] = sig_drc
+        elif drk_key_alias in profiles:
+            drk_key = drk_key_alias
+        else:
+            continue
+    
+        drk = profiles[drk_key].mean(dim="time", skipna=True)
+    
+        acquisition_mode = channel_info[key].sel(parameters="acquisition_mode")
+    
+        mask_p = acquisition_mode == "a"
+    
+        drk = xr.where(mask_p, drk, 0.0)
+    
+        sig_drc = profiles[key] - drk
+    
+        output_data["profile"][key] = sig_drc
 
     print_entry('Dark correction succesfully performed!')
 

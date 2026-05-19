@@ -15,6 +15,8 @@ from utils.__parse_settings_file__ import parse_atlas_settings_file
 
 from visualizer.__quicklook__ import generate_quicklooks
 from visualizer.__rayleigh_fit__ import generate_rayleigh_fit
+from visualizer.__quadrant_telecover__ import generate_quadrant_telecover
+from visualizer.__ring_telecover__ import generate_ring_telecover
 
 from utils.cookbook import run_linear_recipe
 from utils.parse_caller_args import call_parser
@@ -147,11 +149,28 @@ processor.package(output_id = 'averaged_hr_qck', input_id = 'averaged_hr')
 rayleigh_fit__metadata = generate_rayleigh_fit(
     data_pack = processor.export_test_from_stage('averaged'),
     caller_info = processor.processing_info['caller_info'],
-    settings_info = processor.settings_info)
+    settings_info = processor.settings_info
+    )
+
+
+# Quadrant telecover test
+quadrant_telecover__metadata = generate_quadrant_telecover(
+    data_pack = processor.export_test_from_stage('preprocessing_complete'),
+    caller_info = processor.processing_info['caller_info'],
+    settings_info = processor.settings_info['tlc_qua']
+    )
+
+# Ring telecover test
+ring_telecover__metadata = generate_ring_telecover(
+    data_pack = processor.export_test_from_stage('preprocessing_complete'),
+    caller_info = processor.processing_info['caller_info'],
+    settings_info = processor.settings_info['tlc_rin']
+    )
 
 
 # Quicklooks
 generate_quicklooks(
     data_pack = processor.export_test_from_stage('averaged_hr_qck'),
     caller_info = processor.processing_info['caller_info'],
-    settings_info = processor.settings_info['qck'])
+    settings_info = processor.settings_info['qck']
+    )

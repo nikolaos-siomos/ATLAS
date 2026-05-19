@@ -260,7 +260,7 @@ def compute_check_for_overflows(
         
         meas_type: 
             A 3 letter identifier that specifies the measurement type,
-            it can be one of ray, tlc, pcb, drk        
+            it can be one of e.g. ray, tlc, pcb, drk        
         
         method:
             An integer. If set to 0 only the check for overflows will be 

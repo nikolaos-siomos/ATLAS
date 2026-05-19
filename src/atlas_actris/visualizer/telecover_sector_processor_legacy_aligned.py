@@ -5,11 +5,6 @@ Telecover sector processor for the modern ATLAS visualizer architecture.
 
 This class mirrors the legacy visualizer.sector.process(...) procedure while
 returning named outputs instead of a long tuple.
-
-This version is simplified for the modern telecover workflow:
-- only constant-window fast smoothing functions are used;
-- exponential smoothing is disabled permanently (expo=False);
-- the legacy near/far smoothing strategy is preserved.
 """
 
 from __future__ import annotations
@@ -21,7 +16,9 @@ import numpy as np
 
 from visualizer import normalize
 from visualizer.smoothing import (
+    sliding_average_1D,
     sliding_average_1D_fast,
+    sliding_average_2D,
     sliding_average_2D_fast,
 )
 
@@ -61,20 +58,15 @@ class TelecoverSectorProcessor:
     """
     Process one telecover sector.
 
-    This mirrors the relevant parts of the old sector.process(...) procedure:
+    This mirrors the old sector.process(...) procedure:
     - average the first ``iters`` profiles;
     - optionally smooth the averaged and unaveraged profiles;
-    - use near smoothing inside ``nr_ulim``;
-    - use far smoothing from ``nr_ulim`` to 20 km;
+    - use near smoothing inside ``x_sm_lims``;
+    - use far smoothing from ``x_sm_lims[1]`` to 20 km;
     - keep the original signal outside the smoothed ranges;
     - use min/max of the smoothed individual profiles as variability envelope;
     - normalize with ``visualizer.normalize.to_a_point``;
     - keep one extra profile if the sector has exactly ``iters + 1`` profiles.
-
-    Differences from the old implementation:
-    - only ``sliding_average_1D_fast`` and ``sliding_average_2D_fast`` are used;
-    - ``expo`` is always passed as ``False``;
-    - ``settings['smooth_exponential']`` is ignored.
     """
 
     def __init__(self, settings: Dict[str, Any]) -> None:
@@ -84,8 +76,8 @@ class TelecoverSectorProcessor:
         self,
         x: Sequence[float],
         y: np.ndarray,
-        nr_ulim: float = 2.5,
         iters: Optional[int] = None,
+        x_sm_lims: Optional[Sequence[float]] = None,
         region: Optional[Sequence[float]] = None,
     ) -> Dict[str, Any]:
         """
@@ -101,6 +93,8 @@ class TelecoverSectorProcessor:
         iters : int or None
             Number of profiles used for the common sector mean. If None, all
             available profiles are used.
+        x_sm_lims : list or tuple or None
+            Smoothing range. If None, it is inferred from x.
         region : list or tuple or None
             Normalization region. If None, settings['normalization_region'] is used.
 
@@ -132,29 +126,27 @@ class TelecoverSectorProcessor:
         if iters < 1:
             raise ValueError("iters must be at least 1 after clipping to available profiles.")
 
+        if x_sm_lims is None:
+            x_sm_lims = [float(np.nanmin(x)), float(np.nanmax(x))]
+
         if region is None:
             region = self.settings["normalization_region"]
 
         smooth = bool(self.settings.get("smooth", False))
         x_sm_win = self.settings.get("smoothing_window")
-        nr_ulim = self.settings["near_range_upper_limit"]
-        
-        if smooth and isinstance(x_sm_win, list):
-            raise TypeError(
-                "This fast telecover processor expects a constant smoothing window. "
-                "Please provide settings['smoothing_window'] as a scalar, not a list."
-            )
+        expo = bool(self.settings.get("smooth_exponential", False))
 
         # Legacy: average only the common number of profiles.
         y_m = np.nanmean(y[:iters, :], axis=0)
 
-        if smooth and x_sm_win:
-            y_m_sm, y_sm = self._legacy_fast_smoothing(
+        if smooth:
+            y_m_sm, y_sm = self._legacy_smoothing(
                 x=x,
                 y=y,
                 y_m=y_m,
-                nr_ulim=nr_ulim,
+                x_sm_lims=x_sm_lims,
                 x_sm_win=x_sm_win,
+                expo=expo,
             )
         else:
             y_m_sm = y_m
@@ -209,41 +201,50 @@ class TelecoverSectorProcessor:
         ).as_dict()
 
     @staticmethod
-    def _legacy_fast_smoothing(
+    def _legacy_smoothing(
         x: np.ndarray,
         y: np.ndarray,
         y_m: np.ndarray,
-        nr_ulim: Sequence[float],
+        x_sm_lims: Sequence[float],
         x_sm_win: Any,
+        expo: bool,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Apply the legacy near/far smoothing strategy using fast functions only.
+        Apply the same near/far smoothing strategy as the legacy sector.py.
         """
 
+        # Legacy switches between variable-window and fast constant-window
+        # smoothing based on whether the smoothing window is a list.
+        if isinstance(x_sm_win, list):
+            smooth_1d_near = sliding_average_1D
+            smooth_2d_near = sliding_average_2D
+        else:
+            smooth_1d_near = sliding_average_1D_fast
+            smooth_2d_near = sliding_average_2D_fast
+
         # Near smoothing: user-defined smoothing region/window.
-        # Exponential smoothing is intentionally disabled.
-        y_m_sm_n, _ = sliding_average_1D_fast(
+        y_m_sm_n, _ = smooth_1d_near(
             y_vals=y_m,
             x_vals=x,
-            x_sm_lims=[0.,nr_ulim],
-            x_sm_win=1E3*x_sm_win,
-            expo=False,
+            x_sm_lims=x_sm_lims,
+            x_sm_win=x_sm_win,
+            expo=expo,
         )
 
-        y_sm_n, _ = sliding_average_2D_fast(
+        y_sm_n, _ = smooth_2d_near(
             z_vals=y,
             y_vals=x,
-            y_sm_lims=[0.,nr_ulim],
-            y_sm_win=1E3*x_sm_win,
-            expo=False,
+            y_sm_lims=x_sm_lims,
+            y_sm_win=x_sm_win,
+            expo=expo,
         )
 
-        # Far smoothing: legacy uses a 500 m constant window from the upper
-        # smoothing limit to 20 km.
+        # Far smoothing: legacy always uses the fast functions from the upper
+        # smoothing limit to 20 km with a 500 m window.
         y_m_sm_f, _ = sliding_average_1D_fast(
             y_vals=y_m,
             x_vals=x,
-            x_sm_lims=[nr_ulim, 20.0],
+            x_sm_lims=[x_sm_lims[1], 20.0],
             x_sm_win=500.0,
             expo=False,
         )
@@ -251,15 +252,15 @@ class TelecoverSectorProcessor:
         y_sm_f, _ = sliding_average_2D_fast(
             z_vals=y,
             y_vals=x,
-            y_sm_lims=[nr_ulim, 20.0],
+            y_sm_lims=[x_sm_lims[1], 20.0],
             y_sm_win=500.0,
             expo=False,
         )
 
         y_m_sm = np.nan * np.zeros(y_m.copy().shape)
 
-        mask_n = (x > 0.) & (x < nr_ulim)
-        mask_f = (x >= nr_ulim) & (x < 20.0)
+        mask_n = (x > x_sm_lims[0]) & (x < x_sm_lims[1])
+        mask_f = (x >= x_sm_lims[1]) & (x < 20.0)
 
         y_m_sm[mask_n] = y_m_sm_n[mask_n]
         y_m_sm[mask_f] = y_m_sm_f[mask_f]

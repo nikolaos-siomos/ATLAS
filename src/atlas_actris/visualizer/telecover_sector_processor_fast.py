@@ -64,8 +64,8 @@ class TelecoverSectorProcessor:
     This mirrors the relevant parts of the old sector.process(...) procedure:
     - average the first ``iters`` profiles;
     - optionally smooth the averaged and unaveraged profiles;
-    - use near smoothing inside ``nr_ulim``;
-    - use far smoothing from ``nr_ulim`` to 20 km;
+    - use near smoothing inside ``x_sm_lims``;
+    - use far smoothing from ``x_sm_lims[1]`` to 20 km;
     - keep the original signal outside the smoothed ranges;
     - use min/max of the smoothed individual profiles as variability envelope;
     - normalize with ``visualizer.normalize.to_a_point``;
@@ -84,8 +84,8 @@ class TelecoverSectorProcessor:
         self,
         x: Sequence[float],
         y: np.ndarray,
-        nr_ulim: float = 2.5,
         iters: Optional[int] = None,
+        x_sm_lims: Optional[Sequence[float]] = None,
         region: Optional[Sequence[float]] = None,
     ) -> Dict[str, Any]:
         """
@@ -101,6 +101,8 @@ class TelecoverSectorProcessor:
         iters : int or None
             Number of profiles used for the common sector mean. If None, all
             available profiles are used.
+        x_sm_lims : list or tuple or None
+            Smoothing range. If None, it is inferred from x.
         region : list or tuple or None
             Normalization region. If None, settings['normalization_region'] is used.
 
@@ -132,13 +134,15 @@ class TelecoverSectorProcessor:
         if iters < 1:
             raise ValueError("iters must be at least 1 after clipping to available profiles.")
 
+        if x_sm_lims is None:
+            x_sm_lims = [float(np.nanmin(x)), float(np.nanmax(x))]
+
         if region is None:
             region = self.settings["normalization_region"]
 
         smooth = bool(self.settings.get("smooth", False))
         x_sm_win = self.settings.get("smoothing_window")
-        nr_ulim = self.settings["near_range_upper_limit"]
-        
+
         if smooth and isinstance(x_sm_win, list):
             raise TypeError(
                 "This fast telecover processor expects a constant smoothing window. "
@@ -148,12 +152,12 @@ class TelecoverSectorProcessor:
         # Legacy: average only the common number of profiles.
         y_m = np.nanmean(y[:iters, :], axis=0)
 
-        if smooth and x_sm_win:
+        if smooth:
             y_m_sm, y_sm = self._legacy_fast_smoothing(
                 x=x,
                 y=y,
                 y_m=y_m,
-                nr_ulim=nr_ulim,
+                x_sm_lims=x_sm_lims,
                 x_sm_win=x_sm_win,
             )
         else:
@@ -213,7 +217,7 @@ class TelecoverSectorProcessor:
         x: np.ndarray,
         y: np.ndarray,
         y_m: np.ndarray,
-        nr_ulim: Sequence[float],
+        x_sm_lims: Sequence[float],
         x_sm_win: Any,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -225,16 +229,16 @@ class TelecoverSectorProcessor:
         y_m_sm_n, _ = sliding_average_1D_fast(
             y_vals=y_m,
             x_vals=x,
-            x_sm_lims=[0.,nr_ulim],
-            x_sm_win=1E3*x_sm_win,
+            x_sm_lims=x_sm_lims,
+            x_sm_win=x_sm_win,
             expo=False,
         )
 
         y_sm_n, _ = sliding_average_2D_fast(
             z_vals=y,
             y_vals=x,
-            y_sm_lims=[0.,nr_ulim],
-            y_sm_win=1E3*x_sm_win,
+            y_sm_lims=x_sm_lims,
+            y_sm_win=x_sm_win,
             expo=False,
         )
 
@@ -243,7 +247,7 @@ class TelecoverSectorProcessor:
         y_m_sm_f, _ = sliding_average_1D_fast(
             y_vals=y_m,
             x_vals=x,
-            x_sm_lims=[nr_ulim, 20.0],
+            x_sm_lims=[x_sm_lims[1], 20.0],
             x_sm_win=500.0,
             expo=False,
         )
@@ -251,15 +255,15 @@ class TelecoverSectorProcessor:
         y_sm_f, _ = sliding_average_2D_fast(
             z_vals=y,
             y_vals=x,
-            y_sm_lims=[nr_ulim, 20.0],
+            y_sm_lims=[x_sm_lims[1], 20.0],
             y_sm_win=500.0,
             expo=False,
         )
 
         y_m_sm = np.nan * np.zeros(y_m.copy().shape)
 
-        mask_n = (x > 0.) & (x < nr_ulim)
-        mask_f = (x >= nr_ulim) & (x < 20.0)
+        mask_n = (x > x_sm_lims[0]) & (x < x_sm_lims[1])
+        mask_f = (x >= x_sm_lims[1]) & (x < 20.0)
 
         y_m_sm[mask_n] = y_m_sm_n[mask_n]
         y_m_sm[mask_f] = y_m_sm_f[mask_f]
