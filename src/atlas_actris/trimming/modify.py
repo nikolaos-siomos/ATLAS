@@ -15,7 +15,9 @@ from typing import Any, Dict, Tuple
 from utils.__parse_config_file__ import _compute_background_bins_if_missing, \
     _compute_emitted_wavelength_if_missing, _compute_dead_time_if_missing, \
         _compute_GH_if_missing, _check_background_limits, _normalize_entries
-from utils.__parse_config_file__ import SCHEMA, SYSTEM_KEYS, CHANNEL_KEYS, POL_CAL_KEYS
+from utils.__parse_config_file__ import (
+    SCHEMA, SYSTEM_KEYS, CHANNEL_KEYS, POL_CAL_KEYS, WV_KEYS, TEMP_KEYS
+    )
 from utils.error_classes import ConfigError, CustomWarning
 
 def unique_cross_key_pairs(d1: Dict[str, Any], d2: Dict[str, Any]):
@@ -101,7 +103,214 @@ def load_metadata(config_info: Dict[str, Any],
                 config_info = cfg[key2]
                 
     return(config_info)
-   
+
+def find_reflected_transmitted_pairs(channels):
+    """
+    Find reflected/transmitted channel pairs.
+
+    Channel ID convention:
+        length = 8
+        6th char, index 5: one of "t", "p", "c"
+        8th char, index 7: "r" or "t"
+
+    Pairing rule:
+        r_channels = channels with 8th char "r"
+        t_channels = channels with 8th char "t"
+
+    Channels are paired when all characters are identical except
+    the 6th and 8th characters.
+
+    Returns
+    -------
+    r_channels : list[str]
+        Reflected channels, used as numerator channels.
+
+    t_channels : list[str]
+        Transmitted channels, used as denominator channels.
+
+    Notes
+    -----
+    The two returned lists are aligned by index:
+        r_channels[i] pairs with t_channels[i]
+    """
+
+    allowed_6th = {"t", "p", "c"}
+    allowed_8th = {"r", "t"}
+
+    grouped = {}
+
+    for ch in channels:
+        if len(ch) != 8:
+            continue
+
+        if ch[5] not in allowed_6th:
+            continue
+
+        if ch[7] not in allowed_8th:
+            continue
+
+        # Keep chars 1-5 and 7 fixed.
+        # Ignore chars 6 and 8.
+        key = ch[:5] + ch[6]
+
+        grouped.setdefault(key, {"r": [], "t": []})
+        grouped[key][ch[7]].append(ch)
+
+    r_channels = []
+    t_channels = []
+
+    for group in grouped.values():
+        for ch_r in group["r"]:
+            for ch_t in group["t"]:
+                r_channels.append(ch_r)
+                t_channels.append(ch_t)
+
+    return r_channels, t_channels
+
+def expand_with_loading_map(data, caller_info, *, copy=False, strict=True):
+    """
+    Expand a dictionary with alias keys from caller_info["loading_map"].
+
+    If caller_info has no loading_map entry, or if loading_map is empty,
+    no expansion is performed.
+
+    Parameters
+    ----------
+    data : dict
+        Dictionary to expand, e.g. profiles, metadata["time_info"], etc.
+
+    caller_info : dict
+        Caller information dictionary. If present and non-empty,
+        caller_info["loading_map"] should map alias keys to source keys.
+
+        Example:
+            {
+                "loading_map": {
+                    "drk_ray": "drk",
+                    "ray_pcb": "ray",
+                }
+            }
+
+    copy : bool, default False
+        If False, alias entries point to the same object as the source entry.
+        If True, use copy.deepcopy() for each alias entry.
+
+    strict : bool, default True
+        If True, raise an error if a source key is missing or an alias key
+        already exists in data.
+
+    Returns
+    -------
+    expanded : dict
+        New dictionary with original keys plus alias keys, or a shallow copy
+        of the original dictionary if no expansion is needed.
+    """
+
+    import copy as _copy
+
+    if not isinstance(data, dict):
+        raise TypeError(f"data must be a dict. Got {type(data)}.")
+
+    if not isinstance(caller_info, dict):
+        raise TypeError(f"caller_info must be a dict. Got {type(caller_info)}.")
+
+    loading_map = caller_info.get("loading_map")
+
+    # No loading_map entry, None, or empty dict -> no expansion
+    if not loading_map:
+        return dict(data)
+
+    if not isinstance(loading_map, dict):
+        raise TypeError(
+            f'caller_info["loading_map"] must be a dict. Got {type(loading_map)}.'
+        )
+
+    expanded = dict(data)
+
+    for alias_key, source_key in loading_map.items():
+
+        if source_key not in expanded:
+            if strict:
+                raise KeyError(
+                    f'caller_info["loading_map"] points {alias_key!r} '
+                    f"to missing source key {source_key!r}."
+                )
+            continue
+
+        if alias_key in expanded:
+            if strict:
+                raise KeyError(
+                    f'caller_info["loading_map"] alias key {alias_key!r} '
+                    f"already exists in data."
+                )
+            continue
+
+        if copy:
+            expanded[alias_key] = _copy.deepcopy(expanded[source_key])
+        else:
+            expanded[alias_key] = expanded[source_key]
+
+    return expanded
+
+def expand_nested_with_loading_map(metadata, caller_info, *, copy=False, strict=False):
+    """
+    Expand second-level measurement dictionaries inside metadata.
+
+    Expected structure
+    ------------------
+    metadata = {
+        "system_info": {
+            "ray": ...,
+            "drk": ...,
+        },
+        "time_info": {
+            "ray": ...,
+            "drk": ...,
+        },
+        ...
+    }
+
+    Result
+    ------
+    metadata["system_info"]["ray_pcb"] = metadata["system_info"]["ray"]
+    metadata["system_info"]["drk_ray"] = metadata["system_info"]["drk"]
+    etc.
+
+    Empty metadata groups remain empty.
+    """
+
+    if not isinstance(metadata, dict):
+        raise TypeError(f"metadata must be a dict. Got {type(metadata)}.")
+
+    loading_map = caller_info.get("loading_map") if isinstance(caller_info, dict) else None
+
+    # No loading_map entry, None, or empty dict -> no expansion
+    if not loading_map:
+        return dict(metadata)
+
+    expanded_metadata = dict(metadata)
+
+    for group_name, group_data in metadata.items():
+
+        # Only expand metadata groups that are dictionaries
+        if not isinstance(group_data, dict):
+            expanded_metadata[group_name] = group_data
+            continue
+
+        # Empty groups stay empty
+        if not group_data:
+            expanded_metadata[group_name] = {}
+            continue
+
+        expanded_metadata[group_name] = expand_with_loading_map(
+            group_data,
+            caller_info,
+            copy=copy,
+            strict=strict,
+        )
+
+    return expanded_metadata
+
 def remove_unrecognised_channels(caller_info: Dict[str, Any], config_info: Dict[str, Any], 
                                  profiles: Dict[str, Any], metadata: Dict[str, Any]) -> Tuple[Dict[str, Any],Dict[str, Any]]:
     
@@ -147,78 +356,308 @@ def get_atlas_channel_id(config_info: Dict[str, Any], profiles: Dict[str, Any],
     
     return(config_info)
 
+def resolve_to_atlas_channel_id(ch, config_info):
+    """
+    Resolve a manually provided channel ID to atlas_channel_id.
+
+    The provided channel may be:
+        - atlas_channel_id
+        - recorder_channel_id
+        - scc_channel_id, if available
+
+    Returns
+    -------
+    atlas_id : str
+    """
+
+    atlas_ids = config_info.get("atlas_channel_id", [])
+    recorder_ids = config_info.get("recorder_channel_id", [])
+    scc_ids = config_info.get("scc_channel_id", [])
+
+    if ch in atlas_ids:
+        return ch
+
+    if ch in recorder_ids:
+        return atlas_ids[recorder_ids.index(ch)]
+
+    if scc_ids and ch in scc_ids:
+        return atlas_ids[scc_ids.index(ch)]
+
+    raise ConfigError(
+        f"Provided channel '{ch}' was not found in atlas_channel_id, "
+        f"recorder_channel_id, or scc_channel_id"
+    )
+
+
+def default_pol_cal_value(key, n_pairs):
+    """
+    Return the default value for a POL_CAL key.
+    """
+
+    meta = SCHEMA[key]
+
+    if meta["is_list"]:
+        return n_pairs * [str(meta["default"])]
+
+    return str(meta["default"])
+
+
+def extend_or_default_pol_cal_list(existing, default, n_target):
+    """
+    Keep manually provided values where available and fill the rest with defaults.
+
+    This is used for POL_CAL list-like metadata other than ch_r/ch_t.
+    """
+
+    if existing is None:
+        existing = []
+
+    if not isinstance(existing, list):
+        existing = [existing]
+
+    out = [str(v) for v in existing[:n_target]]
+
+    if len(out) < n_target:
+        out.extend((n_target - len(out)) * [str(default)])
+
+    return out
+
+def check_reflected_transmitted_pairs(r_channels, t_channels):
+    """
+    Check reflected/transmitted channel pairs.
+
+    Invalid pairs are skipped.
+    Non-critical inconsistencies are reported as warnings.
+
+    Parameters
+    ----------
+    r_channels : list[str]
+        Channels expected to have last character "r".
+    t_channels : list[str]
+        Channels expected to have last character "t".
+
+    Returns
+    -------
+    pairs : list[dict]
+        Valid pairs, in the same style as find_reflected_transmitted_pairs.
+
+    warnings : list[str]
+        Warnings for skipped or suspicious pairs.
+    """
+
+    allowed_6th = {"t", "p", "c"}
+
+    pairs = []
+    warnings = []
+
+    if len(r_channels) != len(t_channels):
+        warnings.append(
+            f"Different number of reflected and transmitted channels: "
+            f"{len(r_channels)} vs {len(t_channels)}. "
+            f"Only the first {min(len(r_channels), len(t_channels))} pairs will be checked."
+        )
+
+    for i, (ch_r, ch_t) in enumerate(zip(r_channels, t_channels)):
+
+        pair_label = f"pair {i}: [{ch_r}, {ch_t}]"
+
+        valid = True
+
+        if len(ch_r) != 8:
+            warnings.append(
+                f"{pair_label}: skipped because reflected channel has length "
+                f"{len(ch_r)}, expected 8."
+            )
+            valid = False
+
+        if len(ch_t) != 8:
+            warnings.append(
+                f"{pair_label}: skipped because transmitted channel has length "
+                f"{len(ch_t)}, expected 8."
+            )
+            valid = False
+
+        if not valid:
+            continue
+
+        if ch_r[7] != "r":
+            warnings.append(
+                f"{pair_label}: skipped because reflected channel should end "
+                f"with 'r', got '{ch_r[7]}'."
+            )
+            valid = False
+
+        if ch_t[7] != "t":
+            warnings.append(
+                f"{pair_label}: skipped because transmitted channel should end "
+                f"with 't', got '{ch_t[7]}'."
+            )
+            valid = False
+
+        if ch_r[5] not in allowed_6th:
+            warnings.append(
+                f"{pair_label}: skipped because reflected channel has invalid "
+                f"6th character '{ch_r[5]}', expected one of {sorted(allowed_6th)}."
+            )
+            valid = False
+
+        if ch_t[5] not in allowed_6th:
+            warnings.append(
+                f"{pair_label}: skipped because transmitted channel has invalid "
+                f"6th character '{ch_t[5]}', expected one of {sorted(allowed_6th)}."
+            )
+            valid = False
+
+        if ch_r[:4] != ch_t[:4]:
+            warnings.append(
+                f"{pair_label}: skipped because wavelength differs: "
+                f"'{ch_r[:4]}' != '{ch_t[:4]}'."
+            )
+            valid = False
+
+        if not valid:
+            continue
+
+        if ch_r[4] != ch_t[4]:
+            warnings.append(
+                f"{pair_label}: warning, 5th character differs: "
+                f"'{ch_r[4]}' != '{ch_t[4]}'."
+            )
+
+        if ch_r[6] != ch_t[6]:
+            warnings.append(
+                f"{pair_label}: warning, 7th character differs: "
+                f"'{ch_r[6]}' != '{ch_t[6]}'."
+            )
+
+        pairs.append(
+            {
+                "numerator_channel": ch_r,
+                "denominator_channel": ch_t,
+                "ratio_id": f"{ch_r}_over_{ch_t}",
+            }
+        )
+
+    return {
+        "pairs": pairs,
+        "warnings": warnings,
+    }
 
 def load_pol_cal_defaults(config_info):
-    
+    """
+    Fill polarization calibration channel pairs and defaults.
+
+    Final config_info["ch_r"] and config_info["ch_t"] are always
+    atlas_channel_id.
+
+    No pol_cal_pairs are created here.
+    """
+
     print_header("Filling pol. cal. parameters with defaults")
 
     atlas_channel_id = config_info["atlas_channel_id"]
-    recorder_channel_id = config_info["recorder_channel_id"]
-    
-    if config_info["ch_r"] == [] or config_info["ch_t"] == []:
-    
-    
-        ch_r = [rec_id for at_id, rec_id in zip(atlas_channel_id, recorder_channel_id)
-                if at_id[6] == "r"]
-        ch_t = [rec_id for at_id, rec_id in zip(atlas_channel_id, recorder_channel_id) 
-                if at_id[6] == "t"]
-        
-        ch_r_atlas = [at_id for at_id in atlas_channel_id if at_id[6] == "r"]
-        ch_t_atlas = [at_id for at_id in atlas_channel_id if at_id[6] == "t"]
-    
-        clear_r = [f"{r[:5]}{r[7:]}" for r in ch_r_atlas]
-        clear_t = [f"{t[:5]}{t[7:]}" for t in ch_t_atlas]
-    
-        com_index = [clear_t.index(r) for r in clear_r]
-    
-        ch_r = [ch_r[ind] for ind in com_index]
-        ch_t = [ch_t[ind] for ind in com_index]
-    
-        ch_r_atlas = [ch_r_atlas[ind] for ind in com_index]
-        ch_t_atlas = [ch_t_atlas[ind] for ind in com_index]
-        
-        config_info["ch_r"] = ch_r_atlas
-        config_info["ch_t"] = ch_t_atlas
-        
-    else:
-        ch_r = config_info["ch_r"]
-        ch_t = config_info["ch_t"]
-        
-        index_r = [recorder_channel_id.index(r) for r in ch_r]
-        index_t = [recorder_channel_id.index(t) for t in ch_t]
-        
-        ch_r_atlas = [atlas_channel_id[ind] for ind in index_r]
-        ch_t_atlas = [atlas_channel_id[ind] for ind in index_t]
 
-        for i, r in enumerate(ch_r_atlas):
-            if r[6] != "r":
-                raise ConfigError(f"Provided ch_r value: {ch_r[i]} ({r}) does not correspond to a reflected channel ")
+    # ------------------------------------------------------------------
+    # 1. Resolve manually provided pairs to atlas_channel_id
+    # ------------------------------------------------------------------
+    ch_r_manual_raw = config_info.get("ch_r", []) or []
+    ch_t_manual_raw = config_info.get("ch_t", []) or []
 
-        for i, t in enumerate(ch_t_atlas):
-            if t[6] != "t":
-                raise ConfigError(f"Provided ch_t: {ch_t[i]} ({t}) does not correspond to a transmitted channel ")
-        
-        config_info["ch_r"] = ch_r_atlas
-        config_info["ch_t"] = ch_t_atlas
-        
+    if len(ch_r_manual_raw) != len(ch_t_manual_raw):
+        raise ConfigError(
+            "Provided ch_r and ch_t lists have different lengths: "
+            f"{len(ch_r_manual_raw)} vs {len(ch_t_manual_raw)}"
+        )
 
-        
-    pairs = [f"{r}_{t}" for r, t in zip(ch_r_atlas,ch_t_atlas)]
-    
-    config_info["pol_cal_pairs"] = pairs
-    
-    if config_info["pol_cal_pairs"] != []:
-        for key in POL_CAL_KEYS:
-            if key not in ["ch_r", "ch_t"]:
-                meta = SCHEMA[key]
-                if meta["is_list"]:
-                    config_info[key] = len(config_info["pol_cal_pairs"]) * [str(meta["default"])]
-                else:
-                    config_info[key] = str(meta["default"])
-    
+    ch_r_manual = [
+        resolve_to_atlas_channel_id(ch, config_info)
+        for ch in ch_r_manual_raw
+    ]
+
+    ch_t_manual = [
+        resolve_to_atlas_channel_id(ch, config_info)
+        for ch in ch_t_manual_raw
+    ]
+
+    # ------------------------------------------------------------------
+    # 2. Sanity-check manual pairs
+    # ------------------------------------------------------------------
+    checked_manual = check_reflected_transmitted_pairs(
+        r_channels=ch_r_manual,
+        t_channels=ch_t_manual,
+    )
+
+    for warning in checked_manual["warnings"]:
+        CustomWarning(warning)
+
+    ch_r_manual = [
+        pair["numerator_channel"]
+        for pair in checked_manual["pairs"]
+    ]
+
+    ch_t_manual = [
+        pair["denominator_channel"]
+        for pair in checked_manual["pairs"]
+    ]
+
+    manual_pairs = set(zip(ch_r_manual, ch_t_manual))
+
+    # ------------------------------------------------------------------
+    # 3. Find all automatic pairs from atlas_channel_id
+    # ------------------------------------------------------------------
+    ch_r_auto, ch_t_auto = find_reflected_transmitted_pairs(atlas_channel_id)
+
+    # ------------------------------------------------------------------
+    # 4. Remove automatic pairs already provided manually
+    # ------------------------------------------------------------------
+    ch_r_auto_new = []
+    ch_t_auto_new = []
+
+    for r, t in zip(ch_r_auto, ch_t_auto):
+        if (r, t) in manual_pairs:
+            continue
+
+        ch_r_auto_new.append(r)
+        ch_t_auto_new.append(t)
+
+    # ------------------------------------------------------------------
+    # 5. Combine manual + automatic pairs
+    # ------------------------------------------------------------------
+    ch_r_all = ch_r_manual + ch_r_auto_new
+    ch_t_all = ch_t_manual + ch_t_auto_new
+
+    n_pairs = len(ch_r_all)
+
+    config_info["ch_r"] = ch_r_all
+    config_info["ch_t"] = ch_t_all
+
+    # ------------------------------------------------------------------
+    # 6. Fill the rest of the POL_CAL keys
+    # ------------------------------------------------------------------
+    for key in POL_CAL_KEYS:
+
+        if key in ["ch_r", "ch_t", "pol_cal_pairs"]:
+            continue
+
+        meta = SCHEMA[key]
+
+        if meta["is_list"]:
+            config_info[key] = extend_or_default_pol_cal_list(
+                existing=config_info.get(key, []),
+                default=meta["default"],
+                n_target=n_pairs,
+            )
+        else:
+            value = config_info.get(key)
+
+            if value in [None, ""]:
+                config_info[key] = str(meta["default"])
+            else:
+                config_info[key] = str(value)
+
     config_info = dict(sorted(config_info.items()))
-    
-    return(config_info)
+
+    return config_info
 
 def special_config_checks(config_info):
     
@@ -298,9 +737,14 @@ def store_updated_metadata(
 
     system_info = {}
     channel_info = pd.DataFrame(index=config_info["atlas_channel_id"])
-    pol_cal_info = pd.DataFrame(index=config_info["pol_cal_pairs"])
+    pol_cal_info = pd.DataFrame()
+    water_vapour_info = pd.DataFrame()
+    temperature_info = pd.DataFrame()
 
+    # Always initialize metadata groups
     metadata["pol_cal_info"] = {}
+    metadata["water_vapour_info"] = {}
+    metadata["temperature_info"] = {}
 
     for key in config_info:
 
@@ -313,11 +757,21 @@ def store_updated_metadata(
         elif key in POL_CAL_KEYS:
             pol_cal_info.loc[:, key] = [v for v in config_info[key]]
 
+        elif key in WV_KEYS:
+            water_vapour_info.loc[:, key] = [v for v in config_info[key]]
+
+        elif key in TEMP_KEYS:
+            temperature_info.loc[:, key] = [v for v in config_info[key]]
+
     system_parameters = list(system_info.keys())
     system_values = np.array(
         list(system_info.values()),
         dtype=object,
     )
+
+    has_pol_cal_info = pol_cal_info.index.size > 0
+    has_water_vapour_info = water_vapour_info.index.size > 0
+    has_temperature_info = temperature_info.index.size > 0
 
     for key in metadata["time_info"].keys():
 
@@ -347,14 +801,34 @@ def store_updated_metadata(
             },
         )
 
-        metadata["pol_cal_info"][key] = xr.DataArray(
-            pol_cal_info.T.values,
-            dims=["parameters", "pairs"],
-            coords={
-                "parameters": pol_cal_info.columns.values,
-                "pairs": pol_cal_info.index.values,
-            },
-        )
+        if has_pol_cal_info:
+            metadata["pol_cal_info"][key] = xr.DataArray(
+                pol_cal_info.T.values,
+                dims=["parameters", "pair"],
+                coords={
+                    "parameters": pol_cal_info.columns.values,
+                    "pair": pol_cal_info.index.values,
+                },
+            )
+
+        if has_water_vapour_info:
+            metadata["water_vapour_info"][key] = xr.DataArray(
+                water_vapour_info.T.values,
+                dims=["parameters", "pair"],
+                coords={
+                    "parameters": water_vapour_info.columns.values,
+                    "pair": water_vapour_info.index.values,
+                },
+            )
+
+        if has_temperature_info:
+            metadata["temperature_info"][key] = xr.DataArray(
+                temperature_info.T.values,
+                dims=["parameters", "pair"],
+                coords={
+                    "parameters": temperature_info.columns.values,
+                    "pair": temperature_info.index.values,
+                },
+            )
 
     return metadata
-    

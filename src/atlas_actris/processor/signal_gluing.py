@@ -99,3 +99,27 @@ def compute_gluing(
 
 
     return output_data
+
+def compute_some_derived_profile(processing_info, input_data):
+    output_data = shallow_copy(input_data)
+
+    derived_profile = output_data["derived_profile"]
+    derived_profile_error = output_data["derived_profile_error"]
+    derived_profile_info = output_data["derived_profile_info"]
+
+    for qa_test in allowed_qa_tests:
+        new_sig = ...
+        new_err = ...
+
+        derived_profile[qa_test] = new_sig
+        derived_profile_error[qa_test] = new_err
+
+        derived_profile_info[qa_test] = {
+            "NEW_CHANNEL_ID": {
+                "derived_type": "sum",
+                "parent_channels": [...],
+                "status": "candidate",
+            }
+        }
+
+    return output_data

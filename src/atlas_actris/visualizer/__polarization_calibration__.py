@@ -1,644 +1,525 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Sep  1 12:02:25 2022
+New-style polarization calibration visualizer.
 
-@author: nick
+This module consumes polarization calibration products that have already been
+created by the processor, typically from a stage such as ``vldr_generated``.
+
+Expected call pattern
+---------------------
+from visualizer.__polarization_calibration__ import generate_polarization_calibration
+
+pol_cal__metadata = generate_polarization_calibration(
+    data_pack=processor.export_test_from_stage("vldr_generated"),
+    caller_info=processor.processing_info["caller_info"],
+    settings_info=processor.settings_info,
+)
+
+Main assumptions
+----------------
+- data_pack["pcb"] contains combined calibration products:
+    pol_cal_ratio, pol_cal_ratio_error, pol_cal_info
+- data_pack["pcb_p45"] and data_pack["pcb_m45"] contain source calibration
+  products and metadata/vertical scale.
+- data_pack["ray_pcb"] contains Rayleigh-side calibration products and metadata.
+- The left/calibration panel plots gain_ratio products, not eta products:
+    gain_ratio, gain_ratio_p45, gain_ratio_m45
+- eta entries are used only as the valid pair basis.
 """
 
-import warnings, sys
+from collections import defaultdict
+import warnings
+
 import numpy as np
-from .readers.parse_pcb_args import call_parser, check_parser
-from .readers.check import check_channels_no_exclude as check_channels
-from .readers.check import find_rt_channels
-from .readers.read_prepro import unpack
-from .plotting import make_axis, make_title, make_plot, plot_utils
-from .tools import average, curve_fit
-from .writters import make_header, export_ascii 
-import os
 
-# Ignores all warnings --> they are not printed in terminal
-warnings.filterwarnings('ignore')
+from version import __version__
+from utils.printouts import print_header
+from processor.packaging import collect_metadata
+from visualizer.make_text import GenerateText, Libraries
+from visualizer.plot_utils import (
+    prepare_folder,
+    slice_by_vertical_scale,
+    smoothing,
+    convert_m_to_km,
+    perform_color_reduction,
+    add_plot_metadata,
+)
+from visualizer import plot_polarization_calibration
 
-def main(args, __version__):
-    # Check the command line argument information
-    args = check_parser(args)
-    
-    print('-----------------------------------------')
-    print('Initializing the pcb. Calibration...')
-    print('-----------------------------------------')
-    
-    # Read the pcb cal file
-    profiles, metadata = unpack(args['input_file'])
 
-    channels_r, channels_t= find_rt_channels(ch_r = args['ch_r'], 
-                                             ch_t = args['ch_t'], 
-                                             channels = metadata['atlas_channel_id'])
-    
-    # Check if the parsed channels exist
-    channels_r = check_channels(sel_channels = args['ch_r'], 
-                                all_channels = channels_r) 
-    channels_t = check_channels(sel_channels = args['ch_t'], 
-                                all_channels = channels_t)
-    
-    G_R_def = len(channels_r) * [1.]
-    G_T_def = len(channels_r) * [1.]
-    H_R_def = len(channels_r) * [1.]
-    H_T_def = len(channels_r) * [1.]
+warnings.filterwarnings("ignore")
 
-    for i in range(len(channels_r)):
-        if channels_r[i][5] == 'c' and channels_t[i][5] == 'p':
-            H_R_def[i] = -1.
-        if channels_r[i][5] == 'p' and channels_t[i][5] == 'c':
-            H_T_def[i] = -1.
-        if channels_r[i][5] == 't' and channels_t[i][5] == 'p':
-            H_R_def[i] =  0.
-        if channels_r[i][5] == 'p' and channels_t[i][5] == 't':
-            H_T_def[i] =  0.
-        if channels_r[i][5] == 't' and channels_t[i][5] == 'c':
-            H_R_def[i] =  0.
-            H_T_def[i] = -1.
-        if channels_r[i][5] == 'c' and channels_t[i][5] == 't':
-            H_R_def[i] = -1.
-            H_T_def[i] =  0.
 
-    # Extract pair values
-    if args['K'] == None:
-        K = len(channels_r) * [1.]
-        args['K'] = K
-    else:
-        K = args['K']
+def generate_polarization_calibration(data_pack, caller_info, settings_info):
+    """
+    Generate polarization calibration plots from processor products.
 
-    if args['G_R'] == None:
-        G_R = G_R_def
-        args['G_R'] = G_R
-    else:
-        G_R = args['G_R']
+    Required data_pack entries
+    --------------------------
+    data_pack["pcb"]:
+        pol_cal_ratio
+        pol_cal_ratio_error
+        pol_cal_info
 
-    if args['G_T'] == None:
-        G_T = G_T_def
-        args['G_T'] = G_T
-    else:
-        G_T = args['G_T']
+    data_pack["pcb_p45"]:
+        pol_cal_ratio
+        vertical scale and metadata
 
-    if args['H_R'] == None:
-        H_R = H_R_def
-        args['H_R'] = H_R
-    else:
-        H_R = args['H_R']
+    data_pack["pcb_m45"]:
+        pol_cal_ratio
+        vertical scale and metadata
 
-    if args['H_T'] == None:
-        H_T = H_T_def
-        args['H_T'] = H_T
-    else:
-        H_T = args['H_T']
+    data_pack["ray_pcb"]:
+        pol_cal_ratio
+        pol_cal_ratio_error
+        pol_cal_info
+        vertical scale and metadata
 
-    if args['R_to_T_transmission_ratio'] == None:
-        TR_to_TT = len(channels_r) * [1.]
-        args['R_to_T_transmission_ratio'] = TR_to_TT
-    else:
-        TR_to_TT = args['R_to_T_transmission_ratio']
+    Optional
+    --------
+    data_pack["ray_pcb"]["molecular_ratio"]
+    data_pack["ray_pcb"]["molecular_info"]
 
-    # Iterate over the channels
-    for i in range(len(channels_r)):
-                
-        ch_r = channels_r[i]
-        ch_t = channels_t[i]
-        K_ch = float(K[i])
-        G_R_ch = float(G_R[i])
-        G_T_ch = float(G_T[i])
-        H_R_ch = float(H_R[i])
-        H_T_ch = float(H_T[i])
-        G_R_def_ch = G_R_def[i]
-        G_T_def_ch = G_T_def[i]
-        H_R_def_ch = H_R_def[i]
-        H_T_def_ch = H_T_def[i]
-        TR_to_TT_ch = TR_to_TT[i]
-        
+    Returns
+    -------
+    defaultdict(dict)
+        QA-test metadata, indexed as qa_test_info["pcb"][eta_id].
+    """
+
+    qa_test_info = defaultdict(dict)
+
+    required_keys = ["pcb", "pcb_m45", "pcb_p45", "ray_pcb"]
+    if any(key not in data_pack for key in required_keys):
+        return qa_test_info
+
+    print_header("Initializing the Polarization Calibration test")
+
+    prepare_folder(caller_info, pattern="_pcb_")
+
+    settings = settings_info["pcb"].copy()
+    vertical_scale_name = caller_info["vertical_scale"]
+
+    pcb_pack = data_pack["pcb"]
+    pcb_p45_pack = data_pack["pcb_p45"]
+    pcb_m45_pack = data_pack["pcb_m45"]
+    ray_pack = data_pack["ray_pcb"]
+
+    pcb_ratio = pcb_pack["pol_cal_ratio"]
+    pcb_info = pcb_pack["pol_cal_info"]
+
+    pcb_p45_ratio = pcb_p45_pack["pol_cal_ratio"]
+    pcb_m45_ratio = pcb_m45_pack["pol_cal_ratio"]
+
+    ray_ratio = ray_pack["pol_cal_ratio"]
+    ray_info = ray_pack["pol_cal_info"]
+
+    molecular_ratio = ray_pack.get("molecular_ratio", None)
+    molecular_info = ray_pack.get("molecular_info", None)
+
+    # data_pack["pcb"] has only combined products, so use a source
+    # calibration pack for the calibration vertical scale.
+    z_cal_all = convert_m_to_km(pcb_m45_pack[vertical_scale_name])
+    z_ray_all = convert_m_to_km(ray_pack[vertical_scale_name])
+
+    eta_ids = _select_pairs_by_type(pcb_info, "eta")
+
+    for eta_id in eta_ids:
+
+        pair_settings = settings.copy()
+
+        ch_r = _info_value(pcb_info, eta_id, "ch_r", default=None)
+        ch_t = _info_value(pcb_info, eta_id, "ch_t", default=None)
+
+        if ch_r is None or ch_t is None:
+            continue
+
         print(f"-- channels: {ch_r} & {ch_t}")
 
-        ch_r_d = dict(channel = ch_r)
-        ch_t_d = dict(channel = ch_t)
-        
-        sig_r_p45_ch = profiles['sig_p45'].copy().loc[ch_r_d].values
-        sig_t_p45_ch = profiles['sig_p45'].copy().loc[ch_t_d].values
-        sig_r_m45_ch = profiles['sig_m45'].copy().loc[ch_r_d].values
-        sig_t_m45_ch = profiles['sig_m45'].copy().loc[ch_t_d].values
-        sig_r_ray_ch = profiles['sig_ray'].copy().loc[ch_r_d].values
-        sig_t_ray_ch = profiles['sig_ray'].copy().loc[ch_t_d].values
-        
-        delta_m_prf = profiles['mldr'].loc[ch_r_d].values
-        
-        ranges_ray_ch = profiles['ranges_ray'].copy().loc[ch_r_d].values
-        heights_ray_ch = profiles['heights_ray'].copy().loc[ch_r_d].values
-        
-        ranges_cal_ch = profiles['ranges_cal'].copy().loc[ch_r_d].values
-        heights_cal_ch = profiles['heights_cal'].copy().loc[ch_r_d].values
-        
+        gain_ratio_id = replace_ratio_id_type(eta_id, "g")
+        eta_s_f_id = replace_ratio_id_type(eta_id, "f")
+        calibrated_ratio_id = replace_ratio_id_type(eta_id, "d")
+        vldr_id = replace_ratio_id_type(eta_id, "v")
+        mldr_id = replace_ratio_id_type(eta_id, "m")
 
-        # Create the y axis (height/range)
-        x_lbin_cal, x_ubin_cal, x_llim_cal, x_ulim_cal, x_vals_cal, x_label_cal = \
-            make_axis.polarization_calibration_x(
-                heights = heights_cal_ch, 
-                ranges = ranges_cal_ch,
-                x_lims = args['x_lims_calibration'], 
-                use_dis = args['use_range'])
-    
-        # Create the y axis (height/range)
-        x_lbin_ray, x_ubin_ray, x_llim_ray, x_ulim_ray, x_vals_ray, x_label_ray = \
-            make_axis.polarization_calibration_x(
-                heights = heights_ray_ch, 
-                ranges = ranges_ray_ch,
-                x_lims = args['x_lims_rayleigh'], 
-                use_dis = args['use_range'])
-    
-        # Smoothing
-        if args['smooth']== True:
-            if not isinstance(args['smoothing_window'],list):
-                from .tools.smoothing import sliding_average_1D_fast as smooth_1D
-            else:
-                from .tools.smoothing import sliding_average_1D as smooth_1D
+        if not _all_pairs_exist(pcb_ratio, [gain_ratio_id, eta_s_f_id, eta_id]):
+            print(f"   Skipping {eta_id}: missing pcb calibration products.")
+            continue
 
-            y_r_m45_sm, _ = \
-                smooth_1D(y_vals = sig_r_m45_ch, 
-                          x_vals = x_vals_cal,
-                          x_sm_lims = args['smoothing_range'],
-                          x_sm_win = args['smoothing_window'],
-                          expo = args['smooth_exponential'])
-    
-            y_t_m45_sm, _ = \
-                smooth_1D(y_vals = sig_t_m45_ch, 
-                          x_vals = x_vals_cal,
-                          x_sm_lims = args['smoothing_range'],
-                          x_sm_win = args['smoothing_window'],
-                          expo = args['smooth_exponential'])
-                
-            y_r_p45_sm, _ = \
-                smooth_1D(y_vals = sig_r_p45_ch, 
-                          x_vals = x_vals_cal,
-                          x_sm_lims = args['smoothing_range'],
-                          x_sm_win = args['smoothing_window'],
-                          expo = args['smooth_exponential'])
-    
-            y_t_p45_sm, _ = \
-                smooth_1D(y_vals = sig_t_p45_ch, 
-                          x_vals = x_vals_cal,
-                          x_sm_lims = args['smoothing_range'],
-                          x_sm_win = args['smoothing_window'],
-                          expo = args['smooth_exponential'])
-    
-            y_r_rax_sm, _ = \
-                smooth_1D(y_vals = sig_r_ray_ch, 
-                          x_vals = x_vals_ray,
-                          x_sm_lims = args['smoothing_range'],
-                          x_sm_win = args['smoothing_window'],
-                          expo = args['smooth_exponential'])    
-                
-            y_t_rax_sm, _ = \
-                smooth_1D(y_vals = sig_t_ray_ch, 
-                          x_vals = x_vals_ray,
-                          x_sm_lims = args['smoothing_range'],
-                          x_sm_win = args['smoothing_window'],
-                          expo = args['smooth_exponential'])      
-                
-        else:
-            y_r_m45_sm = sig_r_m45_ch
-            y_t_m45_sm = sig_t_m45_ch
-            y_r_p45_sm = sig_r_p45_ch
-            y_t_p45_sm = sig_t_p45_ch
-            y_r_rax_sm = sig_r_ray_ch
-            y_t_rax_sm = sig_t_ray_ch
-        
-        eta_m45_prf = (y_r_m45_sm / y_t_m45_sm) 
-    
-        eta_p45_prf = (y_r_p45_sm / y_t_p45_sm)
-        
-        eta_prf = np.sqrt(eta_m45_prf * eta_p45_prf)
-        
-        delta_r_prf = (y_r_rax_sm / y_t_rax_sm)
-        
-        llim = 0.5
-        ulim = 11.
-        min_win = 1.
-        max_win = 4.
-        
-        if args['calibration_region'][0] < llim:
-            llim = args['calibration_region'][0]
-        if args['calibration_region'][0] > ulim:
-            ulim = args['calibration_region'][1]
-        if args['calibration_region'][1] - args['calibration_region'][0] < min_win:
-            min_win = args['calibration_region'][1] - args['calibration_region'][0]
-        if args['calibration_region'][1] - args['calibration_region'][0] > max_win:
-            max_win = args['calibration_region'][1] - args['calibration_region'][0]
-        
-        # # Check for a fit range for the Δ90 calibration
-        # rsem, nder, mfit, msem, mder, msec, mshp, mcrc, coef = \
-        #     curve_fit.statistics(y1 = eta_prf.copy(),
-        #                          y2 = np.ones(eta_prf.shape), 
-        #                          x  = x_vals_cal,
-        #                          min_win = min_win,
-        #                          max_win = max_win,
-        #                          step = 0.1,
-        #                          llim = llim,
-        #                          ulim = ulim,
-        #                          rsem_lim = 0.05,
-        #                          cross_check_type = 'both',
-        #                          cross_check_all_points = False,
-        #                          cross_check_crit = 'both',
-        #                          der_fac = 2.,
-        #                          cancel_shp = True)
-        
+        if not _all_pairs_exist(pcb_p45_ratio, [gain_ratio_id]):
+            print(f"   Skipping {eta_id}: missing pcb_p45 gain-ratio product.")
+            continue
 
-        # norm_region_cal, idx_cal, fit_cal = \
-        #     curve_fit.scan(mfit = mfit,
-        #                    dflt_region = args['calibration_region'],
-        #                    prefered_range = "near")
+        if not _all_pairs_exist(pcb_m45_ratio, [gain_ratio_id]):
+            print(f"   Skipping {eta_id}: missing pcb_m45 gain-ratio product.")
+            continue
 
-        llim = 1.
-        ulim = 11.
-        min_win = 0.5
-        max_win = 4.
-        
-        if args['rayleigh_region'][0] < llim:
-            llim = args['rayleigh_region'][0]
-        if args['rayleigh_region'][0] > ulim:
-            ulim = args['rayleigh_region'][1]
-        if args['rayleigh_region'][1] - args['rayleigh_region'][0] < min_win:
-            min_win = args['rayleigh_region'][1] - args['rayleigh_region'][0]
-        if args['rayleigh_region'][1] - args['rayleigh_region'][0] > max_win:
-            max_win = args['rayleigh_region'][1] - args['rayleigh_region'][0]
-        
-        # # Check for a fit range for the Rayleigh calibration
-        # rsem, nder, mfit, msem, mder, msec, mshp, mcrc, coef = \
-        #     curve_fit.statistics(y1 = delta_r_prf.copy(),
-        #                          y2 = delta_m_prf.copy(), 
-        #                          x  = x_vals_cal,
-        #                          min_win = min_win,
-        #                          max_win = max_win,
-        #                          step = 0.1,
-        #                          llim = llim,
-        #                          ulim = ulim,
-        #                          rsem_lim = 0.05,
-        #                          cross_check_type = 'both',
-        #                          cross_check_all_points = False,
-        #                          der_fac = 2.,
-        #                          cancel_shp = True)    
+        if not _all_pairs_exist(ray_ratio, [calibrated_ratio_id, vldr_id]):
+            print(f"   Skipping {eta_id}: missing ray_pcb calibration products.")
+            continue
 
-        # norm_region_ray, idx_ray, fit_ray = \
-        #     curve_fit.scan(mfit = mfit,
-        #                    dflt_region = args['rayleigh_region'],
-        #                    prefered_range = "far")
-                        
-        avg_r_m45, _, sem_r_m45 = \
-            average.region(sig = sig_r_m45_ch, 
-                           x_vals = x_vals_cal, 
-                           region = args['calibration_region'], 
-                           axis = 0,
-                           squeeze = True)
-        
-        avg_t_m45, _, sem_t_m45 = \
-            average.region(sig = sig_t_m45_ch, 
-                           x_vals = x_vals_cal, 
-                           region = args['calibration_region'], 
-                           axis = 0,
-                           squeeze = True)
-        
-        avg_r_p45, _, sem_r_p45 = \
-            average.region(sig = sig_r_p45_ch, 
-                           x_vals = x_vals_cal, 
-                           region = args['calibration_region'], 
-                           axis = 0,
-                           squeeze = True)
-        
-        avg_t_p45, _, sem_t_p45 = \
-            average.region(sig = sig_t_p45_ch, 
-                           x_vals = x_vals_cal, 
-                           region = args['calibration_region'], 
-                           axis = 0,
-                           squeeze = True)
-                
-        avg_r_ray, _, sem_r_ray = \
-            average.region(sig = sig_r_ray_ch, 
-                           x_vals = x_vals_ray, 
-                           region = args['rayleigh_region'], 
-                           axis = 0,
-                           squeeze = True)
-            
-        avg_t_ray, _, sem_t_ray = \
-            average.region(sig = sig_t_ray_ch, 
-                           x_vals = x_vals_ray, 
-                           region = args['rayleigh_region'], 
-                           axis = 0,
-                           squeeze = True)
+        # ------------------------------------------------------------------
+        # Calibration panel: gain-ratio profiles
+        # ------------------------------------------------------------------
+        z_cal = z_cal_all.sel(channel=ch_r)
 
-        delta_m, _, _ = \
-            average.region(sig = delta_m_prf, 
-                           x_vals = x_vals_ray, 
-                           region = args['rayleigh_region'], 
-                           axis = 0,
-                           squeeze = True) 
-            
-        avg_r_m45_i = np.random.normal(loc = avg_r_m45, scale = sem_r_m45, size = 200)
-        avg_t_m45_i = np.random.normal(loc = avg_t_m45, scale = sem_t_m45, size = 200)
-        avg_r_p45_i = np.random.normal(loc = avg_r_p45, scale = sem_r_p45, size = 200)
-        avg_t_p45_i = np.random.normal(loc = avg_t_p45, scale = sem_t_p45, size = 200)
-        avg_r_ray_i = np.random.normal(loc = avg_r_ray, scale = sem_r_ray, size = 200)
-        avg_t_ray_i = np.random.normal(loc = avg_t_ray, scale = sem_t_ray, size = 200)
+        gain_ratio = pcb_ratio.sel(pair=gain_ratio_id)
+        gain_ratio_p45 = pcb_p45_ratio.sel(pair=gain_ratio_id)
+        gain_ratio_m45 = pcb_m45_ratio.sel(pair=gain_ratio_id)
 
-        eta_f_s_m45 = (avg_r_m45_i / avg_t_m45_i)
-        
-        eta_f_s_m45[0] = (avg_r_m45 / avg_t_m45)
-        
-        eta_f_s_p45 = (avg_r_p45_i / avg_t_p45_i)
+        gain_ratio, z_cal_sliced, cal_mask = slice_by_vertical_scale(
+            da=gain_ratio,
+            vertical_scale=z_cal,
+            x_lims=pair_settings["smoothing_range"],
+        )
 
-        eta_f_s_p45[0] = (avg_r_p45 / avg_t_p45)
-        
-        eta_f_s = np.sqrt(eta_f_s_p45 * eta_f_s_m45)
-        
-        eta_s = eta_f_s / TR_to_TT_ch
+        gain_ratio_p45 = gain_ratio_p45.where(cal_mask, drop=True)
+        gain_ratio_m45 = gain_ratio_m45.where(cal_mask, drop=True)
 
-        eta = eta_s / K_ch
+        x_cal = z_cal_sliced.values
 
-        delta_s_prf = (y_r_rax_sm / y_t_rax_sm) / eta[0]
+        Y_cal = {}
+        E_cal = {}
 
-        delta_s = (avg_r_ray_i / avg_t_ray_i) / eta
-            
-        delta_s[0] = (avg_r_ray / avg_t_ray) / eta[0]
-
-        delta_c_def_prf = (delta_s_prf * (G_T_def_ch + H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
-            ((G_R_def_ch - H_R_def_ch) - delta_s_prf * (G_T_def_ch - H_T_def_ch))
-        
-        delta_c_def = (delta_s * (G_T_def_ch+ H_T_def_ch) - (G_R_def_ch + H_R_def_ch)) /\
-            ((G_R_def_ch - H_R_def_ch) - delta_s * (G_T_def_ch - H_T_def_ch))
-            
-        delta_c_prf = (delta_s_prf * (G_T_ch + H_T_ch) - (G_R_ch + H_R_ch)) /\
-            ((G_R_ch - H_R_ch) - delta_s_prf * (G_T_ch - H_T_ch))
-
-        delta_c = (delta_s * (G_T_ch + H_T_ch) - (G_R_ch + H_R_ch)) /\
-            ((G_R_ch - H_R_ch) - delta_s * (G_T_ch - H_T_ch))
-                    
-        psi = (eta_f_s_p45 - eta_f_s_m45) / (eta_f_s_p45 + eta_f_s_m45)
-        
-        kappa = 1.
-        
-        epsilon = np.rad2deg(0.5 * np.arcsin(np.tan(0.5 * np.arcsin(psi) / kappa)))
-        # kappa = np.tan(0.5 * np.arcsin(psi)) / np.sin(2. * np.deg2rad(epsilon)) 
-        
-        delta_l = (delta_c - delta_m) / (1. - delta_c * delta_m)
-        
-        # delta_l_err = delta_c_err * (1. - delta_m) * (1. + delta_c) / \
-        #     (1. - delta_m * delta_c)**2
-                      
-        # base_delta_v = np.ceil(1E3 * delta_m) / 1E3
-        # delta_v = np.hstack((np.arange(base_delta_v, 0.021, 0.001),
-        #                      np.arange(0.02, 0.31, 0.01)))
-        
-        # err_v = delta_l[0]
-        err_p = 0.025
-        delta_p_err, delta_p, R, sr_lim = pldr_error(delta_m = delta_m, 
-                                                     delta_v_err = delta_l[0], 
-                                                     delta_p_err_ulim = err_p)
-        
-        # alpha = (1. + delta_m)**2 * (err_v - err_p)
-        # beta = (1. + delta_m) * (2. * err_p * (1. + delta_v + err_v / 2.) - err_v * (1. + delta_m))
-        # gamma = - err_p * (1. + delta_v) * (1. + delta_v + err_v)
-        
-        # sr_lim = (-beta - np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
- 
-        # Create the y axis (calibration)
-        y_llim_cal, y_ulim_cal, y_label_cal = \
-            make_axis.polarization_calibration_cal_y(
-                ratio_m = eta_f_s_m45[0], ratio_p = eta_f_s_p45[0],
-                y_lims_cal = args['y_lims_calibration'])
-            
-        # Create the y axis (rayleigh)
-        y_llim_ray, y_ulim_ray, y_label_ray = \
-            make_axis.polarization_calibration_ray_y(
-                ratio = delta_c_def[0], y_lims_ray = args['y_lims_rayleigh'])
-        
-                
-        # Make title
-        title = make_title.polarization_calibration(channel_r = ch_r, 
-                                                    channel_t = ch_t, 
-                                                    metadata = metadata, 
-                                                    args = args)
-        
-        # Make plot filename
-        fname = make_plot.make_filename(metadata = metadata, 
-                                        channel = ch_r,
-                                        extra_channel = ch_t,
-                                        meas_type = 'pcb', 
-                                        version = __version__)
-        
-        pol_cal_metadata = dict(
-            eta = eta[0], 
-            eta_f_s = eta_f_s[0], 
-            eta_s = eta_s[0], 
-            mldr = delta_m,
-            calibrated_ratio = delta_c_def[0],
-            vldr = delta_c[0],
-            vldr_offset = delta_l[0],
-            epsilon_angle = epsilon[0],
-            min_bsc_ratio = sr_lim,
-            err_p = err_p,
-            eta_err = np.std(eta[1:]), 
-            eta_f_s_err = np.std(eta_f_s[1:]), 
-            eta_s_err = np.std(eta_s[1:]), 
-            calibrated_ratio_err = np.std(delta_c_def[1:]),
-            vldr_err = np.std(delta_c[1:]),
-            vldr_offset_err = np.std(delta_l[1:]),
-            epsilon_angle_err = np.std(epsilon[1:]),
-            K_ch = K_ch,
-            G_R_ch = G_R_ch,
-            G_T_ch = G_T_ch,
-            H_R_ch = H_R_ch,
-            H_T_ch = H_T_ch,
-            TR_to_TT_ch = TR_to_TT_ch
+        for key, da in [
+            ("gain_ratio", gain_ratio),
+            ("gain_ratio_p45", gain_ratio_p45),
+            ("gain_ratio_m45", gain_ratio_m45),
+        ]:
+            y_sm, y_err = smoothing(
+                args=pair_settings,
+                x_vals=x_cal,
+                y_vals=da.values,
+                err_type="std",
             )
-        
-        # Make filename
-        plot_path = \
-            make_plot.polarization_calibration(dir_out = os.path.join(args['output_folder'],'plots'), 
-                                               fname = f"{fname}.png", title = title,
-                                               dpi_val = args['dpi'],
-                                               color_reduction = args['color_reduction'],
-                                               cal_region = args['calibration_region'],
-                                               vdr_region = args['rayleigh_region'],
-                                               x_vals_cal = x_vals_cal, 
-                                               x_vals_vdr = x_vals_ray, 
-                                               y1_vals = eta_prf, 
-                                               y2_vals = eta_p45_prf, 
-                                               y3_vals = eta_m45_prf, 
-                                               y4_vals = delta_c_def_prf,
-                                               y5_vals = delta_c_prf,
-                                               y6_vals = delta_m_prf,
-                                               metadata = pol_cal_metadata,
-                                               x_lbin_cal = x_lbin_cal,
-                                               x_ubin_cal = x_ubin_cal, 
-                                               x_llim_cal = x_llim_cal,
-                                               x_ulim_cal = x_ulim_cal, 
-                                               y_llim_cal = y_llim_cal, 
-                                               y_ulim_cal = y_ulim_cal, 
-                                               x_lbin_vdr = x_lbin_ray, 
-                                               x_ubin_vdr = x_ubin_ray, 
-                                               x_llim_vdr = x_llim_ray, 
-                                               x_ulim_vdr = x_ulim_ray, 
-                                               y_llim_vdr = y_llim_ray, 
-                                               y_ulim_vdr = y_ulim_ray, 
-                                               y_label_cal = y_label_cal, 
-                                               x_label_cal = x_label_cal, 
-                                               x_tick_cal = args['x_tick_calibration'],
-                                               y_label_vdr = y_label_ray, 
-                                               x_label_vdr = x_label_ray, 
-                                               x_tick_vdr = args['x_tick_rayleigh'])  
-    
-        # Make ascii file header
-        header = \
-            make_header.polarisation_calibration(channel_r = ch_r,
-                                                 channel_t = ch_t,
-                                                 metadata = metadata,
-                                                 K = K_ch,
-                                                 G_R = G_R_ch,
-                                                 G_T = G_T_ch,
-                                                 H_R = H_R_ch,
-                                                 H_T = H_T_ch)
-        
-        # Export to ascii (Volker's format)        
-        export_ascii.polarisation_calibration(dir_out = args['output_folder'], 
-                                              fname = f"{fname}.txt", 
-                                              alt_cal = x_vals_cal,                                              
-                                              alt_ray = x_vals_ray,
-                                              r_p45 = sig_r_p45_ch,
-                                              t_p45 = sig_t_p45_ch,
-                                              r_m45 = sig_r_m45_ch,
-                                              t_m45 = sig_t_m45_ch,   
-                                              ray_r = sig_r_ray_ch,
-                                              ray_t = sig_t_ray_ch,
-                                              header = header)
-        
-        
-        
 
-            
-        # Combine metadata to add to the plot
-        plot_metadata_r = make_plot.get_plot_metadata(metadata = metadata, 
-                                                      args = args, 
-                                                      channel = ch_r,
-                                                      meas_type = 'pcb', 
-                                                      version = __version__,
-                                                      data_source_id = 'r')
-       
-        plot_metadata_t = make_plot.get_plot_metadata(metadata = metadata, 
-                                                      args = args, 
-                                                      channel = ch_t,
-                                                      meas_type = 'pcb', 
-                                                      version = __version__,
-                                                      data_source_id = 't')
-        
-        pol_cal_metadata = make_plot.prepare_png_text_metadata(pol_cal_metadata)
+            Y_cal[key] = y_sm
+            E_cal[key] = y_err
 
-        # Add metadata to the plot
-        make_plot.add_plot_metadata(
-            plot_path = plot_path, 
-            plot_metadata = plot_metadata_r,
-            plot_metadata_extra = plot_metadata_t,
-            plot_metadata_extra_2 = pol_cal_metadata
+        # ------------------------------------------------------------------
+        # Rayleigh panel: time-resolved ray_pcb products -> mean over time
+        # ------------------------------------------------------------------
+        z_ray = z_ray_all.sel(channel=ch_r)
+
+        calibrated_ratio = _time_mean(ray_ratio.sel(pair=calibrated_ratio_id))
+        vldr = _time_mean(ray_ratio.sel(pair=vldr_id))
+
+        calibrated_ratio, z_ray_sliced, ray_mask = slice_by_vertical_scale(
+            da=calibrated_ratio,
+            vertical_scale=z_ray,
+            x_lims=pair_settings["smoothing_range"],
+        )
+
+        vldr = vldr.where(ray_mask, drop=True)
+
+        x_ray = z_ray_sliced.values
+
+        Y_ray = {}
+        E_ray = {}
+
+        for key, da in [
+            ("calibrated_ratio", calibrated_ratio),
+            ("vldr", vldr),
+        ]:
+            y_sm, y_err = smoothing(
+                args=pair_settings,
+                x_vals=x_ray,
+                y_vals=da.values,
+                err_type="std",
             )
-        
-    print('-----------------------------------------')
-    print(' ')
-    
-    return()
 
-def add_extra_plot_metadata(plot_metadata, norm_region_flag, 
-                            stats_norm_region, maximum_channel_height):
-    
-    plot_metadata['norm_region_flag'] = f"{norm_region_flag}"
-    for key in stats_norm_region.keys():
-        plot_metadata[f"stats_{key}"] = f"{stats_norm_region[key]}"
-    for key in stats_norm_region.keys():
-        plot_metadata[f"masks_{key}"] = f"{stats_norm_region[key]}"
-        
-    plot_metadata['maximum_channel_height'] = f"{maximum_channel_height}"
-    
-    return(plot_metadata)
+            Y_ray[key] = y_sm
+            E_ray[key] = y_err
 
-def pldr_error(delta_m, delta_v_err, delta_p_ulim = 0.3, delta_p_err_ulim = 0.025):
-    
-    R = np.arange(1.01, 3., 0.001)
-    delta_p = np.arange(0., delta_p_ulim + 0.001, 0.001)
-    
-    # delta_p_err = np.zeros((len(delta_p), len(R)))
-    
-    # for i in range(len(delta_p)):
-    sq_term_nom = (delta_v_err + delta_p[:,np.newaxis]) * (1. + delta_m)**2 * np.power(R[np.newaxis,:], 2)
-    sq_term_denom = (1. + delta_m)**2 * np.power(R[np.newaxis,:], 2)
-    
-    lin_term_nom = (1. + delta_m)*(delta_v_err * (delta_p[:,np.newaxis] - 2. * delta_m) - delta_p[:,np.newaxis] * (1. + delta_m)) * R[np.newaxis,:]
-    lin_term_denom = -(1. + delta_m)*(delta_v_err + 1. + delta_m) * R[np.newaxis,:]
-    
-    const_term_nom = -delta_m * (delta_p[:,np.newaxis] - delta_m) * delta_v_err
-    const_term_denom = (delta_p[:,np.newaxis] - delta_m) * delta_v_err
-        
-    delta_p_err = (sq_term_nom + lin_term_nom + const_term_nom) /\
-        (sq_term_denom + lin_term_denom + const_term_denom) - delta_p[:,np.newaxis]
-        
-    delta_p_err[np.abs(delta_p_err) > delta_p_err_ulim] = np.nan
-    
-    if not np.isnan(delta_p_err[-1,:]).all():
-        if delta_v_err > 0.0001:
-            min_bsc_ratio = R[np.nanargmax(delta_p_err[-1,:])]
-        elif delta_v_err < -0.0001:
-            min_bsc_ratio = R[np.nanargmin(delta_p_err[-1,:])]
+        # Optional MLDR
+        if molecular_ratio is not None and _all_pairs_exist(molecular_ratio, [mldr_id]):
+            mldr = molecular_ratio.sel(pair=mldr_id)
+            mldr = mldr.where(ray_mask, drop=True)
+
+            mldr_sm, _ = smoothing(
+                args=pair_settings,
+                x_vals=x_ray,
+                y_vals=mldr.values,
+                err_type="std",
+            )
+
+            Y_ray["mldr"] = mldr_sm
+            E_ray["mldr"] = np.nan * mldr_sm
         else:
-            min_bsc_ratio = 1.01
+            Y_ray["mldr"] = np.nan * Y_ray["vldr"]
+            E_ray["mldr"] = np.nan * Y_ray["vldr"]
+
+        # ------------------------------------------------------------------
+        # Metadata / scalar diagnostics
+        # ------------------------------------------------------------------
+        pair_info = {
+            "gain_ratio_id": gain_ratio_id,
+            "eta_s_f_id": eta_s_f_id,
+            "eta_id": eta_id,
+            "calibrated_ratio_id": calibrated_ratio_id,
+            "vldr_id": vldr_id,
+            "mldr_id": mldr_id,
+            "ch_r": ch_r,
+            "ch_t": ch_t,
+        }
+
+        scalar_info = _collect_scalar_info(
+            pcb_info=pcb_info,
+            ray_info=ray_info,
+            molecular_info=molecular_info,
+            ids=pair_info,
+            settings=pair_settings,
+        )
+
+        qa_test_info["pcb"][eta_id] = scalar_info | pair_info
+
+        metadata_ray_r = collect_metadata(ray_pack, atlas_channel_id=ch_r)
+        metadata_ray_t = collect_metadata(ray_pack, atlas_channel_id=ch_t)
+
+        # Use source calibration packs for PCB measurement metadata.
+        metadata_pcb_r = collect_metadata(pcb_m45_pack, atlas_channel_id=ch_r)
+        metadata_pcb_t = collect_metadata(pcb_m45_pack, atlas_channel_id=ch_t)
+
+        lib = Libraries(
+            caller_info=caller_info,
+            metadata=metadata_ray_r,
+            extra_metadata=metadata_pcb_r,
+            settings=pair_settings,
+            qa_test_info=qa_test_info["pcb"][eta_id],
+        )
+
+        text_generator = GenerateText(lib=lib)
+
+        # Use the polarization title function if available in your module.
+        qa_test_info["pcb"][eta_id]["title"] = text_generator.make_polarization_calibration_title(
+            metadata_r=metadata_ray_r,
+            metadata_t=metadata_ray_t,
+        )
+
+        qa_test_info["pcb"][eta_id]["filename"] = text_generator.make_filename(
+            qa_test="pcb",
+            extra_metadata=metadata_ray_r,
+        )
+
+        plot_args = (
+            caller_info
+            | pair_settings
+            | metadata_ray_r
+            | qa_test_info["pcb"][eta_id]
+            | {
+                "vertical_scale": vertical_scale_name,
+                "calibration_text": plot_polarization_calibration.make_calibration_text(
+                    pair_settings | scalar_info
+                ),
+                "rayleigh_text": plot_polarization_calibration.make_rayleigh_text(
+                    pair_settings | scalar_info
+                ),
+            }
+        )
+
+        plot_path = plot_polarization_calibration.generate_plot(
+            X_cal=x_cal,
+            Y_cal=Y_cal,
+            E_cal=E_cal,
+            X_ray=x_ray,
+            Y_ray=Y_ray,
+            E_ray=E_ray,
+            args=plot_args,
+        )
+
+        qa_test_info["pcb"][eta_id]["pol_cal_plot_path"] = plot_path
+
+        perform_color_reduction(
+            color_reduction=caller_info["color_reduction"],
+            plot_path=plot_path,
+        )
+
+        plot_metadata = (
+            metadata_ray_r
+            | {
+                **pair_settings,
+                **pair_info,
+                **scalar_info,
+                "atlas_channel_id_r": ch_r,
+                "atlas_channel_id_t": ch_t,
+                "ATLAS_version": __version__,
+                "QA_test_ID": "pcb",
+                "calibration_vertical_scale_source": "pcb_m45",
+            }
+        )
+
+        add_plot_metadata(
+            plot_path=plot_path,
+            plot_metadata=plot_metadata,
+            plot_metadata_extra=metadata_ray_t | metadata_pcb_r | metadata_pcb_t,
+        )
+
+    return qa_test_info
+
+
+def replace_ratio_id_type(pair_id, new_type):
+    """
+    Replace the product-type character at index 5 of an 8-character pair ID.
+
+    Examples
+    --------
+    0532xeax -> 0532xgax if new_type='g'
+    0532xeax -> 0532xdax if new_type='d'
+    """
+    pair_id = str(pair_id)
+
+    if len(pair_id) != 8:
+        raise ValueError(f"Expected 8-character pair id. Got: {pair_id}")
+
+    return f"{pair_id[:5]}{new_type}{pair_id[6:]}"
+
+
+def _time_mean(da):
+    """
+    Average over time if a time dimension exists.
+    """
+    if "time" in da.dims:
+        return da.mean("time")
+
+    return da
+
+
+def _select_pairs_by_type(info, ratio_type):
+    """
+    Select pair IDs from a pol_cal_info DataArray by ratio_type.
+    """
+    if info is None:
+        return []
+
+    if "parameters" not in info.dims:
+        return []
+
+    if "ratio_type" not in info.parameters.values:
+        return []
+
+    types = info.sel(parameters="ratio_type")
+
+    return [
+        str(pair)
+        for pair, value in zip(types.pair.values, types.values)
+        if str(value) == ratio_type
+    ]
+
+
+def _all_pairs_exist(da, pair_ids):
+    """
+    Check whether all requested pair IDs exist in a DataArray.
+    """
+    if da is None:
+        return False
+
+    if "pair" not in da.dims:
+        return False
+
+    available = set(str(pair) for pair in da.pair.values)
+
+    return all(str(pair_id) in available for pair_id in pair_ids)
+
+
+def _info_value(info, pair_id, parameter, default=np.nan):
+    """
+    Safely extract a scalar value from a pol_cal_info-like DataArray.
+    """
+    if info is None:
+        return default
+
+    if "parameters" not in info.dims or "pair" not in info.dims:
+        return default
+
+    if parameter not in info.parameters.values:
+        return default
+
+    if pair_id not in info.pair.values:
+        return default
+
+    value = info.sel(parameters=parameter, pair=pair_id).values
+
+    try:
+        value = np.asarray(value).item()
+    except Exception:
+        pass
+
+    if value is None:
+        return default
+
+    try:
+        if np.isnan(value):
+            return default
+    except Exception:
+        pass
+
+    return value
+
+
+def _collect_scalar_info(pcb_info, ray_info, molecular_info, ids, settings):
+    """
+    Collect scalar diagnostics already calculated by the processor.
+    """
+    gain_ratio_id = ids["gain_ratio_id"]
+    eta_s_f_id = ids["eta_s_f_id"]
+    eta_id = ids["eta_id"]
+    calibrated_ratio_id = ids["calibrated_ratio_id"]
+    vldr_id = ids["vldr_id"]
+    mldr_id = ids["mldr_id"]
+
+    return {
+        "gain_ratio_mean": _info_value(pcb_info, gain_ratio_id, "mean"),
+        "gain_ratio_sem": _info_value(pcb_info, gain_ratio_id, "sem"),
+        "eta_s_f_mean": _info_value(pcb_info, eta_s_f_id, "mean"),
+        "eta_s_f_sem": _info_value(pcb_info, eta_s_f_id, "sem"),
+        "eta_mean": _info_value(pcb_info, eta_id, "mean"),
+        "eta_sem": _info_value(pcb_info, eta_id, "sem"),
+        "epsilon": _info_value(pcb_info, eta_id, "epsilon"),
+        "calibrated_ratio_mean": _info_value(ray_info, calibrated_ratio_id, "mean"),
+        "calibrated_ratio_sem": _info_value(ray_info, calibrated_ratio_id, "sem"),
+        "vldr_mean": _info_value(ray_info, vldr_id, "mean"),
+        "vldr_sem": _info_value(ray_info, vldr_id, "sem"),
+        "vldr_residual": _info_value(ray_info, vldr_id, "vldr_residual"),
+        "sr_limit": _info_value(ray_info, vldr_id, "sr_limit"),
+        "G_R": _info_value(ray_info, vldr_id, "G_R"),
+        "G_T": _info_value(ray_info, vldr_id, "G_T"),
+        "H_R": _info_value(ray_info, vldr_id, "H_R"),
+        "H_T": _info_value(ray_info, vldr_id, "H_T"),
+        "mldr_mean": _info_value(molecular_info, mldr_id, "mean"),
+        "pldr_error_threshold": settings.get("pldr_error_threshold", 0.025),
+    }
+
+
+def make_polarization_calibration_title(metadata_r, metadata_t):
+    """
+    Fallback title builder.
+
+    You can replace this with a GenerateText.make_polarization_calibration_title()
+    method later, following the Rayleigh-fit text architecture.
+    """
+    lidar_name = metadata_r.get("lidar_name", "")
+    station_name = metadata_r.get("station_name", "")
+
+    ch_r = metadata_r.get("atlas_channel_id", "")
+    ch_t = metadata_t.get("atlas_channel_id", "")
+
+    scc_r = metadata_r.get("scc_channel_id", "")
+    scc_t = metadata_t.get("scc_channel_id", "")
+
+    start = metadata_r.get("start_time_first", "")
+    end = metadata_r.get("end_time_last", "")
+
+    if hasattr(start, "strftime"):
+        start_text = start.strftime("%d.%m.%Y %H:%M:%S")
     else:
-        min_bsc_ratio = np.nan
-        
-    return(delta_p_err, delta_p, R, min_bsc_ratio)
+        start_text = str(start)
 
-if __name__ == '__main__':
-    
-    sys.path.append('../')
-    
-    from .version import __version__
-    
-    # Get the command line argument information
-    args = call_parser()
-    
-    # Call main
-    main(args, __version__)
-    
+    if hasattr(end, "strftime"):
+        end_text = end.strftime("%H:%M:%S")
+    else:
+        end_text = str(end)
 
-# scat_lim_1 = (-beta + np.sqrt(beta**2 - 4. * alpha * gamma)) / (2. * alpha)
-# R = np.arange(1.005, 10.005, 0.005)
-
-# def d_p(delta_m, delta_v, R):
-    
-#     delta_p = np.nan * np.zeros((delta_v.size, R.size))
-    
-#     for i in range(delta_v.size):
-#         crit_1 = (1. + delta_v[i]) * delta_m / ((1. + delta_m) * delta_v[i])
-#         crit_2 = (1. + delta_v[i]) / (1. + delta_m)
-        
-#         for j in range(R.size):
-#             if (R[j] >= crit_1 and R[j] >= crit_2) or (R[j] <= -crit_1 and R[j] <= -crit_2):
-#                 delta_p[i,j] = \
-#                     ((1. + delta_m) * delta_v[i] * R[j] - (1. + delta_v[i]) * delta_m) /\
-#                     ((1. + delta_m) * R[j] - (1. + delta_v[i]))
-#     return(delta_p)
-
-# delta_p_cor = d_p(delta_m = delta_m, delta_v = delta_v, R = R)
-# delta_p_off = d_p(delta_m = delta_m, delta_v = delta_v + err_v, R = R)
-
-# from matplotlib import pyplot as plt
-# [X, Y] = np.meshgrid(delta_v, R)
-# Z = (delta_p_off - delta_p_cor)
-# plt.pcolormesh(X,Y,Z.T[:-1,:-1], vmin =0, vmax=0.05)
-# plt.colorbar(label= 'PLDR error')
-# plt.title(f'VLDR Offset: {np.round(err_v, decimals = 4)} ')
-# # plt.plot(delta_v, scat_lim_1)
-# plt.plot(delta_v, sr_lim, c = 'tab:orange')
-# plt.xlabel('VLDR')
-# plt.ylabel('Scattering Ratio')
-# plt.show()
+    return (
+        f"{lidar_name} {station_name} {ch_r} ({scc_r}) to {ch_t} ({scc_t})\n"
+        f"{start_text} to {end_text} UTC"
+    ).strip()

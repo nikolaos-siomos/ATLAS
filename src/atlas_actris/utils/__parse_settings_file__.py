@@ -126,15 +126,17 @@ SCHEMA_TLC_RIN: Dict[str, Dict[str, Any]] = {
 
 SCHEMA_PCB: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
-    "x_lims_calibration":   {"dtype": float,   "default": [0., 15.], "is_list": True,  "min": 0.,  "max": 50.},
-    "x_lims_rayleigh":      {"dtype": float,   "default": [0., 31.], "is_list": True,  "min": 0.,  "max": 50.},
-    "x_tick_calibration":   {"dtype": float,   "default": 0.5,       "is_list": False, "min": 0.1, "max": 10.},   
+    "x_lims_calibration":   {"dtype": float,   "default": [0., 8.], "is_list": True,  "min": 0.,  "max": 50.},
+    "x_lims_rayleigh":      {"dtype": float,   "default": [0., 16.], "is_list": True,  "min": 0.,  "max": 50.},
+    "x_tick_calibration":   {"dtype": float,   "default": 1.,        "is_list": False, "min": 0.1, "max": 10.},   
     "x_tick_rayleigh":      {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.1, "max": 10.},   
-    "y_lims_calibration":   {"dtype": float,   "default": [],      "is_list": True},
-    "y_lims_rayleigh":      {"dtype": float,   "default": [],      "is_list": True},
+    "y_lims_calibration":   {"dtype": float,   "default": [],        "is_list": True},
+    "y_lims_rayleigh":      {"dtype": float,   "default": [],        "is_list": True},
 
-    "calibration_region": {"dtype": float,   "default": [2., 4.], "is_list": True,  "min": 0.,  "max": 50., "size": 2},
-    "rayleigh_region":    {"dtype": float,   "default": [6., 8.], "is_list": True, "size": 2},
+    "calibration_region":   {"dtype": float,   "default": [2., 4.],  "is_list": True,  "min": 0.,  "max": 50., "size": 2},
+    "rayleigh_region":      {"dtype": float,   "default": [6., 8.],  "is_list": True, "size": 2},
+    
+    "pldr_error_threshold": {"dtype": float,   "default": 0.25,      "is_list": False, "min": 0., "max": 0.5},   
     
     "smooth":                           {"dtype": bool,  "default": True,        "is_list": False},
     "smoothing_range":                  {"dtype": float, "default": [0.05, 31.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},

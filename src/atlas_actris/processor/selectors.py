@@ -41,27 +41,54 @@ def set_from_selector(processor, selector, value):
 
 def get_source_map(io_id):
     source_map = {
-        'profile':{'db':'profile_db', 'item_id':io_id},
-        'profile_error':{'db':'profile_error_db', 'item_id':io_id},
-        'profile_mask':{'db':'profile_mask_db', 'item_id':io_id},
-        'meteo':{'db':'meteo_db', 'item_id':io_id},
-        'molecular':{'db':'molecular_db', 'item_id':io_id},
-        'background':{'db':'background_db', 'item_id':io_id},
-        'background_error':{'db':'background_error_db', 'item_id':io_id},
-        'background_mask':{'db':'background_mask_db', 'item_id':io_id},
-        'time_mask':{'db':'time_mask_db', 'item_id':io_id},
-        'channel_mask':{'db':'channel_mask_db', 'item_id':io_id},
-        'range':{'db':'range_db', 'item_id':io_id},
-        'height_agl':{'db':'height_agl_db', 'item_id':io_id},
-        'height_asl':{'db':'height_asl_db', 'item_id':io_id},
-        'system_info':{'db':'system_info_db', 'item_id':io_id},
-        'time_info':{'db':'time_info_db', 'item_id':io_id},
-        'channel_info':{'db':'channel_info_db', 'item_id':io_id},
-        'pol_cal_info':{'db':'pol_cal_info_db', 'item_id':io_id},
-        'radiosonde_info':{'db':'radiosonde_info_db', 'item_id':io_id},
-        'gluing_info':{'db':'gluing_info_db', 'item_id':io_id},
-        'shots':{'db':'shots_db', 'item_id':io_id},
-        }
+        'profile': {'db': 'profile_db', 'item_id': io_id},
+        'profile_error': {'db': 'profile_error_db', 'item_id': io_id},
+        'profile_mask': {'db': 'profile_mask_db', 'item_id': io_id},
+
+        # New: signal-like derived profiles
+        'derived_profile': {'db': 'derived_profile_db','item_id': io_id},
+        'derived_profile_error': {'db': 'derived_profile_error_db','item_id': io_id},
+        'derived_profile_mask': {'db': 'derived_profile_mask_db','item_id': io_id},
+        'derived_profile_info': {'db': 'derived_profile_info_db','item_id': io_id},
+
+        # New: ratio-like products
+        'pol_cal_ratio': {'db': 'pol_cal_ratio_db', 'item_id': io_id},
+        'pol_cal_ratio_error': {'db': 'pol_cal_error_db','item_id': io_id,},
+        'pol_cal_info': {'db': 'pol_cal_info_db', 'item_id': io_id},
+
+        'molecular_ratio': {'db': 'molecular_ratio_db', 'item_id': io_id},
+        'molecular_info': {'db': 'molecular_info_db', 'item_id': io_id},
+
+        'water_vapour_ratio': {'db': 'water_vapour_ratio_db', 'item_id': io_id},
+        'water_vapour_ratio_error': {'db': 'water_vapour_error_db', 'item_id': io_id},
+        'water_vapour_info':  {'db': 'water_vapour_info_db', 'item_id': io_id},
+
+        'temperature_ratio': {'db': 'temperature_ratio_db', 'item_id': io_id},
+        'temperature_ratio_error': {'db': 'temperature_error_db', 'item_id': io_id},
+        'temperature_info': {'db': 'temperature_info_db', 'item_id': io_id},
+
+        'meteo': {'db': 'meteo_db', 'item_id': io_id},
+        'molecular': {'db': 'molecular_db', 'item_id': io_id},
+        
+        'background': {'db': 'background_db', 'item_id': io_id},
+        'background_error': {'db': 'background_error_db', 'item_id': io_id},
+        'background_mask': {'db': 'background_mask_db', 'item_id': io_id},
+        
+        'time_mask': {'db': 'time_mask_db', 'item_id': io_id},
+        'channel_mask': {'db': 'channel_mask_db', 'item_id': io_id},
+        
+        'range': {'db': 'range_db', 'item_id': io_id},
+        'height_agl': {'db': 'height_agl_db', 'item_id': io_id},
+        'height_asl': {'db': 'height_asl_db', 'item_id': io_id},
+        
+        'system_info': {'db': 'system_info_db', 'item_id': io_id},
+        'time_info': {'db': 'time_info_db', 'item_id': io_id},
+        'channel_info': {'db': 'channel_info_db', 'item_id': io_id},
+                
+        'radiosonde_info': {'db': 'radiosonde_info_db', 'item_id': io_id},
+        'gluing_info': {'db': 'gluing_info_db', 'item_id': io_id},
+        'shots': {'db': 'shots_db', 'item_id': io_id},
+    }
 
     return source_map
     

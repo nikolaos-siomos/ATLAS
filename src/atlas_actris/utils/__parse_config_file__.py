@@ -78,6 +78,24 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "ch_t":                      {"dtype": str,   "default": None, "is_list": True, "category": "recommended"},
     "K":                         {"dtype": float, "default": 1.0,  "is_list": True, "category": "recommended", "min": 0.5,  "max": 2.},
     "R_to_T_transmission_ratio": {"dtype": float, "default": 1.0,  "is_list": True, "category": "recommended", "min": 1E-3, "max": 1E3},
+    "eta":                       {"dtype": float, "default": 1.0,  "is_list": True, "category": "recommended", "min": 1E-3, "max": 1E3},
+
+    # -------------------- [Gluing] --------------------
+    "ch_n":                      {"dtype": str,   "default": None, "is_list": True, "category": "recommended"},
+    "ch_f":                      {"dtype": str,   "default": None, "is_list": True, "category": "recommended"},
+    
+    # -------------------- [relative_humidity] --------------------
+    "ch_w":                      {"dtype": str,   "default": None, "is_list": True, "category": "recommended"},
+    "ch_v":                      {"dtype": str,   "default": None, "is_list": True, "category": "recommended"},
+    "wv_calibration_factor":     {"dtype": float, "default": 1.0,  "is_list": True, "category": "recommended"},
+
+    # -------------------- [Temperature] --------------------
+    "ch_h":                      {"dtype": str,   "default": None, "is_list": True, "category": "recommended"},
+    "ch_l":                      {"dtype": str,   "default": None, "is_list": True, "category": "recommended"},
+    "alpha_prime":               {"dtype": float, "default": 1.0,  "is_list": True, "category": "recommended"},
+    "beta_prime":                {"dtype": float, "default": 1.0,  "is_list": True, "category": "recommended"},
+    "gamma_prime":               {"dtype": float, "default": 1.0,  "is_list": True, "category": "recommended"},
+
 }
 
 # Groups to simplify length checks/expansion
@@ -120,12 +138,30 @@ CHANNEL_KEYS = {
     "range_resolution",
     "laser_repetition_rate"
 }
-POL_CAL_KEYS = {"ch_r",
-                "ch_t",
-                "K",
-                "R_to_T_transmission_ratio"}
 
-recognized_sections = ["System", "Channels", "polarization_calibration"]
+POL_CAL_KEYS = {
+    "ch_r",
+    "ch_t",
+    "K",
+    "R_to_T_transmission_ratio"
+    }
+
+
+WV_KEYS = {
+    "ch_w",
+    "ch_v",
+    "wv_calibration_factor"
+    }
+
+TEMP_KEYS = {
+    "ch_w",
+    "ch_v",
+    "T_calibration_factor"
+    }
+
+recognized_sections = [
+    "System", "Channels", "polarization_calibration", "water_vapour", "temperature"
+    ]
 
 blank_tokens = ["_"]
 # -------------------------------------------------------------------
@@ -309,6 +345,42 @@ def _expand_pol_cal_lists_with_defaults(parser_args: Dict[str, Any]) -> None:
     
     return parser_args
 
+def _expand_water_vapour_lists_with_defaults(parser_args: Dict[str, Any]) -> None:
+    """Ensure every [water_vapour] list has length N (ch_w), filling from schema default scalar."""
+    ch_w = parser_args.get("ch_w")
+    n_pairs = len(ch_w)
+    
+    if n_pairs > 0:
+        # Expand K and R_to_T_transmission_ratio if omitted
+        for key in WV_KEYS:
+            if key in ("ch_w", "ch_v"):
+                continue
+            arg = parser_args.get(key)
+            if arg is None or len(arg) == 0:
+                parser_args[key] = [SCHEMA[key]["default"]] * n_pairs
+            elif len(arg) != n_pairs:
+                raise ConfigError(f"{key} length {len(arg)} must equal {n_pairs} length {n_pairs}")
+    
+    return parser_args
+
+def _expand_temperature_lists_with_defaults(parser_args: Dict[str, Any]) -> None:
+    """Ensure every [temperature] list has length N (ch_h), filling from schema default scalar."""
+    ch_h = parser_args.get("ch_h")
+    n_pairs = len(ch_h)
+    
+    if n_pairs > 0:
+        # Expand K and R_to_T_transmission_ratio if omitted
+        for key in TEMP_KEYS:
+            if key in ("ch_h", "ch_l"):
+                continue
+            arg = parser_args.get(key)
+            if arg is None or len(arg) == 0:
+                parser_args[key] = [SCHEMA[key]["default"]] * n_pairs
+            elif len(arg) != n_pairs:
+                raise ConfigError(f"{key} length {len(arg)} must equal {n_pairs} length {n_pairs}")
+    
+    return parser_args
+
 def _compute_dead_time_if_missing(parser_args: Dict[str, Any]) -> None:
 
     for i, ch in enumerate(parser_args["recorder_channel_id"]):
@@ -448,7 +520,6 @@ def _enforce_mandatory_and_recommended(parser_args: Dict[str, Any]) -> None:
 def _recorder_channel_id_check(parser_args: Dict[str, Any]) -> None:
     
     recorder_channel_id = parser_args.get("recorder_channel_id")
-    laser_id = parser_args.get("laser_id")
     
     if len(recorder_channel_id) == 0:
         raise ConfigError("recorder_channel_id must list at least one channel.")
@@ -491,7 +562,7 @@ def _polarisation_calibration_check(parser_args: Dict[str, Any]) -> None:
 
     if ch_r != []:
         if parser_args["recorder_channel_id"] == []:
-            raise ConfigError(f"ch_r was provided but the recorder_channel_id is empty. Parameter ch_r must be a subset of recorder_channel_id")
+            raise ConfigError("ch_r was provided but the recorder_channel_id is empty. Parameter ch_r must be a subset of recorder_channel_id")
 
         for r in ch_r:
             if r not in parser_args["recorder_channel_id"]:
@@ -499,7 +570,7 @@ def _polarisation_calibration_check(parser_args: Dict[str, Any]) -> None:
 
     if ch_t != []:
         if parser_args["recorder_channel_id"] == []:
-            raise ConfigError(f"ch_t was provided but the recorder_channel_id is empty. Parameter ch_t must be a subset of recorder_channel_id")
+            raise ConfigError("ch_t was provided but the recorder_channel_id is empty. Parameter ch_t must be a subset of recorder_channel_id")
 
         for t in ch_t:
             if r not in parser_args["recorder_channel_id"]:
@@ -575,12 +646,14 @@ def parse_atlas_config_file(filepath: str, debug: bool = False) -> Dict[str, Any
     # Expand channel lists using scalar defaults (including None) when omitted
     _expand_channel_lists_with_defaults(parser_args)
 
-    # Expand polarisation calibration lists using scalar defaults (including None) when omitted
+    # Expand polarisation calibration, water vapour, temperature lists using scalar defaults (including None) when omitted
     _expand_pol_cal_lists_with_defaults(parser_args)
+    _expand_water_vapour_lists_with_defaults(parser_args)
+    _expand_temperature_lists_with_defaults(parser_args)
     
-    # Length check polarisation calibratio
+    # Length check polarisation calibration
     # all variables must have the same length (either all 0 if not provided or all the same legnth)
-    _polarisation_calibration_check(parser_args)
+    # _polarisation_calibration_check(parser_args)
     
     # Range & allowed checks (only on non-empty values)
     for name, meta in SCHEMA.items():

@@ -81,10 +81,13 @@ class GenerateText:
         if self.extra_metadata:
             self.extra_metadata['start_timestamp'] = pd.Timestamp(self.extra_metadata['start_time_first'])
             self.extra_metadata['stop_timestamp'] = pd.Timestamp(self.extra_metadata['end_time_last'])
-
-        if 'radiosonde_time' in self.extra_metadata:
-            self.extra_metadata['radiosonde_timestamp'] = pd.Timestamp(self.extra_metadata['radiosonde_time'])
-    
+        
+            self.dateloc_part_extra = dateloc_text(
+                start_timestamp = self.extra_metadata['start_timestamp'], 
+                stop_timestamp = self.extra_metadata['stop_timestamp'], 
+                laser_pointing_angle = self.extra_metadata['zenith_angle']
+                )
+            
         self.dateloc_part = dateloc_text(
             start_timestamp = self.metadata['start_timestamp'], 
             stop_timestamp = self.metadata['stop_timestamp'], 
@@ -103,13 +106,7 @@ class GenerateText:
             config_name = self.metadata['configuration_name']
             )
         
-        self.if_part = if_text(
-            self.metadata['emitted_wavelength'], 
-            self.metadata['detected_wavelength'], 
-            self.metadata['channel_bandwidth']
-            )
-        
-    def make_filename(self, qa_test, extra_type = '', extra_channel = None):
+    def make_filename(self, qa_test, extra_type = '', extra_metadata = {}):
                
         start_date = self.metadata['start_timestamp'].strftime("%Y%m%d")
         start_time = self.metadata['start_timestamp'].strftime("%H%M%S")
@@ -130,8 +127,9 @@ class GenerateText:
             __version__
             ]
         
-        if extra_channel is not None:
-            extra_scc_channel = self.scc_channel_ids.sel({'channel':extra_channel}).item()
+        if extra_metadata:
+            extra_channel = extra_metadata['atlas_channel_id']
+            extra_scc_channel = extra_metadata['scc_channel_id']
 
             extra_parts = [
                 extra_channel,
@@ -182,8 +180,14 @@ class GenerateText:
             sm_expo = False
             )
         
+        if_part = if_text(
+            self.metadata['emitted_wavelength'], 
+            self.metadata['detected_wavelength'], 
+            self.metadata['channel_bandwidth']
+            )
+        
         title = self.channel_part + ' - ' + self.dateloc_part + ' - ' + sm_part + '\n'+\
-                    self.config_part + ' - ' + mol_part + ' - ' + self.if_part 
+                    self.config_part + ' - ' + mol_part + ' - ' + if_part 
 
         return title 
 
@@ -205,9 +209,15 @@ class GenerateText:
             sm_expo = False
             )
         
+        if_part = if_text(
+            self.metadata['emitted_wavelength'], 
+            self.metadata['detected_wavelength'], 
+            self.metadata['channel_bandwidth']
+            )
+        
         title = self.channel_part + ' - ' + sm_part + '\n'+\
                     self.config_part + ' - ' + self.dateloc_part + '\n'+\
-                        mol_part+ ' - ' + self.if_part
+                        mol_part+ ' - ' + if_part
 
         return title 
     
@@ -218,10 +228,52 @@ class GenerateText:
             sm_win = self.settings['smoothing_window'], 
             nr_ulim = self.settings['near_range_upper_limit']
             )
+        
+        if_part = if_text(
+            self.metadata['emitted_wavelength'], 
+            self.metadata['detected_wavelength'], 
+            self.metadata['channel_bandwidth']
+            )
 
-        title = self.channel_part + ' - ' + sm_part + ' - ' + self.if_part + '\n'+\
+        title = self.channel_part + ' - ' + sm_part + ' - ' + if_part + '\n'+\
             self.config_part + ' - ' + self.dateloc_part
                         
+        return title 
+    
+    def make_polarization_calibration_title(self, metadata_r, metadata_t):
+        
+        radiosonde_timestamp = pd.Timestamp(self.metadata['radiosonde_time'])
+         
+        mol_part = mol_text(
+            rs_format = self.metadata['radiosonde_format'], 
+            rs_station_name = self.caller_info['rsonde_station_name'], 
+            wmo_id = self.caller_info['rsonde_station_wmo_id'], 
+            rs_start_timestamp = radiosonde_timestamp
+            )
+        
+        sm_part = sm_text(
+            smooth = self.settings['smooth'], 
+            sm_lims = self.settings['smoothing_range'], 
+            sm_win = self.settings['smoothing_window'], 
+            sm_expo = False
+            )
+        
+        if_part_r = if_text(
+            metadata_r['emitted_wavelength'], 
+            metadata_r['detected_wavelength'], 
+            metadata_r['channel_bandwidth']
+            )
+        
+        if_part_t = if_text(
+            metadata_t['emitted_wavelength'], 
+            metadata_t['detected_wavelength'], 
+            metadata_t['channel_bandwidth']
+            )
+        
+        title = self.channel_part + ' - ' + sm_part + '\n'+\
+            f"Rayleigh: {self.dateloc_part}" + ' ' + f"Calibration: {self.dateloc_part_extra}" + '-' +  mol_part + '\n'+\
+                    self.config_part + ' - ' + if_part_r + '-' + if_part_t
+
         return title 
     
     def make_header_rayleigh_fit(self):

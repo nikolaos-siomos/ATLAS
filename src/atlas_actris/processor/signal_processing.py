@@ -609,8 +609,6 @@ def compute_dark_correction(
     # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
 
-    loading_map = processing_info["loading_map"]
-
     profiles = output_data['profile']
 
     channel_info = output_data['channel_info']
@@ -622,10 +620,8 @@ def compute_dark_correction(
 
         if key not in profiles:
             continue
-    
-        if drk_key_alias in loading_map:
-            drk_key = loading_map[drk_key_alias]
-        elif drk_key_alias in profiles:
+
+        if drk_key_alias in profiles:
             drk_key = drk_key_alias
         else:
             continue

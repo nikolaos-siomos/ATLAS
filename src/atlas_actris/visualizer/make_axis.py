@@ -383,7 +383,7 @@ def polarization_calibration_cal_y(ratio_m, ratio_p, y_lims_cal):
     else:
         y_llim_cal = 0.
           
-    y_label_cal = r'Gain ratio $η^{\star}_{f}$'
+    y_label_cal = r'Gain ratio $η^{\star}$'
         
     
     return(y_llim_cal, y_ulim_cal, y_label_cal)

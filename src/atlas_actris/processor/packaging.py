@@ -48,13 +48,15 @@ def combine_QA_pack(input_data):
                     pack_list.append(da[key])
     
             if len(pack_list) > 0:
-                if "time" in pack_list[0].dims:
-                    output_data[source][new_key] = xr.concat(
-                        pack_list,
-                        dim="time",
-                    ).sortby("time")
-                else:
-                    output_data[source][new_key] = pack_list[0]
+                
+                if type(pack_list[0]) is type(xr.DataArray()):
+                    if "time" in pack_list[0].dims:
+                        output_data[source][new_key] = xr.concat(
+                            pack_list,
+                            dim="time",
+                        ).sortby("time")
+                    else:
+                        output_data[source][new_key] = pack_list[0]
                   
     print_entry("Packaging complete")
 
@@ -90,6 +92,10 @@ def collect_metadata(data_arrays, atlas_channel_id):
     
     for array_name, da in data_arrays.items():
 
+        # Skip nested dictionaries, scalars, lists, etc.
+        if not isinstance(da, xr.DataArray):
+            continue
+        
         # Ignore arrays without a parameters dimension
         if "parameters" not in da.dims:
             continue

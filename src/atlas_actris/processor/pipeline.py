@@ -62,6 +62,16 @@ from processor.signal_gluing import (
     compute_gluing,
     )
 
+from processor.pol_cal_calculations import (
+    compute_gain_ratio,
+    compute_calibration_factor,
+    compute_calibrated_ratio,
+    compute_mldr,
+    compute_vldr
+    # compute_eta,
+    # compute_calibrated_ratio_pol_cal,
+    # compute_vldr
+    )
 from processor.molecular_calculations import compute_molecular_calculations
 
 from processor.selectors import (
@@ -75,7 +85,6 @@ from processor.selectors import (
 @dataclass(frozen=True)
 class Context:
     processing_info: Dict[str, Any]
-    settings_info: Dict[str, Any]
     starting_dataset: Dict[str, Any]
     
 @dataclass(frozen=True)
@@ -90,7 +99,6 @@ class Processor():
     
     def __init__(self, ctx: Context):
         self.processing_info = ctx.processing_info
-        self.settings_info = ctx.settings_info
         self.starting_dataset = ctx.starting_dataset
         self.run_id = 0
         self.stage_info = {}
@@ -172,6 +180,40 @@ class Processor():
                 "function":compute_molecular_calculations,
                 "header":"Molecular calculations"
                 },
+            "gain_ratio": {
+                "function": compute_gain_ratio,
+                "header": "Calculating gain ratios for pcb_x45 and pcb_aux_x45",
+                },
+
+            "calibration_factor": {
+                "function": compute_calibration_factor,
+                "header": "Calculating polarization calibration factor eta",
+                },
+
+            "calibrated_ratio": {
+                "function": compute_calibrated_ratio,
+                "header": "Calculating calibrated Rayleigh polarization ratios",
+                },
+            "mldr": {
+                "function": compute_mldr,
+                "header": "Calculating molecular linear depolarization ratio",
+                },
+            "vldr": {
+                "function": compute_vldr,
+                "header": "Calculating volume linear depolarization ratio",
+                },
+            # "eta": {
+            #     "function": compute_eta,
+            #     "header": "Calculating pol. calibration factor",
+            #     },
+            # "pol_calibrated_ratio": {
+            #     "function": compute_calibrated_ratio_pol_cal,
+            #     "header": "Calculating pol. calibrated ratio",
+            #     },
+            # "vldr": {
+            #     "function": compute_vldr,
+            #     "header": "Calculating VLDR",
+            #     },
             # "pol_calibration_factor":{
             #     "function":,
             #     "header":"Calculating polarization calibration factor"

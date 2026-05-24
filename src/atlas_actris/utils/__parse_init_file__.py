@@ -47,7 +47,7 @@ qa_tests = [
     "cam",
 ]
 
-qck_tests = [
+quicklooks = [
     "ray",
     "pcb",
     "tlc_qua",
@@ -57,7 +57,7 @@ qck_tests = [
     "pcb_aux",
 ]
 
-recognised_slicers = [
+qa_measurement_folders = [
     "ray",
     "pcb_p45",
     "pcb_m45",
@@ -65,8 +65,8 @@ recognised_slicers = [
     "tlc_east",
     "tlc_south",
     "tlc_west",
-    "tlc_rin_inner",
-    "tlc_rin_outer",
+    "tlc_inner",
+    "tlc_outer",
     "trg",
     "dtm",
     "nsf",
@@ -103,17 +103,17 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "atlas_settings_file":       {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "file"},
     "radiosonde_folder":         {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "dir"},
 
-    "quick_run":           {"dtype": bool, "default": False,     "is_list": False, "category": "optional"},
-    "process":             {"dtype": str,  "default": qa_tests,  "is_list": True,  "category": "optional", "allowed": qa_tests + ["off"]},
-    "process_qck":         {"dtype": str,  "default": qck_tests, "is_list": True,  "category": "optional", "allowed": qa_tests + ["off"]},
-    "vertical_scale":      {"dtype": str,  "default": "range",   "is_list": False, "category": "optional", "allowed": ["range", "height_agl", "height_asl"]},
-    "dpi":                 {"dtype": int,  "default": 300,       "is_list": False, "category": "optional"},
-    "color_reduction":     {"dtype": bool, "default": False,     "is_list": False, "category": "optional"},
-    "output_folder":       {"dtype": str,  "default": None,      "is_list": False, "category": "optional"},
-    "expert_analyst":      {"dtype": str,  "default": None,      "is_list": False, "category": "optional"},
-    "debug_signals":       {"dtype": bool, "default": False,     "is_list": False, "category": "optional"},
-    "export_netcdf":       {"dtype": bool, "default": True,      "is_list": False, "category": "optional"},
-    "export_all":          {"dtype": bool, "default": False,     "is_list": False, "category": "optional"},
+    "quick_run":           {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
+    "process":             {"dtype": str,  "default": qa_tests,   "is_list": True,  "category": "optional", "allowed": qa_tests + ["off"]},
+    "process_qck":         {"dtype": str,  "default": quicklooks, "is_list": True,  "category": "optional", "allowed": qa_tests + ["off"]},
+    "vertical_scale":      {"dtype": str,  "default": "range",    "is_list": False, "category": "optional", "allowed": ["range", "height_agl", "height_asl"]},
+    "dpi":                 {"dtype": int,  "default": 300,        "is_list": False, "category": "optional"},
+    "color_reduction":     {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
+    "output_folder":       {"dtype": str,  "default": None,       "is_list": False, "category": "optional"},
+    "expert_analyst":      {"dtype": str,  "default": None,       "is_list": False, "category": "optional"},
+    "debug_signals":       {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
+    "export_netcdf":       {"dtype": bool, "default": True,       "is_list": False, "category": "optional"},
+    "export_all":          {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
 
     "channels":                 {"dtype": str, "default": [], "is_list": True, "category": "optional"},
     "exclude_telescope_type":   {"dtype": str, "default": [], "is_list": True, "category": "optional", "allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
@@ -136,7 +136,6 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "nrm":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "pcb":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "tlc":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
-    "tlc_qua":      {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "tlc_rin":      {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "drk":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "trg":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
@@ -444,10 +443,10 @@ def _special_checks(parser_args: Dict[str, Any]) -> None:
             )
 
         for i in range(0, len(slice_measurement), 3):
-            if slice_measurement[i] not in recognised_slicers:
+            if slice_measurement[i] not in qa_measurement_folders:
                 raise ConfigError(
                     f"slice_measurement: unrecognized qa_test ID provided: "
-                    f"{slice_measurement[i]}\nRecognised IDs: {recognised_slicers}"
+                    f"{slice_measurement[i]}\nRecognised IDs: {qa_measurement_folders}"
                 )
 
         for i in range(1, len(slice_measurement), 3):
@@ -486,10 +485,10 @@ def _special_checks(parser_args: Dict[str, Any]) -> None:
             )
 
         for i in range(0, len(exclude_measurement), 3):
-            if exclude_measurement[i] not in recognised_slicers:
+            if exclude_measurement[i] not in qa_measurement_folders:
                 raise ConfigError(
                     f"slice_measurement: unrecognized qa_test ID provided: "
-                    f"{exclude_measurement[i]}\nRecognised IDs: {recognised_slicers}"
+                    f"{exclude_measurement[i]}\nRecognised IDs: {qa_measurement_folders}"
                 )
 
         for i in range(1, len(exclude_measurement), 3):
@@ -873,75 +872,6 @@ def _special_path_handling(parser_args: Dict[str, Any]) -> Dict[str, Any]:
 
     return parser_args
 
-def _add_telecover_sector_aliases(parser_args: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Add clean telecover sector/ring aliases for downstream loading.
-
-    Internal folder/test keys:
-        abs_tlc_qua_north
-        abs_tlc_qua_east
-        abs_tlc_qua_south
-        abs_tlc_qua_west
-        abs_tlc_rin_inner
-        abs_tlc_rin_outer
-
-    Loader-friendly aliases:
-        abs_tlc_north
-        abs_tlc_east
-        abs_tlc_south
-        abs_tlc_west
-        abs_tlc_inner
-        abs_tlc_outer
-
-    The mtype aliases keep the original QA-test identity:
-        mtype_tlc_north = "tlc_qua"
-        mtype_tlc_inner = "tlc_rin"
-    """
-
-    qua_aliases = {
-        "north": "north",
-        "east": "east",
-        "south": "south",
-        "west": "west",
-    }
-
-    rin_aliases = {
-        "inner": "inner",
-        "outer": "outer",
-    }
-
-    for src_suffix, dst_suffix in qua_aliases.items():
-        src_key = f"abs_tlc_qua_{src_suffix}"
-        dst_key = f"abs_tlc_{dst_suffix}"
-
-        if src_key in parser_args:
-            parser_args[dst_key] = parser_args[src_key]
-            parser_args[f"mtype_tlc_{dst_suffix}"] = "tlc_qua"
-
-            drk_src_key = f"abs_drk_tlc_qua_{src_suffix}"
-            drk_dst_key = f"abs_drk_tlc_{dst_suffix}"
-
-            if drk_src_key in parser_args:
-                parser_args[drk_dst_key] = parser_args[drk_src_key]
-                parser_args[f"mtype_drk_tlc_{dst_suffix}"] = "drk"
-
-    for src_suffix, dst_suffix in rin_aliases.items():
-        src_key = f"abs_tlc_rin_{src_suffix}"
-        dst_key = f"abs_tlc_{dst_suffix}"
-
-        if src_key in parser_args:
-            parser_args[dst_key] = parser_args[src_key]
-            parser_args[f"mtype_tlc_{dst_suffix}"] = "tlc_rin"
-
-            drk_src_key = f"abs_drk_tlc_rin_{src_suffix}"
-            drk_dst_key = f"abs_drk_tlc_{dst_suffix}"
-
-            if drk_src_key in parser_args:
-                parser_args[drk_dst_key] = parser_args[drk_src_key]
-                parser_args[f"mtype_drk_tlc_{dst_suffix}"] = "drk"
-
-    return parser_args
-
 def _canonicalize_telecover_sector_keys(parser_args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Convert expanded telecover sector/ring path keys to loader-friendly names.
@@ -1232,6 +1162,107 @@ def _get_mtype(d: Dict[str, Any]) -> Dict[str, Any]:
 
     return d
 
+
+def measurement_type(meas_key: str) -> str:
+    """
+    Infer the raw-reader measurement type from a caller_info measurement key.
+
+    This replaces the old flat mtype_* entries in caller_info. The returned
+    value is still the value expected by the raw file readers.
+    """
+
+    if meas_key.startswith("drk"):
+        return "drk"
+
+    if meas_key.startswith("ray"):
+        return "nrm"
+
+    if meas_key in ["trg", "dtm", "nsf"]:
+        return "nrm"
+
+    if meas_key in ["tlc_north", "tlc_east", "tlc_south", "tlc_west"]:
+        return "tlc_qua"
+
+    if meas_key in ["tlc_inner", "tlc_outer"]:
+        return "tlc_rin"
+
+    if meas_key == "pcb_p45":
+        return "pcb_p45"
+
+    if meas_key == "pcb_m45":
+        return "pcb_m45"
+
+    if meas_key == "pcb_aux_p45":
+        return "pcb_p45"
+
+    if meas_key == "pcb_aux_m45":
+        return "pcb_m45"
+
+    if meas_key.startswith("cam"):
+        return "cam"
+
+    raise ConfigError(f"Could not infer measurement type for {meas_key}")
+
+
+def _build_path_registry(parser_args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert temporary flat abs_* keys into a nested path registry.
+
+    Final caller_info entries:
+        paths:
+            Dict with keys from qa_measurement_folders and values the physical
+            folders that should be read exactly once.
+
+        loading_map:
+            Dict with logical measurement keys as keys and the already-loaded
+            physical measurement keys as values.
+
+    Examples:
+        loading_map["ray_pcb"] = "ray"
+        loading_map["drk_ray"] = "drk"
+        loading_map["drk_tlc_qua"] = "drk"
+    """
+
+    path_by_key: Dict[str, str] = {}
+
+    for meas_key in qa_measurement_folders:
+        abs_key = f"abs_{meas_key}"
+        path = parser_args.get(abs_key)
+
+        if path is not None:
+            path_by_key[meas_key] = os.path.normpath(str(path))
+
+    paths: Dict[str, str] = {}
+    loading_map: Dict[str, str] = {}
+    owner_by_path: Dict[str, str] = {}
+
+    for meas_key in qa_measurement_folders:
+        path = path_by_key.get(meas_key)
+
+        if path is None:
+            continue
+
+        if path not in owner_by_path:
+            owner_by_path[path] = meas_key
+            paths[meas_key] = path
+        else:
+            loading_map[meas_key] = owner_by_path[path]
+
+    parser_args["paths"] = dict(sorted(paths.items()))
+    parser_args["loading_map"] = dict(sorted(loading_map.items()))
+
+    # Remove temporary flat absolute-path keys from caller_info.
+    for key in list(parser_args.keys()):
+        if key.startswith("abs_"):
+            parser_args.pop(key)
+
+    # Remove legacy mtype_* keys if they were added by older code paths.
+    for key in list(parser_args.keys()):
+        if key.startswith("mtype_"):
+            parser_args.pop(key)
+
+    return parser_args
+
 def _export_hoi_cfg_check(parser_args: Dict[str, Any]) -> None:
     export_hoi_cfg = parser_args["export_hoi_cfg"]
     atlas_configuration_file = parser_args["atlas_configuration_file"]
@@ -1277,7 +1308,7 @@ def parse_call_atlas_ini(filepath: str, debug: bool = False) -> Dict[str, Any]:
     # 8) Check if the relative QA test folder paths exist and add corresponding absolute paths
     parser_args = _relative_paths_exist_check(parser_args)
 
-    # 8b) Map physical folder 'tlc' to internal key 'tlc_qua'
+    # 8b) Map physical folder/alias 'tlc' to internal key 'tlc_qua'
     parser_args = _handle_telecover_path_aliases(parser_args)
 
     # 9) Distribute tlc files in the correct sector/ring if requested
@@ -1299,11 +1330,12 @@ def parse_call_atlas_ini(filepath: str, debug: bool = False) -> Dict[str, Any]:
     parser_args = _special_path_handling(parser_args)
     
     # 10b) Rename expanded telecover keys to loader-friendly names.
-    # This prevents mixed keys like tlc_north and tlc_qua_south.
+    # This prevents mixed keys like tlc_qua_north and tlc_north.
     parser_args = _canonicalize_telecover_sector_keys(parser_args)
-    
-    # 11) Set the measurement type according to the absolute paths
-    _get_mtype(parser_args)
+
+    # 11) Collapse temporary abs_* keys into caller_info["paths"] and
+    # caller_info["loading_map"].
+    parser_args = _build_path_registry(parser_args)
 
     # 12) Range & allowed checks, only on non-empty values
     for name, meta in SCHEMA.items():

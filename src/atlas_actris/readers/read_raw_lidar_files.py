@@ -33,6 +33,66 @@ reader_menu: dict[str, Callable[[str], object]] = {
     "polly_xt_first": reader_polly_xt_first,
 }
 
+
+def measurement_type(meas_key: str) -> str:
+    """
+    Infer the raw-reader measurement type from a caller_info measurement key.
+
+    This mirrors the parser-side measurement_type helper and replaces the old
+    flat mtype_* entries in caller_info. The returned value is still the value
+    expected by the raw file readers.
+    """
+
+    if meas_key.startswith("drk"):
+        return "drk"
+
+    if meas_key.startswith("ray"):
+        return "nrm"
+
+    if meas_key in ["trg", "dtm", "nsf"]:
+        return "nrm"
+
+    if meas_key in ["tlc_north", "tlc_east", "tlc_south", "tlc_west"]:
+        return "tlc_qua"
+
+    if meas_key in ["tlc_inner", "tlc_outer"]:
+        return "tlc_rin"
+
+    if meas_key == "pcb_p45":
+        return "pcb_p45"
+
+    if meas_key == "pcb_m45":
+        return "pcb_m45"
+
+    if meas_key == "pcb_aux_p45":
+        return "pcb_p45"
+
+    if meas_key == "pcb_aux_m45":
+        return "pcb_m45"
+
+    if meas_key.startswith("cam"):
+        return "cam"
+
+    raise FileReaderError(f"Could not infer measurement type for {meas_key}")
+
+
+def _iter_physical_paths(d: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Return physical measurement folders from caller_info['paths']."""
+
+    paths = d.get("paths", {})
+
+    if paths is None:
+        paths = {}
+
+    if not isinstance(paths, dict):
+        raise FileReaderError("caller_info['paths'] must be a dictionary")
+
+    return [
+        (meas_key, filepath)
+        for meas_key, filepath in paths.items()
+        if filepath is not None and not meas_key.startswith("cam")
+    ]
+
 # def downcast_float_safe(da: xr.DataArray, tol=1e-6) -> xr.DataArray:
 #     """
 #     Downcast a float64 DataArray to float32 if conversion
@@ -105,143 +165,128 @@ def downcast_float_safe(da: xr.DataArray, tol: float = 1e-6) -> xr.DataArray:
 
 def infer_format(d: Dict[str, Any], station_id: str, debug: bool = False) -> str:
     """
-    Try to read a file with each registered reader.
-    Return the format name if one succeeds, else None.
+    Infer the raw file format by trying the registered readers on the physical
+    folders listed in caller_info["paths"].
+
+    The new parser stores only folders that should be read physically under
+    caller_info["paths"].
     """
-    
+
     print_header("Infering raw file format")
-    
-    file_format = None
-    
-    # Exceptional readers are detected based on the station ID
+
+    # Exceptional readers are detected based on the station ID.
     if station_id == "evo":
         return "polly_xt_first"
-    elif station_id in ["brc", "run"]:
+
+    if station_id in ["brc", "run"]:
         return "licel_matlab"
-    else:
-    # For the rest of the stations the reader is infered by trial and error
-        for key in d.keys():
-            if key.startswith("abs_") and d[key] != None and not key.startswith("abs_cam_"):
-                filepath = d[key]
-                meas_type = d[f"mtype_{key.removeprefix('abs_')}"]
-                
-                print("Trying reader:")
-                for fmt, reader in READERS.items():
-                    print(f"--{fmt}: ",end="")
-                    if debug:
-                        try:
-                            with contextlib.redirect_stdout(io.StringIO()):
-                                _, _, _, sig_raw, _ =\
-                                    reader(filepath, meas_type = meas_type)   # try reading
-                            file_format = fmt
-                            print("Correct reader")
-                            print(f"File format: {file_format}")
-                            return file_format         # success!
-                
-                        except Exception as e:
-                            print("Wrong reader")
-                            print(e)
-                            continue
-                    else:
-                        try:
-                            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                                _, _, _, sig_raw, _ =\
-                                    reader(filepath, meas_type = meas_type)   # try reading
-                            file_format = fmt
-                            print("Correct reader")
-                            print(f"File format: {file_format}")
-                            return file_format         # success!
-                
-                        except Exception as e:
-                            print("Wrong reader")
-                            continue
-        
-    if len(sig_raw) == 0:
+
+    physical_paths = _iter_physical_paths(d)
+
+    if len(physical_paths) == 0:
         endpoint(1)
-        
-    if file_format is None:
-        raise FileReaderError("The raw QA file format is not supported ")
-    
-    
 
-def flexible_reader(d: Dict[str, Any], downscale = True, chunk = True) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    
-    # Reading
-    print_header("Reading lidar signals...")
-    
-    file_format = d["raw_file_format"]
-    
-    profiles = {}
+    # For the rest of the stations, infer the reader by trial and error.
+    for meas_key, filepath in physical_paths:
+        meas_type = measurement_type(meas_key)
 
-    metadata = {}
-    metadata["system_info"] = {}
-    metadata["channel_info"] = {}
-    metadata["time_info"] = {}
-    metadata["shots"] = {}
-    metadata["mtype"]  = {}
-    
-    loading_map = {}
-    
-    filepaths = []
-    path_keys = []
-    
-    for key, val in d.items():
-        if key.startswith("abs_") and d[key] != None and not key.startswith("abs_cam_"):
-            path_keys.append(key)
-            filepaths.append(val)
-            meas_type = d[f"mtype_{key.removeprefix('abs_')}"]                
-    
-    if len(path_keys) > 0:
-        unique_paths = set(filepaths)
-        unique_index = [filepaths.index(path) for path in unique_paths]
-        unique_keys = [path_keys[ind] for ind in unique_index]
-        
-        for key in unique_keys:
-            meas_key = key.removeprefix("abs_")
+        print(f"Trying readers with {meas_key} dataset:")
 
-            print_subsection(f"{meas_key} dataset")
-            
-            system_info, channel_info, time_info, sig_raw, shots =\
-                reader_menu[file_format](d[key], meas_type = d[f"mtype_{meas_key}"])
+        for fmt, reader in READERS.items():
+            print(f"--{fmt}: ", end="")
 
-            if not isinstance(sig_raw, list):            
-                if chunk:
-                    time_chunks = min(50, max(10, sig_raw.sizes["time"]))
-                    bin_chunks = 4096
-
-                    profiles[meas_key] = sig_raw.chunk({
-                        "time": time_chunks,
-                        "channel": -1,
-                        "bins": bin_chunks,
-                    })
+            try:
+                if debug:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        _, _, _, sig_raw, _ = reader(filepath, meas_type=meas_type)
                 else:
-                    profiles[meas_key] = sig_raw               
-                
-                if downscale:
-                    profiles[meas_key] = downcast_float_safe(profiles[meas_key])
-                
-                metadata["system_info"][meas_key] = system_info
-                metadata["channel_info"][meas_key] = channel_info
-                metadata["time_info"][meas_key] = time_info
-                metadata["shots"][meas_key] = shots
-                metadata["mtype"][meas_key]  = meas_type
-        
-        for key in path_keys:
-            
-            meas_key = key.removeprefix("abs_")
+                    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                        _, _, _, sig_raw, _ = reader(filepath, meas_type=meas_type)
 
-            if key not in unique_keys:                                
+                if isinstance(sig_raw, list) and len(sig_raw) == 0:
+                    print("Wrong reader")
+                    continue
 
-                data_key = [k for k, p in zip(unique_keys, unique_paths) if p == d[key]][0].removeprefix("abs_")
-                
-                loading_map[meas_key] = data_key
+                print("Correct reader")
+                print(f"File format: {fmt}")
+                return fmt
+
+            except Exception as e:
+                print("Wrong reader")
+                if debug:
+                    print(e)
+                continue
+
+    raise FileReaderError("The raw QA file format is not supported")
+
+
+def flexible_reader(
+    d: Dict[str, Any],
+    downscale: bool = True,
+    chunk: bool = True,
+) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, str]]:
+    """
+    Read only physical lidar signal folders from caller_info["paths"].
+
+    The parser is responsible for deciding which logical measurements are
+    aliases of an already-loaded physical folder. 
+    """
+
+    print_header("Reading lidar signals...")
+
+    file_format = d["raw_file_format"]
+
+    profiles: Dict[str, Any] = {}
+
+    metadata: Dict[str, Any] = {
+        "system_info": {},
+        "channel_info": {},
+        "time_info": {},
+        "shots": {},
+        "mtype": {},
+    }
+    
+    physical_paths = _iter_physical_paths(d)
+
+    for meas_key, filepath in physical_paths:
+        meas_type = measurement_type(meas_key)
+
+        print_subsection(f"{meas_key} dataset")
+
+        system_info, channel_info, time_info, sig_raw, shots = reader_menu[file_format](
+            filepath,
+            meas_type=meas_type,
+        )
+
+        if isinstance(sig_raw, list):
+            continue
+
+        if chunk:
+            time_chunks = min(50, max(10, sig_raw.sizes["time"]))
+            bin_chunks = 4096
+
+            profiles[meas_key] = sig_raw.chunk({
+                "time": time_chunks,
+                "channel": -1,
+                "bins": bin_chunks,
+            })
+        else:
+            profiles[meas_key] = sig_raw
+
+        if downscale:
+            profiles[meas_key] = downcast_float_safe(profiles[meas_key])
+
+        metadata["system_info"][meas_key] = system_info
+        metadata["channel_info"][meas_key] = channel_info
+        metadata["time_info"][meas_key] = time_info
+        metadata["shots"][meas_key] = shots
+        metadata["mtype"][meas_key] = meas_type
 
     if profiles == {}:
         endpoint(1)
 
-    return(profiles, metadata, loading_map)
+    return profiles, metadata
             
-
 def radiosonde(finput_rs, delimiter, skip_header, skip_footer, 
                usecols, units, mtime, ground):
 

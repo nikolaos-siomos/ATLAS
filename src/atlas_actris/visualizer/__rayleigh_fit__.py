@@ -79,7 +79,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 sig_ch, vertical_scale_ch, sl_mask  = slice_by_vertical_scale(
                     da = sig_ch, 
                     vertical_scale = vertical_scale_ch, 
-                    x_lims = channel_settings['x_lims'], 
+                    x_lims = channel_settings['smoothing_range'], 
                     )
                 
                 y1_vals = sig_ch.values

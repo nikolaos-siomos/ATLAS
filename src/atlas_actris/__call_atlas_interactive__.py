@@ -32,7 +32,9 @@ from trimming.modify import (
     load_pol_cal_defaults,
     bring_to_correct_type, 
     special_config_checks, 
-    store_updated_metadata
+    store_updated_metadata,
+    expand_with_loading_map,
+    expand_nested_with_loading_map
     )
 
 # Get the input .ini file path of the ATLAS caller
@@ -42,10 +44,12 @@ cmd_args = call_parser()
 caller_info = parse_call_atlas_ini(filepath = cmd_args['ini_file'])
 
 # Export the config file from SCC HOI
-scc_info = export_scc_config(scc_configuration_id = caller_info['scc_configuration_id'], 
-                             atlas_configuration_file = caller_info['atlas_configuration_file'], 
-                             export_hoi_cfg = caller_info['export_hoi_cfg'],
-                             output_folder = caller_info['output_folder'])
+scc_info = export_scc_config(
+    scc_configuration_id = caller_info['scc_configuration_id'], 
+    atlas_configuration_file = caller_info['atlas_configuration_file'], 
+    export_hoi_cfg = caller_info['export_hoi_cfg'],
+    output_folder = caller_info['output_folder']
+    )
 
 # Parse the configuration file
 config_info = parse_atlas_config_file(caller_info['atlas_configuration_file'])
@@ -60,7 +64,13 @@ caller_info["raw_file_format"] = infer_format(caller_info, station_id = config_i
 caller_info = special_path_rules(caller_info)
       
 # Reading the files
-profiles, metadata, loading_map = flexible_reader(caller_info)
+profiles, metadata = flexible_reader(caller_info)
+
+# Expand profiles dictionary using the loading_map aliases
+profiles = expand_with_loading_map(profiles, caller_info)
+
+# Expand each entry of metadata dictionary using the loading_map aliases
+metadata = expand_nested_with_loading_map(metadata, caller_info)
 
 # Transfer metadata from the raw file header to config_info
 config_info = load_metadata(config_info, metadata)
@@ -91,8 +101,7 @@ meteo, metadata = load_radiosonde(caller_info, metadata)
 
 # Load all data needed for processing in a data class
 ctx = Context(
-    processing_info = {'caller_info':caller_info, 'loading_map':loading_map},
-    settings_info = settings_info,
+    processing_info = {'caller_info':caller_info, 'settings_info':settings_info},
     starting_dataset = {'profile' : profiles, 'meteo' : meteo} | metadata,
     )
 
@@ -119,7 +128,20 @@ preprocessing_recipe = [
     ("glued", "gluing"),
     ("noise_calculated", "signal_noise_calculation"),
     ("molecular_calculated", "molecular_calculations"),
+    ("mldr_generated", "mldr"),
+    ("gain_ratio_generated", "gain_ratio"),
+    ("calibration_factor_generated", "calibration_factor"),
 ]
+
+pol_cal_hr_recipe = [
+    ("calibrated_ratio_hr_generated", "calibrated_ratio"),
+    ("vldr_hr_generated", "vldr"),
+    ]
+
+pol_cal_recipe = [
+    ("calibrated_ratio_generated", "calibrated_ratio"),
+    ("vldr_generated", "vldr"),
+    ]
 
 # Apply screening recipe
 run_linear_recipe(
@@ -142,6 +164,30 @@ processor.run(output_id = 'averaged', input_id = 'preprocessing_complete', stage
 processor.run(output_id = 'averaged_lr', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_low_res")
 processor.run(output_id = 'averaged_hr', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_high_res")
 
+# Apply pol_cal recipes
+run_linear_recipe(
+    processor, 
+    recipe = pol_cal_hr_recipe, 
+    initial_input = "averaged_hr",
+    checkout_id = "pol_cal_hr_complete",
+    )
+
+run_linear_recipe(
+    processor, 
+    recipe = pol_cal_recipe, 
+    initial_input = "averaged",
+    checkout_id = "pol_cal_complete",
+    )
+
+from visualizer.__polarization_calibration__ import generate_polarization_calibration
+
+pol_cal__metadata = generate_polarization_calibration(
+    data_pack=processor.export_test_from_stage("vldr_generated"),
+    caller_info=processor.processing_info["caller_info"],
+    settings_info=settings_info,
+)
+raise Exception
+
 # Package the measurements for quicklooks
 processor.package(output_id = 'averaged_hr_qck', input_id = 'averaged_hr')
 
@@ -149,7 +195,7 @@ processor.package(output_id = 'averaged_hr_qck', input_id = 'averaged_hr')
 rayleigh_fit__metadata = generate_rayleigh_fit(
     data_pack = processor.export_test_from_stage('averaged'),
     caller_info = processor.processing_info['caller_info'],
-    settings_info = processor.settings_info
+    settings_info = settings_info
     )
 
 
@@ -157,14 +203,14 @@ rayleigh_fit__metadata = generate_rayleigh_fit(
 quadrant_telecover__metadata = generate_quadrant_telecover(
     data_pack = processor.export_test_from_stage('preprocessing_complete'),
     caller_info = processor.processing_info['caller_info'],
-    settings_info = processor.settings_info['tlc_qua']
+    settings_info = settings_info['tlc_qua']
     )
 
 # Ring telecover test
 ring_telecover__metadata = generate_ring_telecover(
     data_pack = processor.export_test_from_stage('preprocessing_complete'),
     caller_info = processor.processing_info['caller_info'],
-    settings_info = processor.settings_info['tlc_rin']
+    settings_info = settings_info['tlc_rin']
     )
 
 
@@ -172,5 +218,5 @@ ring_telecover__metadata = generate_ring_telecover(
 generate_quicklooks(
     data_pack = processor.export_test_from_stage('averaged_hr_qck'),
     caller_info = processor.processing_info['caller_info'],
-    settings_info = processor.settings_info['qck']
+    settings_info = settings_info['qck']
     )
