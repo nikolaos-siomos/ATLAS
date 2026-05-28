@@ -56,7 +56,7 @@ def apply_time_mask(qa_tests, mask_time, output_data):
                 output_data["profile"][key].where(mask_time[key]).copy()
             
             output_data["time_mask"][key] = mask_time[key]
-            
+
             output_data["time_info"][key] = \
                 output_data["time_info"][key].where(mask_time[key]).copy()
             

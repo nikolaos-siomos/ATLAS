@@ -43,10 +43,19 @@ def telecover(dir_out, fname, header, iters,
     mask = np.any(np.isnan(body), axis = 1)
     body = body[~mask,:]
  
-    fpath = os.path.join(dir_out, 'ascii', fname)
-    
-    np.savetxt(fpath, body, header = header, comments = '', 
-               delimiter = ',', fmt = '%.6e')
+    dir_ascii = os.path.join(dir_out, "ascii")
+    os.makedirs(dir_ascii, exist_ok=True)
+
+    fpath = os.path.join(dir_ascii, fname)
+
+    np.savetxt(
+        fpath,
+        body,
+        header=header,
+        comments="",
+        delimiter=",",
+        fmt="%.6e",
+    )
     
     return()
 

@@ -208,35 +208,13 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
         filter_parameters['transmission_shape'] = 'Gaussian'
         normalize = False
         
-        rrv = arc(
-            laser_wavelength, 
-            max_J = 40, 
-            backscattering = True,
-            mode = mode,
-            )
-        
-        incident_wavelength = rrv.lamda_pol['N2']
-        
     elif ch[5] == 'v' and ch[7] == 'o':
         mode = 'vibrational_raman_O2'
         filter_parameters['transmission_shape'] = 'Gaussian'
         normalize = False
         
-        with contextlib.redirect_stdout(io.StringIO()):
-
-            rrv = arc(
-                laser_wavelength, 
-                max_J = 40, 
-                backscattering = True,
-                mode = mode,
-                )
-            
-            incident_wavelength = rrv.lamda_pol['O2']
-
-        
     elif ch[5] in ['p','c','t','r']:
         mode = 'rotational_raman'
-        incident_wavelength = laser_wavelength
         
         if ch[5] == 'r':
             filter_parameters['transmission_shape'] = 'Tophat'
@@ -252,36 +230,49 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
     if mode != 'not_applicable':
         for i, T in enumerate(temperature_scale):
             with contextlib.redirect_stdout(io.StringIO()):
-
-                rrb = arc(
-                    incident_wavelength, 
-                    temperature = T,
-                    max_J = 40, 
-                    backscattering = True,
-                    mode = mode,
-                    filter_parameters = filter_parameters
-                    )
                 
                 rre = arc(
-                    incident_wavelength, 
+                    incident_wavelength = laser_wavelength, 
                     temperature = T,
                     max_J = 40, 
                     backscattering = False,
                     mode = "rotational_raman",
                     )
-            
-            with contextlib.redirect_stdout(io.StringIO()):
+                
+                if ch[5] in ['p','c','t','r']:
+                    rrb = arc(
+                        incident_wavelength = laser_wavelength, 
+                        temperature = T,
+                        max_J = 40, 
+                        backscattering = True,
+                        mode = mode,
+                        filter_parameters = filter_parameters,
+                        
+                        )
+                    
+                    c_bsc[i] = rrb.cross_section(cross_section_type = 'full', normalize = normalize)
+
+                    mldr = rrb.mldr(mldr_type = 'full')
+
+                    if ch[5] == 'p':
+                        c_bsc[i] = 1. / (1. + mldr) * c_bsc[i]
+                    elif ch[5] == 'c':
+                        c_bsc[i] = mldr / (1. + mldr) * c_bsc[i]
+
+                elif ch[5] in ['v']:
+                    rrb = arc(
+                        incident_wavelength = laser_wavelength, 
+                        max_J = 40, 
+                        backscattering = True,
+                        mode = mode,
+                        )
+                    
+                    c_bsc[i] = rrb.cross_section(cross_section_type = 'full', normalize = normalize)
+                    
+                else:
+                    c_bsc[i] = np.nan
+                
                 c_ext[i] = rre.cross_section(cross_section_type = 'full')
-                c_bsc[i] = rrb.cross_section(cross_section_type = 'full', normalize = normalize)
-            
-            if ch[5] == 'p':
-                with contextlib.redirect_stdout(io.StringIO()):
-                    mldr = rrb.mldr(mldr_type = 'full')
-                c_bsc[i] = 1. / (1. + mldr) * c_bsc[i]
-            elif ch[5] == 'c':
-                with contextlib.redirect_stdout(io.StringIO()):
-                    mldr = rrb.mldr(mldr_type = 'full')
-                c_bsc[i] = mldr / (1. + mldr) * c_bsc[i]
     
     c_ext = xr.DataArray(c_ext, dims = ['T'], coords = [temperature_scale])
     c_bsc = xr.DataArray(c_bsc, dims = ['T'], coords = [temperature_scale])

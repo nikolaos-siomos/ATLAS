@@ -97,36 +97,6 @@ def _common_channels(sector_profiles):
 
     return np.array(sorted(channels))
 
-
-def _slice_sector_profiles(sector_profiles_ch, vertical_scale_ch, settings, ref_sector):
-    """
-    Slice all sector profiles with one bin mask from the reference sector.
-
-    The reference sector is sliced using slice_by_vertical_scale. The returned
-    bin mask is then applied to all other available sectors.
-    """
-
-    ref_time_dim = _get_time_dim(sector_profiles_ch[ref_sector], ref_sector)
-
-    sector_profiles_ch[ref_sector], vertical_scale_ch, sl_mask = slice_by_vertical_scale(
-        da=sector_profiles_ch[ref_sector],
-        vertical_scale=vertical_scale_ch,
-        x_lims=settings["x_lims"],
-        time_dim=ref_time_dim,
-    )
-
-    for sector_id in sector_profiles_ch:
-        if sector_id == ref_sector:
-            continue
-
-        sector_profiles_ch[sector_id] = sector_profiles_ch[sector_id].where(
-            sl_mask,
-            drop=True,
-        )
-
-    return sector_profiles_ch, vertical_scale_ch, sl_mask
-
-
 def _sector_iters(sector_profiles_ch):
     """Return the common number of profiles among available sectors."""
 

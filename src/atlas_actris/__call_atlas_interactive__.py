@@ -186,7 +186,6 @@ pol_cal__metadata = generate_polarization_calibration(
     caller_info=processor.processing_info["caller_info"],
     settings_info=settings_info,
 )
-raise Exception
 
 # Package the measurements for quicklooks
 processor.package(output_id = 'averaged_hr_qck', input_id = 'averaged_hr')

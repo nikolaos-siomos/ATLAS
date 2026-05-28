@@ -144,28 +144,64 @@ def transfer_missing_metadata(
 
 def special_path_rules(caller_info):
 
-    if caller_info["raw_file_format"] == "scc":
+    raw_file_format = caller_info.get("raw_file_format")
+
+    alias_map = {}
+
+    if raw_file_format in ["scc", "tamarin"]:
+
+        alias_map = {
+            "drk_ray": "ray",
+            "drk_ray_pcb": "ray_pcb",
+            "drk_pcb": "pcb_p45",
+            "drk_pcb_aux": "pcb_p45_aux",
+            "drk_tlc_qua": "tlc_qua_north",
+            "drk_tlc_rin": "tlc_rin_outer",
+            "drk_dtm": "dtm_fo",
+            "drk_trg": "trg",
+        }
+
+    elif raw_file_format == "polly_xt":
+
+        alias_map = {
+            "pcb_p45": "ray",
+            "pcb_m45": "ray",
+        }
+
+    paths = caller_info.get("paths", {})
+
+    for alias, test in alias_map.items():
+        if test in paths and alias not in paths:
+            paths[alias] = paths[test]
+
+    caller_info["paths"] = paths
+
+    return caller_info
+
+# def special_path_rules(caller_info):
+
+#     if caller_info["raw_file_format"] in ["scc","tamarin"]:
     
-        infered = ["abs_drk_ray", "abs_drk_ray_pcb", "abs_drk_dtm", "abs_drk_trg"]
-        for key in infered:
-            key_m = key.replace("abs_drk_", "abs_", 1)
-            if caller_info[key] == None and caller_info[key_m] != None:
-                caller_info[key] = caller_info[key_m]
+#         infered = ["abs_drk_ray", "abs_drk_ray_pcb", "abs_drk_dtm", "abs_drk_trg"]
+#         for key in infered:
+#             key_m = key.replace("abs_drk_", "abs_", 1)
+#             if caller_info[key] == None and caller_info[key_m] != None:
+#                 caller_info[key] = caller_info[key_m]
         
-        pairs = {"abs_drk_tlc": "abs_tlc_north",
-                 "abs_drk_tlc_rin": "abs_tlc_rin_inner",
-                 "abs_drk_pcb": "abs_pcb_p45",
-                 "abs_drk_pcb_aux": "abs_pcb_aux_p45"}
-        for key, paired in pairs.items():
-            if caller_info[key] == None and caller_info[paired] != None:
-                caller_info[key] = caller_info[paired]
+#         pairs = {"abs_drk_tlc": "abs_tlc_north",
+#                  "abs_drk_tlc_rin": "abs_tlc_rin_inner",
+#                  "abs_drk_pcb": "abs_pcb_p45",
+#                  "abs_drk_pcb_aux": "abs_pcb_aux_p45"}
+#         for key, paired in pairs.items():
+#             if caller_info[key] == None and caller_info[paired] != None:
+#                 caller_info[key] = caller_info[paired]
         
-    if caller_info["raw_file_format"] == "polly_xt":
+#     if caller_info["raw_file_format"] == "polly_xt":
         
-        pairs = {"abs_pcb_p45": "abs_ray",
-                 "abs_pcb_m45": "abs_ray"}
-        for key, paired in pairs.items():
-            if caller_info[key] == None and caller_info[paired] != None:
-                caller_info[key] = caller_info[paired]
+#         pairs = {"abs_pcb_p45": "abs_ray",
+#                  "abs_pcb_m45": "abs_ray"}
+#         for key, paired in pairs.items():
+#             if caller_info[key] == None and caller_info[paired] != None:
+#                 caller_info[key] = caller_info[paired]
     
-    return(caller_info)
+#     return(caller_info)

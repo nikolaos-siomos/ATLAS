@@ -121,8 +121,6 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
     # calibration pack for the calibration vertical scale.
     z_cal_all = convert_m_to_km(pcb_m45_pack[vertical_scale_name])
     z_ray_all = convert_m_to_km(ray_pack[vertical_scale_name])
-    z_p45_all = convert_m_to_km(pcb_p45_pack[vertical_scale_name])
-    z_m45_all = convert_m_to_km(pcb_m45_pack[vertical_scale_name])
 
     eta_ids = _select_pairs_by_type(pcb_info, "eta")
 
@@ -159,49 +157,6 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         if not _all_pairs_exist(ray_ratio, [calibrated_ratio_id, vldr_id]):
             print(f"   Skipping {eta_id}: missing ray_pcb calibration products.")
             continue
-
-        # ------------------------------------------------------------------
-        # Signal panel: reflected/transmitted profiles from ray, +45 and -45
-        # ------------------------------------------------------------------
-        X_sig = {}
-        Y_sig = {}
-        E_sig = {}
-
-        signal_sources = [
-            ("ray", ray_pack, z_ray_all),
-            ("pcb_p45", pcb_p45_pack, z_p45_all),
-            ("pcb_m45", pcb_m45_pack, z_m45_all),
-        ]
-
-        for source_key, source_pack, source_z_all in signal_sources:
-            if "profile" not in source_pack:
-                continue
-
-            source_profile = source_pack["profile"]
-
-            for suffix, channel in [("r", ch_r), ("t", ch_t)]:
-                signal_key = f"{source_key}_{suffix}"
-                x_sig = source_z_all.sel(channel=channel).values
-                source_signal = _time_mean(source_profile.sel(channel=channel))
-
-                # source_signal, source_z_sliced, _ = slice_by_vertical_scale(
-                #     da=source_signal,
-                #     vertical_scale=source_z,
-                #     x_lims=pair_settings["smoothing_range"],
-                # )
-
-                # x_sig = source_z_sliced.values
-
-                y_sig, e_sig = smoothing(
-                    args=pair_settings,
-                    x_vals=x_sig,
-                    y_vals=source_signal.values,
-                    err_type="std",
-                )
-
-                X_sig[signal_key] = x_sig
-                Y_sig[signal_key] = y_sig
-                E_sig[signal_key] = e_sig
 
         # ------------------------------------------------------------------
         # Calibration panel: gain-ratio profiles
@@ -346,6 +301,7 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
             extra_metadata=metadata_ray_r,
         )
 
+        print(scalar_info['epsilon'])
         plot_args = (
             caller_info
             | pair_settings
@@ -363,9 +319,6 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         )
 
         plot_path = plot_polarization_calibration.generate_plot(
-            X_sig=X_sig,
-            Y_sig=Y_sig,
-            E_sig=E_sig,
             X_cal=x_cal,
             Y_cal=Y_cal,
             E_cal=E_cal,

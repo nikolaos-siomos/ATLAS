@@ -1074,6 +1074,15 @@ def multiply_y_values(sig, sig_err, coef):
     
     return(y_vals, y_errs)
 
+
+def get_normalization_factor(sig_1, sig_2, x_vals, region):
+    
+    mask = (x_vals >= region[0]) & (x_vals <= region[1])
+    
+    coef =  np.nanmean(sig_2[mask]) / np.nanmean(sig_1[mask])
+    
+    return coef
+
 def insert_nan_time_gaps(sig, dim="time", gap_factor=1.5):
     """
     Insert NaN profiles around large time gaps while keeping original time values.

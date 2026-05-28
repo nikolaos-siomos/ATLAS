@@ -8,10 +8,7 @@ Created on Thu Aug 14 15:16:34 2025
 
 from __future__ import annotations
 import configparser
-import warnings
 from typing import Any, Dict, List, Optional, Union
-import numpy as np
-import os
 from utils.printouts import print_header
 from pprint import pprint
 from utils.error_classes import ConfigError, CustomWarning
@@ -63,8 +60,8 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "cross_check_lower_limit":     {"dtype": float,   "default": None,      "is_list": False},
     "normalization_region":        {"dtype": float,   "default": [6.,8.],   "is_list": True,  "min": 0.,   "max": 50.},
     
-    "molecular_mask_region":       {"dtype": float,   "default": [2., 30.], "is_list": True,  "min": 0.,    "max": 50.},
-    "molecular_mask_window":       {"dtype": float,   "default": 0.5,       "is_list": False, "min": 0.05,   "max": 5.},
+    "molecular_mask_region":       {"dtype": float,   "default": [2., 30.], "is_list": True,  "min": 0.,    "max": 150.},
+    "molecular_mask_window":       {"dtype": float,   "default": [1., 4.],  "is_list": True,  "min": 0.05,  "max": 50.},
     "molecular_mask_window_step":  {"dtype": float,   "default": 0.2,       "is_list": False, "min": 0.05,  "max": 5.},
     "rsem_threshold":              {"dtype": float,   "default": 0.2,       "is_list": False, "min": 0.01,  "max": 1.},
     "first_derivative_threshold":  {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
@@ -126,15 +123,20 @@ SCHEMA_TLC_RIN: Dict[str, Dict[str, Any]] = {
 
 SCHEMA_PCB: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
-    "x_lims_calibration":   {"dtype": float,   "default": [0., 8.], "is_list": True,  "min": 0.,  "max": 50.},
-    "x_lims_rayleigh":      {"dtype": float,   "default": [0., 16.], "is_list": True,  "min": 0.,  "max": 50.},
+    "x_lims_signals":       {"dtype": float,   "default": [0., 8.],  "is_list": True,  "min": 0.,  "max": 50.},
+    "x_tick_signals":       {"dtype": float,   "default": 1.,        "is_list": False, "min": 0.1, "max": 10.},   
+    "y_lims_signals":       {"dtype": float,   "default": [],        "is_list": True},
+
+    "x_lims_calibration":   {"dtype": float,   "default": [0., 8.],  "is_list": True,  "min": 0.,  "max": 50.},
     "x_tick_calibration":   {"dtype": float,   "default": 1.,        "is_list": False, "min": 0.1, "max": 10.},   
-    "x_tick_rayleigh":      {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.1, "max": 10.},   
     "y_lims_calibration":   {"dtype": float,   "default": [],        "is_list": True},
+
+    "x_lims_rayleigh":      {"dtype": float,   "default": [0., 16.], "is_list": True,  "min": 0.,  "max": 50.},
+    "x_tick_rayleigh":      {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.1, "max": 10.},   
     "y_lims_rayleigh":      {"dtype": float,   "default": [],        "is_list": True},
 
     "calibration_region":   {"dtype": float,   "default": [2., 4.],  "is_list": True,  "min": 0.,  "max": 50., "size": 2},
-    "rayleigh_region":      {"dtype": float,   "default": [6., 8.],  "is_list": True, "size": 2},
+    "rayleigh_region":      {"dtype": float,   "default": [6., 8.],  "is_list": True,  "size": 2},
     
     "pldr_error_threshold": {"dtype": float,   "default": 0.25,      "is_list": False, "min": 0., "max": 0.5},   
     

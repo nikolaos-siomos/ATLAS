@@ -122,13 +122,23 @@ def find_radiosonde(caller_info, metadata):
             if status == 0:
                 
                 caller_info['radiosonde_status'] = status
-                radiosonde_info['measurement_mid_time'] = mid_time_dt64
+                radiosonde_info['measurement_time'] = mid_time_dt64
+                radiosonde_info['radiosonde_status'] = status
                 
                 metadata['radiosonde_info'][key] = xr.DataArray(
                     data=list(radiosonde_info.values()),
                     dims=["parameters"],
                     coords={"parameters": list(radiosonde_info.keys())},
                     )
+        else:
+            radiosonde_info = {'radiosonde_status':-1}
+            
+            metadata['radiosonde_info'][key] = xr.DataArray(
+                data=list(radiosonde_info.values()),
+                dims=["parameters"],
+                coords={"parameters": list(radiosonde_info.keys())},
+                )
+
                         
     return metadata
                     

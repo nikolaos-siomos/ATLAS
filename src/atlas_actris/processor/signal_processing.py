@@ -50,13 +50,13 @@ def compute_height_and_range_calculation(
     
     system_info = output_data["system_info"]
     channel_info = output_data["channel_info"]
+    
+    profiles = output_data["profile"]
         
     qa_tests = list(channel_info.keys())
     
     for key in qa_tests:
         
-        max_bins = int(channel_info[key].loc["bins", :].max().values)
-
         resolution = (
             channel_info[key]
             .loc["range_resolution", :]
@@ -74,14 +74,14 @@ def compute_height_and_range_calculation(
         zenith_angle = float(system_info[key].loc["zenith_angle"].values)
         station_altitude = system_info[key].loc["station_altitude"].values
         
-        bin_arr = np.arange(max_bins, dtype=np.int32)
+        bins = profiles[key].bins
 
-        bins = xr.DataArray(
-            bin_arr.astype(np.float32),
-            dims=["bins"],
-            coords={"bins": bin_arr},
-            name="bins",
-        )
+        # bins = xr.DataArray(
+        #     bin_arr.astype(np.float32),
+        #     dims=["bins"],
+        #     coords={"bins": bin_arr},
+        #     name="bins",
+        # )
         
         zenith_angle_rad = np.pi * zenith_angle / 180.0
         

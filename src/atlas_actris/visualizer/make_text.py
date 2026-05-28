@@ -93,10 +93,13 @@ class GenerateText:
             stop_timestamp = self.metadata['stop_timestamp'], 
             laser_pointing_angle = self.metadata['zenith_angle']
             )
-        
-        self.channel_part = channel_text(
+
+        self.system_part = system_text(
             lidar_name = self.metadata['lidar_name'], 
             station_name = self.metadata['station_name'], 
+            )   
+        
+        self.channel_part = channel_text(
             atlas_channel_id = self.metadata['atlas_channel_id'], 
             scc_channel_id = self.metadata['scc_channel_id']
             )
@@ -157,7 +160,7 @@ class GenerateText:
             sm_expo = self.settings['smoothing_exponential']
             )
         
-        title = self.channel_part + ' - ' + sm_part + '\n'+\
+        title = self.system_part + ' ' + self.channel_part + ' - ' + sm_part + '\n'+\
             self.config_part + ' - ' + self.dateloc_part
                             
         return title 
@@ -186,7 +189,7 @@ class GenerateText:
             self.metadata['channel_bandwidth']
             )
         
-        title = self.channel_part + ' - ' + self.dateloc_part + ' - ' + sm_part + '\n'+\
+        title = self.system_part + ' ' + self.channel_part + ' - ' + self.dateloc_part + ' - ' + sm_part + '\n'+\
                     self.config_part + ' - ' + mol_part + ' - ' + if_part 
 
         return title 
@@ -215,7 +218,7 @@ class GenerateText:
             self.metadata['channel_bandwidth']
             )
         
-        title = self.channel_part + ' - ' + sm_part + '\n'+\
+        title = self.system_part + ' ' + self.channel_part + ' - ' + sm_part + '\n'+\
                     self.config_part + ' - ' + self.dateloc_part + '\n'+\
                         mol_part+ ' - ' + if_part
 
@@ -235,7 +238,7 @@ class GenerateText:
             self.metadata['channel_bandwidth']
             )
 
-        title = self.channel_part + ' - ' + sm_part + ' - ' + if_part + '\n'+\
+        title = self.system_part + ' ' + self.channel_part + ' - ' + sm_part + ' - ' + if_part + '\n'+\
             self.config_part + ' - ' + self.dateloc_part
                         
         return title 
@@ -270,9 +273,21 @@ class GenerateText:
             metadata_t['channel_bandwidth']
             )
         
-        title = self.channel_part + ' - ' + sm_part + '\n'+\
-            f"Rayleigh: {self.dateloc_part}" + ' ' + f"Calibration: {self.dateloc_part_extra}" + '-' +  mol_part + '\n'+\
-                    self.config_part + ' - ' + if_part_r + '-' + if_part_t
+        
+        ch_r_text = channel_text(
+            atlas_channel_id=metadata_r['atlas_channel_id'], 
+            scc_channel_id=metadata_r['scc_channel_id']
+            )
+        
+        ch_t_text = channel_text(
+            atlas_channel_id=metadata_t['atlas_channel_id'], 
+            scc_channel_id=metadata_t['scc_channel_id']
+            )
+        
+        title = self.system_part + ' - ' + sm_part + '\n'+\
+            f"Rayleigh: {self.dateloc_part}" + ' - ' + f"Calibration: {self.dateloc_part_extra}" + '\n'+\
+                    self.config_part + ' - ' + mol_part + '\n'+\
+                        'Ch R: ' + ch_r_text + ', ' + if_part_r + ' - ' +'Ch T: ' + ch_t_text + ', ' + if_part_t
 
         return title 
     
@@ -572,7 +587,16 @@ def sm_text_tlc(smooth, sm_win, nr_ulim):
 
     return sm_part
 
-def channel_text(lidar_name, station_name, atlas_channel_id, scc_channel_id=""):
+def channel_text(atlas_channel_id, scc_channel_id=""):
+
+    channel_part = str(atlas_channel_id)
+
+    if scc_channel_id:
+        channel_part = f"{channel_part} ({scc_channel_id})"
+
+    return channel_part
+
+def system_text(lidar_name, station_name):
     
     parts = []
 
@@ -582,14 +606,10 @@ def channel_text(lidar_name, station_name, atlas_channel_id, scc_channel_id=""):
     if station_name:
         parts.append(str(station_name))
 
-    parts.append(str(atlas_channel_id))
-
     channel_part = " ".join(parts)
 
-    if scc_channel_id:
-        channel_part = f"{channel_part} ({scc_channel_id})"
-
     return channel_part
+
 
 def channel_text_ratio(
     lidar_name,

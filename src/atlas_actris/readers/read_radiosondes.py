@@ -6,17 +6,26 @@ Created on Tue Nov 25 11:17:36 2025
 @author: nikos
 """
 
-import os, sys, glob
+import re
 import numpy as np
 import xarray as xr
-import re
+import os, sys, glob
 import netCDF4 as nc
+
 from utils.error_classes import CustomWarning
-from utils.printouts import print_header, print_subsection, print_entry
-from utils.toolbox import get_mid_time, find_nearest_file
+from utils.printouts import print_header, print_entry
 from molecular.utilities import number_density_at_pt, saturation_vapour_pressure
-from utils.unit_conversions import km_asl_to_m_asl, m_agl_to_m_asl, \
-    km_agl_to_m_asl, hPa_to_Pa, atm_to_Pa, C_to_K, Cx10_to_K, percent_to_fraction
+
+from utils.unit_conversions import (
+    km_asl_to_m_asl, 
+    m_agl_to_m_asl, 
+    km_agl_to_m_asl, 
+    hPa_to_Pa, 
+    atm_to_Pa, 
+    C_to_K, 
+    Cx10_to_K, 
+    percent_to_fraction
+    )
 
 def date_from_filename(input_file):
     
@@ -304,8 +313,8 @@ def read_radiosonde_ecmwf(station_altitude, radiosonde_info):
     meteo.attrs = {}
     
     meteo = meteo.assign_coords(atmo_parameters = ['P', 'T', 'RH'])
-    meteo = meteo.rename(level='height')
-    meteo = meteo.assign_coords(height = height.values + station_altitude).sortby("height")
+    meteo = meteo.rename(level='height_asl')
+    meteo = meteo.assign_coords(height_asl = height.values + station_altitude).sortby("height_asl")
     
     meteo = add_number_density(meteo)
 
@@ -426,23 +435,25 @@ def read_radiosonde_ascii(caller_info, radiosonde_info):
 
 def load_radiosonde(caller_info, metadata):
     
-    if caller_info['radiosonde_status'] == 0:
-        
-        print_header("Parsing radiosonde file")
+    meteo = {}
+                
+    print_header("Parsing radiosonde file")
 
-        radiosonde_info = metadata['radiosonde_info']
+    radiosonde_info = metadata['radiosonde_info']
+                
+    for key in radiosonde_info:
         
-        meteo = {}
-            
-        for key in radiosonde_info:
-                        
+        radiosonde_status = radiosonde_info[key].loc['radiosonde_status'].item()
+        
+        if radiosonde_status == 0:
+                    
             radiosonde_format = radiosonde_info[key].loc['radiosonde_format'].item()
             
             if radiosonde_format == 'ecmwf':
                 print_entry("Parsing downloaded Cloudnet meteorological files")
                 station_altitude = float(metadata['system_info'][key].loc['station_altitude'].values)
                 da = read_radiosonde_ecmwf(station_altitude, radiosonde_info[key])
-
+    
             elif radiosonde_format == 'wyoming':
                 print_entry("Parsing downloaded Wyoming radiosonde")
                 da = read_radiosonde_wyoming(radiosonde_info[key])

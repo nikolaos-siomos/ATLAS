@@ -53,12 +53,12 @@ def get_overflow_mask(sig, acquisition_mode, daq_range, max_count = 2.**15):
     
     mask_p = (acquisition_mode == "p") & (sig_clean >= max_count)
 
-    # daq_range = daq_range.where(daq_range.isnull(), max_count) # avoids nan comparison warnings that occur for photon channels
     mask_a_h = (acquisition_mode == "a") & (sig_clean >= daq_clean)
 
     mask_a_l = (acquisition_mode == "a") & (sig_clean < 0.)
 
-    mask = (mask_a_h) | (mask_a_l) | (mask_p)
+    # mask = (mask_a_h) | (mask_a_l) | (mask_p)
+    mask = mask_p
     
     reduce_dims = set(sig.dims) - {"channel"}
     
@@ -76,10 +76,6 @@ def get_overflow_mask(sig, acquisition_mode, daq_range, max_count = 2.**15):
     ch_a_l = a_l_ch["channel"].values[a_l_ch.values]
     ch_p = p_ch["channel"].values[p_ch.values]
     
-    # ch_a_h = mask_a_h_ch.channel.values[mask_a_h_ch.values]
-    # ch_a_l = mask_p_ch.channel.values[mask_p_ch.values]
-    # ch_p   = mask_p_ch.channel.values[mask_p_ch.values]
-
     if len(ch_a_h) > 0:
         print("")
         print("-- Warning: Analog signal mV values above the data acqusition range detected:")

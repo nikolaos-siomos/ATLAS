@@ -64,7 +64,7 @@ def read_dataset(dir_meas: str, meas_type: str):
                 raw_data = xr.open_dataset(mfiles[k])
                 
                 if "Measurement_ID" not in raw_data.attrs:
-                    raise FileReaderError(f"Measurement_ID parameter not found in the netcdf file. This is not a scc raw file")
+                    raise FileReaderError("Measurement_ID parameter not found in the netcdf file. This is not a scc raw file")
                     
                 # Reading the scc file metadata
                 time_info_f = get_time_info(raw_data, 

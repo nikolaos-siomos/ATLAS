@@ -17,13 +17,31 @@ from visualizer.check import check_channels
 from processor.packaging import collect_metadata
 from visualizer.make_text import GenerateText, Libraries
 from visualizer.plot_utils import (
-    prepare_folder, slice_by_vertical_scale, smoothing, collect_dict,
-    multiply_y_values, convert_m_to_km, perform_color_reduction, add_plot_metadata
+    prepare_folder, 
+    smoothing, 
+    collect_dict,
+    multiply_y_values, 
+    get_normalization_factor, 
+    convert_m_to_km, 
+    perform_color_reduction, 
+    add_plot_metadata
     )
 from visualizer import plot_rayleigh, plot_rayleigh_mask
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
+
+key_translation = {
+    "molecular_mask_window": "fit_mask_window",
+    "molecular_mask_window_step": "fit_mask_window_step",
+    "molecular_mask_region": "fit_mask_region",
+    "rsem_threshold": "rsem_threshold",
+    "first_derivative_threshold": "first_derivative_threshold",
+    "second_derivative_threshold": "second_derivative_threshold",
+    "shapiro_wilk_threshold": "shapiro_wilk_threshold",
+    "cross_criterium_threshold": "cross_criterion_threshold",
+    "durbin_watson_threshold": "durbin_watson_threshold",
+}
 
 def get_max_channel_height(norm_region, norm_region_flag):
     
@@ -70,23 +88,24 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 ch_d = dict(channel = ch)
                 
                 channel_settings = settings.copy()
-                                        
-                sig_ch = profiles.mean('time').sel(ch_d)
-                atb_ch = atten_bsc.sel(ch_d)
-                vertical_scale_ch = vertical_scale.sel(ch_d)
+                
+                for old_key, new_key in key_translation.items():
+                    if old_key in channel_settings:
+                        channel_settings[new_key] = channel_settings.pop(old_key)
+                                                                
+                y1_vals = profiles.mean('time').sel(ch_d).values
+                y2_vals = atten_bsc.sel(ch_d).values
+                x_vals = vertical_scale.sel(ch_d).values
                                                 
-                # Trim the x and y1 using the x axis limits                
-                sig_ch, vertical_scale_ch, sl_mask  = slice_by_vertical_scale(
-                    da = sig_ch, 
-                    vertical_scale = vertical_scale_ch, 
-                    x_lims = channel_settings['smoothing_range'], 
-                    )
-                
-                y1_vals = sig_ch.values
-                x_vals = vertical_scale_ch.values
-                
+                # # Trim the x and y1 using the x axis limits                
+                # sig_ch, vertical_scale_ch, sl_mask  = slice_by_vertical_scale(
+                #     da = sig_ch, 
+                #     vertical_scale = vertical_scale_ch, 
+                #     x_lims = channel_settings['smoothing_range'], 
+                #     )
+
                 # Trim the x and y2 using the x axis limits                
-                y2_vals = atb_ch.where(sl_mask, drop=True).values
+                # y2_vals = atb_ch.where(sl_mask, drop=True).values
         
                 # Smoothing of the y1 array - generates also the corresponding standard deviation
                 y1_vals_sm, y1_errs = smoothing(
@@ -120,7 +139,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 norm_region, norm_region_flag, idx = \
                     curve_fit.scan(
                         masks, 
-                        user_norm_region = channel_settings['normalization_region'],
+                        default_norm_region = channel_settings['normalization_region'],
                         auto_fit = True,
                         prefered_range = 'far'
                         )
@@ -133,7 +152,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                         stats = stats, 
                         masks = masks
                         )
-                
+                                
                 # Get the maximum channel height
                 maximum_channel_height = get_max_channel_height(
                     norm_region= norm_region, 
@@ -141,11 +160,18 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                     )
         
                 # Normalize y1_vals and y1_errs with the normalization factor from the Rayleigh fit test
+                coef = get_normalization_factor(
+                    sig_1 = y1_vals_sm, 
+                    sig_2 = y2_vals_sm, 
+                    x_vals = x_vals,
+                    region = norm_region
+                    )
+                
                 y1_vals_nrm, y1_errs_nrm = multiply_y_values(
                     sig = y1_vals_sm, 
                     sig_err = y1_errs, 
-                    coef = stats_norm_region['normalization_factor']
-                    )
+                    coef = coef
+                )
                       
                 # Gather the metadata that are common for all QA tests in a dictonary
                 metadata = collect_metadata(data_pack[key], atlas_channel_id = ch)

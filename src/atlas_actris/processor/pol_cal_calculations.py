@@ -101,7 +101,7 @@ def mean_in_region(
 
 
 def sem_in_region(
-    da_error: xr.DataArray,
+    da: xr.DataArray,
     z: xr.DataArray,
     averaging_range,
 ) -> xr.DataArray:
@@ -114,10 +114,29 @@ def sem_in_region(
     z_min, z_max = averaging_range
     mask = (z >= 1E3 * z_min) & (z <= 1E3 * z_max)
 
-    da_sel = da_error.where(mask)
+    da_sel = da.where(mask)
     n_bins = da_sel.notnull().sum("bins")
 
-    return da_sel.mean("bins", skipna=True) / np.sqrt(n_bins)
+    return da_sel.std("bins", skipna=True) / np.sqrt(n_bins)
+
+# def sem_in_region(
+#     da_error: xr.DataArray,
+#     z: xr.DataArray,
+#     averaging_range,
+# ) -> xr.DataArray:
+#     """
+#     Average an error DataArray over bins and convert it to SEM.
+
+#     This assumes da_error is already the per-bin uncertainty of the ratio.
+#     """
+
+#     z_min, z_max = averaging_range
+#     mask = (z >= 1E3 * z_min) & (z <= 1E3 * z_max)
+
+#     da_sel = da_error.where(mask)
+#     n_bins = da_sel.notnull().sum("bins")
+
+#     return da_sel.mean("bins", skipna=True) / np.sqrt(n_bins)
 
 
 def channels_to_pairs(
@@ -1185,7 +1204,7 @@ def compute_gain_ratio(
         )
 
         ratio_error_m_bins = sem_in_region(
-            da_error=ratio_error_da,
+            da=ratio_da,
             z=z_pair,
             averaging_range=averaging_range,
         )
@@ -1302,7 +1321,7 @@ def compute_gain_ratio(
             averaging_range=averaging_range,
         )
         eta_s_error_m_bins = sem_in_region(
-            da_error=eta_s_error,
+            da=eta_s,
             z=z_pair_p45,
             averaging_range=averaging_range,
         )
@@ -1322,9 +1341,16 @@ def compute_gain_ratio(
             averaging_range=averaging_range,
         )
 
+        epsilon_error_m_bins = sem_in_region(
+            da=epsilon,
+            z=z_pair_p45,
+            averaging_range=averaging_range,
+        )
+        
         combined_info = add_parameter(combined_info, name="mean", values=eta_s_m_bins)
         combined_info = add_parameter(combined_info, name="sem", values=eta_s_error_m_bins)
         combined_info = add_parameter(combined_info, name="epsilon", values=epsilon_m_bins)
+        combined_info = add_parameter(combined_info, name="epsilon_error", values=epsilon_error_m_bins)
         combined_info = add_parameter(combined_info, name="ratio_type", values="gain_ratio")
 
         output_data["pol_cal_ratio"][target_key] = append_or_replace_pairs(
@@ -1401,7 +1427,7 @@ def compute_calibration_factor(
             averaging_range=averaging_range,
         )
         errors_m_bins = sem_in_region(
-            da_error=errors,
+            da=values,
             z=z_pair,
             averaging_range=averaging_range,
         )
@@ -1760,7 +1786,7 @@ def compute_calibrated_ratio(
         averaging_range=processing_info["settings_info"]["pcb"]["rayleigh_region"],
     )
     calibrated_error_m_bins = sem_in_region(
-        da_error=calibrated_error_m_time,
+        da=calibrated_m_time,
         z=z_pair,
         averaging_range=processing_info["settings_info"]["pcb"]["rayleigh_region"],
     )
@@ -1996,7 +2022,7 @@ def compute_vldr(
         averaging_range=processing_info["settings_info"]["pcb"]["rayleigh_region"],
     )
     vldr_error_m_bins_store = sem_in_region(
-        da_error=vldr_error_m_time,
+        da=vldr_m_time,
         z=z_pair_stats,
         averaging_range=processing_info["settings_info"]["pcb"]["rayleigh_region"],
     )

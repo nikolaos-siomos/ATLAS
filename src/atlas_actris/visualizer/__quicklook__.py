@@ -75,12 +75,12 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
                 sig_ch = profiles.sel(ch_d)
                 vertical_scale_ch = vertical_scale.sel(ch_d)
                 
-                # Trim the x and y using the x axis limits                
-                sig_ch, vertical_scale_ch, _  = slice_by_vertical_scale(
-                    da = sig_ch,
-                    vertical_scale = vertical_scale_ch,
-                    x_lims = settings['x_lims'], 
-                    )
+                # # Trim the x and y using the x axis limits                
+                # sig_ch, vertical_scale_ch, _  = slice_by_vertical_scale(
+                #     da = sig_ch,
+                #     vertical_scale = vertical_scale_ch,
+                #     x_lims = settings['x_lims'], 
+                #     )
                 y_vals = sig_ch.values
                 x_vals = vertical_scale_ch.values
 

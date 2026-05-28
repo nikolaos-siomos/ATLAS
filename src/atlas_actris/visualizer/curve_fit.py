@@ -97,11 +97,11 @@ def select_norm_region(auto_norm_region, user_norm_region):
         
     return(norm_region, norm_region_flag)
 
-def idx_from_region(user_norm_region, middle_point, window):
+def idx_from_region(norm_region, middle_point, window):
 
-    middle_point_user = (user_norm_region[0] + user_norm_region[1]) / 2.
+    middle_point_user = (norm_region[0] + norm_region[1]) / 2.
     
-    window_user = user_norm_region[1] - user_norm_region[0]
+    window_user = norm_region[1] - norm_region[0]
     
     middle_point_user = np.argmin(np.abs(middle_point.values - middle_point_user))
     
@@ -727,10 +727,8 @@ def statistics(y1, y2, x, y1_err = None, y1_avg = None, keyw_args = {},
     return(stats, masks)
 
        
-def scan(masks, prefered_range = 'far', user_norm_region = None, auto_fit = True):
-    
-    default_norm_region = [4., 8.]
-    
+def scan(masks, prefered_range = 'far', default_norm_region = None, auto_fit = True):
+        
     mfit = masks['total']
 
     window = mfit.window
@@ -779,22 +777,12 @@ def scan(masks, prefered_range = 'far', user_norm_region = None, auto_fit = True
         else:
             raise Exception(f"-- Error: The provided prefered_range {prefered_range} is wrong. Select one of: near, far")
     
-    else:
-        if user_norm_region is not None:
+    else:        
+        norm_region_flag = "external"
+
+        auto_norm_region = default_norm_region
         
-            norm_region_flag = "external"
-    
-            auto_norm_region = user_norm_region
-            
-            auto_idx = idx_from_region(user_norm_region, middle_point, window)
-        
-        else:
-            
-            norm_region_flag = "default"
-    
-            auto_norm_region = default_norm_region
-            
-            auto_idx = idx_from_region(default_norm_region, middle_point, window)
+        auto_idx = idx_from_region(default_norm_region, middle_point, window)
             
     return(auto_norm_region, norm_region_flag, auto_idx)   
     

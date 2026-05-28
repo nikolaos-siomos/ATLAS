@@ -1,22 +1,24 @@
 """
 @author: Nikos Siomos
 """
-import os, sys, glob, contextlib
+import re
 import numpy as np
+import xarray as xr
+from datetime import datetime
+import io, os, glob, contextlib
+
+from typing import Callable
+from typing import Any, Dict, List, Tuple
+
+from utils.error_classes import FileReaderError
+from utils.printouts import print_header, print_subsection, endpoint
+
 from readers.read_scc import read_dataset as reader_scc
 from readers.read_licel import read_dataset as reader_licel
+from readers.read_tamarin_dimfix import read_dataset as reader_tamarin
 from readers.read_polly_xt import read_dataset as reader_polly_xt
 from readers.read_licel_matlab import read_dataset as reader_licel_matlab
 from readers.read_polly_xt_first import read_dataset as reader_polly_xt_first
-import xarray as xr
-import pandas as pd
-from datetime import datetime
-import re
-from typing import Callable, Optional
-from typing import Any, Dict, List, Tuple
-from utils.printouts import print_header, print_subsection, endpoint
-import contextlib, io
-from utils.error_classes import FileReaderError
 
 # Example registry of formats -> reading functions
 READERS: dict[str, Callable[[str], object]] = {
@@ -28,6 +30,7 @@ READERS: dict[str, Callable[[str], object]] = {
 reader_menu: dict[str, Callable[[str], object]] = {
     "scc": reader_scc,
     "licel": reader_licel,
+    "tamarin": reader_tamarin,
     "polly_xt": reader_polly_xt,
     "licel_matlab": reader_licel_matlab,
     "polly_xt_first": reader_polly_xt_first,
@@ -180,6 +183,9 @@ def infer_format(d: Dict[str, Any], station_id: str, debug: bool = False) -> str
 
     if station_id in ["brc", "run"]:
         return "licel_matlab"
+
+    if station_id == "tam":
+        return "tamarin"
 
     physical_paths = _iter_physical_paths(d)
 

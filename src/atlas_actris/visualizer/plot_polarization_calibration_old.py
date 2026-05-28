@@ -19,19 +19,12 @@ from visualizer.generate_polarization_calibration_axis import (
 )
 
 
-def generate_plot(X_sig, Y_sig, E_sig, X_cal, Y_cal, E_cal, X_ray, Y_ray, E_ray, args):
+def generate_plot(X_cal, Y_cal, E_cal, X_ray, Y_ray, E_ray, args):
     """
     Generate polarization calibration plot.
 
     Parameters
     ----------
-    X_sig : dict
-        Signal vertical scales in km, indexed like Y_sig/E_sig.
-    Y_sig : dict
-        Smoothed signal profiles. Expected keys:
-        ray_r, ray_t, pcb_p45_r, pcb_p45_t, pcb_m45_r, pcb_m45_t
-    E_sig : dict
-        Signal SEM profiles. Same keys as Y_sig, optional values may be NaN.
     X_cal : np.ndarray
         Calibration vertical scale in km.
     Y_cal : dict
@@ -50,7 +43,7 @@ def generate_plot(X_sig, Y_sig, E_sig, X_cal, Y_cal, E_cal, X_ray, Y_ray, E_ray,
         Plot/settings/metadata dictionary.
     """
 
-    fig = plt.figure(figsize=(16.0, 4.))
+    fig = plt.figure(figsize=(14.0, 3.5))
 
     add_fitting_suptitle(
         fig=fig,
@@ -60,18 +53,9 @@ def generate_plot(X_sig, Y_sig, E_sig, X_cal, Y_cal, E_cal, X_ray, Y_ray, E_ray,
         min_fontsize=10,
     )
 
-    signal_panel(
-        fig=fig,
-        coords=[0.045, 0.14, 0.28, 0.58],
-        X=X_sig,
-        Y=Y_sig,
-        E=E_sig,
-        args=args,
-    )
-
     left_panel(
         fig=fig,
-        coords=[0.375, 0.14, 0.285, 0.58],
+        coords=[0.045, 0.14, 0.44, 0.60],
         X=X_cal,
         Y=Y_cal,
         E=E_cal,
@@ -80,7 +64,7 @@ def generate_plot(X_sig, Y_sig, E_sig, X_cal, Y_cal, E_cal, X_ray, Y_ray, E_ray,
 
     right_panel(
         fig=fig,
-        coords=[0.705, 0.14, 0.285, 0.58],
+        coords=[0.545, 0.14, 0.44, 0.60],
         X=X_ray,
         Y=Y_ray,
         E=E_ray,
@@ -90,81 +74,6 @@ def generate_plot(X_sig, Y_sig, E_sig, X_cal, Y_cal, E_cal, X_ray, Y_ray, E_ray,
     fpath = export_plot(fig, args)
 
     return fpath
-
-
-
-def signal_panel(fig, coords, X, Y, E, args):
-    ax = fig.add_axes(coords)
-
-    signal_specs = [
-        ("ray_r", "tab:blue", "-", "ray R"),
-        ("ray_t", "tab:blue", "--", "ray T"),
-        ("pcb_p45_r", "tab:red", "-", "+45 R"),
-        ("pcb_p45_t", "tab:red", "--", "+45 T"),
-        ("pcb_m45_r", "tab:cyan", "-", "-45 R"),
-        ("pcb_m45_t", "tab:cyan", "--", "-45 T"),
-    ]
-    
-    for key, color, linestyle, label in signal_specs:
-        if key not in Y or key not in X:
-            continue
-
-        ax.plot(X[key], Y[key], color=color, linestyle=linestyle, label=label)
-        _fill_error(ax, X[key], Y[key], E.get(key), color)
-
-    ax.axhline(0.0, color="black", linewidth=1.0)
-
-    x_ticks, x_labels, x_tick = get_x_ticks(
-        x_lims=args["x_lims_signals"],
-        x_tick=args.get("x_tick_signals"),
-    )
-
-    ax.set_xticks(x_ticks, labels=x_labels)
-    ax.set_xlim(args["x_lims_signals"])
-
-    ax.set_xlabel(get_vertical_axis_label(args["vertical_scale"]))
-    ax.xaxis.set_minor_locator(MultipleLocator(x_tick / 2.0))
-
-    ax.set_ylim(_get_signal_y_limits(Y, args.get("y_lims_signals", [])))
-    ax.set_ylabel("Signal")
-
-    ax.grid(which="both")
-
-    if ax.get_legend_handles_labels() != ([], []):
-        ax.legend(loc="upper right", fontsize="small")
-
-    ax.axvspan(
-        args["rayleigh_region"][0],
-        args["rayleigh_region"][1],
-        alpha=0.2,
-        facecolor="tab:grey",
-    )
-
-    return ax
-
-
-def _get_signal_y_limits(Y, y_lims):
-    if y_lims is not None and len(y_lims) == 2:
-        if y_lims[0] is not None and y_lims[1] is not None:
-            y_lims = np.asarray(y_lims, dtype=float)
-            if np.isfinite(y_lims).all():
-                return y_lims
-
-    finite_max = []
-    for values in Y.values():
-        values = np.asarray(values, dtype=float)
-        if values.size == 0 or np.isnan(values).all():
-            continue
-        finite_max.append(np.nanmax(values))
-
-    if len(finite_max) == 0:
-        return [-1.0, 1.0]
-
-    vmax = np.nanmax(finite_max)
-    if not np.isfinite(vmax) or vmax == 0:
-        vmax = 1.0
-
-    return [-0.1 * abs(vmax), 1.1 * abs(vmax)]
 
 
 def left_panel(fig, coords, X, Y, E, args):
@@ -276,7 +185,7 @@ def _fill_error(ax, X, Y, E, color):
 
     if E.size == 0 or np.isnan(E).all():
         return
-    
+
     ax.fill_between(X, Y - E, Y + E, color=color, alpha=0.3)
 
 

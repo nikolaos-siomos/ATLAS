@@ -53,7 +53,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
 
     # Partly optional (RECOMMENDED)
     "zero_bin":            {"dtype": int,   "default": 0,    "is_list": True,  "category": "recommended"},
-    "dead_time":           {"dtype": float, "default": None, "is_list": True,  "category": "recommended", "min": 1.,   "max": 5.},
+    "dead_time":           {"dtype": float, "default": None, "is_list": True,  "category": "recommended", "min": 0.,   "max": 5.},
     "background_low_bin":  {"dtype": int,   "default": None, "is_list": True,  "category": "recommended", "min": 0,    "max": 32768},
     "background_high_bin": {"dtype": int,   "default": None, "is_list": True,  "category": "recommended", "min": 0,    "max": 32768},
     "channel_bandwidth":   {"dtype": float, "default": 1.0,  "is_list": True,  "category": "recommended", "min": 0.05, "max": 150.},
@@ -66,7 +66,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "emitted_wavelength":          {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 200., "max": 3000.},
     "detected_wavelength":         {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 200., "max": 3000.},
     "bins":                        {"dtype": int,   "default": None, "is_list": True, "category": "optional", "min": 512,  "max": 32768},
-    "data_acquisition_range":      {"dtype": float, "default": None, "is_list": True, "category": "optional", "allowed": [20., 100., 500.]},
+    "data_acquisition_range":      {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 0.},
     "range_resolution":            {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 1.,  "max": 30.},
     "laser_repetition_rate":       {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 10., "max": 200.},
     "analog_noise_per_bin":        {"dtype": float, "default": 0.22, "is_list": True, "category": "optional", "min": 0.},
