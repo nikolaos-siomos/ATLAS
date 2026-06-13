@@ -95,46 +95,60 @@ def read_channels(buffer, num_channels, file_format):
      laser repetiotion rate, detected wavelength, channel polarization] """
      
     if file_format == 'new':
-        cols = ['active', 
-                'acquisition_mode', 
-                'laser_id', 
-                'bins', 
-                'laser_polarization', 
-                'pmt_high_voltage', 
-                'range_resolution', 
-                'wave_pol', 
-                'unk1', 
-                'unk2', 
-                'unk3', 
-                'unk4', 
-                'analog_to_digital_resolution', 
-                'shots', 
-                'data_acquisition_range',
-                'recorder_channel_id']
+        cols = [
+            'active', 
+            'acquisition_mode', 
+            'laser_id', 
+            'bins', 
+            'laser_polarization', 
+            'pmt_high_voltage', 
+            'range_resolution', 
+            'wave_pol', 
+            'unk1', 
+            'unk2', 
+            'unk3', 
+            'unk4', 
+            'analog_to_digital_resolution', 
+            'shots', 
+            'data_acquisition_range',
+            'recorder_channel_id'
+            ]
     else:
-        cols = ['active', 
-                'acquisition_mode', 
-                'laser_id', 
-                'bins', 
-                'laser_polarization', 
-                'pmt_high_voltage', 
-                'range_resolution', 
-                'wave_pol', 
-                'analog_to_digital_resolution', 
-                'shots', 
-                'data_acquisition_range',
-                'recorder_channel_id',
-                'unk1', 
-                'unk2', 
-                'unk3']                
+        cols = [
+            'active', 
+            'acquisition_mode', 
+            'laser_id', 
+            'bins', 
+            'laser_polarization', 
+            'pmt_high_voltage', 
+            'range_resolution', 
+            'wave_pol', 
+            'analog_to_digital_resolution', 
+            'shots', 
+            'data_acquisition_range',
+            'recorder_channel_id',
+            'unk1', 
+            'unk2', 
+            'unk3'
+            ]                
 
     channel_info = pd.DataFrame()
-    temp_info = pd.DataFrame(index = np.arange(num_channels), columns = cols)
     
-    # Store channel metadata in a nested list  
+    temp_info = []
+    
+    # Store channel metadata in a nested list - trailing columns will be ignored 
     for i in range(num_channels):
         linevars = str(buffer.readline(), encoding="utf-8").split()
-        temp_info.iloc[i,:] = linevars
+        channel = linevars[cols.index('recorder_channel_id')]
+        
+        if channel.startswith('BT') or channel.startswith('BC'): 
+            temp_info.append(linevars[:len(cols)])
+
+    temp_info = pd.DataFrame(
+        temp_info, 
+        index = np.arange(len(temp_info)), 
+        columns = cols
+        )
 
     header_channel_id = temp_info.loc[:,'recorder_channel_id'].values
     laser_id = temp_info.loc[:,'laser_id'].values
@@ -152,15 +166,17 @@ def read_channels(buffer, num_channels, file_format):
 
     channel_info.index = recorder_channel_id
 
-    info_columns = ['acquisition_mode', 
-                    'laser_id', 
-                    'bins', 
-                    'range_resolution', 
-                    'shots',
-                    'data_acquisition_range', 
-                    'analog_to_digital_resolution', 
-                    'recorder_channel_id']
-    
+    info_columns = [
+        'acquisition_mode', 
+        'laser_id', 
+        'bins', 
+        'range_resolution', 
+        'shots',
+        'data_acquisition_range', 
+        'analog_to_digital_resolution', 
+        'recorder_channel_id'
+        ]
+
     channel_info.loc[:, info_columns] = temp_info.loc[:, info_columns].copy().values.astype(object)
 
     mask_an = channel_info.loc[:,'acquisition_mode'].values == "0"
@@ -179,7 +195,7 @@ def read_channels(buffer, num_channels, file_format):
     channel_info.loc[mask_an,'acquisition_mode'] = "a" # convert to atlas nomenclature
     channel_info.loc[~mask_an,'acquisition_mode'] = "p" # convert to atlas nomenclature
     
-    return(channel_info)
+    return channel_info
 
 def read_buffer(fname):
        
@@ -252,9 +268,13 @@ def read_dataset(dir_meas, meas_type = None):
             system_info, stime, etime, num_channels, file_format = \
                 read_header(buffer)
             
-            channel_info = read_channels(buffer = buffer, 
-                                         num_channels = num_channels, 
-                                         file_format = file_format)
+            channel_info = read_channels(
+                buffer = buffer, 
+                num_channels = num_channels, 
+                file_format = file_format
+                )
+            
+            num_channels = channel_info.index.size
             
             channels = channel_info.index.values
             
@@ -299,27 +319,31 @@ def read_dataset(dir_meas, meas_type = None):
                 system_info_i, stime_i, etime_i, num_channels_i, file_format_i = \
                     read_header(buffer)
                 
-                # Check if the number of channel is the same for all files
-                if num_channels_i != num_channels:
-                    raise FileReaderError(f"--Not all files have the same number of: {mfiles[k]}\nCompare with: {mfiles[0]}")
-                
                 # Check if the files have the same licel format (new or old)
                 if file_format_i != file_format:
                     raise FileReaderError(f"--Not all files have the same Licel format: {mfiles[k]}\nCompare with: {mfiles[0]}")
                 
-                channel_info_i = read_channels(buffer = buffer, 
-                                               num_channels = num_channels,
-                                               file_format = file_format_i)
-                
+                channel_info_i = read_channels(
+                    buffer = buffer, 
+                    num_channels = num_channels,
+                    file_format = file_format_i
+                    )
+
+                # Check if the number of channel is the same for all files
+                if not channel_info_i.index.equals(channel_info.index):
+                    raise FileReaderError(f"--Not all files have the same channels: {mfiles[k]}\nCompare with: {mfiles[0]}")
+
                 # Check if the number of bins is the same for all files per channel
                 if not channel_info_i.loc[:,'bins'].equals(channel_info.loc[:,'bins']):
                     raise FileReaderError(f"--Not all files include channels with the same number of bins: {mfiles[k]}\nCompare with: {mfiles[0]}")
                 
                 shots_arr[k,:] = channel_info.loc[:,"shots"].values
                 
-                sig = read_body(buffer = buffer, 
-                                num_channels = num_channels, 
-                                bins = bins)
+                sig = read_body(
+                    buffer = buffer, 
+                    num_channels = num_channels, 
+                    bins = bins
+                    )
 
                 buffer.close()
 

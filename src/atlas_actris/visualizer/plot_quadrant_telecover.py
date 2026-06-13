@@ -565,7 +565,7 @@ def get_raw_ulim(raw, X, x_llim, x_ulim):
 def get_x_ticks(x_llim, x_ulim, args):
     
     # Set the x_tick depending on the telescope_type
-    if args['atlas_channel_id'][4] in ['l', 'm', 'n', 'x']:
+    if args['atlas_channel_id'][4] in ['l', 'm', 'n', 'x', 'y', 'z']:
         x_tick = 0.5
     else:
         x_tick = 1.
@@ -595,7 +595,7 @@ def get_x_lims(args):
     x_llim = 0.
         
     # Set the upper x limit depending on the telescope_type
-    if args['atlas_channel_id'][4] in ['l', 'm', 'n', 'x']:
+    if args['atlas_channel_id'][4] in ['l', 'm', 'n', 'x', 'y', 'z']:
         x_ulim = 2.5
     else:
         x_ulim = 5.

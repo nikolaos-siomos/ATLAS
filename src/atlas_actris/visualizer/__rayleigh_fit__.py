@@ -26,7 +26,8 @@ from visualizer.plot_utils import (
     perform_color_reduction, 
     add_plot_metadata
     )
-from visualizer import plot_rayleigh, plot_rayleigh_mask
+from visualizer import plot_rayleigh
+from visualizer import plot_rayleigh_mask
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
@@ -43,6 +44,7 @@ key_translation = {
     "durbin_watson_threshold": "durbin_watson_threshold",
 }
 
+
 def get_max_channel_height(norm_region, norm_region_flag):
     
     max_channel_height = np.mean(norm_region)
@@ -56,19 +58,22 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
     
     qa_test_info = defaultdict(dict)
     
-    for key in ['ray','ray_pcb']:
+
+    for key in ['ray']:
         if key in process and key in data_pack:
     
             print_header(f'Initializing the Rayleigh fit test ({key})')
             
             # Prepare folders
-            prepare_folder(caller_info, pattern = "_ray_")
+            prepare_folder(caller_info, pattern = "_ray_", exclude_pattern = '_qck_ray_')
 
             # Load arrays
-            profiles = data_pack[key]['profile']
-            atten_bsc = data_pack[key]['molecular'].sel({'opto_parameters':'atten_bsc'})
+            profiles = data_pack[key]['profile_mean']
+            atten_bsc = data_pack[key]['molecular'].sel({'opto_parameters':'atten_bsc'}).compute()
             vertical_scale = data_pack[key][caller_info['vertical_scale']]
-                                       
+            system_info = data_pack[key]["system_info"]
+            channel_info = data_pack[key]["channel_info"]
+            
             # Load settings
             settings = settings_info['ray'].copy()
             
@@ -80,6 +85,8 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 all_channels = profiles.channel.values,
                 settings = settings
                 )
+
+            sys_info = dict(zip(system_info.parameters.values, system_info.values))
             
             # Iterate over the channels
             for ch in channels:
@@ -87,6 +94,9 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
         
                 ch_d = dict(channel = ch)
                 
+                ch_info = channel_info.sel({'channel':ch})  
+                ch_info_d = dict(zip(ch_info.parameters.values, ch_info.values))
+
                 channel_settings = settings.copy()
                 
                 for old_key, new_key in key_translation.items():
@@ -194,24 +204,40 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                         ]
                     )
                 
-                # Collect metadata to be added in the plot files
-                plot_metadata = collect_dict(
-                    data_list = [
-                        maximum_channel_height, 
-                        norm_region, 
-                        norm_region_flag,
-                        __version__,
-                        'ray'
-                        ],
-                    data_keys = [
-                        'maximum_channel_height', 
-                        'norm_region', 
-                        'norm_flag',
-                        'ATLAS_version',
-                        'QA_test_ID'
-                        ],
-                    add_dicts = [channel_settings, metadata]
-                    )
+                # # Collect metadata to be added in the plot files
+                # plot_metadata = collect_dict(
+                #     data_list = [
+                #         maximum_channel_height, 
+                #         norm_region, 
+                #         norm_region_flag,
+                #         __version__,
+                #         'ray'
+                #         ],
+                #     data_keys = [
+                #         'maximum_channel_height', 
+                #         'norm_region', 
+                #         'norm_flag',
+                #         'ATLAS_version',
+                #         'QA_test_ID'
+                #         ],
+                #     add_dicts = [channel_settings, metadata]
+                #     )
+                
+                plot_metadata = (
+                    {
+                        **sys_info,
+                        **ch_info_d,
+                        **settings,
+                        "atlas_channel_id": ch,
+                        "ATLAS_version": __version__,
+                        "QA_test_ID": "ray",
+                        'maximum_channel_height':maximum_channel_height, 
+                        'normalization_region':norm_region, 
+                        'normalization_flag':norm_region_flag,
+                    }
+                )
+                
+                plot_metadata = dict(sorted(plot_metadata.items()))
 
 #------------------------------------------------------------------------------
 # Rayleigh Fit
@@ -245,6 +271,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
             
 #------------------------------------------------------------------------------  
 # Plot
+
                 # Generate the Rayleigh fit plot
                 qa_test_info[key][ch]['ray_plot_path'] = plot_rayleigh.generate_plot(
                     X = x_vals, 

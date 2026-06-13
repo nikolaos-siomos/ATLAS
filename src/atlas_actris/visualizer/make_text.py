@@ -20,9 +20,15 @@ label = {
     }
 
 telescope_map = {
-    'n' : 'Near Range',
-    'f' : 'Far Range',
-    'x' : ''
+    'n' : 'Near Range 1',
+    'm' : 'Near Range 2',
+    'l' : 'Near Range 3',
+    'f' : 'Far Range 1',
+    'g' : 'Far Range 2',
+    'h' : 'Far Range 3',
+    'x' : 'Telescope 1',
+    'y' : 'Telescope 2',
+    'z' : 'Telescope 3',
     }
 
 mode_map = {
@@ -122,6 +128,47 @@ class GenerateText:
             qa_test, 
             self.metadata['atlas_channel_id'], 
             self.metadata['scc_channel_id']
+            ]
+        
+        final_parts = [
+            extra_type, 
+            'ATLAS', 
+            __version__
+            ]
+        
+        if extra_metadata:
+            extra_channel = extra_metadata['atlas_channel_id']
+            extra_scc_channel = extra_metadata['scc_channel_id']
+
+            extra_parts = [
+                extra_channel,
+                extra_scc_channel
+                ]
+                
+        else:
+            extra_parts = []
+        
+        parts = common_parts + extra_parts + final_parts
+        
+        filename = "_".join(
+            str(part) for part in parts
+            if part is not None and str(part) != ""
+            )   
+        
+        return filename
+    
+    def make_filename_pair(self, qa_test, extra_type = '', extra_metadata = {}):
+               
+        start_date = self.metadata['start_timestamp'].strftime("%Y%m%d")
+        start_time = self.metadata['start_timestamp'].strftime("%H%M%S")
+        
+        common_parts = [
+            self.metadata['station_id'], 
+            self.metadata['configuration_id'], 
+            start_date, 
+            start_time, 
+            qa_test, 
+            self.qa_test_info['pair'], 
             ]
         
         final_parts = [

@@ -287,7 +287,7 @@ def telecover_x(heights, ranges, x_lims, x_tick, use_dis, telescope_type):
         
     # Set the upper x limit depending on the telescope_type
     if x_lims[-1] == None:
-        if telescope_type in ['l', 'm', 'n', 'x']:
+        if telescope_type in ['l', 'm', 'n', 'x', 'y', 'z']:
             x_ulim = 2.5
         else:
             x_ulim = 5.
@@ -295,7 +295,7 @@ def telecover_x(heights, ranges, x_lims, x_tick, use_dis, telescope_type):
         x_ulim = x_lims[-1]
 
     # Set the x_tick depending on the telescope_type
-    if x_tick == None and telescope_type in ['l', 'm', 'n', 'x']:
+    if x_tick == None and telescope_type in ['l', 'm', 'n', 'x', 'y', 'z']:
         x_tick = 0.5
     elif x_tick == None and telescope_type in ['f', 'g',' h']:
         x_tick = 1.

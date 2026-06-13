@@ -124,3 +124,37 @@ def normalize_quicklook_y(y_vals, x_vals, y_max_zone):
     y_vals_nrm = y_vals / y_max
 
     return y_vals_nrm
+
+def max_quicklook_y(y_vals, x_vals, y_max_zone):
+    """
+    Normalize quicklook signal using the maximum mean signal
+    inside a selected x-zone.
+
+    Parameters
+    ----------
+    y_vals : array-like
+        Signal values with shape usually (time, bins).
+    x_vals : array-like
+        Range/height values with shape usually (bins,).
+    y_max_zone : list or tuple
+        Zone [x_min, x_max] used to estimate the normalization maximum.
+
+    Returns
+    -------
+    y_vals_nrm : array-like
+        Normalized signal.
+    y_max : float
+        Normalization factor.
+    """
+
+    mask_max_zone = (x_vals >= y_max_zone[0]) & (x_vals <= y_max_zone[1])
+
+    y_vals_sm = np.nanmean(y_vals[:, mask_max_zone], axis=0)
+
+    y_max = round_it(np.nanmax(y_vals_sm), 1)
+
+    # Avoid division by zero or invalid normalization
+    if y_max == 0 or np.isnan(y_max):
+        y_max = 1.0
+
+    return y_max

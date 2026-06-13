@@ -10,6 +10,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 from scipy.signal import savgol_coeffs
+from scipy.ndimage import uniform_filter1d
 
 from typing import Tuple
 from utils.error_classes import CustomWarning
@@ -179,4 +180,210 @@ def rolling_noise_savgol(
     )
 
     return noise
+
+def fast_rolling_mean(
+    da: xr.DataArray,
+    window: int,
+    dim: str = "bins",
+    min_periods: int = None,
+) -> xr.DataArray:
+
+    if min_periods is None:
+        min_periods = window
+
+    axis = da.get_axis_num(dim)
+
+    values = da.values.astype(float, copy=False)
+    valid = np.isfinite(values)
+
+    values_filled = np.where(valid, values, 0.0)
+
+    summed = (
+        uniform_filter1d(
+            values_filled,
+            size=window,
+            axis=axis,
+            mode="constant",
+            cval=0.0,
+        )
+        * window
+    )
+
+    counts = (
+        uniform_filter1d(
+            valid.astype(float),
+            size=window,
+            axis=axis,
+            mode="constant",
+            cval=0.0,
+        )
+        * window
+    )
+
+    mean = summed / counts
+    mean = np.where(counts >= min_periods, mean, np.nan)
+
+    return xr.DataArray(
+        mean.astype(da.dtype, copy=False),
+        dims=da.dims,
+        coords=da.coords,
+        attrs=da.attrs,
+        name=da.name,
+    )
+
+def fast_rolling_std(
+    da: xr.DataArray,
+    window: int,
+    dim: str = "bins",
+    min_periods: int = None,
+) -> xr.DataArray:
+
+    if min_periods is None:
+        min_periods = window
+
+    axis = da.get_axis_num(dim)
+
+    values = da.values.astype(float, copy=False)
+    valid = np.isfinite(values)
+
+    values_filled = np.where(valid, values, 0.0)
+    values2_filled = np.where(valid, values**2, 0.0)
+
+    summed = (
+        uniform_filter1d(
+            values_filled,
+            size=window,
+            axis=axis,
+            mode="constant",
+            cval=0.0,
+        )
+        * window
+    )
+
+    summed2 = (
+        uniform_filter1d(
+            values2_filled,
+            size=window,
+            axis=axis,
+            mode="constant",
+            cval=0.0,
+        )
+        * window
+    )
+
+    counts = (
+        uniform_filter1d(
+            valid.astype(float),
+            size=window,
+            axis=axis,
+            mode="constant",
+            cval=0.0,
+        )
+        * window
+    )
+
+    mean = summed / counts
+    mean2 = summed2 / counts
+
+    var = mean2 - mean**2
+    var = np.maximum(var, 0.0)
+
+    std = np.sqrt(var)
+    std = np.where(counts >= min_periods, std, np.nan)
+
+    return xr.DataArray(
+        std.astype(da.dtype, copy=False),
+        dims=da.dims,
+        coords=da.coords,
+        attrs=da.attrs,
+        name=da.name,
+    )
+
+def fast_rolling_noise(
+    sig: xr.DataArray,
+    smooth_window: int = 5,
+    noise_window: int = 31,
+    dim: str = "bins",
+):
+    # 1. Local smooth signal estimate
+    sig_sm = fast_rolling_mean(
+        da=sig,
+        window=smooth_window,
+        dim=dim,
+        min_periods=smooth_window,
+    )
+
+    # 2. Residual = high-frequency component
+    residual = sig - sig_sm
+
+    # 3. Local rolling noise estimate
+    noise = fast_rolling_std(
+        da=residual,
+        window=noise_window,
+        dim=dim,
+        min_periods=noise_window,
+    )
+
+    return noise
+
+def fast_rolling_mean_range(
+    da: xr.DataArray,
+    ranges: xr.DataArray,
+    window: int = 1000,
+    smooth_above: float = 2000.0,
+    dim: str = "bins",
+) -> xr.DataArray:
+    """
+    Smooth da along bins and replace values above smooth_above range
+    with smoothed values.
+
+    The original dimensions are preserved, including singleton time.
+    """
+
+    axis = da.get_axis_num(dim)
+
+    values = da.values.astype(float, copy=False)
+    valid = np.isfinite(values)
+
+    values_filled = np.where(valid, values, 0.0)
+
+    summed = (
+        uniform_filter1d(
+            values_filled,
+            size=window,
+            axis=axis,
+            mode="constant",
+            cval=0.0,
+        )
+        * window
+    )
+
+    counts = (
+        uniform_filter1d(
+            valid.astype(float),
+            size=window,
+            axis=axis,
+            mode="constant",
+            cval=0.0,
+        )
+        * window
+    )
+
+    smooth_values = summed / counts
+    smooth_values = np.where(counts > 0, smooth_values, np.nan)
+
+    smoothed = xr.DataArray(
+        smooth_values.astype(da.dtype, copy=False),
+        dims=da.dims,
+        coords=da.coords,
+        attrs=da.attrs,
+        name=da.name,
+    )
+
+    out = xr.where(ranges > smooth_above, smoothed, da)
+
+    # Important: restore original dimension order and keep singleton time.
+    out = out.transpose(*da.dims)
+
+    return out
     

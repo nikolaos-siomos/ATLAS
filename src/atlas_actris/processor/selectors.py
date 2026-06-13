@@ -42,8 +42,19 @@ def set_from_selector(processor, selector, value):
 def get_source_map(io_id):
     source_map = {
         'profile': {'db': 'profile_db', 'item_id': io_id},
+        'profile_mean': {'db': 'profile_mean_db', 'item_id': io_id},
+        'profile_low_res': {'db': 'profile_low_res_db', 'item_id': io_id},
+        'profile_high_res': {'db': 'profile_high_res_db', 'item_id': io_id},
+
         'profile_error': {'db': 'profile_error_db', 'item_id': io_id},
+        'profile_error_mean': {'db': 'profile_error_mean_db', 'item_id': io_id},
+        'profile_error_low_res': {'db': 'profile_error_low_res_db', 'item_id': io_id},
+        'profile_error_high_res': {'db': 'profile_error_high_res_db', 'item_id': io_id},
+
         'profile_mask': {'db': 'profile_mask_db', 'item_id': io_id},
+        'profile_mask_mean': {'db': 'profile_mask_mean_db', 'item_id': io_id},
+        'profile_mask_low_res': {'db': 'profile_mask_low_res_db', 'item_id': io_id},
+        'profile_mask_high_res': {'db': 'profile_mask_high_res_db', 'item_id': io_id},
 
         # New: signal-like derived profiles
         'derived_profile': {'db': 'derived_profile_db','item_id': io_id},
@@ -53,7 +64,15 @@ def get_source_map(io_id):
 
         # New: ratio-like products
         'pol_cal_ratio': {'db': 'pol_cal_ratio_db', 'item_id': io_id},
+        'pol_cal_ratio_mean': {'db': 'pol_cal_ratio_mean_db', 'item_id': io_id},
+        'pol_cal_ratio_low_res': {'db': 'pol_cal_ratio_low_res_db', 'item_id': io_id},
+        'pol_cal_ratio_high_res': {'db': 'pol_cal_ratio_high_res_db', 'item_id': io_id},
+        
         'pol_cal_ratio_error': {'db': 'pol_cal_error_db','item_id': io_id,},
+        'pol_cal_ratio_error_mean': {'db': 'pol_cal_mean_error_db','item_id': io_id,},
+        'pol_cal_ratio_error_low_res': {'db': 'pol_cal_error_low_res_db','item_id': io_id,},
+        'pol_cal_ratio_error_high_res': {'db': 'pol_cal_error_high_res_db','item_id': io_id,},
+        
         'pol_cal_info': {'db': 'pol_cal_info_db', 'item_id': io_id},
 
         'molecular_ratio': {'db': 'molecular_ratio_db', 'item_id': io_id},
@@ -71,7 +90,15 @@ def get_source_map(io_id):
         'molecular': {'db': 'molecular_db', 'item_id': io_id},
         
         'background': {'db': 'background_db', 'item_id': io_id},
+        'background_mean': {'db': 'background_mean_db', 'item_id': io_id},
+        'background_low_res': {'db': 'background_low_res_db', 'item_id': io_id},
+        'background_high_res': {'db': 'background_high_res_db', 'item_id': io_id},
+
         'background_error': {'db': 'background_error_db', 'item_id': io_id},
+        'background_error_mean': {'db': 'background_error_mean_db', 'item_id': io_id},
+        'background_error_low_res': {'db': 'background_error_low_res_db', 'item_id': io_id},
+        'background_error_high_res': {'db': 'background_error_high_res_db', 'item_id': io_id},
+
         'background_mask': {'db': 'background_mask_db', 'item_id': io_id},
         
         'time_mask': {'db': 'time_mask_db', 'item_id': io_id},

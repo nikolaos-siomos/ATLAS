@@ -60,15 +60,18 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "cross_check_lower_limit":     {"dtype": float,   "default": None,      "is_list": False},
     "normalization_region":        {"dtype": float,   "default": [6.,8.],   "is_list": True,  "min": 0.,   "max": 50.},
     
-    "molecular_mask_region":       {"dtype": float,   "default": [2., 30.], "is_list": True,  "min": 0.,    "max": 150.},
-    "molecular_mask_window":       {"dtype": float,   "default": [1., 4.],  "is_list": True,  "min": 0.05,  "max": 50.},
-    "molecular_mask_window_step":  {"dtype": float,   "default": 0.2,       "is_list": False, "min": 0.05,  "max": 5.},
-    "rsem_threshold":              {"dtype": float,   "default": 0.2,       "is_list": False, "min": 0.01,  "max": 1.},
-    "first_derivative_threshold":  {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
-    "second_derivative_threshold": {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
-    "shapiro_wilk_threshold":      {"dtype": float,   "default": 0.05,      "is_list": False, "min": 0.,    "max": 1.},
-    "cross_criterium_threshold":   {"dtype": float,   "default": 1.,        "is_list": False, "min": 0.5,   "max": 5.},
-    "durbin_watson_threshold":     {"dtype": float,   "default": [1., 3.],  "is_list": True,  "min": 0.,    "max": 4.},
+    "molecular_mask_region":                {"dtype": float,   "default": [2., 30.], "is_list": True,  "min": 0.,    "max": 150.},
+    "molecular_mask_window":                {"dtype": float,   "default": [0.5, 4.], "is_list": True,  "min": 0.05,  "max": 50.},
+    "molecular_mask_window_step":           {"dtype": float,   "default": 0.1,       "is_list": False, "min": 0.05,  "max": 5.},
+    "rsem_threshold":                       {"dtype": float,   "default": 0.025,     "is_list": False, "min": 0.01,  "max": 1.},
+    "first_derivative_threshold":           {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
+    "second_derivative_threshold":          {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
+    "shapiro_wilk_threshold":               {"dtype": float,   "default": 0.05,      "is_list": False, "min": 0.,    "max": 1.},
+    "cross_criterium_threshold":            {"dtype": float,   "default": 1.,        "is_list": False, "min": 0.5,   "max": 5.},
+    "durbin_watson_threshold":              {"dtype": float,   "default": [1., 3.],  "is_list": True,  "min": 0.,    "max": 4.},
+    "absolute_extinction_error_threshold":  {"dtype": float,   "default": 10.,       "is_list": False, "min": 0.,    "max": 100.},
+    "isolated_point_radius":                {"dtype": int,     "default": 2,         "is_list": False, "min": 0,     "max": 10},
+    "isolated_point_neighbour_threshold":   {"dtype": int,     "default": 2,         "is_list": False, "min": 0},
     
     "smooth":                      {"dtype": bool,  "default": True,        "is_list": False},
     "smoothing_range":             {"dtype": float, "default": [0.05, 31.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},
@@ -86,7 +89,7 @@ SCHEMA_TLC_QUA: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
     "plot_raw_signals":         {"dtype": bool,    "default": False,      "is_list": False},
     "use_last_sector":          {"dtype": bool,    "default": False,      "is_list": False},
-    "normalization_region":     {"dtype": float,   "default": [1.8, 2.2], "is_list": True},
+    "normalization_region":     {"dtype": float,   "default": [1.5, 2.0], "is_list": True},
     "relative_deviation_limit": {"dtype": float,   "default": 0.05,       "is_list": False, "min": 0.005, "max": 0.1},
     "near_range_upper_limit":   {"dtype": float,   "default": 2.5,        "is_list": False, "min": 0.05,  "max": 10.},
     
@@ -106,7 +109,7 @@ SCHEMA_TLC_RIN: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
     "plot_raw_signals":         {"dtype": bool,    "default": False,      "is_list": False},
     "use_last_sector":          {"dtype": bool,    "default": False,      "is_list": False},
-    "normalization_region":     {"dtype": float,   "default": [1.8, 2.2], "is_list": True},
+    "normalization_region":     {"dtype": float,   "default": [1.5, 2.0], "is_list": True},
     "relative_deviation_limit": {"dtype": float,   "default": 0.05,       "is_list": False, "min": 0.005, "max": 0.1},
     "near_range_upper_limit":   {"dtype": float,   "default": 2.5,        "is_list": False, "min": 0.05,  "max": 10.},
     
@@ -138,7 +141,7 @@ SCHEMA_PCB: Dict[str, Dict[str, Any]] = {
     "calibration_region":   {"dtype": float,   "default": [2., 4.],  "is_list": True,  "min": 0.,  "max": 50., "size": 2},
     "rayleigh_region":      {"dtype": float,   "default": [6., 8.],  "is_list": True,  "size": 2},
     
-    "pldr_error_threshold": {"dtype": float,   "default": 0.25,      "is_list": False, "min": 0., "max": 0.5},   
+    "pldr_error_threshold": {"dtype": float,   "default": 0.025,     "is_list": False, "min": 0., "max": 0.5},   
     
     "smooth":                           {"dtype": bool,  "default": True,        "is_list": False},
     "smoothing_range":                  {"dtype": float, "default": [0.05, 31.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},

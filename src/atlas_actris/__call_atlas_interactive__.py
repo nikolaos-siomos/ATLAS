@@ -7,23 +7,33 @@ Created on Tue Sep 19 17:43:26 2023
 """
 
 # from __master__ import main as atlas_master
+from utils.cleaners import ask_clean_cache
+from utils.caller_utils import export_report
 from utils.find_radiosonde import find_radiosonde
 from utils.__get_scc_config__ import export_scc_config
 from utils.__parse_init_file__ import parse_call_atlas_ini
 from utils.__parse_config_file__ import parse_atlas_config_file
 from utils.__parse_settings_file__ import parse_atlas_settings_file
 
-from visualizer.__quicklook__ import generate_quicklooks
+from visualizer.__quicklook_lazy__ import generate_quicklooks
 from visualizer.__rayleigh_fit__ import generate_rayleigh_fit
-from visualizer.__quadrant_telecover__ import generate_quadrant_telecover
 from visualizer.__ring_telecover__ import generate_ring_telecover
+from visualizer.__quicklook_lazy_vldr__ import generate_vldr_quicklooks
+from visualizer.__quadrant_telecover__ import generate_quadrant_telecover
+from visualizer.__polarization_calibration__ import generate_polarization_calibration
 
-from utils.cookbook import run_linear_recipe
 from utils.parse_caller_args import call_parser
 from processor.pipeline import Context, Processor
 from readers.reader_utils import special_path_rules
 from readers.read_radiosondes import load_radiosonde
-from readers.read_raw_lidar_files import infer_format, flexible_reader
+from readers.read_raw_lidar_files_cache import infer_format, flexible_reader
+
+from utils.cookbook import (
+    run_linear_recipe,
+    screening_recipe, 
+    preprocessing_recipe, 
+    pol_cal_recipe
+    )
 
 from trimming.modify import (
     load_metadata, 
@@ -33,8 +43,6 @@ from trimming.modify import (
     bring_to_correct_type, 
     special_config_checks, 
     store_updated_metadata,
-    expand_with_loading_map,
-    expand_nested_with_loading_map
     )
 
 # Get the input .ini file path of the ATLAS caller
@@ -66,11 +74,11 @@ caller_info = special_path_rules(caller_info)
 # Reading the files
 profiles, metadata = flexible_reader(caller_info)
 
-# Expand profiles dictionary using the loading_map aliases
-profiles = expand_with_loading_map(profiles, caller_info)
+# # Expand profiles dictionary using the loading_map aliases
+# profiles = expand_with_loading_map(profiles, caller_info)
 
-# Expand each entry of metadata dictionary using the loading_map aliases
-metadata = expand_nested_with_loading_map(metadata, caller_info)
+# # Expand each entry of metadata dictionary using the loading_map aliases
+# metadata = expand_nested_with_loading_map(metadata, caller_info)
 
 # Transfer metadata from the raw file header to config_info
 config_info = load_metadata(config_info, metadata)
@@ -108,41 +116,6 @@ ctx = Context(
 # Initialize the Processor class
 processor = Processor(ctx)
 
-screening_recipe = [
-    ("ranges_and_heights", "height_and_range_calculation"),
-    ("sliced", "slice_and_exclude"),
-    ("shots_screened", "screen_low_shots"),
-    ("overflows_checked", "handling_overflows"),
-    ("saturation_detected", "check_saturation"),
-]
-
-preprocessing_recipe = [
-    ("photon_units_converted", "photon_units_conversion"),
-    ("dead_time_corrected", "dead_time_correction"),
-    ("background_calculated", "background_calculation"),
-    ("background_corrected", "background_correction"),
-    ("range_corrected", "range_correction"),
-    ("dark_corrected", "dark_correction"),
-    ("vert_trimmed", "trim_vertically"),
-    ("gluing_region_found", "gluing_region"),
-    ("glued", "gluing"),
-    ("noise_calculated", "signal_noise_calculation"),
-    ("molecular_calculated", "molecular_calculations"),
-    ("mldr_generated", "mldr"),
-    ("gain_ratio_generated", "gain_ratio"),
-    ("calibration_factor_generated", "calibration_factor"),
-]
-
-pol_cal_hr_recipe = [
-    ("calibrated_ratio_hr_generated", "calibrated_ratio"),
-    ("vldr_hr_generated", "vldr"),
-    ]
-
-pol_cal_recipe = [
-    ("calibrated_ratio_generated", "calibrated_ratio"),
-    ("vldr_generated", "vldr"),
-    ]
-
 # Apply screening recipe
 run_linear_recipe(
     processor, 
@@ -159,44 +132,28 @@ run_linear_recipe(
     checkout_id = "preprocessing_complete",
     )
 
-# Averaging profiles - single averages for all datasets and special handling for ray
-processor.run(output_id = 'averaged', input_id = 'preprocessing_complete', stage_name = "averaging_by_time")
-processor.run(output_id = 'averaged_lr', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_low_res")
-processor.run(output_id = 'averaged_hr', input_id = 'preprocessing_complete', stage_name = "averaging_by_time_high_res")
-
-# Apply pol_cal recipes
-run_linear_recipe(
-    processor, 
-    recipe = pol_cal_hr_recipe, 
-    initial_input = "averaged_hr",
-    checkout_id = "pol_cal_hr_complete",
-    )
-
 run_linear_recipe(
     processor, 
     recipe = pol_cal_recipe, 
-    initial_input = "averaged",
+    initial_input = "preprocessing_complete",
     checkout_id = "pol_cal_complete",
     )
 
-from visualizer.__polarization_calibration__ import generate_polarization_calibration
+# Package measurements for quicklooks
+processor.package(output_id = 'preprocessing_complete_qck', input_id = 'preprocessing_complete')
 
 pol_cal__metadata = generate_polarization_calibration(
-    data_pack=processor.export_test_from_stage("vldr_generated"),
-    caller_info=processor.processing_info["caller_info"],
-    settings_info=settings_info,
+    data_pack = processor.export_test_from_stage("pol_cal_complete"),
+    caller_info = processor.processing_info["caller_info"],
+    settings_info = settings_info,
 )
-
-# Package the measurements for quicklooks
-processor.package(output_id = 'averaged_hr_qck', input_id = 'averaged_hr')
 
 # Rayleigh fit test
 rayleigh_fit__metadata = generate_rayleigh_fit(
-    data_pack = processor.export_test_from_stage('averaged'),
+    data_pack = processor.export_test_from_stage('preprocessing_complete'),
     caller_info = processor.processing_info['caller_info'],
     settings_info = settings_info
     )
-
 
 # Quadrant telecover test
 quadrant_telecover__metadata = generate_quadrant_telecover(
@@ -212,10 +169,21 @@ ring_telecover__metadata = generate_ring_telecover(
     settings_info = settings_info['tlc_rin']
     )
 
-
 # Quicklooks
 generate_quicklooks(
-    data_pack = processor.export_test_from_stage('averaged_hr_qck'),
+    data_pack = processor.export_test_from_stage('preprocessing_complete_qck'),
     caller_info = processor.processing_info['caller_info'],
-    settings_info = settings_info['qck']
+    settings_info = settings_info['qck'],
     )
+
+generate_vldr_quicklooks(
+    data_pack = processor.export_test_from_stage('pol_cal_complete'),
+    caller_info = processor.processing_info['caller_info'],
+    settings_info = settings_info['qck'],
+    )
+
+# Create report
+export_report(caller_info)
+
+# Commandline promt to clean cache or not
+ask_clean_cache(caller_info)

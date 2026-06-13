@@ -33,8 +33,8 @@ from utils.printouts import print_header
 from dataclasses import dataclass
 from collections import defaultdict
 
-from processor.handle_overflows import compute_check_for_overflows
-from processor.signal_flagging import compute_detect_saturation
+from processor.handle_overflows_lazy import compute_check_for_overflows
+from processor.signal_flagging_lazy import compute_detect_saturation
 from processor.signal_trimming import (
     compute_slice_and_exclude, 
     compute_screen_low_shots,
@@ -51,8 +51,10 @@ from processor.signal_processing import (
     compute_trim_vertically,
     compute_background_correction,
     compute_range_correction,
+    compute_smoothing_dark,
     compute_dark_correction,
     compute_signal_noise,
+    compute_mean_arrays,
     )
 
 from processor.packaging import combine_QA_pack
@@ -62,11 +64,13 @@ from processor.signal_gluing import (
     compute_gluing,
     )
 
-from processor.pol_cal_calculations import (
+from processor.pol_cal_calculations_lazy import (
     compute_gain_ratio,
     compute_calibration_factor,
     compute_calibrated_ratio,
+    compute_mean_calibrated_ratio,
     compute_mldr,
+    compute_mean_vldr,
     compute_vldr
     # compute_eta,
     # compute_calibrated_ratio_pol_cal,
@@ -160,6 +164,10 @@ class Processor():
                 "function":compute_range_correction,
                 "header":"Range correction"
                 },
+            "smoothing_dark":{
+                "function":compute_smoothing_dark,
+                "header":"Smoothing dark profiles"
+                },
             "dark_correction":{
                 "function":compute_dark_correction,
                 "header":"Dark correction"
@@ -176,6 +184,10 @@ class Processor():
                 "function":compute_gluing,
                 "header":"Gluing signals"
                 },
+            "computing_mean":{
+                "function":compute_mean_arrays,
+                "header":"Compute mean arrays"
+                },
             "molecular_calculations":{
                 "function":compute_molecular_calculations,
                 "header":"Molecular calculations"
@@ -184,15 +196,17 @@ class Processor():
                 "function": compute_gain_ratio,
                 "header": "Calculating gain ratios for pcb_x45 and pcb_aux_x45",
                 },
-
             "calibration_factor": {
                 "function": compute_calibration_factor,
                 "header": "Calculating polarization calibration factor eta",
                 },
-
             "calibrated_ratio": {
                 "function": compute_calibrated_ratio,
-                "header": "Calculating calibrated Rayleigh polarization ratios",
+                "header": "Calculating Rayleigh calibrated depolarization ratios",
+                },
+            "calibrated_ratio_mean": {
+                "function": compute_mean_calibrated_ratio,
+                "header": "Calculating mean Rayleigh calibrated depolarization ratios",
                 },
             "mldr": {
                 "function": compute_mldr,
@@ -201,6 +215,10 @@ class Processor():
             "vldr": {
                 "function": compute_vldr,
                 "header": "Calculating volume linear depolarization ratio",
+                },
+            "vldr_mean": {
+                "function": compute_mean_vldr,
+                "header": "Calculating mean volume linear depolarization ratio",
                 },
             # "eta": {
             #     "function": compute_eta,
@@ -385,7 +403,7 @@ class Processor():
     def checkout(self, output_id, input_id):
     
         # Print process header
-        print_header(f"Calculating stage {input_id} and save to stage {output_id}")
+        print_header(f"Saving to stage {output_id}")
             
         # Get input data and output map
         input_data = self.export_stage(input_id)
@@ -399,13 +417,13 @@ class Processor():
             for key_1 in input_data.keys()
         }
     
-        # Persist everything that can be persisted
-        for key_1 in output_data.keys():
-            for key_2 in output_data[key_1].keys():
-                value = output_data[key_1][key_2]
+        # # Persist everything that can be persisted
+        # for key_1 in output_data.keys():
+        #     for key_2 in output_data[key_1].keys():
+        #         value = output_data[key_1][key_2]
     
-                if hasattr(value, "persist"):
-                    output_data[key_1][key_2] = value.persist()
+        #         if hasattr(value, "persist"):
+        #             output_data[key_1][key_2] = value.persist()
     
         # Save output entries
         self.save_output(output_data, output_map)

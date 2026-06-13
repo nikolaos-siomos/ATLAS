@@ -47,7 +47,7 @@ def left_panel(fig, ax1_coords, X, Y1, Y1E, Y2, args):
     ax.plot(X, Y1, color = 'tab:blue', label = 'measured')
     ax.plot(X, Y2, color = 'tab:red', label = 'molecular')
 
-    if np.isnan(Y1E).all() == False:
+    if Y1E is not None and np.isfinite(Y1E).any():
         ax.fill_between(X, Y1 - Y1E, Y1 + Y1E, color = 'tab:blue', alpha = 0.3)
 
     y1_label = get_y1_label()
@@ -118,13 +118,30 @@ def right_panel(fig, ax2_coords, X, Y1, Y1E, Y2, args):
                                                x_tick = args['x_tick'])
     
     ax2 = fig.add_axes(ax2_coords)
-    
-    if np.isnan(Y1E).all() == False:
-        ax2.fill_between(X, (Y1 - Y1E - Y2) / Y2, 
-                         (Y1 + Y1E - Y2) / Y2, color = 'tab:blue', 
+
+    rel = np.full_like(Y1, np.nan, dtype = float)
+    rel_low = np.full_like(Y1, np.nan, dtype = float)
+    rel_high = np.full_like(Y1, np.nan, dtype = float)
+
+    valid = np.isfinite(Y1) & np.isfinite(Y2) & (Y2 != 0)
+    rel[valid] = (Y1[valid] - Y2[valid]) / Y2[valid]
+
+    if Y1E is not None:
+        valid_err = valid & np.isfinite(Y1E)
+
+        rel_low[valid_err] = (
+            Y1[valid_err] - Y1E[valid_err] - Y2[valid_err]
+        ) / Y2[valid_err]
+
+        rel_high[valid_err] = (
+            Y1[valid_err] + Y1E[valid_err] - Y2[valid_err]
+        ) / Y2[valid_err]
+
+    if np.isfinite(rel_low).any() and np.isfinite(rel_high).any():
+        ax2.fill_between(X, rel_low, rel_high, color = 'tab:blue', 
                          alpha = 0.3, label = 'sem')
         
-    ax2.plot(X, (Y1 - Y2) / Y2, color = 'tab:blue',label = 'mean')
+    ax2.plot(X, rel, color = 'tab:blue',label = 'mean')
     
     ax2.axhline(c = 'k')
     
@@ -240,7 +257,7 @@ def add_text_ax1(ax, box_colors, box_edge_x, box_edge_y, box_text):
                 transform = ax.transAxes,
                 bbox = dict(facecolor = box_colors[key], alpha = 0.22, zorder = 3))
 
-    for key in ["is_positive", "durbin_watson", "residual_extinction"]:
+    for key in ["is_positive", "durbin_watson", "extinction_error", "isolated_points"]:
         ax.text(box_edge_x['column_3'], box_edge_y[key], 
                 box_text[key],
                 transform = ax.transAxes,
@@ -302,23 +319,31 @@ def mask_to_color(masks_norm_region, norm_region_flag):
     else: 
         c_mdbw = 'tab:red'
 
-    if masks_norm_region['residual_extinction']: 
+    if masks_norm_region['extinction_error']: 
         c_mext = 'tab:green'
     else: 
         c_mext = 'tab:red'
+
+    if masks_norm_region['isolated_points']:
+        c_miso = 'tab:green'
+    else:
+        c_miso = 'tab:red'
         
-    box_colors = {'norm_region': c_nrmg,
-                  'max_channel_height': c_maxh,
-                  'relative_sem':c_msem,
-                  'first_derivative':c_mder,
-                  'second_derivative':c_msec,
-                  'shapiro_wilk':c_mshp,
-                  'cross_criterion':c_mcrc,
-                  'is_positive':c_mpos,
-                  'durbin_watson':c_mdbw,
-                  'normalization_factor':c_norm,
-                  'residual_extinction':c_mext}
-        
+    box_colors = {
+        'norm_region': c_nrmg,
+        'max_channel_height': c_maxh,
+        'relative_sem':c_msem,
+        'first_derivative':c_mder,
+        'second_derivative':c_msec,
+        'shapiro_wilk':c_mshp,
+        'cross_criterion':c_mcrc,
+        'is_positive':c_mpos,
+        'durbin_watson':c_mdbw,
+        'normalization_factor':c_norm,
+        'extinction_error':c_mext,
+        'isolated_points':c_miso
+        }
+  
     return(box_colors)
 
 def get_box_text(norm_region, stats_norm_region):
@@ -341,7 +366,8 @@ def get_box_text(norm_region, stats_norm_region):
         'cross_criterion':'Cross crit',
         'is_positive':'Positive sig',
         'durbin_watson':'Durbin Watson',
-        'residual_extinction':'Residual Extinction'
+        'extinction_error':'Extinction error',
+        'isolated_points':'Isolated point'
         }
     
     return(box_text)
@@ -355,19 +381,6 @@ def box_edges(x_ulim, y_ulim, use_lin_scale):
         'low_mid': 0.20
         }
     
-    # box_edge_y = {
-    #     'norm_region':0.90,
-    #     'max_channel_height':0.77,
-    #     'relative_sem':0.64,
-    #     'first_derivative':0.90,
-    #     'second_derivative':0.77,
-    #     'shapiro_wilk':0.64,
-    #     'cross_criterion':0.90,
-    #     'is_positive':0.77,
-    #     'durbin_watson':0.64
-    #     'durbin_watson':0.64
-    #     }   
-
     box_edge_y = {
         'norm_region':0.06,
         'max_channel_height':0.20,
@@ -378,7 +391,8 @@ def box_edges(x_ulim, y_ulim, use_lin_scale):
         'cross_criterion':0.64,
         'is_positive':0.90,
         'durbin_watson':0.77,
-        'residual_extinction':0.64
+        'extinction_error':0.64,
+        'isolated_points':0.51
         }       
         
     return(box_edge_x, box_edge_y)

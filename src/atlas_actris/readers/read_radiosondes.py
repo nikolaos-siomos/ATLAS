@@ -302,19 +302,56 @@ def read_radiosonde_ecmwf(station_altitude, radiosonde_info):
     
     data = xr.open_dataset(radiosonde_file)
 
-    height = data.height.interp(time = mtime)
-    pressure = data.pressure.interp(time = mtime)
-    temperature = data.temperature.interp(time = mtime)
-    relative_humidity = data.rh.interp(time = mtime)
+    # Convert to numpy datetime64 for robust comparison
+    mtime64 = np.datetime64(mtime)
+    tmin = data.time.values.min()
+    tmax = data.time.values.max()
+
+    # If measurement time is outside the ECMWF time window,
+    # use the nearest available boundary profile.
+    # Otherwise, interpolate normally in time.
+    if mtime64 < tmin:
+        CustomWarning(
+            "Measurement time is before the first ECMWF profile. "
+            f"Using first ECMWF profile instead. "
+            f"measurement_time={mtime64}, first_ecmwf_time={tmin}"
+        )
+
+        height = data.height.sel(time=tmin)
+        pressure = data.pressure.sel(time=tmin)
+        temperature = data.temperature.sel(time=tmin)
+        relative_humidity = data.rh.sel(time=tmin)
+
+    elif mtime64 > tmax:
+        CustomWarning(
+            "Measurement time is after the last ECMWF profile. "
+            f"Using last ECMWF profile instead. "
+            f"measurement_time={mtime64}, last_ecmwf_time={tmax}"
+        )
+
+        height = data.height.sel(time=tmax)
+        pressure = data.pressure.sel(time=tmax)
+        temperature = data.temperature.sel(time=tmax)
+        relative_humidity = data.rh.sel(time=tmax)
+
+    else:
+        height = data.height.interp(time=mtime)
+        pressure = data.pressure.interp(time=mtime)
+        temperature = data.temperature.interp(time=mtime)
+        relative_humidity = data.rh.interp(time=mtime)
     
-    meteo = xr.concat([pressure, temperature, relative_humidity],
-                     dim="atmo_parameters")
+    meteo = xr.concat(
+        [pressure, temperature, relative_humidity],
+        dim="atmo_parameters"
+    )
     
     meteo.attrs = {}
     
-    meteo = meteo.assign_coords(atmo_parameters = ['P', 'T', 'RH'])
+    meteo = meteo.assign_coords(atmo_parameters=['P', 'T', 'RH'])
     meteo = meteo.rename(level='height_asl')
-    meteo = meteo.assign_coords(height_asl = height.values + station_altitude).sortby("height_asl")
+    meteo = meteo.assign_coords(
+        height_asl=height.values + station_altitude
+    ).sortby("height_asl")
     
     meteo = add_number_density(meteo)
 

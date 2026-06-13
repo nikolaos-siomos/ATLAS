@@ -11,7 +11,7 @@ import pandas as pd
 import xarray as xr
 
 from __get_T_P_profiles_from_cloudnet__ import _download_from_cloudnet  
-from __get_T_P_profiles_from_wyoming__ import _download_wyoming
+from __get_T_P_profiles_from_wyoming_updated__ import _download_wyoming
 from utils.select_radiosonde import select_radiosonde_filename
 from utils.printouts import print_header, print_entry
 from utils.error_classes import CustomWarning
@@ -43,6 +43,67 @@ def find_radiosonde(caller_info, metadata):
             mid_date = mid_stamp.strftime("%d.%m.%Y")
             mid_time = mid_stamp.strftime("%H:%M:%S")
             
+            wyoming_file_downloaded = False
+            cloudnet_file_downloaded = False
+            
+            print("Downloading will be attempted")
+            print()
+            
+            if rsonde_wmo_number:
+                dl_status = None
+                
+                try:
+                    dl_status = _download_wyoming(
+                        wmo_id = rsonde_wmo_number,
+                        date = mid_date,
+                        time_utc = mid_time,
+                        save_dir = radiosonde_folder,
+                        )
+                    
+                except Exception as e:
+                    CustomWarning(f"Downloading radiosonde from Wyoming failed:\n{e}")
+                    print()
+                
+                else:
+                    if dl_status.ok:
+                        wyoming_file_downloaded = True
+                        print(f"Downloading status from Wyoming: Downloaded {os.path.basename(dl_status.path)}")
+                        print()
+                        
+                    else:
+                        CustomWarning(f"Downloading radiosonde from Wyoming failed: {dl_status.message}")
+                        print()
+                
+            if cloudnet_station_name:
+                rs_path = None
+
+                try:
+                    rs_path = _download_from_cloudnet(
+                        station_name=cloudnet_station_name,
+                        date=mid_date,
+                        time_utc=mid_time,
+                        save_dir=radiosonde_folder,
+                    )
+                
+                except Exception as e:
+                    CustomWarning(f"Downloading radiosonde from Cloudnet failed:\n{e}")
+                    print()
+                
+                else:
+                    if rs_path:
+                        cloudnet_file_downloaded = True
+                        print(
+                            f"Downloading status from Cloudnet: "
+                            f"Downloaded {os.path.basename(rs_path)}"
+                        )
+                        print()
+                    else:
+                        CustomWarning(
+                            "Downloading radiosonde from Cloudnet failed: "
+                            "no file path was returned."
+                        )
+                        print()
+            
             radiosonde_info, status = select_radiosonde_filename(
                 mid_time_dt64, 
                 folder = radiosonde_folder
@@ -51,74 +112,14 @@ def find_radiosonde(caller_info, metadata):
             if status == 0:
                 print(f"Radiosonde file detected: {radiosonde_info['radiosonde_file']}")
                 print()
-    
-            else:
-                print("Dowloading will be attempted")
-                print()
-                
-                if rsonde_wmo_number:
-                    try:
-                        dl_status = _download_wyoming(
-                            wmo_id = rsonde_wmo_number,
-                            date = mid_date,
-                            time_utc = mid_time,
-                            save_dir = radiosonde_folder,
-                            )
-                        
-                    except Exception as e:
-                        CustomWarning(f"Downloading radiosonde from Wyoming failed:\n{e}")
-                        print()
-        
-                    if dl_status.ok:
-                        print(f"Downloading status from Wyoming: Downloaded {os.path.basename(dl_status.path)}")
-                        print()
-                        
-                    else:
-                        CustomWarning(f"Downloading radiosonde from Wyoming failed: {dl_status.message}")
-                        print()
-                    
-                if cloudnet_station_name:
-                    rs_path = None
 
-                    try:
-                        rs_path = _download_from_cloudnet(
-                            station_name=cloudnet_station_name,
-                            date=mid_date,
-                            time_utc=mid_time,
-                            save_dir=radiosonde_folder,
-                        )
-                    
-                    except Exception as e:
-                        CustomWarning(f"Downloading radiosonde from Cloudnet failed:\n{e}")
-                        print()
-                    
-                    else:
-                        if rs_path:
-                            print(
-                                f"Downloading status from Cloudnet: "
-                                f"Downloaded {os.path.basename(rs_path)}"
-                            )
-                            print()
-                        else:
-                            CustomWarning(
-                                "Downloading radiosonde from Cloudnet failed: "
-                                "no file path was returned."
-                            )
-                            print()
-        
-                if dl_status.ok or rs_path:
-                    radiosonde_info, status = select_radiosonde_filename(
-                        mid_time_dt64, 
-                        folder = radiosonde_folder
-                        )
-                    
-                if status == 0:
-                    print(f"Radiosonde file detected: {radiosonde_info['radiosonde_file']}")
+            else:
+                if wyoming_file_downloaded or cloudnet_file_downloaded:
+                    CustomWarning("Downloaded radiosonde files were not selected. Please check the selection rules and file timestamps.")
                     print()
-    
-                else:
-                    CustomWarning("Radiosonde not found and could not be downloaded. Computations which need molecular profiles will not be performed")
-                 
+                
+                CustomWarning("Radiosonde not found and could not be downloaded. Computations which need molecular profiles will not be performed")
+             
             if status == 0:
                 
                 caller_info['radiosonde_status'] = status
@@ -141,5 +142,4 @@ def find_radiosonde(caller_info, metadata):
 
                         
     return metadata
-                    
                 

@@ -7,6 +7,7 @@ Created on Tue Aug 30 20:19:58 2022
 """
 
 import warnings
+import numpy as np
 from version import __version__
 from collections import defaultdict
 from utils.printouts import print_header
@@ -22,6 +23,75 @@ from visualizer.plot_utils import (
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
+
+def _get_vertical_bin_dim(vertical_scale):
+    """Return the vertical/bin dimension name from a 1D vertical scale."""
+
+    if len(vertical_scale.dims) != 1:
+        raise ValueError(
+            "The selected vertical scale must be 1D after selecting one channel. "
+            f"Found dimensions: {vertical_scale.dims}"
+        )
+
+    return vertical_scale.dims[0]
+
+
+def _slice_vertical_scale_only(sig_ch, vertical_scale_ch, x_lims):
+    """
+    Slice one channel lazily using only the eager vertical scale.
+
+    This intentionally does not inspect the profile values.  Inspecting profile
+    validity with operations such as da.notnull().any(dim='time') would trigger
+    a calculation over the lazy profile.  For quicklooks, filtering finite
+    vertical coordinates within x_lims is enough and keeps pcolormesh happy.
+    """
+
+    bin_dim = _get_vertical_bin_dim(vertical_scale_ch)
+    x_vals_all = np.asarray(vertical_scale_ch.values)
+
+    if x_lims is None or len(x_lims) == 0:
+        mask = np.isfinite(x_vals_all)
+    else:
+        mask = (
+            np.isfinite(x_vals_all)
+            & (x_vals_all >= x_lims[0])
+            & (x_vals_all <= x_lims[1])
+        )
+
+    if not np.any(mask):
+        selected_id = None
+        for coord_name in ["channel", "pair"]:
+            if coord_name in sig_ch.coords:
+                try:
+                    selected_id = sig_ch.coords[coord_name].values
+                except Exception:
+                    selected_id = sig_ch.coords[coord_name]
+                break
+
+        raise ValueError(
+            "No finite vertical-scale bins were found inside x_lims "
+            f"({x_lims}) for selection {selected_id}."
+        )
+
+    sig_ch = sig_ch.isel({bin_dim: mask})
+    vertical_scale_ch = vertical_scale_ch.isel({bin_dim: mask})
+
+    return sig_ch, vertical_scale_ch
+
+
+def _to_numpy_selected(da):
+    """
+    Materialize only the already-selected quicklook slice.
+
+    Matplotlib cannot draw a Dask-backed array directly, so a computation is
+    still necessary.  The important point is that channel/time/bin selection has
+    already happened before this function is called.
+    """
+
+    if hasattr(da, "compute"):
+        da = da.compute()
+
+    return np.asarray(da.values)
             
 def generate_quicklooks(data_pack, caller_info, settings_info):
     
@@ -40,6 +110,8 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
             # Load arrays
             profiles = data_pack[key]['profile']
             vertical_scale = data_pack[key][caller_info['vertical_scale']]
+            system_info = data_pack[key]["system_info"]
+            channel_info = data_pack[key]["channel_info"]
 
             # Load settings
             settings = settings_info.copy()
@@ -47,10 +119,12 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
             # Slice time
             profiles, time_sliced = slice_time(profiles, t_lims = settings['t_lims'])
             
-            # Add nan values in time gaps
+            # Add NaN profiles in time gaps. This keeps time coordinates finite
+            # and only inserts NaNs into the lazy profile values.
             profiles, _, has_time_gap = insert_nan_time_gaps(profiles, gap_factor = 1.5)
 
-            # Load time after slicing and icluding time gaps
+            # Load time after slicing and including time gaps. The time coordinate
+            # is eager; only the profile values are lazy.
             time = profiles.time.values
 
             # Convert the range/height units to km 
@@ -65,6 +139,8 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
             if len(channels) > 0:
                 qa_test_info[key] = {}
             
+            sys_info = dict(zip(system_info.parameters.values, system_info.values))
+
             # iterate over the channels
             for ch in channels:
                 
@@ -72,17 +148,25 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
         
                 ch_d = dict(channel = ch)
                 
+                ch_info = channel_info.sel({'channel':ch})  
+                ch_info_d = dict(zip(ch_info.parameters.values, ch_info.values))
+                
                 sig_ch = profiles.sel(ch_d)
                 vertical_scale_ch = vertical_scale.sel(ch_d)
-                
-                # # Trim the x and y using the x axis limits                
-                # sig_ch, vertical_scale_ch, _  = slice_by_vertical_scale(
-                #     da = sig_ch,
-                #     vertical_scale = vertical_scale_ch,
-                #     x_lims = settings['x_lims'], 
-                #     )
-                y_vals = sig_ch.values
-                x_vals = vertical_scale_ch.values
+
+                # Trim bins before materializing the lazy profile.  This uses
+                # only the eager vertical scale, so it does not compute over the
+                # full lazy profile array.
+                sig_ch, vertical_scale_ch = _slice_vertical_scale_only(
+                    sig_ch = sig_ch,
+                    vertical_scale_ch = vertical_scale_ch,
+                    x_lims = settings['x_lims'],
+                    )
+
+                # Matplotlib and the current smoothing functions need NumPy
+                # arrays.  Compute only this selected 2D quicklook slice.
+                y_vals = _to_numpy_selected(sig_ch)
+                x_vals = np.asarray(vertical_scale_ch.values)
 
                 # Smoothing
                 y_vals_sm, _ = smoothing_2D(
@@ -100,23 +184,19 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
                     'time_sliced': time_sliced,
                     'has_time_gap': has_time_gap
                     }
+
+                plot_metadata = (
+                    {
+                        **sys_info,
+                        **ch_info_d,
+                        **settings,
+                        "atlas_channel_id": ch,
+                        "ATLAS_version": __version__,
+                        "QA_test_ID": f"qck_{key}",
+                    }
+                )
                 
-                # Collect metadata to be added in the plot files
-                plot_metadata = collect_dict(
-                    data_list = [
-                        time_sliced,
-                        has_time_gap,
-                        __version__,
-                        f'qck_{key}'
-                        ],
-                    data_keys = [
-                        'time_sliced',
-                        'has_time_gap',
-                        'ATLAS_version',
-                        'QA_test_ID'
-                        ],
-                    add_dicts = [settings, metadata]
-                    )
+                plot_metadata = dict(sorted(plot_metadata.items()))
 
                 # Load libraris
                 lib = Libraries(
@@ -144,7 +224,7 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
                 qa_test_info[key][ch]['qck_plot_path'] = generate_plot(
                     T = time,
                     X = x_vals,
-                    Y = y_vals,
+                    Y = y_vals_sm,
                     args = settings | qa_test_info[key][ch] | caller_info
                     )  
             
@@ -162,5 +242,3 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
 
             print('-----------------------------------------')
             print(' ')
-
-    

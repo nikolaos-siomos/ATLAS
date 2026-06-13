@@ -25,7 +25,6 @@ Fucntions
 
 """
 
-import copy
 import numpy as np
 import xarray as xr
 
@@ -35,11 +34,56 @@ from utils.printouts import print_header, print_subsection, print_entry
 from utils.signal_utils import (
     temporal_averaging, 
     temporal_averaging_error, 
-    rolling_noise,
-    rolling_noise_savgol
+    fast_rolling_mean_range,
+    fast_rolling_noise,
     )
+
 from utils.error_classes import CustomWarning
 from utils.dataarray_utils import shallow_copy
+
+profile_instances = [
+    'profile', 
+    'profile_mean', 
+    'profile_low_res', 
+    'profile_high_res'
+    ]
+
+profile_error_instances = [
+    'profile_error', 
+    'profile_error_mean', 
+    'profile_error_low_res', 
+    'profile_error_high_res'
+    ]
+
+background_instances = [
+    'background', 
+    'background_mean', 
+    'background_low_res', 
+    'background_high_res'
+    ]
+
+background_error_instances = [
+    'background_error', 
+    'background_error_mean', 
+    'background_error_low_res', 
+    'background_error_high_res'
+    ]
+
+profile_error_map = dict(zip(profile_instances,profile_error_instances))
+background_map = dict(zip(profile_instances,background_instances))
+background_error_map = dict(zip(profile_instances,background_error_instances))
+
+def _drop_or_mean_time(da: xr.DataArray) -> xr.DataArray:
+    if "time" not in da.dims:
+        return da
+    if da.sizes["time"] == 1:
+        return da.squeeze("time", drop=True)
+    return da.mean("time", skipna=True)
+
+def _restore_dim_order(da: xr.DataArray, template: xr.DataArray) -> xr.DataArray:
+    preferred = [dim for dim in template.dims if dim in da.dims]
+    extra = [dim for dim in da.dims if dim not in preferred]
+    return da.transpose(*preferred, *extra)
 
 def compute_height_and_range_calculation(
     processing_info: Dict[str, Any],
@@ -76,13 +120,6 @@ def compute_height_and_range_calculation(
         
         bins = profiles[key].bins
 
-        # bins = xr.DataArray(
-        #     bin_arr.astype(np.float32),
-        #     dims=["bins"],
-        #     coords={"bins": bin_arr},
-        #     name="bins",
-        # )
-        
         zenith_angle_rad = np.pi * zenith_angle / 180.0
         
         ranges = (
@@ -109,120 +146,125 @@ def compute_unit_conv_counts_to_MHz(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
-    
-    # output_data = copy.deepcopy(input_data)
+
     output_data = shallow_copy(input_data)
-
     channel_info = output_data["channel_info"]
-    shots = output_data["shots"]
-    profiles = output_data["profile"]
 
-    for key in channel_info:
-        ci = channel_info[key]
-        sig = profiles[key]
-
-        acquisition_mode = ci.sel(parameters="acquisition_mode")
-        range_resolution = ci.sel(parameters="range_resolution").astype(sig.dtype)
-
-        photon_channels = acquisition_mode.channel.values[
-            acquisition_mode.values == "p"
-        ]
-
-        if len(photon_channels) == 0:
-            output_data["profile"][key] = sig
+    for prof_key in profile_instances:
+        profiles = output_data[prof_key]
+        if not profiles:
             continue
 
-        factor = (150.0 / range_resolution.sel(channel=photon_channels)) / shots[key]
+        for key, sig in profiles.items():
 
-        sig_out = sig.copy()
-        sig_out.loc[dict(channel=photon_channels)] = (
-            sig.sel(channel=photon_channels) * factor
-        )
+            if key not in channel_info:
+                continue
 
-        output_data["profile"][key] = sig_out
+            ci = channel_info[key]
 
+            acquisition_mode = ci.sel(parameters="acquisition_mode")
+            range_resolution = ci.sel(parameters="range_resolution").astype(sig.dtype)
+
+            is_photon = acquisition_mode == "p"
+
+            if not bool(is_photon.any()):
+                output_data[prof_key][key] = sig
+                continue
+
+            if prof_key == "profile":
+                shots = output_data["shots"][key]
+            else:
+                shots = output_data["shots"][key].median("time")
+
+            factor = (150.0 / range_resolution) / shots
+
+            sig_out = xr.where(is_photon, sig * factor, sig)
+            sig_out = _restore_dim_order(sig_out, sig)
+            
+            output_data[prof_key][key] = sig_out
+            
     print_entry("Unit conversion (counts to countrate in MHz) for photon channels complete!")
     return output_data
 
 def compute_dead_time_correction(processing_info, input_data):
-    
+
     output_data = shallow_copy(input_data)
-
     channel_info = output_data["channel_info"]
-    profiles = output_data["profile"]
 
-    for key in channel_info:
-        ci = channel_info[key]
-        sig = profiles[key]
-
-        acquisition_mode = ci.sel(parameters="acquisition_mode")
-        dead_time = ci.sel(parameters="dead_time").astype(sig.dtype)
-
-        photon_channels = acquisition_mode.channel.values[
-            acquisition_mode.values == "p"
-        ]
-
-        if len(photon_channels) == 0:
-            output_data["profile"][key] = sig
+    for prof_key in profile_instances:
+        profiles = output_data[prof_key]
+        if not profiles:
             continue
 
-        sig_p = sig.sel(channel=photon_channels)
-        dt_p = dead_time.sel(channel=photon_channels)
+        for key, sig in profiles.items():
 
-        denom = 1.0 - sig_p * dt_p * 1e-3
-        sig_p_corr = sig_p / denom
-        sig_p_corr = sig_p_corr.where(denom != 0)
+            if key not in channel_info:
+                continue
 
-        sig_out = sig.copy()
-        sig_out.loc[dict(channel=photon_channels)] = sig_p_corr
+            ci = channel_info[key]
 
-        output_data["profile"][key] = sig_out
+            acquisition_mode = ci.sel(parameters="acquisition_mode")
+            dead_time = ci.sel(parameters="dead_time").astype(sig.dtype)
 
+            is_photon = acquisition_mode == "p"
+
+            if not bool(is_photon.any()):
+                output_data[prof_key][key] = sig
+                continue
+
+            denom = 1.0 - sig * dead_time * 1e-3
+            sig_corr = (sig / denom).where(denom != 0)
+
+            sig_out = xr.where(is_photon, sig_corr, sig)
+            sig_out = _restore_dim_order(sig_out, sig)
+            
+            output_data[prof_key][key] = sig_out
+            
     print_entry("Dead time correction succesfully performed!")
-    
     return output_data
 
 def compute_background_calculation(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
-    
-    # output_data = copy.deepcopy(input_data)
+
     output_data = shallow_copy(input_data)
+    channel_info = output_data["channel_info"]
 
-    channel_info = output_data['channel_info']
-        
-    profiles = output_data['profile']
+    for prof_key in profile_instances:
+        profiles = output_data[prof_key]
+        if not profiles:
+            continue
 
-    qa_tests = list(channel_info.keys())
-    
-    for key in qa_tests:
-        # Create a single average from all measurements for each QA test
-        
-        background_low_bin = channel_info[key]\
-            .sel(parameters = 'background_low_bin')
-        
-        background_high_bin = channel_info[key]\
-            .sel(parameters = 'background_high_bin')
-            
-        sig = profiles[key]
-        
-        mask_bins = (sig["bins"] >= background_low_bin) & \
-            (sig["bins"] <= background_high_bin)
-        
-        sig_masked = sig.where(mask_bins)
-        
-        bg_mean_bins = sig_masked.mean("bins", skipna = True)
-        bg_sdev_bins = sig_masked.std("bins", skipna = True)
-        n_bins = sig_masked.sum("bins")
-                    
-        output_data['background'][key] = bg_mean_bins
-        output_data['background_error'][key] = bg_sdev_bins / np.sqrt(n_bins)
+        back_key = background_map[prof_key]
+        back_error_key = background_error_map[prof_key]
 
-    print_entry('Background calculated sucessfully')
-    
+        for key, sig in profiles.items():
+
+            if key not in channel_info:
+                continue
+
+            ci = channel_info[key]
+
+            background_low_bin = ci.sel(parameters="background_low_bin")
+            background_high_bin = ci.sel(parameters="background_high_bin")
+
+            mask_bins = (
+                (sig["bins"] >= background_low_bin)
+                & (sig["bins"] <= background_high_bin)
+            )
+
+            sig_bg = sig.where(mask_bins)
+
+            bg_mean = sig_bg.mean("bins", skipna=True)
+            bg_std = sig_bg.std("bins", skipna=True)
+            n_bins = sig_bg.notnull().sum("bins")
+
+            output_data[back_key][key] = bg_mean
+            output_data[back_error_key][key] = bg_std / np.sqrt(n_bins)
+
+    print_entry("Background calculated sucessfully")
     return output_data
-
                     
 def compute_averaging_by_time_single(
     processing_info: Dict[str, Any],
@@ -244,14 +286,14 @@ def compute_averaging_by_time_single(
         sig = profile[key]            
         sig_avg = sig.mean(dim="time", keepdims = True)
         
-        output_data['profile'][key] = sig_avg
+        output_data['profile_mean'][key] = sig_avg
         
         if key in background:
             bgd = background[key]
             
             bgd_avg = bgd.mean(dim="time", keepdims = True)
 
-            output_data['background'][key] = bgd_avg
+            output_data['background_mean'][key] = bgd_avg
         
         if key in profile_error:
             sig_err = profile_error[key]
@@ -259,7 +301,7 @@ def compute_averaging_by_time_single(
             N = sig_err.notnull().sum(dim="time")
             sig_avg_err = sig_err.mean(dim="time", keepdims = True) / np.sqrt(N) 
 
-            output_data['profile_error'][key] = sig_avg_err
+            output_data['profile_error_mean'][key] = sig_avg_err
 
         if key in background_error:
             bgd_err = background_error[key]
@@ -267,7 +309,7 @@ def compute_averaging_by_time_single(
             N = bgd_err.notnull().sum(dim="time")
             bgd_avg_err = bgd_err.mean(dim="time", keepdims = True) / np.sqrt(N) 
 
-            output_data['background_error'][key] = bgd_avg_err        
+            output_data['background_error_mean'][key] = bgd_avg_err 
 
     print_entry('Single mean profile per QA test produced!')
 
@@ -312,7 +354,7 @@ def compute_averaging_by_time_low_res(
                     averaging_threshold = ray_averaging_threshold
                     )
 
-                output_data['profile'][key] = sig_avg
+                output_data['profile_low_res'][key] = sig_avg
                 
                 if key in background:
                     bgd = background[key]
@@ -323,7 +365,7 @@ def compute_averaging_by_time_low_res(
                         averaging_threshold = ray_averaging_threshold
                         )
                     
-                    output_data['background'][key] = bgd_avg
+                    output_data['background_low_res'][key] = bgd_avg
                 
                 if key in profile_error:
                     sig_err = profile_error[key]
@@ -334,7 +376,7 @@ def compute_averaging_by_time_low_res(
                         averaging_threshold = ray_averaging_threshold
                         )
 
-                    output_data['profile_error'][key] = sig_avg_err
+                    output_data['profile_error_low_res'][key] = sig_avg_err
 
                 if key in background_error:
                     bgd_err = background_error[key]
@@ -346,13 +388,13 @@ def compute_averaging_by_time_low_res(
                         )
            
             
-                    output_data['background_error'][key] = bgd_avg_err
+                    output_data['background_error_low_res'][key] = bgd_avg_err
                 
                 if key in profile_mask:    
-                    output_data['profile_mask'][key] = sig_avg_mask
+                    output_data['profile_mask_low_res'][key] = sig_avg_mask
                                         
                 if key in background_mask:    
-                    output_data['background_mask'][key] = bgd_avg_mask
+                    output_data['background_mask_low_res'][key] = bgd_avg_mask
 
     print_entry('Low resolution averaging for the rayleigh measurement complete!')
 
@@ -397,7 +439,7 @@ def compute_averaging_by_time_high_res(
                     averaging_threshold = ray_qck_averaging_threshold
                     )
 
-                output_data['profile'][key] = sig_avg
+                output_data['profile_high_res'][key] = sig_avg
                 
                 if key in background:
                     bgd = background[key]
@@ -409,7 +451,7 @@ def compute_averaging_by_time_high_res(
                             averaging_threshold = ray_qck_averaging_threshold
                             )
                         
-                        output_data['background'][key] = bgd_avg
+                        output_data['background_high_res'][key] = bgd_avg
                 
                 if key in profile_error:
                     sig_err = profile_error[key]
@@ -421,7 +463,7 @@ def compute_averaging_by_time_high_res(
                             averaging_threshold = ray_qck_averaging_threshold
                             )
 
-                        output_data['profile_error'][key] = sig_avg_err
+                        output_data['profile_error_high_res'][key] = sig_avg_err
                 
 
                 if key in background_error:
@@ -435,13 +477,13 @@ def compute_averaging_by_time_high_res(
                             )
                
                 
-                        output_data['background_error'][key] = bgd_avg_err
+                        output_data['background_error_high_res'][key] = bgd_avg_err
                 
                 if key in profile_mask:    
-                    output_data['profile_mask'][key] = sig_avg_mask
+                    output_data['profile_mask_high_res'][key] = sig_avg_mask
                                         
                 if key in background_mask:    
-                    output_data['background_mask'][key] = bgd_avg_mask
+                    output_data['background_mask_high_res'][key] = bgd_avg_mask
 
     print_entry('High resolution averaging for quicklooks complete!')
 
@@ -452,58 +494,73 @@ def compute_trim_vertically(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
 
-    max_height_agl = 1E3 * processing_info['caller_info']['max_height_agl']
-    
-    # output_data = copy.deepcopy(input_data)
+    max_height_agl = 1E3 * processing_info["caller_info"]["max_height_agl"]
+
     output_data = shallow_copy(input_data)
 
-    height_agl = output_data['height_agl']
-    height_asl = output_data['height_asl']
-    ranges = output_data['range']
+    height_agl = output_data["height_agl"]
+    height_asl = output_data["height_asl"]
+    ranges = output_data["range"]
+    channel_info = output_data["channel_info"]
 
-    profiles = output_data['profile']
+    if not height_agl:
+        print_entry(
+            "Vertical trimming could not be performed! "
+            "Range data not found in input stage"
+        )
+        return output_data
 
-    # profile_error = output_data['profile_error'] trim error
-    
-    channel_info = output_data['channel_info']
-    
-    qa_tests = list(profiles.keys())
-    
-    if height_agl:
+    qa_tests = list(ranges.keys())
 
-        for key in qa_tests:
-         
+    for key in qa_tests:
+
+        if key not in height_agl:
+            continue
+        if key not in height_asl:
+            continue
+        if key not in channel_info:
+            continue
+
+        z_agl = height_agl[key]
+        z_asl = height_asl[key]
+        z_rng = ranges[key]
+
+        zero_bin = channel_info[key].sel(parameters="zero_bin")
+
+        # Use the coordinate of the vertical arrays as the reference.
+        bins = z_agl.bins
+
+        # Direct mask. Avoid argmax because it returns a position index,
+        # not necessarily the actual bins coordinate value.
+        mask_bins = (bins >= zero_bin) & (z_agl <= max_height_agl)
+
+        # Trim all profile instances using the same mask.
+        for prof_key in profile_instances:
+
+            profiles = output_data[prof_key]
+
+            if not profiles:
+                continue
+            if key not in profiles:
+                continue
+
             sig = profiles[key]
 
-            bins = sig.bins
-            
-            z_agl = height_agl[key]
-            z_asl = height_asl[key]
-            z_rng = ranges[key]
-            
-            zero_bin = channel_info[key]\
-                .sel(parameters = 'zero_bin')
-                        
-            max_bin = z_agl.where(z_agl <= max_height_agl).argmax('bins')
-            
-            mask_bins = (bins >= zero_bin) & (bins <= max_bin)
+            sig_trm = sig.where(mask_bins, drop=True)
 
-            sig_trm = sig.where(mask_bins, drop = True)
-            
-            z_agl_trm = z_agl.where(mask_bins, drop = True)
-            z_asl_trm = z_asl.where(mask_bins, drop = True)
-            z_rng_trm = z_rng.where(mask_bins, drop = True)
-            
-            output_data['profile'][key] = sig_trm.reset_coords(drop=True)
-            
-            output_data['height_agl'][key] = z_agl_trm.reset_coords(drop=True)
-            output_data['height_asl'][key] = z_asl_trm.reset_coords(drop=True)
-            output_data['range'][key] = z_rng_trm.reset_coords(drop=True)
-    
-        print_entry('Vertical trimming succesfully performed!')
-        
-    else:
-        print_entry('Vertical trimming could not be performed! Range data not found in input stage')
+            output_data[prof_key][key] = sig_trm.reset_coords(drop=True)
+
+        # Trim vertical coordinate stores only once per QA key,
+        # not once per profile instance.
+        z_agl_trm = z_agl.where(mask_bins, drop=True)
+        z_asl_trm = z_asl.where(mask_bins, drop=True)
+        z_rng_trm = z_rng.where(mask_bins, drop=True)
+
+        output_data["height_agl"][key] = z_agl_trm.reset_coords(drop=True)
+        output_data["height_asl"][key] = z_asl_trm.reset_coords(drop=True)
+        output_data["range"][key] = z_rng_trm.reset_coords(drop=True)
+
+    print_entry("Vertical trimming succesfully performed!")
 
     return output_data
       
@@ -514,23 +571,24 @@ def compute_background_correction(
         
     # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
-
-    profiles = output_data['profile']
-
-    background = output_data['background']
     
-    qa_tests = list(profiles.keys())
+    qa_tests = list(output_data['channel_info'].keys())
 
-    if background:
-
-        # Create a single average from all measurements for each QA test
-        for key in qa_tests:
-            sig = profiles[key]
-            bc = background[key]
+    if output_data['background']:
+        for prof_key in profile_instances:
+            profiles = output_data[prof_key]
+            back_key = background_map[prof_key]
+            background = output_data[back_key]
             
-            sig_bc = sig - bc
-            
-            output_data['profile'][key] = sig_bc
+            if profiles:
+                # Create a single average from all measurements for each QA test
+                for key in qa_tests:
+                    sig = profiles[key]
+                    bc = background[key]
+                    
+                    sig_bc = sig - bc
+                    
+                    output_data[prof_key][key] = sig_bc
             
         print_entry('Background correction succesfully performed!')
 
@@ -547,32 +605,66 @@ def compute_range_correction(
     # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
 
-    profiles = output_data['profile']
-
     ranges = output_data['range']
     
-    qa_tests = list(profiles.keys())
+    qa_tests = list(ranges.keys())
 
     if ranges:
-
-        for key in qa_tests:
-    
-            z_rng = ranges[key]#.astype("float32")
-    
-            sig = profiles[key]
+        for prof_key in profile_instances:
+            profiles = output_data[prof_key]
+            if profiles:
+                for key in qa_tests:
             
-            sig_rc = sig * z_rng**2
+                    z_rng = ranges[key]#.astype("float32")
             
-            mask_below_zero_range = (z_rng >= 0.)
+                    sig = profiles[key]
+                    
+                    sig_rc = sig * z_rng**2
+                    
+                    mask_below_zero_range = (z_rng >= 0.)
+                    
+                    sig_rc = sig_rc.where(mask_below_zero_range, sig)
+                    
+                    output_data[prof_key][key] = sig_rc
             
-            sig_rc = sig_rc.where(mask_below_zero_range, sig)
-            
-            output_data['profile'][key] = sig_rc
-    
         print_entry('Range correction succesfully performed!')
     
     else:
         print_entry('Range correction could not be performed! Height (ASL) data not found in input stage')
+
+    return output_data
+
+def compute_smoothing_dark(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+
+    output_data = shallow_copy(input_data)
+
+    ranges = output_data["range"]
+
+    dark_profiles = output_data["profile_mean"]
+
+    for key in dark_profiles:
+
+        if not key.startswith("drk"):
+            continue
+
+        z_rng = ranges[key]
+
+        drk = dark_profiles[key]
+
+        drk_sm = fast_rolling_mean_range(
+            da=drk,
+            ranges=z_rng,
+            window=1000,
+            smooth_above=2000.0,
+            dim="bins",
+        )
+        
+        output_data["profile_mean"][key] = drk_sm
+
+    print_entry("Dark smoothing succesfully performed!")
 
     return output_data
 
@@ -606,37 +698,48 @@ def compute_dark_correction(
         "cam": "drk_cam",
         }
     
+    loading_map = processing_info['caller_info']['loading_map']
+    
     # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
 
-    profiles = output_data['profile']
-
     channel_info = output_data['channel_info']
     
-    # add dark correction to background
-    # add error increase
+    dark_profiles = output_data['profile_mean']
             
     for key, drk_key_alias in assign_drk.items():
+        for prof_key in profile_instances:
+            profiles = output_data[prof_key]
+            if profiles:
 
-        if key not in profiles:
-            continue
+                if key not in profiles:
+                    continue
+        
+                if drk_key_alias in profiles:
+                    drk_key = drk_key_alias
+                elif drk_key_alias in loading_map:
+                    drk_key = loading_map[drk_key_alias]
+                else:
+                    continue
+            
+                drk = dark_profiles[drk_key]
+                
+                # if "time" in drk.dims:
+                #     if drk.sizes["time"] == 1:
+                #         drk = drk.squeeze("time", drop=True)
+                #     else:
+                #         drk = drk.mean('time')                      
+                
+                acquisition_mode = channel_info[key].sel(parameters="acquisition_mode")
+                                
+                mask_a = acquisition_mode == "a"
 
-        if drk_key_alias in profiles:
-            drk_key = drk_key_alias
-        else:
-            continue
-    
-        drk = profiles[drk_key].mean(dim="time", skipna=True)
-    
-        acquisition_mode = channel_info[key].sel(parameters="acquisition_mode")
-    
-        mask_p = acquisition_mode == "a"
-    
-        drk = xr.where(mask_p, drk, 0.0)
-    
-        sig_drc = profiles[key] - drk
-    
-        output_data["profile"][key] = sig_drc
+                # Apply only to analog channels.
+                drk = xr.where(mask_a, drk, 0.0)
+            
+                sig_drc = profiles[key] - drk.squeeze("time", drop=True)
+                
+                output_data[prof_key][key] = sig_drc
 
     print_entry('Dark correction succesfully performed!')
 
@@ -647,31 +750,85 @@ def compute_signal_noise(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
 
+    output_data = shallow_copy(input_data)
+
+    profiles = output_data["profile"]
+    profiles_m = output_data["profile_mean"]
+
+    use_nan_count = processing_info["caller_info"].get("noise_use_nan_count", False)
+
+    # Keep False by default to avoid broadcasting the small mean-profile
+    # noise estimate back to the full lazy time-resolved profile.
+    store_full_profile_error = processing_info["caller_info"].get(
+        "store_full_profile_error", False
+    )
+
+    for key, sig in profiles.items():
+
+        if key not in profiles_m:
+            continue
+
+        sig_m = profiles_m[key]
+
+        sig_m_err = fast_rolling_noise(
+            sig_m,
+            smooth_window=7,
+            noise_window=31,
+        )
+
+        sig_m_err = _drop_or_mean_time(sig_m_err)
+
+        output_data["profile_error_mean"][key] = sig_m_err.broadcast_like(sig_m)
+
+        if store_full_profile_error:
+
+            if use_nan_count:
+                N = sig.count("time")
+            else:
+                N = sig.sizes["time"]
+
+            output_data["profile_error"][key] = (
+                sig_m_err.broadcast_like(sig) * np.sqrt(N)
+            )
+
+    print_entry("Signal error calculation succesfully performed!")
+    return output_data
+
+def compute_mean_arrays(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+
     # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
 
-    profiles = output_data['profile']
+    profiles = output_data['profile_mean']
+        
+    profile_error = output_data['profile_error_mean']
+    
+    background = output_data['background_mean']
+
+    background_error = output_data['background_error_mean']
     
     qa_tests = list(profiles.keys())
 
     for key in qa_tests:
 
-        sig = profiles[key]
-        
-        sig_m = sig.mean('time')
-        
-        N = sig.count('time')
-        
-        sig_m_err = rolling_noise(sig_m, smooth_window = 7, noise_window = 31)
-                
-        sig_err = sig_m_err.broadcast_like(sig) * np.sqrt(N)
-        
-        output_data['profile_error'][key] = sig_err
+        if key in profiles:
+            output_data['profile_mean'][key] = profiles[key].persist()
 
-    print_entry('Signal error calculation succesfully performed!')
+        if key in profile_error:
+            output_data['profile_error_mean'][key] = profile_error[key].persist()
+        
+        if key in background:
+            output_data['background_mean'][key] = background[key].persist()
+
+        if key in background_error:
+            output_data['background_error_mean'][key] = background_error[key].persist()
+
+    print_entry('Mean arrays succesfully computed!')
     
     return output_data
-
 
 def slice_along_bins(arr, indices, min_ind, max_ind, drop=False, min_bins=10):
     """

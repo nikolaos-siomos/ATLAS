@@ -901,14 +901,23 @@ def export_plot(fig, args):
     
     return(fpath)
 
-
-def clean_plots(plot_dir,pattern):
+def clean_plots(plot_dir, pattern, exclude_pattern=None):
     
     if not os.path.isdir(plot_dir):
         return
 
+    if exclude_pattern is None:
+        exclude_patterns = []
+    elif isinstance(exclude_pattern, str):
+        exclude_patterns = [exclude_pattern]
+    else:
+        exclude_patterns = list(exclude_pattern)
+
     for filename in os.listdir(plot_dir):
         if pattern not in filename:
+            continue
+
+        if any(excl in filename for excl in exclude_patterns):
             continue
 
         file_path = os.path.join(plot_dir, filename)
@@ -916,13 +925,18 @@ def clean_plots(plot_dir,pattern):
         if os.path.isfile(file_path):
             os.remove(file_path)
             
-def prepare_folder(caller_info, pattern):
+
+def prepare_folder(caller_info, pattern, exclude_pattern=None):
     
     plot_dir = os.path.join(caller_info["output_folder"], "plots")
             
-    os.makedirs(plot_dir, exist_ok = True)
+    os.makedirs(plot_dir, exist_ok=True)
             
-    clean_plots(plot_dir, pattern = pattern)  
+    clean_plots(
+        plot_dir=plot_dir,
+        pattern=pattern,
+        exclude_pattern=exclude_pattern,
+    )
 
 def collect_dict(data_list, data_keys, add_dicts = []):
     

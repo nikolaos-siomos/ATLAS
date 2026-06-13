@@ -8,7 +8,7 @@ Created on Thu Mar 20 21:43:45 2025
 
 import os, glob
 import numpy as np
-#from ..visualizer.writters import export_html
+from visualizer import export_html
 #from ..scc_converter.readers.read_config import config
 
 def default_station_folder(parser_args):
@@ -147,61 +147,45 @@ def autodetect_paths(parser_args):
     return(parser_args)
 
 
-def export_report(parser_args):
+def export_report(caller_info):
     
     print('-----------------------------------------')
     print('Creating QA report...')
     print('-----------------------------------------')
-
-    path_cfg = parser_args['atlas_configuration_file']
     
-    file_format = parser_args['file_format']
-        
-    # Reading of the configuration file    
-    cfg = config(path = path_cfg, file_format = file_format, 
-                 operation_mode = 'labeling') 
-        
     # File format
-    file_format = parser_args['file_format']
+    file_format = caller_info['raw_file_format']
         
-    if 'scc_configuration_id' in parser_args.keys():
-        scc_configuration_id = cfg.system['configuration_id']
-    else:
-        scc_configuration_id = None
-        
-    if 'scc_station_id' in parser_args.keys():
-        scc_station_id = cfg.system['station_id']
-    else:
-        scc_station_id = None
+    scc_configuration_id = caller_info.get('scc_configuration_id')
 
-    if 'expert_analyst' in parser_args.keys():
-        expert_analyst = parser_args['expert_analyst']
-    else:
-        expert_analyst = None
+    scc_station_id = caller_info.get('scc_station_id')
 
-    if 'export_all' in parser_args.keys():
-        export_all = parser_args['export_all']
-    else:
-        export_all = False
+    expert_analyst = caller_info.get('expert_analyst')
 
-    data_identifier = parser_args['data_identifier']
+    export_all = caller_info.get('export_all')
+
+    data_identifier = caller_info.get('data_identifier')
   
-    html_filename = export_html.make_filename(data_identifier = data_identifier, 
-                                              expert_analyst = expert_analyst,
-                                              scc_station_id = scc_station_id,
-                                              scc_configuration_id = scc_configuration_id)
+    html_filename = export_html.make_filename(
+        data_identifier = data_identifier, 
+        expert_analyst = expert_analyst,
+        scc_station_id = scc_station_id,
+        scc_configuration_id = scc_configuration_id
+        )
 
     photon_only = file_format in ['polly_xt', 'polly_xt_first']
 
-    reports_folder = os.path.join(parser_args["output_folder"], 'reports')
-    plots_folder = os.path.join(parser_args["output_folder"], 'plots')
-    
+    reports_folder = os.path.join(caller_info["output_folder"], 'reports')
+    plots_folder = os.path.join(caller_info["output_folder"], 'plots')
+
     os.makedirs(reports_folder, exist_ok = True)
 
-    export_html.QA_report(plots_folder = plots_folder, 
-                          html_filename = os.path.join(reports_folder, html_filename),
-                          photon_only = photon_only, 
-                          export_all = export_all)
+    export_html.QA_report(
+        plots_folder = plots_folder, 
+        html_filename = os.path.join(reports_folder, html_filename),
+        photon_only = photon_only, 
+        export_all = export_all
+        )
     
 
     return()

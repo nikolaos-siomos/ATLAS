@@ -857,12 +857,14 @@ def _find_eta_for_pairs(
     ch_t: Sequence[str],
     calibrated_pair_ids: Sequence[str],
 ) -> Tuple[xr.DataArray, xr.DataArray]:
-    """Find pcb/pcb_aux eta values and align them to calibrated_pair_ids.
+    """Find scalar pcb/pcb_aux eta values and align to calibrated_pair_ids.
 
-    Only eta entries created under the combined calibration keys ("pcb" and
-    "pcb_aux") are valid sources.  The returned eta arrays are time-free so
-    they broadcast over time-resolved ray_pcb profiles without xarray aligning
-    incompatible calibration and measurement time coordinates.
+    The calibration-factor stage stores the calibration-region eta value and
+    its SEM in output_data["pol_cal_info"] under the combined calibration keys
+    ("pcb" and "pcb_aux") as ratio_type="eta" entries.  These scalar values
+    are the calibration factors that ray_pcb signal ratios should be divided
+    by.  The eta profiles stored in pol_cal_ratio are intentionally not used
+    here, because ray_pcb must not be calibrated by a bin-resolved eta profile.
     """
 
     eta_pair_ids = [
@@ -870,66 +872,75 @@ def _find_eta_for_pairs(
         for r, t in zip(ch_r, ch_t)
     ]
 
+    info_store = output_data.get("pol_cal_info", {})
     eta_sources = ["pcb", "pcb_aux"]
     eta_values = []
     eta_errors = []
 
     for eta_id, calibrated_id in zip(eta_pair_ids, calibrated_pair_ids):
-        eta_da = None
-        eta_err_da = None
+        eta_value = None
+        eta_error = None
 
         for source in eta_sources:
-            ratio_store = output_data.get("pol_cal_ratio", {})
-            error_store = output_data.get("pol_cal_ratio_error", {})
-
-            if source not in ratio_store or source not in error_store:
+            if source not in info_store:
                 continue
 
-            candidate = ratio_store[source]
-            candidate_err = error_store[source]
-
-            if "ratio" in candidate.dims:
-                candidate = candidate.rename({"ratio": "pair"})
-            if "ratio" in candidate_err.dims:
-                candidate_err = candidate_err.rename({"ratio": "pair"})
-
-            if "pair" not in candidate.dims or eta_id not in candidate.pair.values:
+            source_info = _filter_info_with_ratio_type(info_store[source])
+            if source_info is None or source_info.sizes.get("pair", 0) == 0:
+                continue
+            if "pair" not in source_info.dims or eta_id not in source_info.pair.values:
                 continue
 
-            eta_da = candidate.sel(pair=eta_id)
-            eta_err_da = candidate_err.sel(pair=eta_id)
+            source_eta_ids = _select_pairs_by_type(source_info, "eta")
+            if eta_id not in source_eta_ids:
+                continue
 
-            # Calibration products must not impose their calibration time
-            # coordinate on time-resolved ray_pcb products.
-            if "time" in eta_da.dims:
-                if eta_da.sizes.get("time", 0) == 1:
-                    eta_da = eta_da.isel(time=0, drop=True)
-                    eta_err_da = eta_err_da.isel(time=0, drop=True)
-                else:
-                    eta_da = eta_da.mean("time", skipna=True)
-                    eta_err_da = np.sqrt((eta_err_da**2).sum("time", skipna=True)) / eta_err_da.count("time")
+            if "mean" not in source_info.parameters.values:
+                raise KeyError(
+                    f"Eta entry {eta_id!r} in pol_cal_info[{source!r}] has no 'mean' row."
+                )
+            if "sem" not in source_info.parameters.values:
+                raise KeyError(
+                    f"Eta entry {eta_id!r} in pol_cal_info[{source!r}] has no 'sem' row."
+                )
 
+            eta_value = (
+                source_info
+                .sel(parameters="mean", pair=eta_id)
+                .astype("float64")
+                .reset_coords(drop=True)
+            )
+            eta_error = (
+                source_info
+                .sel(parameters="sem", pair=eta_id)
+                .astype("float64")
+                .reset_coords(drop=True)
+            )
             break
 
-        if eta_da is None or eta_err_da is None:
+        if eta_value is None or eta_error is None:
             continue
 
-        eta_values.append(eta_da.expand_dims(pair=[calibrated_id]))
-        eta_errors.append(eta_err_da.expand_dims(pair=[calibrated_id]))
+        eta_values.append(
+            eta_value.expand_dims(pair=[calibrated_id]).rename("eta")
+        )
+        eta_errors.append(
+            eta_error.expand_dims(pair=[calibrated_id]).rename("eta_error")
+        )
 
     if not eta_values:
-        raise KeyError("No matching eta entries found in pcb/pcb_aux for ray_pcb channel pairs.")
+        raise KeyError(
+            "No matching scalar eta entries found in pcb/pcb_aux pol_cal_info "
+            "for ray_pcb channel pairs. Run compute_calibration_factor first."
+        )
 
-    eta = xr.concat(eta_values, dim="pair")
-    eta_error = xr.concat(eta_errors, dim="pair")
+    eta = xr.concat(eta_values, dim="pair").astype("float64")
+    eta_error = xr.concat(eta_errors, dim="pair").astype("float64")
 
-    preferred = [dim for dim in ["pair", "bins"] if dim in eta.dims]
-    other = [dim for dim in eta.dims if dim not in preferred]
-    eta = eta.transpose(*preferred, *other)
-    eta_error = eta_error.transpose(*preferred, *other)
+    eta = eta.transpose("pair")
+    eta_error = eta_error.transpose("pair")
 
     return eta, eta_error
-
 
 
 def _collect_eta_pairs_from_pcb(
@@ -1121,8 +1132,8 @@ def compute_gain_ratio(
     vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
     vertical_scale = output_data[vertical_scale_name]
 
-    profiles = output_data["profile"]
-    profile_errors = output_data["profile_error"]
+    profiles = output_data["profile_mean"]
+    profile_errors = output_data["profile_error_mean"]
     channel_info = output_data["channel_info"]
     pol_cal_info = output_data["pol_cal_info"]
 
@@ -1353,12 +1364,12 @@ def compute_gain_ratio(
         combined_info = add_parameter(combined_info, name="epsilon_error", values=epsilon_error_m_bins)
         combined_info = add_parameter(combined_info, name="ratio_type", values="gain_ratio")
 
-        output_data["pol_cal_ratio"][target_key] = append_or_replace_pairs(
+        output_data["pol_cal_ratio_mean"][target_key] = append_or_replace_pairs(
             output_data["pol_cal_ratio"].get(target_key),
             eta_s,
         )
-        output_data["pol_cal_ratio_error"][target_key] = append_or_replace_pairs(
-            output_data["pol_cal_ratio_error"].get(target_key),
+        output_data["pol_cal_ratio_error_mean"][target_key] = append_or_replace_pairs(
+            output_data["pol_cal_ratio_error_mean"].get(target_key),
             eta_s_error,
         )
         output_data["pol_cal_info"][target_key] = append_or_replace_info(
@@ -1398,8 +1409,8 @@ def compute_calibration_factor(
     vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
     vertical_scale = output_data[vertical_scale_name]
 
-    pol_cal_ratio = output_data["pol_cal_ratio"]
-    pol_cal_ratio_error = output_data["pol_cal_ratio_error"]
+    pol_cal_ratio = output_data["pol_cal_ratio_mean"]
+    pol_cal_ratio_error = output_data["pol_cal_ratio_error_mean"]
     pol_cal_info = output_data["pol_cal_info"]
 
     averaging_range = processing_info["settings_info"]["pcb"]["calibration_region"]
@@ -1446,12 +1457,12 @@ def compute_calibration_factor(
     ) -> None:
         """Append or replace one product family in the output dictionaries."""
 
-        output_data["pol_cal_ratio"][key] = append_or_replace_pairs(
-            output_data["pol_cal_ratio"].get(key),
+        output_data["pol_cal_ratio_mean"][key] = append_or_replace_pairs(
+            output_data["pol_cal_ratio_mean"].get(key),
             values,
         )
-        output_data["pol_cal_ratio_error"][key] = append_or_replace_pairs(
-            output_data["pol_cal_ratio_error"].get(key),
+        output_data["pol_cal_ratio_error_mean"][key] = append_or_replace_pairs(
+            output_data["pol_cal_ratio_error_mean"].get(key),
             errors,
         )
         output_data["pol_cal_info"][key] = append_or_replace_info(
@@ -1604,16 +1615,26 @@ def compute_calibrated_ratio(
     vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
     vertical_scale = output_data[vertical_scale_name]
 
+    loading_map = processing_info['caller_info']['loading_map']
+
     qa_test = "ray_pcb"
 
+    if qa_test not in output_data["profile"] and qa_test not in loading_map:
+        return output_data
+    
+    if qa_test in output_data["profile"]:
+        qa_test_alias = qa_test
+    else:
+        qa_test_alias = loading_map["ray_pcb"]
+        
     profiles = output_data["profile"]
     profile_errors = output_data["profile_error"]
 
-    if qa_test not in profiles:
+    if qa_test_alias not in profiles:
         return output_data
-    if qa_test not in vertical_scale:
+    if qa_test_alias not in vertical_scale:
         return output_data
-    if qa_test not in profile_errors:
+    if qa_test_alias not in profile_errors:
         return output_data
 
     ch_r, ch_t, eta_ids, eta_info = _collect_eta_pairs_from_pcb(output_data)
@@ -1621,9 +1642,9 @@ def compute_calibrated_ratio(
         print_entry("Calibrated ratio calculation skipped: no pcb/pcb_aux eta entries found.")
         return output_data
     
-    sig = profiles[qa_test]
-    sig_err = profile_errors[qa_test]
-    z = vertical_scale[qa_test]
+    sig = profiles[qa_test_alias]
+    sig_err = profile_errors[qa_test_alias]
+    z = vertical_scale[qa_test_alias]
 
     available_channels = set(sig.channel.values.tolist())
     keep = [
@@ -1659,8 +1680,9 @@ def compute_calibrated_ratio(
     sig_t_err = sig_err.sel(channel=ch_t)
 
     # ------------------------------------------------------------------
-    # 1) Time-resolved product branch: store these profiles unchanged in
-    #    pol_cal_ratio/pol_cal_ratio_error.
+    # 1) Time-resolved product branch: build signal ratios, divide them by
+    #    the scalar eta values from compute_calibration_factor, then apply
+    #    the ideal GH correction.
     # ------------------------------------------------------------------
     uncalibrated = simple_ratio(
         numerator=sig_r,
@@ -1683,9 +1705,6 @@ def compute_calibrated_ratio(
         ch_t=ch_t,
         calibrated_pair_ids=pair_ids,
     )
-
-    eta = eta_info.sel({"parameters":"eta","pair":pair_ids})
-    eta_error = eta_info.sel({"parameters":"eta_error","pair":pair_ids})
 
     # Keep only pairs for which eta was found.
     pair_ids_found = list(eta.pair.values)
@@ -1845,19 +1864,30 @@ def compute_vldr(
     vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
     vertical_scale = output_data[vertical_scale_name]
 
+    loading_map = processing_info['caller_info']['loading_map']
+
     qa_test = "ray_pcb"
 
-    if qa_test not in vertical_scale:
-        print_entry(f"VLDR calculation skipped: no {qa_test} vertical scale found.")
+    if qa_test not in output_data["profile"] and qa_test not in loading_map:
         return output_data
-    if qa_test not in output_data.get("channel_info", {}):
-        print_entry(f"VLDR calculation skipped: no {qa_test} channel_info found.")
+    
+    if qa_test in output_data["profile"]:
+        qa_test_alias = qa_test
+    else:
+        qa_test_alias = loading_map["ray_pcb"]
+        
+        
+    if qa_test_alias not in vertical_scale:
+        print_entry(f"VLDR calculation skipped: no {qa_test_alias} vertical scale found.")
         return output_data
-    if qa_test not in output_data.get("profile", {}):
-        print_entry(f"VLDR calculation skipped: no {qa_test} profiles found.")
+    if qa_test_alias not in output_data.get("channel_info", {}):
+        print_entry(f"VLDR calculation skipped: no {qa_test_alias} channel_info found.")
         return output_data
-    if qa_test not in output_data.get("profile_error", {}):
-        print_entry(f"VLDR calculation skipped: no {qa_test} profile errors found.")
+    if qa_test_alias not in output_data.get("profile", {}):
+        print_entry(f"VLDR calculation skipped: no {qa_test_alias} profiles found.")
+        return output_data
+    if qa_test_alias not in output_data.get("profile_error", {}):
+        print_entry(f"VLDR calculation skipped: no {qa_test_alias} profile errors found.")
         return output_data
 
     ch_r, ch_t, eta_ids, eta_info = _collect_eta_pairs_from_pcb(output_data)
@@ -1865,9 +1895,9 @@ def compute_vldr(
         print_entry("VLDR calculation skipped: no pcb/pcb_aux eta entries found.")
         return output_data
 
-    sig = output_data["profile"][qa_test]
-    sig_err = output_data["profile_error"][qa_test]
-    z = vertical_scale[qa_test]
+    sig = output_data["profile"][qa_test_alias]
+    sig_err = output_data["profile_error"][qa_test_alias]
+    z = vertical_scale[qa_test_alias]
 
     available_channels = set(sig.channel.values.tolist())
     keep = [
@@ -1948,7 +1978,7 @@ def compute_vldr(
 
     ch_r_found, ch_t_found = _read_channels_from_info(pci_cal_found)
 
-    channel_info_qa = output_data["channel_info"][qa_test]
+    channel_info_qa = output_data["channel_info"][qa_test_alias]
     G_R, G_T, H_R, H_T = _channel_info_GH_for_pairs(
         channel_info_qa=channel_info_qa,
         ch_r=ch_r_found,
@@ -2166,33 +2196,43 @@ def compute_mldr(
     vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
     vertical_scale = output_data[vertical_scale_name]
 
+    loading_map = processing_info['caller_info']['loading_map']
+
     qa_test = "ray_pcb"
 
+    if qa_test not in output_data["profile"] and qa_test not in loading_map:
+        return output_data
+    
+    if qa_test in output_data["profile"]:
+        qa_test_alias = qa_test
+    else:
+        qa_test_alias = loading_map["ray_pcb"]
+        
     molec_store = output_data.get("molecular", output_data.get("molec", {}))
     pol_cal_info = output_data.get("pol_cal_info", {})
 
-    if qa_test not in molec_store:
+    if qa_test_alias not in molec_store:
         print_entry("MLDR calculation skipped: no ray_pcb molecular profiles found.")
         return output_data
-    if qa_test not in vertical_scale:
+    if qa_test_alias not in vertical_scale:
         print_entry("MLDR calculation skipped: no ray_pcb vertical scale found.")
         return output_data
-    if qa_test not in pol_cal_info:
+    if qa_test_alias not in pol_cal_info:
         print_entry("MLDR calculation skipped: no ray_pcb pol_cal_info found.")
         return output_data
 
-    molec = molec_store[qa_test]
+    molec = molec_store[qa_test_alias]
     if "opto_parameters" in molec.dims:
         molec = molec.sel(opto_parameters="atten_bsc")
-    z = vertical_scale[qa_test]
+    z = vertical_scale[qa_test_alias]
 
     if "channel" not in molec.dims:
         raise ValueError(
-            f"MLDR molecular input for {qa_test} must have a channel dimension. "
+            f"MLDR molecular input for {qa_test_alias} must have a channel dimension. "
             f"Found dims: {molec.dims}."
         )
 
-    pci_base = _base_pol_cal_pairs(pol_cal_info[qa_test])
+    pci_base = _base_pol_cal_pairs(pol_cal_info[qa_test_alias])
     ch_r, ch_t = _read_channels_from_info(pci_base)
 
     available_channels = set(molec.channel.values.tolist())

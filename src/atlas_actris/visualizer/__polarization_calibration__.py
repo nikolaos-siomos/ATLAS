@@ -39,7 +39,6 @@ from processor.packaging import collect_metadata
 from visualizer.make_text import GenerateText, Libraries
 from visualizer.plot_utils import (
     prepare_folder,
-    slice_by_vertical_scale,
     smoothing,
     convert_m_to_km,
     perform_color_reduction,
@@ -88,8 +87,16 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
     """
 
     qa_test_info = defaultdict(dict)
+    
+    loading_map = caller_info['loading_map']
 
-    required_keys = ["pcb", "pcb_m45", "pcb_p45", "ray_pcb"]
+    ray_key = "ray_pcb"
+    
+    if ray_key in loading_map:
+        ray_key = loading_map[ray_key]
+        
+    required_keys = ["pcb", "pcb_m45", "pcb_p45", ray_key]
+
     if any(key not in data_pack for key in required_keys):
         return qa_test_info
 
@@ -103,19 +110,22 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
     pcb_pack = data_pack["pcb"]
     pcb_p45_pack = data_pack["pcb_p45"]
     pcb_m45_pack = data_pack["pcb_m45"]
-    ray_pack = data_pack["ray_pcb"]
-
-    pcb_ratio = pcb_pack["pol_cal_ratio"]
+    
+    ray_pack = data_pack[ray_key]
+        
+    pcb_ratio = pcb_pack["pol_cal_ratio_mean"]
     pcb_info = pcb_pack["pol_cal_info"]
 
-    pcb_p45_ratio = pcb_p45_pack["pol_cal_ratio"]
-    pcb_m45_ratio = pcb_m45_pack["pol_cal_ratio"]
+    pcb_p45_ratio = pcb_p45_pack["pol_cal_ratio_mean"]
+    pcb_m45_ratio = pcb_m45_pack["pol_cal_ratio_mean"]
 
-    ray_ratio = ray_pack["pol_cal_ratio"]
+    ray_ratio = ray_pack["pol_cal_ratio_mean"]
     ray_info = ray_pack["pol_cal_info"]
 
-    molecular_ratio = ray_pack.get("molecular_ratio", None)
+    molecular_ratio = ray_pack.get("molecular_ratio", None).compute()
     molecular_info = ray_pack.get("molecular_info", None)
+    
+    channel_info = pcb_p45_pack["channel_info"]
 
     # data_pack["pcb"] has only combined products, so use a source
     # calibration pack for the calibration vertical scale.
@@ -133,6 +143,9 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         ch_r = _info_value(pcb_info, eta_id, "ch_r", default=None)
         ch_t = _info_value(pcb_info, eta_id, "ch_t", default=None)
 
+        ch_r_scc = channel_info.loc['scc_channel_id',ch_r].values        
+        ch_t_scc = channel_info.loc['scc_channel_id',ch_t].values    
+        
         if ch_r is None or ch_t is None:
             continue
 
@@ -174,16 +187,15 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         ]
 
         for source_key, source_pack, source_z_all in signal_sources:
-            if "profile" not in source_pack:
+            if "profile_mean" not in source_pack:
                 continue
 
-            source_profile = source_pack["profile"]
+            source_profile = source_pack["profile_mean"]
 
             for suffix, channel in [("r", ch_r), ("t", ch_t)]:
                 signal_key = f"{source_key}_{suffix}"
                 x_sig = source_z_all.sel(channel=channel).values
                 source_signal = _time_mean(source_profile.sel(channel=channel))
-
                 # source_signal, source_z_sliced, _ = slice_by_vertical_scale(
                 #     da=source_signal,
                 #     vertical_scale=source_z,
@@ -206,22 +218,22 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         # ------------------------------------------------------------------
         # Calibration panel: gain-ratio profiles
         # ------------------------------------------------------------------
-        z_cal = z_cal_all.sel(channel=ch_r)
+        x_cal = z_cal_all.sel(channel=ch_r).values
 
         gain_ratio = pcb_ratio.sel(pair=gain_ratio_id)
         gain_ratio_p45 = pcb_p45_ratio.sel(pair=gain_ratio_id)
         gain_ratio_m45 = pcb_m45_ratio.sel(pair=gain_ratio_id)
 
-        gain_ratio, z_cal_sliced, cal_mask = slice_by_vertical_scale(
-            da=gain_ratio,
-            vertical_scale=z_cal,
-            x_lims=pair_settings["smoothing_range"],
-        )
+        # gain_ratio, z_cal_sliced, cal_mask = slice_by_vertical_scale(
+        #     da=gain_ratio,
+        #     vertical_scale=z_cal,
+        #     x_lims=pair_settings["smoothing_range"],
+        # )
 
-        gain_ratio_p45 = gain_ratio_p45.where(cal_mask, drop=True)
-        gain_ratio_m45 = gain_ratio_m45.where(cal_mask, drop=True)
+        # gain_ratio_p45 = gain_ratio_p45.where(cal_mask, drop=True)
+        # gain_ratio_m45 = gain_ratio_m45.where(cal_mask, drop=True)
 
-        x_cal = z_cal_sliced.values
+        # x_cal = z_cal_sliced.values
 
         Y_cal = {}
         E_cal = {}
@@ -244,20 +256,20 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         # ------------------------------------------------------------------
         # Rayleigh panel: time-resolved ray_pcb products -> mean over time
         # ------------------------------------------------------------------
-        z_ray = z_ray_all.sel(channel=ch_r)
+        x_ray = z_ray_all.sel(channel=ch_r).values
 
         calibrated_ratio = _time_mean(ray_ratio.sel(pair=calibrated_ratio_id))
         vldr = _time_mean(ray_ratio.sel(pair=vldr_id))
 
-        calibrated_ratio, z_ray_sliced, ray_mask = slice_by_vertical_scale(
-            da=calibrated_ratio,
-            vertical_scale=z_ray,
-            x_lims=pair_settings["smoothing_range"],
-        )
+        # calibrated_ratio, z_ray_sliced, ray_mask = slice_by_vertical_scale(
+        #     da=calibrated_ratio,
+        #     vertical_scale=z_ray,
+        #     x_lims=pair_settings["smoothing_range"],
+        # )
 
-        vldr = vldr.where(ray_mask, drop=True)
+        # vldr = vldr.where(ray_mask, drop=True)
 
-        x_ray = z_ray_sliced.values
+        # x_ray = z_ray_sliced.values
 
         Y_ray = {}
         E_ray = {}
@@ -279,7 +291,7 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         # Optional MLDR
         if molecular_ratio is not None and _all_pairs_exist(molecular_ratio, [mldr_id]):
             mldr = molecular_ratio.sel(pair=mldr_id)
-            mldr = mldr.where(ray_mask, drop=True)
+            # mldr = mldr.where(ray_mask, drop=True)
 
             mldr_sm, _ = smoothing(
                 args=pair_settings,
@@ -382,26 +394,31 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
             plot_path=plot_path,
         )
 
+            
         plot_metadata = (
-            metadata_ray_r
-            | {
+            {
                 **pair_settings,
                 **pair_info,
                 **scalar_info,
                 "atlas_channel_id_r": ch_r,
                 "atlas_channel_id_t": ch_t,
+                "scc_channel_id_r": ch_r_scc,
+                "scc_channel_id_t": ch_t_scc,
                 "ATLAS_version": __version__,
                 "QA_test_ID": "pcb",
                 "calibration_vertical_scale_source": "pcb_m45",
             }
         )
+        
+        plot_metadata = dict(sorted(plot_metadata.items()))
 
+            
         add_plot_metadata(
             plot_path=plot_path,
             plot_metadata=plot_metadata,
-            plot_metadata_extra=metadata_ray_t | metadata_pcb_r | metadata_pcb_t,
+            # plot_metadata_extra=metadata_ray_t | metadata_pcb_r | metadata_pcb_t,
         )
-
+        
     return qa_test_info
 
 
@@ -525,6 +542,7 @@ def _collect_scalar_info(pcb_info, ray_info, molecular_info, ids, settings):
         "epsilon": _info_value(pcb_info, eta_id, "epsilon"),
         "epsilon_sem": _info_value(pcb_info, eta_id, "epsilon_error"),
         "K": _info_value(pcb_info, eta_id, "K"),
+        "R_to_T_transmission_ratio": _info_value(pcb_info, eta_id, "R_to_T_transmission_ratio"),
         "calibrated_ratio_mean": _info_value(ray_info, calibrated_ratio_id, "mean"),
         "calibrated_ratio_sem": _info_value(ray_info, calibrated_ratio_id, "sem"),
         "vldr_mean": _info_value(ray_info, vldr_id, "mean"),

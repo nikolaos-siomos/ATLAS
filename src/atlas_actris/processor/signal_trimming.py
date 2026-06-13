@@ -65,76 +65,193 @@ def apply_time_mask(qa_tests, mask_time, output_data):
     
     return output_data
 
-def compute_slice_and_exclude(
-        processing_info: Dict[str, Any],input_data: Dict[str, Dict[str, Any]]) -> \
-    Dict[str, Dict[str, Any]]:
-    
-    output_data = copy.deepcopy(input_data)
-    # output_data.setdefault("time_mask", {})
+def select_by_time_mask(qa_tests, mask_time, output_data):
+    """
+    Apply a 1D time mask to all non-empty dictionaries inside output_data.
 
-    profiles = output_data["profile"]
+    True  = keep
+    False = drop
+
+    RAM-safe behavior:
+    - compute only the small 1D mask once per measurement
+    - slice large xarray objects with isel()
+    - do not use where(..., drop=True)
+    - do not create large NaN-filled arrays
+    - do not add extra output_data sections
+    """
+
+    output_data.setdefault("time_mask", {})
+
+    keep_indices = {}
+    del_keys = []
+
+    # Compute only the small 1D masks.
+    for key in qa_tests:
+        mask = mask_time[key]
+
+        if hasattr(mask.data, "compute"):
+            mask_values = mask.compute().values
+        else:
+            mask_values = mask.values
+
+        keep_idx = np.flatnonzero(mask_values)
+
+        if keep_idx.size == 0:
+            del_keys.append(key)
+        else:
+            keep_indices[key] = keep_idx
+
+    # Remove fully masked measurements from all non-empty output sections.
+    for key in del_keys:
+        CustomWarning(
+            f"{key} measurement will not be processed because masking "
+            "removes all profiles"
+        )
+
+        for _, subdict in output_data.items():
+            if isinstance(subdict, dict) and subdict and key in subdict:
+                del subdict[key]
+
+    # Lazily slice every xarray object that has a time dimension.
+    for key in qa_tests:
+        if key in del_keys:
+            continue
+
+        keep_idx = keep_indices[key]
+
+        for _, subdict in output_data.items():
+
+            if not isinstance(subdict, dict):
+                continue
+
+            if not subdict:
+                continue
+
+            if key not in subdict:
+                continue
+
+            obj = subdict[key]
+
+            if isinstance(obj, (xr.DataArray, xr.Dataset)) and "time" in obj.dims:
+                subdict[key] = obj.isel(time=keep_idx)
+
+        output_data["time_mask"][key] = mask_time[key].isel(time=keep_idx)
+
+    return output_data
+
+def _time_mask_from_time_info(time_info_key: xr.DataArray) -> xr.DataArray:
+    """
+    Create a full-True boolean mask using time_info as reference.
+    """
+
+    if "time" not in time_info_key.dims:
+        raise ValueError(
+            "time_info entry must contain a 'time' dimension in order "
+            "to build the slice/exclude mask."
+        )
+
+    return xr.ones_like(time_info_key["time"], dtype=bool)
+
+
+def _start_time_array_from_time_info(time_info_key: xr.DataArray) -> xr.DataArray:
+    """
+    Return start_time values from time_info as datetime values with the same
+    time coordinates as time_info.
+    """
+
+    start_time = time_info_key.sel({"parameters": "start_time"})
+
+    start_time_values = iso_to_datetimes(start_time.values)
+
+    return xr.DataArray(
+        start_time_values,
+        dims=start_time.dims,
+        coords=start_time.coords,
+        name="start_time",
+    )
+
+
+def compute_slice_and_exclude(
+        processing_info: Dict[str, Any],
+        input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+
+    output_data = copy.deepcopy(input_data)
+    output_data.setdefault("time_mask", {})
+
     time_info = output_data["time_info"]
 
-    qa_tests = list(profiles.keys())
+    qa_tests = list(time_info.keys())
 
-    # Start with full-True masks for all measurements
+    # Start with full-True masks for all measurements.
+    # The mask is based on the time dimension/coordinate of time_info.
     mask_time = {
-        key: xr.ones_like(profiles[key]["time"], dtype=bool)
+        key: xr.ones_like(time_info[key]["time"], dtype=bool)
         for key in qa_tests
     }
 
-    slicer = processing_info['caller_info']["slice_measurement"]
+    slicer = processing_info["caller_info"]["slice_measurement"]
+
     if slicer is not None:
         slice_meas = [slicer[i] for i in range(0, len(slicer), 3)]
         slice_start_time = [slicer[i] for i in range(1, len(slicer), 3)]
         slice_stop_time = [slicer[i] for i in range(2, len(slicer), 3)]
 
-        # If slicing is specified, start from all-False for mentioned keys
+        # If slicing is specified, start from all-False for mentioned keys.
         for key in slice_meas:
             if key in qa_tests:
-                mask_time[key] = xr.zeros_like(profiles[key]["time"], dtype=bool)
+                mask_time[key] = xr.zeros_like(time_info[key]["time"], dtype=bool)
 
         for i, key in enumerate(slice_meas):
-            if key in qa_tests:
-                start_times = iso_to_datetimes(
-                    time_info[key].sel({"parameters": "start_time"}).values
-                )
+            if key not in qa_tests:
+                continue
 
-                start_dt, stop_dt = make_interval(
-                    start_str=slice_start_time[i],
-                    stop_str=slice_stop_time[i],
-                    base=start_times[0]
-                )
+            time = time_info[key]["time"]
 
-                time = profiles[key]["time"]
-                mask_interval = (time >= start_dt) & (time <= stop_dt)
-                mask_time[key] = mask_time[key] | mask_interval
+            start_times = iso_to_datetimes(
+                time_info[key].sel({"parameters": "start_time"}).values
+            )
 
-    slicer = processing_info['caller_info']["exclude_measurement"]
+            start_dt, stop_dt = make_interval(
+                start_str=slice_start_time[i],
+                stop_str=slice_stop_time[i],
+                base=start_times[0],
+            )
+
+            mask_interval = (time >= start_dt) & (time <= stop_dt)
+
+            mask_time[key] = mask_time[key] | mask_interval
+
+    slicer = processing_info["caller_info"]["exclude_measurement"]
+
     if slicer is not None:
         slice_meas = [slicer[i] for i in range(0, len(slicer), 3)]
         slice_start_time = [slicer[i] for i in range(1, len(slicer), 3)]
         slice_stop_time = [slicer[i] for i in range(2, len(slicer), 3)]
 
         for i, key in enumerate(slice_meas):
-            if key in qa_tests:
-                start_times = iso_to_datetimes(
-                    time_info[key].sel({"parameters": "start_time"}).values
-                )
+            if key not in qa_tests:
+                continue
 
-                start_dt, stop_dt = make_interval(
-                    start_str=slice_start_time[i],
-                    stop_str=slice_stop_time[i],
-                    base=start_times[0]
-                )
+            time = time_info[key]["time"]
 
-                time = profiles[key]["time"]
-                mask_interval = (time < start_dt) | (time > stop_dt)
-                mask_time[key] = mask_time[key] & mask_interval
+            start_times = iso_to_datetimes(
+                time_info[key].sel({"parameters": "start_time"}).values
+            )
 
-    output_data = apply_time_mask(qa_tests, mask_time, output_data)
-    
-    if not output_data["profile"]:
+            start_dt, stop_dt = make_interval(
+                start_str=slice_start_time[i],
+                stop_str=slice_stop_time[i],
+                base=start_times[0],
+            )
+
+            mask_interval = (time < start_dt) | (time > stop_dt)
+
+            mask_time[key] = mask_time[key] & mask_interval
+
+    output_data = select_by_time_mask(qa_tests, mask_time, output_data)
+
+    if "profile" in output_data and not output_data["profile"]:
         endpoint(3)
 
     return output_data

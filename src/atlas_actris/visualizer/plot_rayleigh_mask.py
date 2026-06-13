@@ -126,10 +126,9 @@ def generate_plot(args, masks):
                      ax_coords = ax8_coords,
                      X = X,
                      Y = Y,
-                     Z = masks['residual_extinction'].values,
-                     title = 'Residual extinction mask',
+                     Z = masks['extinction_error'].values,
+                     title = 'Extinction error mask',
                      use_x_label = True,
-                     use_y_label = True,
                      args = args)
     
     plot_single_mask(fig = fig, 
@@ -139,15 +138,16 @@ def generate_plot(args, masks):
                      Z = masks['total'].values,
                      title = 'Combined Mask',
                      use_x_label = True,
-                     use_y_label = True,
-                     args = args)
+                     args = args,
+                     isolated_mask = masks['isolated_points'].values)
     
     fpath = export_plot(fig, args)
             
     return(fpath)
 
 def plot_single_mask(fig, ax_coords, X, Y, Z, title, args, 
-                     use_x_label = False, use_y_label = False):
+                     use_x_label = False, use_y_label = False,
+                     isolated_mask = None):
     
     x_llim = args['x_lims'][0]
     x_ulim = args['x_lims'][1]
@@ -156,11 +156,6 @@ def plot_single_mask(fig, ax_coords, X, Y, Z, title, args,
     
     win = args['fit_mask_window_step']
     
-    # extent = (args['fit_mask_region'][0], 
-    #           args['fit_mask_region'][1], 
-    #           args['fit_mask_window'][0], 
-    #           args['fit_mask_window'][1])
-    
     extent = (X[0], X[-1], Y[0], Y[-1])
     
     y_ticks = np.arange(y_llim, y_ulim + win, win * 10.)
@@ -168,7 +163,18 @@ def plot_single_mask(fig, ax_coords, X, Y, Z, title, args,
     ax = fig.add_axes(ax_coords)
     # ax.pcolormesh(X, Y, Z, vmin = 0, vmax = 1)
     ax.imshow(Z, extent = extent, cmap = 'viridis', interpolation = 'nearest',
-              origin = "lower", aspect = "auto")
+              origin = "lower", aspect = "auto", vmin = 0, vmax = 1)
+    
+    if isolated_mask is not None:
+        isolated_mask = np.asarray(isolated_mask, dtype = bool)
+
+        # Plot the isolated-point mask directly on top of the combined mask.
+        # True values are fully transparent. False values are red.
+        overlay = np.zeros((isolated_mask.shape[0], isolated_mask.shape[1], 4))
+        overlay[~isolated_mask, :] = [1., 0., 0., 1.]
+
+        ax.imshow(overlay, extent = extent, interpolation = 'nearest',
+                  origin = "lower", aspect = "auto")
     
     ax.set_title(title, pad = 3)
     

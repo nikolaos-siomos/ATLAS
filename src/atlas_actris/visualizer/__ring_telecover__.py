@@ -30,7 +30,6 @@ from visualizer.make_text import GenerateText, Libraries
 from visualizer.telecover_sector_processor import TelecoverSectorProcessor
 from visualizer.plot_utils import (
     prepare_folder,
-    slice_by_vertical_scale,
     collect_dict,
     convert_m_to_km,
     perform_color_reduction,
@@ -141,14 +140,19 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
     print_header("Initializing the ring Telecover test")
 
     # Telecover is one QA test, not a loop over multiple QA keys.
-    prepare_folder(caller_info, pattern="_tlc_rin_")
+    prepare_folder(caller_info, pattern = "_tlc_rin_", exclude_pattern = '_qck_tlc_rin_')
 
     settings = settings_info.copy()
 
+    # Load common arrays
+    tlc_common_key = next(iter(data_pack))
+    system_info = data_pack[tlc_common_key]["system_info"]
+    channel_info = data_pack[tlc_common_key]["channel_info"]
+          
     # Collect available sector DataArrays into one explicit dictionary:
     # {'I': data_pack['tlc_inner']['profile'], ...}
     sector_profiles = {
-        sector_id: data_pack[data_key]["profile"]
+        sector_id: data_pack[data_key]["profile"].persist()
         for sector_id, data_key in available_sectors.items()
     }
 
@@ -175,6 +179,8 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
         settings=settings,
     )
 
+    sys_info = dict(zip(system_info.parameters.values, system_info.values))
+
     if len(channels) > 0:
         qa_test_info[QA_KEY] = {}
 
@@ -182,6 +188,9 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
         print(f"-- channel: {ch}")
 
         ch_d = dict(channel=ch)
+
+        ch_info = channel_info.sel({'channel':ch})  
+        ch_info_d = dict(zip(ch_info.parameters.values, ch_info.values))
 
         metadata = collect_metadata(data_pack[ref_key], atlas_channel_id=ch)
 
@@ -286,9 +295,23 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
             qa_test_info[QA_KEY][ch]["minimum_channel_height"] = str(
                 int(np.round(1e3 * dofl_x, -1))
             )
-            plot_metadata["minimum_channel_height"] = qa_test_info[QA_KEY][ch][
-                "minimum_channel_height"
-            ]
+            
+        minimum_channel_height = qa_test_info[QA_KEY][ch].get("minimum_channel_height")
+        
+        plot_metadata = (
+            {
+                **sys_info,
+                **ch_info_d,
+                **settings,
+                "atlas_channel_id": ch,
+                "ATLAS_version": __version__,
+                "QA_test_ID": "tlc_qua",
+                "minimum_channel_height": minimum_channel_height
+            }
+        )
+
+        plot_metadata = dict(sorted(plot_metadata.items()))
+
 
         perform_color_reduction(
             color_reduction=caller_info["color_reduction"],

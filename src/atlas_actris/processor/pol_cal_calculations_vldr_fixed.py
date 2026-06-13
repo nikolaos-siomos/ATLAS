@@ -1620,7 +1620,7 @@ def compute_calibrated_ratio(
     if len(eta_ids) == 0:
         print_entry("Calibrated ratio calculation skipped: no pcb/pcb_aux eta entries found.")
         return output_data
-    
+
     sig = profiles[qa_test]
     sig_err = profile_errors[qa_test]
     z = vertical_scale[qa_test]
@@ -1683,9 +1683,6 @@ def compute_calibrated_ratio(
         ch_t=ch_t,
         calibrated_pair_ids=pair_ids,
     )
-
-    eta = eta_info.sel({"parameters":"eta","pair":pair_ids})
-    eta_error = eta_info.sel({"parameters":"eta_error","pair":pair_ids})
 
     # Keep only pairs for which eta was found.
     pair_ids_found = list(eta.pair.values)
