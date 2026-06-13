@@ -1,34 +1,41 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Wyoming radiosonde downloader using the newer University of Wyoming upper-air
+Wyoming radiosonde downloader using the University of Wyoming upper-air
 endpoint shown at https://weather.uwyo.edu/upperair/sounding.shtml.
 
 The public function keeps the same API expected by find_radiosonde.py:
     _download_wyoming(wmo_id, date, time_utc, save_dir)
 
 It returns an object with:
-    ok, path, message
+    ok, path, message, url
 
-The saved file is a simple comma-separated ASCII file with the column order
-expected by read_radiosonde_wyoming():
-    PRES,HGHT,TEMP,DWPT,MIXR,RELH
-so the existing reader can continue using usecols=[1, 0, 2, 5].
+This module only downloads the closest available Wyoming CSV response within
++/-12 hours and saves it with the filename pattern already used by ATLAS:
+    YYYYMMDD_HHMM_wyoming_<source>_<wmo_id>.txt
+
+It does not parse, standardize, or re-export the radiosonde data. Your existing
+reader can skip/handle the header later.
 """
 
+import json
 import os
 import re
+import tempfile
 from dataclasses import dataclass
-from typing import Optional
 from datetime import datetime, timedelta
-from io import StringIO
+from typing import Dict, List, Optional, Tuple
 
-import numpy as np
-import pandas as pd
 import requests
 
 
 WYOMING_NEW_ENDPOINT = "https://weather.uwyo.edu/cgi-bin/bufrraob.py"
+WYOMING_FAILURE_CACHE = ".wyoming_download_failures.json"
+WYOMING_USER_AGENT = "atlas-actris-radiosonde-downloader/1.0"
+
+# Fast-fail timeout: separate connect/read values avoid long hangs when the
+# Wyoming server is temporarily unavailable.
+WYOMING_TIMEOUT = (3.05, 12.0)
 
 
 @dataclass
@@ -62,10 +69,17 @@ def _parse_request_datetime(date: str, time_utc: str) -> datetime:
     )
 
 
-def _nearest_wyoming_hour(dt: datetime) -> datetime:
-    """Snap to the nearest nominal Wyoming sounding hour."""
+def _wyoming_candidate_times(dt: datetime, search_hours: int = 12) -> List[datetime]:
+    """Return nominal Wyoming sounding times within +/- search_hours.
+
+    Wyoming offers the nominal hours visible on the upper-air page:
+    00, 03, 06, 09, 12, 15, 18, and 21 UTC. The candidates are sorted by
+    temporal distance from the requested measurement time.
+    """
 
     nominal_hours = (0, 3, 6, 9, 12, 15, 18, 21)
+    start_dt = dt - timedelta(hours=search_hours)
+    end_dt = dt + timedelta(hours=search_hours)
 
     candidates = []
     for day_offset in (-1, 0, 1):
@@ -73,9 +87,50 @@ def _nearest_wyoming_hour(dt: datetime) -> datetime:
             hour=0, minute=0, second=0, microsecond=0
         )
         for hour in nominal_hours:
-            candidates.append(base + timedelta(hours=hour))
+            candidate = base + timedelta(hours=hour)
+            if start_dt <= candidate <= end_dt:
+                candidates.append(candidate)
 
+    candidates = sorted(set(candidates), key=lambda x: (abs(x - dt), x))
+
+    if not candidates:
+        raise ValueError(
+            f"No Wyoming nominal sounding times found within +/-{search_hours} h "
+            f"of {dt}"
+        )
+
+    return candidates
+
+
+def _nearest_wyoming_hour(dt: datetime) -> datetime:
+    """Snap to the nearest nominal Wyoming sounding hour."""
+
+    candidates = _wyoming_candidate_times(dt=dt, search_hours=12)
     return min(candidates, key=lambda x: abs(x - dt))
+
+
+def _wyoming_filename(wmo_id: str, dt: datetime, source: str) -> str:
+    """Return the ATLAS-expected local filename for a Wyoming download."""
+
+    return f"{dt:%Y%m%d_%H%M}_wyoming_{source}_{wmo_id}.txt"
+
+
+def _existing_wyoming_file(wmo_id: str, dt: datetime, save_dir: str) -> Optional[str]:
+    """Return an already-downloaded Wyoming file for this WMO/time, if present."""
+
+    if not save_dir or not os.path.isdir(save_dir):
+        return None
+
+    prefix = f"{dt:%Y%m%d_%H%M}_wyoming_"
+    suffix = f"_{wmo_id}.txt"
+
+    for fname in sorted(os.listdir(save_dir)):
+        if fname.startswith(prefix) and fname.endswith(suffix):
+            path = os.path.join(save_dir, fname)
+            if os.path.isfile(path) and os.path.getsize(path) > 0:
+                return path
+
+    return None
 
 
 def _build_new_wyoming_url(wmo_id: str, dt: datetime, source: str = "bufr") -> str:
@@ -92,124 +147,157 @@ def _build_new_wyoming_url(wmo_id: str, dt: datetime, source: str = "bufr") -> s
     return req.url
 
 
-def _strip_html_if_needed(text: str) -> str:
-    """Extract preformatted text if the server wraps the response in HTML."""
+def _failure_cache_path(save_dir: str) -> str:
+    """Return the persistent failure cache path."""
 
-    if "<pre" not in text.lower():
-        return text
-
-    match = re.search(r"<pre[^>]*>(.*?)</pre>", text, flags=re.I | re.S)
-    if not match:
-        return text
-
-    txt = match.group(1)
-    txt = re.sub(r"<[^>]+>", "", txt)
-    txt = txt.replace("&nbsp;", " ")
-    txt = txt.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-    return txt
+    return os.path.join(save_dir, WYOMING_FAILURE_CACHE)
 
 
-def _read_wyoming_csv(text: str) -> pd.DataFrame:
-    """Read a Wyoming CSV response and return a dataframe."""
+def _load_failure_cache(save_dir: str) -> Dict[str, Dict[str, str]]:
+    """Load cached Wyoming failures. Invalid caches are ignored."""
 
-    text = _strip_html_if_needed(text)
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    path = _failure_cache_path(save_dir)
+    if not os.path.isfile(path):
+        return {}
 
-    # Find the real CSV header. The response may contain metadata lines first.
-    header_idx = None
-    for i, line in enumerate(lines):
-        uline = line.upper()
-        if "," in line and ("PRES" in uline or "PRESS" in uline) and (
-            "HGHT" in uline or "HEIGHT" in uline
-        ):
-            header_idx = i
-            break
+    try:
+        with open(path, "r", encoding="utf-8") as fobj:
+            data = json.load(fobj)
+    except Exception:
+        return {}
 
-    if header_idx is None:
-        raise ValueError("Could not find a CSV header containing pressure and height")
+    if not isinstance(data, dict):
+        return {}
 
-    csv_text = "\n".join(lines[header_idx:])
-    df = pd.read_csv(StringIO(csv_text))
-
-    # Normalize column names.
-    df.columns = [str(c).strip() for c in df.columns]
-    return df
+    return data
 
 
-def _standardize_for_existing_reader(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Convert Wyoming output to the column order expected by read_radiosonde_wyoming:
-        col 0 -> pressure hPa
-        col 1 -> height m asl
-        col 2 -> temperature C
-        col 5 -> relative humidity percent
-    """
+def _save_failure_cache(save_dir: str, cache: Dict[str, Dict[str, str]]) -> None:
+    """Atomically save the Wyoming failure cache."""
 
-    aliases = {
-        "PRES": ("PRES", "PRESSURE", "P", "PRESS"),
-        "HGHT": ("HGHT", "HEIGHT", "HGT", "ALT", "ALTITUDE"),
-        "TEMP": ("TEMP", "TEMPERATURE", "T"),
-        "DWPT": ("DWPT", "DEWPOINT", "DEW_POINT", "DEWPT", "TD"),
-        "MIXR": ("MIXR", "MIXINGRATIO", "MIXING_RATIO"),
-        "RELH": ("RELH", "RH", "RELATIVEHUMIDITY", "RELATIVE_HUMIDITY"),
-    }
-
-    lookup = {str(c).strip().upper().replace(" ", ""): c for c in df.columns}
-
-    def find_col(name: str, required: bool = True):
-        for alias in aliases[name]:
-            key = alias.upper().replace(" ", "")
-            if key in lookup:
-                return lookup[key]
-        if required:
-            raise ValueError(
-                f"Could not find required Wyoming column {name}. "
-                f"Available columns: {list(df.columns)}"
-            )
-        return None
-
-    pres = pd.to_numeric(df[find_col("PRES")], errors="coerce")
-    hght = pd.to_numeric(df[find_col("HGHT")], errors="coerce")
-    temp = pd.to_numeric(df[find_col("TEMP")], errors="coerce")
-
-    dwpt_col = find_col("DWPT", required=False)
-    mixr_col = find_col("MIXR", required=False)
-    relh_col = find_col("RELH", required=False)
-
-    dwpt = pd.to_numeric(df[dwpt_col], errors="coerce") if dwpt_col else np.nan
-    mixr = pd.to_numeric(df[mixr_col], errors="coerce") if mixr_col else np.nan
-    relh = pd.to_numeric(df[relh_col], errors="coerce") if relh_col else np.nan
-
-    out = pd.DataFrame(
-        {
-            "PRES": pres,
-            "HGHT": hght,
-            "TEMP": temp,
-            "DWPT": dwpt,
-            "MIXR": mixr,
-            "RELH": relh,
-        }
+    os.makedirs(save_dir, exist_ok=True)
+    path = _failure_cache_path(save_dir)
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=".wyoming_download_failures.", suffix=".tmp", dir=save_dir
     )
 
-    # Keep only rows with the core columns needed by your reader.
-    out = out.dropna(subset=["PRES", "HGHT", "TEMP"], how="any")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fobj:
+            json.dump(cache, fobj, indent=2, sort_keys=True)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
-    if out.empty:
-        raise ValueError("Wyoming response did not contain usable numeric rows")
 
-    return out
+def _failure_key(wmo_id: str, dt: datetime, source: str) -> str:
+    """Return a stable cache key for one station/time/source request."""
+
+    return f"{wmo_id}|{dt:%Y%m%d%H%M}|{source}"
 
 
-def _download_one_wyoming_source(wmo_id: str, dt: datetime, save_dir: str, source: str) -> DownloadStatus:
-    """Download one Wyoming source, usually 'bufr' first and then 'temp' as fallback."""
+def _cache_failure(
+    cache: Dict[str, Dict[str, str]],
+    wmo_id: str,
+    dt: datetime,
+    source: str,
+    message: str,
+    url: str,
+) -> None:
+    """Store one failed station/time/source attempt in the cache."""
+
+    cache[_failure_key(wmo_id=wmo_id, dt=dt, source=source)] = {
+        "wmo_id": str(wmo_id),
+        "datetime_utc": dt.strftime("%Y-%m-%d %H:%M:%S"),
+        "source": str(source),
+        "message": str(message),
+        "url": str(url),
+        "cached_at_utc": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def _cached_failure(
+    cache: Dict[str, Dict[str, str]], wmo_id: str, dt: datetime, source: str
+) -> Optional[Dict[str, str]]:
+    """Return cached failure metadata for one request, if present."""
+
+    return cache.get(_failure_key(wmo_id=wmo_id, dt=dt, source=source))
+
+
+def _looks_like_failed_wyoming_response(content: bytes) -> Tuple[bool, str]:
+    """Detect obvious Wyoming failure pages without parsing the CSV data."""
+
+    if not content:
+        return True, "Empty response from Wyoming"
+
+    sample = content[:4096].decode("utf-8", errors="ignore").lower()
+    compact = re.sub(r"\s+", " ", sample)
+
+    failure_markers = (
+        "no data",
+        "can't get",
+        "cannot get",
+        "not found",
+        "invalid station",
+        "error",
+        "service unavailable",
+        "temporarily unavailable",
+    )
+
+    for marker in failure_markers:
+        if marker in compact:
+            return True, f"Wyoming response indicates failure: {marker}"
+
+    # Successful CSV responses from this endpoint should contain commas. If the
+    # server returns an HTML page without CSV-like text, do not save it as data.
+    if b"," not in content[:8192] and b"<html" in content[:8192].lower():
+        return True, "Wyoming returned an HTML page instead of CSV data"
+
+    return False, ""
+
+
+def _write_bytes_atomic(path: str, content: bytes) -> None:
+    """Write downloaded content atomically."""
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=f".{os.path.basename(path)}.", suffix=".tmp", dir=os.path.dirname(path)
+    )
+
+    try:
+        with os.fdopen(fd, "wb") as fobj:
+            fobj.write(content)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _download_one_wyoming_source(
+    wmo_id: str,
+    dt: datetime,
+    save_dir: str,
+    source: str,
+    session: requests.Session,
+) -> DownloadStatus:
+    """Download one Wyoming source and save the raw CSV response."""
 
     url = _build_new_wyoming_url(wmo_id=wmo_id, dt=dt, source=source)
 
-    response = requests.get(
-        url,
-        timeout=40,
-        headers={"User-Agent": "atlas-actris-radiosonde-downloader/1.0"},
-    )
+    try:
+        response = session.get(url, timeout=WYOMING_TIMEOUT)
+    except requests.RequestException as exc:
+        return DownloadStatus(
+            ok=False,
+            message=f"Request to Wyoming failed: {exc}",
+            url=url,
+        )
 
     if not response.ok:
         return DownloadStatus(
@@ -218,74 +306,125 @@ def _download_one_wyoming_source(wmo_id: str, dt: datetime, save_dir: str, sourc
             url=url,
         )
 
-    text = response.text
-    if "no data" in text.lower() or "can't get" in text.lower():
-        return DownloadStatus(
-            ok=False,
-            message="No sounding data returned by Wyoming",
-            url=url,
-        )
+    failed, failure_message = _looks_like_failed_wyoming_response(response.content)
+    if failed:
+        return DownloadStatus(ok=False, message=failure_message, url=url)
 
-    try:
-        df_raw = _read_wyoming_csv(text)
-        df_out = _standardize_for_existing_reader(df_raw)
-    except Exception as exc:
-        return DownloadStatus(
-            ok=False,
-            message=f"Could not parse Wyoming response: {exc}",
-            url=url,
-        )
-
-    os.makedirs(save_dir, exist_ok=True)
-
-    # Filename keeps the yyyymmdd_hhmm prefix required by your current checks.
-    fname = f"{dt:%Y%m%d_%H%M}_wyoming_{source}_{wmo_id}.txt"
+    fname = _wyoming_filename(wmo_id=wmo_id, dt=dt, source=source)
     path = os.path.join(save_dir, fname)
-
-    df_out.to_csv(path, index=False, na_rep="nan")
+    _write_bytes_atomic(path=path, content=response.content)
 
     return DownloadStatus(
         ok=True,
         path=path,
-        message=f"Downloaded Wyoming {source.upper()} sounding",
+        message=(
+            f"Downloaded raw Wyoming {source.upper()} CSV sounding "
+            f"for {dt:%Y-%m-%d %H:%M} UTC"
+        ),
         url=url,
     )
 
 
 def _download_wyoming(wmo_id, date, time_utc, save_dir):
     """
-    Download a Wyoming radiosonde from the newer endpoint.
+    Download the closest available Wyoming radiosonde CSV within +/-12 hours.
 
-    The input date/time can be the measurement midpoint. The downloader snaps it
-    to the nearest nominal Wyoming sounding hour before requesting the file.
-    BUFR is attempted first because it is the newer endpoint/data source; TEMP is
-    attempted as a fallback through the same new endpoint.
+    Existing local files are reused first. Failed station/time/source attempts
+    are cached in save_dir/.wyoming_download_failures.json; a later call skips
+    cached failures and aborts immediately when every candidate source is known
+    to have failed before.
     """
 
     request_dt = _parse_request_datetime(date=date, time_utc=time_utc)
-    sounding_dt = _nearest_wyoming_hour(request_dt)
+    candidate_times = _wyoming_candidate_times(dt=request_dt, search_hours=12)
+    wmo_id = str(wmo_id).strip()
+    os.makedirs(save_dir, exist_ok=True)
 
+    cache = _load_failure_cache(save_dir=save_dir)
     failures = []
+    attempted_network = False
+    cache_changed = False
 
-    for source in ("bufr", "temp"):
-        status = _download_one_wyoming_source(
-            wmo_id=str(wmo_id),
-            dt=sounding_dt,
-            save_dir=save_dir,
-            source=source,
+    session = requests.Session()
+    session.headers.update({"User-Agent": WYOMING_USER_AGENT})
+
+    try:
+        for sounding_dt in candidate_times:
+            existing_path = _existing_wyoming_file(
+                wmo_id=wmo_id,
+                dt=sounding_dt,
+                save_dir=save_dir,
+            )
+
+            if existing_path is not None:
+                return DownloadStatus(
+                    ok=True,
+                    path=existing_path,
+                    message=(
+                        "Using already-downloaded Wyoming sounding "
+                        f"for {sounding_dt:%Y-%m-%d %H:%M} UTC"
+                    ),
+                )
+
+            for source in ("bufr", "temp"):
+                cached = _cached_failure(
+                    cache=cache,
+                    wmo_id=wmo_id,
+                    dt=sounding_dt,
+                    source=source,
+                )
+
+                if cached is not None:
+                    failures.append(
+                        f"{sounding_dt:%Y-%m-%d %H:%M} UTC {source.upper()}: "
+                        f"cached failure: {cached.get('message', 'unknown failure')}"
+                    )
+                    continue
+
+                attempted_network = True
+                status = _download_one_wyoming_source(
+                    wmo_id=wmo_id,
+                    dt=sounding_dt,
+                    save_dir=save_dir,
+                    source=source,
+                    session=session,
+                )
+
+                if status.ok:
+                    return status
+
+                failures.append(
+                    f"{sounding_dt:%Y-%m-%d %H:%M} UTC {source.upper()}: "
+                    f"{status.message}; url={status.url}"
+                )
+                _cache_failure(
+                    cache=cache,
+                    wmo_id=wmo_id,
+                    dt=sounding_dt,
+                    source=source,
+                    message=status.message,
+                    url=status.url or "",
+                )
+                cache_changed = True
+    finally:
+        session.close()
+        if cache_changed:
+            _save_failure_cache(save_dir=save_dir, cache=cache)
+
+    if attempted_network:
+        prefix = "Wyoming download failed for all attempted sources within +/-12 h."
+    else:
+        prefix = (
+            "Wyoming download aborted because all candidate sources have cached "
+            "failures within +/-12 h."
         )
-
-        if status.ok:
-            return status
-
-        failures.append(f"{source.upper()}: {status.message}; url={status.url}")
 
     return DownloadStatus(
         ok=False,
         path=None,
         message=(
-            "Wyoming download failed for all attempted sources. "
-            f"Requested time={request_dt}, nearest sounding time={sounding_dt}. "
+            f"{prefix} Requested time={request_dt}. Attempted sounding times="
+            f"{', '.join(dt.strftime('%Y-%m-%d %H:%M') for dt in candidate_times)}. "
             + " | ".join(failures)
         ),
     )

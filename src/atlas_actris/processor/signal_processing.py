@@ -755,13 +755,14 @@ def compute_signal_noise(
     profiles = output_data["profile"]
     profiles_m = output_data["profile_mean"]
 
-    use_nan_count = processing_info["caller_info"].get("noise_use_nan_count", False)
+    caller_info = processing_info["caller_info"]
 
-    # Keep False by default to avoid broadcasting the small mean-profile
-    # noise estimate back to the full lazy time-resolved profile.
-    store_full_profile_error = processing_info["caller_info"].get(
-        "store_full_profile_error", False
-    )
+    noise_smooth_window = caller_info.get("noise_smooth_window", 7)
+    noise_window = caller_info.get("noise_window", 31)
+
+    # Chunk size used only for the synthetic high-resolution error array.
+    # Keeping time chunks small avoids large materialized blocks later.
+    noise_time_chunk = caller_info.get("noise_time_chunk", 1)
 
     for key, sig in profiles.items():
 
@@ -772,24 +773,42 @@ def compute_signal_noise(
 
         sig_m_err = fast_rolling_noise(
             sig_m,
-            smooth_window=7,
-            noise_window=31,
+            smooth_window=noise_smooth_window,
+            noise_window=noise_window,
         )
 
         sig_m_err = _drop_or_mean_time(sig_m_err)
 
+        # Mean-profile noise. This stays small.
         output_data["profile_error_mean"][key] = sig_m_err.broadcast_like(sig_m)
 
-        if store_full_profile_error:
+        # Number of high-resolution profiles used in the mean.
+        # Metadata only.
+        N = sig.sizes["time"]
 
-            if use_nan_count:
-                N = sig.count("time")
-            else:
-                N = sig.sizes["time"]
+        # Convert the small mean-profile error to a Dask-backed array.
+        # This prevents xarray from eagerly broadcasting it over time.
+        sig_m_err_dask = (sig_m_err * np.sqrt(N)).chunk({
+            dim: sig.chunksizes.get(dim, sig_m_err.sizes[dim])
+            for dim in sig_m_err.dims
+            if dim in sig_m_err.sizes
+        })
 
-            output_data["profile_error"][key] = (
-                sig_m_err.broadcast_like(sig) * np.sqrt(N)
-            )
+        # Create a Dask-backed 1D time template.
+        # Important: chunk this before multiplying.
+        time_template = xr.ones_like(
+            sig["time"],
+            dtype=sig_m_err.dtype,
+        ).chunk({
+            "time": noise_time_chunk,
+        })
+
+        # This broadcast is now lazy because at least one operand is Dask-backed.
+        sig_err = time_template * sig_m_err_dask
+
+        sig_err = _restore_dim_order(sig_err, sig)
+
+        output_data["profile_error"][key] = sig_err
 
     print_entry("Signal error calculation succesfully performed!")
     return output_data
