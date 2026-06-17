@@ -26,10 +26,18 @@ Fucntions
 """
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from typing import Any, Dict
 from utils.printouts import print_header, print_subsection, print_entry
+
+from processor.definitions import (
+    assign_drk, 
+    profile_instances, 
+    background_map, 
+    background_error_map,
+    )
 
 from utils.signal_utils import (
     temporal_averaging, 
@@ -40,38 +48,6 @@ from utils.signal_utils import (
 
 from utils.error_classes import CustomWarning
 from utils.dataarray_utils import shallow_copy
-
-profile_instances = [
-    'profile', 
-    'profile_mean', 
-    'profile_low_res', 
-    'profile_high_res'
-    ]
-
-profile_error_instances = [
-    'profile_error', 
-    'profile_error_mean', 
-    'profile_error_low_res', 
-    'profile_error_high_res'
-    ]
-
-background_instances = [
-    'background', 
-    'background_mean', 
-    'background_low_res', 
-    'background_high_res'
-    ]
-
-background_error_instances = [
-    'background_error', 
-    'background_error_mean', 
-    'background_error_low_res', 
-    'background_error_high_res'
-    ]
-
-profile_error_map = dict(zip(profile_instances,profile_error_instances))
-background_map = dict(zip(profile_instances,background_instances))
-background_error_map = dict(zip(profile_instances,background_error_instances))
 
 def _drop_or_mean_time(da: xr.DataArray) -> xr.DataArray:
     if "time" not in da.dims:
@@ -193,6 +169,8 @@ def compute_dead_time_correction(processing_info, input_data):
 
     for prof_key in profile_instances:
         profiles = output_data[prof_key]
+        background = output_data['background_mean']
+
         if not profiles:
             continue
 
@@ -200,7 +178,7 @@ def compute_dead_time_correction(processing_info, input_data):
 
             if key not in channel_info:
                 continue
-
+            
             ci = channel_info[key]
 
             acquisition_mode = ci.sel(parameters="acquisition_mode")
@@ -211,6 +189,30 @@ def compute_dead_time_correction(processing_info, input_data):
             if not bool(is_photon.any()):
                 output_data[prof_key][key] = sig
                 continue
+            
+            if key in background:
+                bg = background[key]
+            
+                mask_saturated = (bg > 60.0) & is_photon
+            
+                if bool(mask_saturated.any()):
+                    channel_mask = mask_saturated.any(
+                        dim=[dim for dim in mask_saturated.dims if dim != "channel"]
+                    ).compute()
+            
+                    warned_channels = bg["channel"].where(
+                        channel_mask,
+                        drop=True,
+                    ).values
+            
+                    dead_time = dead_time.where(~channel_mask, 0.0)
+            
+                    print_entry(key)
+                    print(
+                        "Warning: Dead-time correction was cancelled for channels "
+                        f"with background > 60 MHz: {', '.join(sorted(warned_channels))}"
+                    )
+                    print()
 
             denom = 1.0 - sig * dead_time * 1e-3
             sig_corr = (sig / denom).where(denom != 0)
@@ -219,7 +221,7 @@ def compute_dead_time_correction(processing_info, input_data):
             sig_out = _restore_dim_order(sig_out, sig)
             
             output_data[prof_key][key] = sig_out
-            
+
     print_entry("Dead time correction succesfully performed!")
     return output_data
 
@@ -672,31 +674,6 @@ def compute_dark_correction(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
-
-    assign_drk = {
-        "ray": "drk_ray",
-        "ray_pcb": "drk_ray_pcb",
-    
-        "pcb_p45": "drk_pcb",
-        "pcb_m45": "drk_pcb",
-        "pcb_aux_p45": "drk_pcb_aux",
-        "pcb_aux_m45": "drk_pcb_aux",
-    
-        "tlc_north": "drk_tlc_qua",
-        "tlc_east": "drk_tlc_qua",
-        "tlc_south": "drk_tlc_qua",
-        "tlc_west": "drk_tlc_qua",
-    
-        "tlc_inner": "drk_tlc_rin",
-        "tlc_outer": "drk_tlc_rin",
-    
-        "trg": "drk_trg",
-        "dtm_fi": "drk_dtm",
-        "dtm_fo": "drk_dtm",
-        "dtm": "drk_dtm",
-        "nsf": "drk_nsf",
-        "cam": "drk_cam",
-        }
     
     loading_map = processing_info['caller_info']['loading_map']
     
@@ -722,13 +699,7 @@ def compute_dark_correction(
                 else:
                     continue
             
-                drk = dark_profiles[drk_key]
-                
-                # if "time" in drk.dims:
-                #     if drk.sizes["time"] == 1:
-                #         drk = drk.squeeze("time", drop=True)
-                #     else:
-                #         drk = drk.mean('time')                      
+                drk = dark_profiles[drk_key]                   
                 
                 acquisition_mode = channel_info[key].sel(parameters="acquisition_mode")
                                 
@@ -959,3 +930,4 @@ def slice_signal_by_range(sig, ranges, region, drop=False, min_bins=10):
 
     return sig_slice, range_slice
     
+

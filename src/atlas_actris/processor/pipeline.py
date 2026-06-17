@@ -38,6 +38,7 @@ from processor.signal_flagging_lazy import compute_detect_saturation
 from processor.signal_trimming import (
     compute_slice_and_exclude, 
     compute_screen_low_shots,
+    compute_asign_dark_blocks,
     )
 
 from processor.signal_processing import (
@@ -127,6 +128,10 @@ class Processor():
             "check_saturation":{
                 "function":compute_detect_saturation,
                 "header":"Checking signal saturation"
+                },
+            "assign_dark":{
+                "function":compute_asign_dark_blocks,
+                "header":"Assign dark measurement blocks"
                 },
             "photon_units_conversion":{
                 "function":compute_unit_conv_counts_to_MHz,

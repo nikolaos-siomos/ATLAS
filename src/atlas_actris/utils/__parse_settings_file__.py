@@ -52,7 +52,7 @@ SCHEMA_QCK: Dict[str, Dict[str, Any]] = {
 
 SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
-    "x_lims":      {"dtype": float,   "default": [0.,31.], "is_list": True,  "min": 0.,  "max": 100.},
+    "x_lims":      {"dtype": float,   "default": [0.,34.], "is_list": True,  "min": 0.,  "max": 100.},
     "x_tick":      {"dtype": float,   "default": 2.,       "is_list": False, "min": 0.1, "max": 10.},   
     "y_lims":      {"dtype": float,   "default": [],       "is_list": True},
 
@@ -60,9 +60,9 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "cross_check_lower_limit":     {"dtype": float,   "default": None,      "is_list": False},
     "normalization_region":        {"dtype": float,   "default": [6.,8.],   "is_list": True,  "min": 0.,   "max": 50.},
     
-    "molecular_mask_region":                {"dtype": float,   "default": [2., 30.], "is_list": True,  "min": 0.,    "max": 150.},
+    "molecular_mask_region":                {"dtype": float,   "default": [2., 34.], "is_list": True,  "min": 0.,    "max": 150.},
     "molecular_mask_window":                {"dtype": float,   "default": [0.5, 4.], "is_list": True,  "min": 0.05,  "max": 50.},
-    "molecular_mask_window_step":           {"dtype": float,   "default": 0.1,       "is_list": False, "min": 0.05,  "max": 5.},
+    "molecular_mask_window_step":           {"dtype": float,   "default": 0.2,       "is_list": False, "min": 0.05,  "max": 5.},
     "rsem_threshold":                       {"dtype": float,   "default": 0.025,     "is_list": False, "min": 0.01,  "max": 1.},
     "first_derivative_threshold":           {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
     "second_derivative_threshold":          {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
@@ -74,7 +74,7 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "isolated_point_neighbour_threshold":   {"dtype": int,     "default": 2,         "is_list": False, "min": 0},
     
     "smooth":                      {"dtype": bool,  "default": True,        "is_list": False},
-    "smoothing_range":             {"dtype": float, "default": [0.05, 31.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},
+    "smoothing_range":             {"dtype": float, "default": [0.05, 35.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},
     "smoothing_window":            {"dtype": float, "default": 0.5,         "is_list": False, "min": 0.05, "max": 10.},
 
     "include_channels":         {"dtype": str,"default": [],         "is_list": True},
@@ -134,7 +134,7 @@ SCHEMA_PCB: Dict[str, Dict[str, Any]] = {
     "x_tick_calibration":   {"dtype": float,   "default": 1.,        "is_list": False, "min": 0.1, "max": 10.},   
     "y_lims_calibration":   {"dtype": float,   "default": [],        "is_list": True},
 
-    "x_lims_rayleigh":      {"dtype": float,   "default": [0., 16.], "is_list": True,  "min": 0.,  "max": 50.},
+    "x_lims_rayleigh":      {"dtype": float,   "default": [0., 20.], "is_list": True,  "min": 0.,  "max": 50.},
     "x_tick_rayleigh":      {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.1, "max": 10.},   
     "y_lims_rayleigh":      {"dtype": float,   "default": [],        "is_list": True},
 

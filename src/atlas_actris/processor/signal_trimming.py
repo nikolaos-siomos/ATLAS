@@ -9,10 +9,19 @@ import numpy as np
 import copy
 import xarray as xr
 import pandas as pd
-from utils.printouts import endpoint
+
 from typing import Any, Dict
-from utils.time_conversions import iso_to_datetimes
+from utils.printouts import endpoint
 from utils.error_classes import CustomWarning
+from utils.dataarray_utils import shallow_copy
+from utils.time_conversions import iso_to_datetimes
+
+from utils.printouts import print_header, print_subsection, print_entry
+
+from processor.definitions import (
+    assign_drk, 
+    profile_instances, 
+    )
 
 def hhmm_to_datetime(hhmm: str, base: pd.Timestamp) -> pd.Timestamp:
     """Convert hhmm string to datetime on the date of base timestamp."""
@@ -341,9 +350,172 @@ def compute_screen_low_shots(
     # If apply_time_mask expects True = keep, invert the bad-time mask
     keep_time_mask = {key: ~bad_time_mask[key] for key in qa_tests}
 
-    output_data = apply_time_mask(qa_tests, keep_time_mask, output_data)
+    output_data = select_by_time_mask(qa_tests, keep_time_mask, output_data)
     
     if not output_data["profile"]:
         endpoint(4)
 
     return output_data
+
+def compute_asign_dark_blocks(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+
+    loading_map = processing_info["caller_info"]["loading_map"]
+
+    output_data = shallow_copy(input_data)
+
+    profiles = output_data["profile"]
+
+    for key, drk_key_alias in assign_drk.items():
+
+        if not profiles:
+            continue
+
+        if key not in profiles:
+            continue
+
+        if drk_key_alias in profiles:
+            drk_key = drk_key_alias
+        elif drk_key_alias in loading_map:
+            drk_key = loading_map[drk_key_alias]
+        else:
+            continue
+
+        if drk_key not in profiles:
+            continue
+
+        drk = profiles[drk_key]
+        sig = profiles[key]
+
+        best_start_time, best_end_time, is_block = (
+            select_dark_block_closest_to_signal(sig, drk)
+        )
+
+        if not is_block:
+            continue
+
+        if drk_key_alias in profiles:
+            continue
+
+        t_slice = slice(best_start_time, best_end_time)
+
+        print_subsection(key)
+
+        start_time = pd.Timestamp(best_start_time).strftime("%Y%m%d %H:%M:%S")
+        end_time = pd.Timestamp(best_end_time).strftime("%Y%m%d %H:%M:%S")
+
+        print_entry(
+            f"Assigned part of {drk_key} to {drk_key_alias}:\n"
+            f"  --start: {start_time}\n"
+            f"  --end: {end_time}"
+        )
+
+        for db_key, db in output_data.items():
+
+            if not isinstance(db, dict):
+                continue
+
+            if drk_key in db:
+                src_key = drk_key
+            elif key in db:
+                src_key = key
+            else:
+                continue
+
+            arr = db[src_key]
+
+            if isinstance(arr, xr.DataArray) and "time" in arr.dims:
+                arr = arr.sel({"time": t_slice})
+
+            output_data[db_key][drk_key_alias] = arr
+
+    print_entry("Dark measurement blocks successfully assigned!")
+
+    return output_data
+
+def select_dark_block_closest_to_signal(
+    sig: xr.DataArray,
+    drk: xr.DataArray,
+    max_gap: str = "1h",
+    time_dim: str = "time",
+):
+    """
+    Select the dark time block closest to the mean signal time only if
+    the dark measurement contains separated time blocks.
+
+    Returns
+    -------
+    drk_selected : xr.DataArray
+        Full drk if no separated blocks exist.
+        Sliced drk block if separated blocks exist.
+
+    best_start_time : np.datetime64
+        Start time of returned drk array.
+
+    best_end_time : np.datetime64
+        End time of returned drk array.
+
+    is_block : bool
+        False if the full/original drk array was returned.
+        True if drk was sliced to one selected time block.
+    """
+
+    if time_dim not in sig.dims:
+        raise ValueError(f"sig has no '{time_dim}' dimension")
+
+    if time_dim not in drk.dims:
+        raise ValueError(f"drk has no '{time_dim}' dimension")
+
+    if drk.sizes[time_dim] == 0:
+        raise ValueError("drk has no time entries")
+
+    # Keep these only if you want to guarantee correct ordering.
+    # If you truly need the exact original object returned when no slicing happens,
+    # remove these two lines.
+    drk = drk.sortby(time_dim)
+    sig = sig.sortby(time_dim)
+
+    drk_time = drk[time_dim]
+
+    # Single dark profile: no block selection possible.
+    # Return the full drk.
+    if drk.sizes[time_dim] == 1:
+        start_time = drk_time.values[0]
+        end_time = drk_time.values[0]
+        return drk, start_time, end_time, False
+
+    gaps = drk_time.diff(time_dim)
+    max_gap_td = np.timedelta64(pd.Timedelta(max_gap).value, "ns")
+
+    split_after = np.where(gaps.values > max_gap_td)[0]
+
+    # No gap larger than max_gap.
+    # This means drk is one continuous block, so return the full drk.
+    if len(split_after) == 0:
+        start_time = drk_time.values[0]
+        end_time = drk_time.values[-1]
+        return start_time, end_time, False
+
+    # Here, separated blocks exist, so select only one block.
+    starts = np.r_[0, split_after + 1]
+    ends = np.r_[split_after + 1, drk.sizes[time_dim]]
+
+    sig_mean_time = sig[time_dim].mean().values
+
+    best_i = np.argmin([
+        abs(
+            drk_time.isel({time_dim: slice(start, end)}).mean().values
+            - sig_mean_time
+        )
+        for start, end in zip(starts, ends)
+    ])
+
+    best_start = starts[best_i]
+    best_end = ends[best_i]
+
+    best_start_time = drk_time.values[best_start]
+    best_end_time = drk_time.values[best_end - 1]
+
+    return best_start_time, best_end_time, True

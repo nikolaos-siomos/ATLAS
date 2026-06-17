@@ -26,7 +26,6 @@ Fucntions
 """
 
 import io
-import copy
 import contextlib
 import numpy as np
 import xarray as xr
@@ -50,8 +49,19 @@ def compute_molecular_calculations(
 
     temperature_scale = np.arange(180.0, 330.0, 10.0)
 
-    opto_parameters = ["c_ext", "c_bsc", "ext", "bsc", "OD", "atten_bsc"]
-    bin_chunk_size = 4096
+    opto_parameters = [
+        "c_ext_f", 
+        "c_ext_b", 
+        "c_bsc", 
+        "ext_f", 
+        "ext_b", 
+        "bsc", 
+        "OD_f", 
+        "OD_b", 
+        "atten_bsc"
+        ]
+    
+    channel_chunks = 5
 
     molecular = {}
 
@@ -77,7 +87,7 @@ def compute_molecular_calculations(
 
         for ch in channels:
 
-            c_ext, c_bsc = get_optical_parameters(
+            c_ext_f, c_ext_b, c_bsc = get_optical_parameters(
                 ch=ch,
                 temperature_scale=temperature_scale,
                 emitted_wavelength=emitted_wavelength,
@@ -103,8 +113,14 @@ def compute_molecular_calculations(
                 .reset_coords(drop=True)
             )
 
-            c_ext_on_bins = (
-                c_ext
+            c_ext_f_on_bins = (
+                c_ext_f
+                .interp(T=T_on_bins)
+                .reset_coords(drop=True)
+            )
+            
+            c_ext_b_on_bins = (
+                c_ext_b
                 .interp(T=T_on_bins)
                 .reset_coords(drop=True)
             )
@@ -115,8 +131,12 @@ def compute_molecular_calculations(
                 .reset_coords(drop=True)
             )
 
-            ext_on_bins = (
-                N_on_bins * c_ext_on_bins
+            ext_f_on_bins = (
+                N_on_bins * c_ext_f_on_bins
+            ).reset_coords(drop=True)
+
+            ext_b_on_bins = (
+                N_on_bins * c_ext_b_on_bins
             ).reset_coords(drop=True)
 
             bsc_on_bins = (
@@ -127,40 +147,61 @@ def compute_molecular_calculations(
             # OD(z_i) = integral from first bin to z_i of ext(z) dz
             dz = z_on_bins.diff("bins", label="upper")
 
-            ext_upper = ext_on_bins.isel(bins=slice(1, None))
+            ext_upper_f = ext_f_on_bins.isel(bins=slice(1, None))
+            ext_upper_b = ext_b_on_bins.isel(bins=slice(1, None))
 
-            ext_lower = (
-                ext_on_bins
+            ext_lower_f = (
+                ext_f_on_bins
                 .isel(bins=slice(None, -1))
-                .assign_coords(bins=ext_upper.bins)
+                .assign_coords(bins=ext_upper_f.bins)
+            )
+            
+            ext_lower_b = (
+                ext_b_on_bins
+                .isel(bins=slice(None, -1))
+                .assign_coords(bins=ext_upper_b.bins)
             )
 
-            dz = dz.assign_coords(bins=ext_upper.bins)
+            dz_f = dz.assign_coords(bins=ext_upper_f.bins)
+            dz_b = dz.assign_coords(bins=ext_upper_b.bins)
 
-            ext_mid = 0.5 * (ext_upper + ext_lower)
+            ext_mid_f = 0.5 * (ext_upper_f + ext_lower_f)
+            ext_mid_b = 0.5 * (ext_upper_b + ext_lower_b)
 
-            od_intervals = (ext_mid * dz).cumsum("bins")
+            od_intervals_f = (ext_mid_f * dz_f).cumsum("bins")
+            od_intervals_b = (ext_mid_b * dz_b).cumsum("bins")
 
-            zero = xr.zeros_like(ext_on_bins.isel(bins=0))
+            zero_f = xr.zeros_like(ext_f_on_bins.isel(bins=0))
+            zero_b = xr.zeros_like(ext_b_on_bins.isel(bins=0))
 
-            od_on_bins = xr.concat(
-                [zero, od_intervals],
+            od_f_on_bins = xr.concat(
+                [zero_f, od_intervals_f],
                 dim="bins",
             ).assign_coords(
-                bins=ext_on_bins.bins
+                bins=ext_f_on_bins.bins
+            ).reset_coords(drop=True)
+
+            od_b_on_bins = xr.concat(
+                [zero_b, od_intervals_b],
+                dim="bins",
+            ).assign_coords(
+                bins=ext_b_on_bins.bins
             ).reset_coords(drop=True)
 
             atten_bsc_on_bins = (
-                bsc_on_bins * np.exp(-2.0 * od_on_bins)
+                bsc_on_bins * np.exp(-(od_f_on_bins + od_b_on_bins))
             ).reset_coords(drop=True)
 
             molecular_ch = xr.concat(
                 [
-                    c_ext_on_bins,
+                    c_ext_f_on_bins,
+                    c_ext_b_on_bins,
                     c_bsc_on_bins,
-                    ext_on_bins,
+                    ext_f_on_bins,
+                    ext_b_on_bins,
                     bsc_on_bins,
-                    od_on_bins,
+                    od_f_on_bins,
+                    od_b_on_bins,
                     atten_bsc_on_bins,
                 ],
                 dim=xr.DataArray(
@@ -178,9 +219,9 @@ def compute_molecular_calculations(
             xr.concat(molecular_channels, dim="channel")
             .transpose("channel", "opto_parameters", "bins")
             .chunk({
-                "channel": 1,
+                "channel": channel_chunks,
                 "opto_parameters": -1,
-                "bins": bin_chunk_size,
+                "bins": -1,
             })
         )
 
@@ -193,10 +234,12 @@ def compute_molecular_calculations(
 def get_optical_parameters(ch, temperature_scale, emitted_wavelength, 
                            detected_wavelength, channel_bandwidth):
     
-    c_ext = np.nan * np.zeros_like(temperature_scale)
+    c_ext_f = np.nan * np.zeros_like(temperature_scale)
+    c_ext_b = np.nan * np.zeros_like(temperature_scale)
     c_bsc = np.nan * np.zeros_like(temperature_scale)
         
-    laser_wavelength = float(emitted_wavelength.loc[ch].values)
+    forward_wavelength = float(emitted_wavelength.loc[ch].values)
+    backward_wavelength = float(detected_wavelength.loc[ch].values)
     
     filter_parameters = {
         'central_wavelength':float(detected_wavelength.loc[ch].values),
@@ -231,23 +274,30 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
         for i, T in enumerate(temperature_scale):
             with contextlib.redirect_stdout(io.StringIO()):
                 
-                rre = arc(
-                    incident_wavelength = laser_wavelength, 
-                    temperature = T,
-                    max_J = 40, 
-                    backscattering = False,
-                    mode = "rotational_raman",
-                    )
+                rre_f = arc(
+                        incident_wavelength = forward_wavelength, 
+                        temperature = T,
+                        max_J = 40, 
+                        backscattering = False,
+                        mode = "rotational_raman",
+                        )
+                
+                rre_b = arc(
+                        incident_wavelength = backward_wavelength, 
+                        temperature = T,
+                        max_J = 40, 
+                        backscattering = False,
+                        mode = "rotational_raman",
+                        )
                 
                 if ch[5] in ['p','c','t','r']:
                     rrb = arc(
-                        incident_wavelength = laser_wavelength, 
+                        incident_wavelength = forward_wavelength, 
                         temperature = T,
                         max_J = 40, 
                         backscattering = True,
                         mode = mode,
                         filter_parameters = filter_parameters,
-                        
                         )
                     
                     c_bsc[i] = rrb.cross_section(cross_section_type = 'full', normalize = normalize)
@@ -261,10 +311,12 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
 
                 elif ch[5] in ['v']:
                     rrb = arc(
-                        incident_wavelength = laser_wavelength, 
+                        incident_wavelength = forward_wavelength, 
+                        temperature = T,
                         max_J = 40, 
                         backscattering = True,
                         mode = mode,
+                        filter_parameters = filter_parameters,
                         )
                     
                     c_bsc[i] = rrb.cross_section(cross_section_type = 'full', normalize = normalize)
@@ -272,9 +324,11 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
                 else:
                     c_bsc[i] = np.nan
                 
-                c_ext[i] = rre.cross_section(cross_section_type = 'full')
+                c_ext_f[i] = rre_f.cross_section(cross_section_type = 'full')
+                c_ext_b[i] = rre_b.cross_section(cross_section_type = 'full')
     
-    c_ext = xr.DataArray(c_ext, dims = ['T'], coords = [temperature_scale])
+    c_ext_f = xr.DataArray(c_ext_f, dims = ['T'], coords = [temperature_scale])
+    c_ext_b = xr.DataArray(c_ext_b, dims = ['T'], coords = [temperature_scale])
     c_bsc = xr.DataArray(c_bsc, dims = ['T'], coords = [temperature_scale])
     
-    return(c_ext, c_bsc)
+    return(c_ext_f, c_ext_b, c_bsc)

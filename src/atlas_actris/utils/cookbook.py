@@ -11,6 +11,7 @@ screening_recipe = [
     ("sliced", "slice_and_exclude"),
     ("shots_screened", "screen_low_shots"),
     ("overflows_checked", "handling_overflows"),
+    ("dark_assigned", "assign_dark"),
     # ("saturation_detected", "check_saturation"),
 ]
 
@@ -20,6 +21,7 @@ preprocessing_recipe = [
     ("averaged_high_res", "averaging_by_time_high_res"),
     ("mean_computed", "computing_mean"),
     ("photon_units_converted", "photon_units_conversion"),
+    ("background_raw_calculated", "background_calculation"),
     ("dead_time_corrected", "dead_time_correction"),
     ("background_calculated", "background_calculation"),
     ("background_corrected", "background_correction"),

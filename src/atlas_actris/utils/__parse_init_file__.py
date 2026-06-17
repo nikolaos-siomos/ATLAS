@@ -115,13 +115,13 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "export_netcdf":       {"dtype": bool, "default": True,       "is_list": False, "category": "optional"},
     "export_all":          {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
 
-    "channels":                 {"dtype": str, "default": [], "is_list": True, "category": "optional"},
+    "exclude_channels":         {"dtype": str, "default": [], "is_list": True, "category": "optional"},
     "exclude_telescope_type":   {"dtype": str, "default": [], "is_list": True, "category": "optional", "allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str, "default": [], "is_list": True, "category": "optional", "allowed": ["p", "c", "t", "v", "r", "a", "f"]},
     "exclude_acquisition_mode": {"dtype": str, "default": [], "is_list": True, "category": "optional", "allowed": ["a", "p", "g"]},
     "exclude_channel_subtype":  {"dtype": str, "default": [], "is_list": True, "category": "optional", "allowed": ["r", "t", "n", "o", "w", "c", "h", "l", "a", "m", "b", "s", "x"]},
 
-    "max_height_agl":               {"dtype": float, "default": 32.,  "is_list": False, "category": "optional"},
+    "max_height_agl":               {"dtype": float, "default": 40.,  "is_list": False, "category": "optional"},
     "low_shot_threshold":           {"dtype": float, "default": 0.9,  "is_list": False, "category": "optional", "min": 0., "max": 0.999},
     "trim_overflows":               {"dtype": int,   "default": 0,    "is_list": False, "category": "optional", "allowed": [0, 1, 2, 3]},
     "ray_averaging_rate":           {"dtype": str,   "default": None, "is_list": False, "category": "optional"},

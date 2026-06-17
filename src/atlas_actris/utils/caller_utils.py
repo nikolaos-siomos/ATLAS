@@ -164,13 +164,21 @@ def export_report(caller_info):
 
     export_all = caller_info.get('export_all')
 
-    data_identifier = caller_info.get('data_identifier')
+    data_identifier = os.path.basename(caller_info.get('parent_folder'))
   
     html_filename = export_html.make_filename(
         data_identifier = data_identifier, 
         expert_analyst = expert_analyst,
         scc_station_id = scc_station_id,
         scc_configuration_id = scc_configuration_id
+        )
+    
+    ods_filename = export_html.make_filename(
+        data_identifier = data_identifier, 
+        expert_analyst = expert_analyst,
+        scc_station_id = scc_station_id,
+        scc_configuration_id = scc_configuration_id,
+        extension = "ods"
         )
 
     photon_only = file_format in ['polly_xt', 'polly_xt_first']
@@ -179,14 +187,18 @@ def export_report(caller_info):
     plots_folder = os.path.join(caller_info["output_folder"], 'plots')
 
     os.makedirs(reports_folder, exist_ok = True)
+    
+    html_filepath = os.path.join(reports_folder, html_filename)
+    docx_filepath = os.path.splitext(html_filepath)[0] + ".docx"
 
     export_html.QA_report(
-        plots_folder = plots_folder, 
-        html_filename = os.path.join(reports_folder, html_filename),
-        photon_only = photon_only, 
-        export_all = export_all
-        )
-    
+        plots_folder=plots_folder,
+        html_filepath=html_filepath,
+        photon_only=False,
+        export_all=False,
+        export_docx=True,
+        docx_filepath=docx_filepath,
+    )
 
     return()
 

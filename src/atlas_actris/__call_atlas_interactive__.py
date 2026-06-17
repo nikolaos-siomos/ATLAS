@@ -9,6 +9,7 @@ Created on Tue Sep 19 17:43:26 2023
 # from __master__ import main as atlas_master
 from utils.cleaners import ask_clean_cache
 from utils.caller_utils import export_report
+from utils.channel_filter import filter_channels
 from utils.find_radiosonde import find_radiosonde
 from utils.__get_scc_config__ import export_scc_config
 from utils.__parse_init_file__ import parse_call_atlas_ini
@@ -70,15 +71,9 @@ caller_info["raw_file_format"] = infer_format(caller_info, station_id = config_i
 
 # Modifying absolute paths for scc and polly_xt readers that have 2 measurements embeeded in one file
 caller_info = special_path_rules(caller_info)
-      
+     
 # Reading the files
 profiles, metadata = flexible_reader(caller_info)
-
-# # Expand profiles dictionary using the loading_map aliases
-# profiles = expand_with_loading_map(profiles, caller_info)
-
-# # Expand each entry of metadata dictionary using the loading_map aliases
-# metadata = expand_nested_with_loading_map(metadata, caller_info)
 
 # Transfer metadata from the raw file header to config_info
 config_info = load_metadata(config_info, metadata)
@@ -106,6 +101,9 @@ metadata = find_radiosonde(caller_info, metadata)
 
 # Load radiosonde files
 meteo, metadata = load_radiosonde(caller_info, metadata)
+
+# Filter out channels
+profiles, meatadata = filter_channels(caller_info, profiles, metadata)     
 
 # Load all data needed for processing in a data class
 ctx = Context(
@@ -138,6 +136,7 @@ run_linear_recipe(
     initial_input = "preprocessing_complete",
     checkout_id = "pol_cal_complete",
     )
+
 
 # Package measurements for quicklooks
 processor.package(output_id = 'preprocessing_complete_qck', input_id = 'preprocessing_complete')
