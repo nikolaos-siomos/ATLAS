@@ -55,15 +55,20 @@ def generate_quadrant_telecover(X, sectors, ranges, args):
 
     plt.rc("font", size=14)
 
-    fig = plt.figure(figsize=(20.0, 4.0))
-    fig.suptitle(args["title"])
+    fig = plt.figure(figsize=(20.0, 4.5))
+    fig.suptitle(args["title"], y=0.98)
+
+    # Leave extra room for three-line telecover titles while keeping
+    # the panel bottoms unchanged. Only the panel height is reduced.
+    panel_bottom = 0.13
+    panel_height = 0.64
 
     axes = {
-        "raw_near": fig.add_axes([0.04, 0.13, 0.19, 0.7]),
-        "raw_far": fig.add_axes([0.24, 0.13, 0.07, 0.7]),
-        "norm_near": fig.add_axes([0.36, 0.13, 0.19, 0.7]),
-        "norm_far": fig.add_axes([0.56, 0.13, 0.07, 0.7]),
-        "deviation": fig.add_axes([0.69, 0.13, 0.29, 0.7]),
+        "raw_near": fig.add_axes([0.04, panel_bottom, 0.19, panel_height]),
+        "raw_far": fig.add_axes([0.24, panel_bottom, 0.07, panel_height]),
+        "norm_near": fig.add_axes([0.36, panel_bottom, 0.19, panel_height]),
+        "norm_far": fig.add_axes([0.56, panel_bottom, 0.07, panel_height]),
+        "deviation": fig.add_axes([0.69, panel_bottom, 0.29, panel_height]),
     }
 
     raw_near_panel(

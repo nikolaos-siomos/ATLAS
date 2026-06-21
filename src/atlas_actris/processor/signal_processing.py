@@ -44,6 +44,7 @@ from utils.signal_utils import (
     temporal_averaging_error, 
     fast_rolling_mean_range,
     fast_rolling_noise,
+    fast_rolling_mean,
     )
 
 from utils.error_classes import CustomWarning
@@ -209,7 +210,7 @@ def compute_dead_time_correction(processing_info, input_data):
             
                     print_entry(key)
                     print(
-                        "Warning: Dead-time correction was cancelled for channels "
+                        "Warning: Dead-time correction was deactivated for channels "
                         f"with background > 60 MHz: {', '.join(sorted(warned_channels))}"
                     )
                     print()
@@ -780,6 +781,48 @@ def compute_signal_noise(
         sig_err = _restore_dim_order(sig_err, sig)
 
         output_data["profile_error"][key] = sig_err
+
+    print_entry("Signal error calculation succesfully performed!")
+    return output_data
+
+def compute_signal_smoothing(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+
+    output_data = shallow_copy(input_data)
+
+    profiles_m = output_data["profile_mean"]
+    profiles_m_error = output_data["profile_error_mean"]
+
+    ranges = output_data["range"]
+
+    caller_info = processing_info["caller_info"]
+
+    smoothing_window_bins = caller_info.get("smoothing_window", 133)
+    
+    for key, sig in profiles_m.items():
+
+        if key not in profiles_m:
+            continue
+        
+        if key not in profiles_m_error:
+            continue
+
+        sig_m = profiles_m[key]
+        sig_m_err = profiles_m_error[key]
+        
+        sig_m_sm = fast_rolling_mean(
+            sig_m,
+            window = smoothing_window_bins,
+        ) 
+        
+        sig_m_sm_err = sig_m_err / np.sqrt(smoothing_window_bins)
+
+        # Mean-profile noise. This stays small.
+        output_data["profile_mean"][key] = sig_m_sm.broadcast_like(sig_m)
+
+        output_data["profile_error_mean"][key] = sig_m_sm_err.broadcast_like(sig_m_err)
 
     print_entry("Signal error calculation succesfully performed!")
     return output_data

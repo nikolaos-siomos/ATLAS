@@ -19,6 +19,9 @@ def _check_err_type(err_type):
 
 
 def _as_odd_window(win):
+    if not np.isfinite(win):
+        raise ValueError(f"Smoothing window must be finite. Got: {win}")
+
     win = int(win)
 
     if win < 1:
@@ -31,12 +34,42 @@ def _as_odd_window(win):
 
 
 def _coord_step(vals):
-    vals = np.asarray(vals)
+    """
+    Estimate the coordinate spacing from finite adjacent coordinate pairs.
+
+    Some channels can have NaNs at the beginning/end of their vertical scale
+    after overlap between channel-specific bins is applied.  The smoothing
+    window must still be calculated from the valid part of the coordinate
+    without changing the original array length.
+    """
+
+    vals = np.asarray(vals, dtype=float)
 
     if vals.size < 2:
         raise ValueError("Coordinate array must contain at least two points.")
 
-    return vals[1] - vals[0]
+    finite_pair = np.isfinite(vals[:-1]) & np.isfinite(vals[1:])
+
+    if not np.any(finite_pair):
+        raise ValueError(
+            "Coordinate array must contain at least one adjacent finite pair "
+            "to calculate the smoothing step."
+        )
+
+    dvals = np.diff(vals)[finite_pair]
+    dvals = dvals[np.isfinite(dvals) & (dvals != 0.0)]
+
+    if dvals.size == 0:
+        raise ValueError(
+            "Coordinate array has no finite non-zero adjacent spacing."
+        )
+
+    step = np.nanmedian(np.abs(dvals))
+
+    if not np.isfinite(step) or step <= 0.0:
+        raise ValueError(f"Invalid coordinate step calculated: {step}")
+
+    return step
 
 
 def _limits_to_slice(vals, lims):
@@ -45,14 +78,23 @@ def _limits_to_slice(vals, lims):
 
     Limits outside the coordinate range are allowed.
     If there is no overlap with the signal, an empty slice is returned.
+    NaN coordinate values are ignored for the limit search, while the returned
+    indices still refer to the original unsliced arrays.
     """
 
-    vals = np.asarray(vals)
+    vals = np.asarray(vals, dtype=float)
+
+    if lims is None or len(lims) == 0:
+        finite = np.isfinite(vals)
+        if not np.any(finite):
+            return 0, 0
+        inds = np.where(finite)[0]
+        return inds[0], inds[-1] + 1
 
     lo = min(lims[0], lims[-1])
     hi = max(lims[0], lims[-1])
 
-    mask = (vals >= lo) & (vals <= hi)
+    mask = np.isfinite(vals) & (vals >= lo) & (vals <= hi)
 
     if not np.any(mask):
         return 0, 0

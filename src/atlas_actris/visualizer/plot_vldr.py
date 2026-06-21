@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.dates as mdates
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MaxNLocator, AutoMinorLocator
 
 from visualizer.plot_utils import export_plot
 from visualizer import color_lib, make_colormap
@@ -84,31 +84,19 @@ def quicklook_panel(fig, fig_coords, T, X, Y, args):
         x_tick=args["x_tick"],
     )
 
+    set_time_axis(
+        ax=ax,
+        t_tick=args["t_tick"],
+    )
+
+    add_minor_ticks(ax=ax)
+
     qck = add_quicklook_mesh(
         ax=ax,
         T=T,
         X=X,
         Y=Y,
         args=args,
-        )
-
-    set_time_axis(
-        ax=ax,
-        t_tick=args["t_tick"],
-    )
-    
-    if not args['has_time_gap']:
-        add_time_index_axis(
-            ax=ax,
-            T=T,
-        )
-
-    qck = add_quicklook_mesh(
-        ax=ax,
-        T=T,
-        X=X,
-        Y=Y,
-        args=args
     )
 
     add_colorbar(
@@ -127,6 +115,11 @@ def set_x_axis(ax, x_lims, x_tick):
 
     ax.set_yticks(x_ticks, labels=x_ticks)
     ax.set_ylim(x_lims)
+
+    try:
+        ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+    except Exception:
+        pass
 
     return ax
 
@@ -195,6 +188,11 @@ def set_time_axis(ax, t_tick=None, target_ticks=8):
         ax.xaxis.set_major_locator(major_locator)
         ax.xaxis.set_major_formatter(formatter)
 
+        try:
+            ax.xaxis.set_minor_locator(AutoMinorLocator(2))
+        except Exception:
+            pass
+
     else:
         # Manual tick spacing in minutes
         major_interval_sec = int(round(60 * t_tick))
@@ -221,50 +219,137 @@ def set_time_axis(ax, t_tick=None, target_ticks=8):
 
     return ax
 
-def add_time_index_axis(ax, T, n_ticks=8):
+
+def add_minor_ticks(ax):
+    """Enable minor ticks on both axes without changing major tick positions."""
+
+    try:
+        ax.minorticks_on()
+    except Exception:
+        pass
+
+    try:
+        if ax.yaxis.get_minor_locator() is None:
+            ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+    except Exception:
+        pass
+
+    ax.tick_params(axis="both", which="minor", length=2.5, width=0.6)
+    ax.tick_params(axis="both", which="major", length=4.0, width=0.8)
+
+    return ax
+
+
+def _manual_y_lims(args):
+    """Return user-provided color limits, or None if they are not usable."""
+
+    y_lims = args.get("y_lims", None)
+
+    if y_lims in [None, []]:
+        return None
+
+    try:
+        y_min = float(y_lims[0])
+        y_max = float(y_lims[1])
+    except Exception:
+        return None
+
+    if not np.isfinite(y_min) or not np.isfinite(y_max) or y_max <= y_min:
+        return None
+
+    return y_min, y_max
+
+
+def _safe_positive_vmin(y_vals, y_max):
+    """Return a strictly positive vmin suitable for LogNorm."""
+
+    positive = np.asarray(y_vals)[np.isfinite(y_vals) & (np.asarray(y_vals) > 0.)]
+
+    if positive.size > 0:
+        vmin = float(np.nanpercentile(positive, 1.0))
+    else:
+        vmin = np.nan
+
+    if not np.isfinite(vmin) or vmin <= 0.:
+        vmin = max(float(y_max) * 1.0e-4, 1.0e-12)
+
+    if vmin >= y_max:
+        vmin = max(float(y_max) * 1.0e-4, 1.0e-12)
+
+    return vmin
+
+
+def _safe_vldr_color_limits(y_vals, x_vals, args):
+    """Compute robust VLDR color limits.
+
+    If args['y_lims'] is provided and valid, it is used directly.  Otherwise
+    vmax is estimated from args['y_max_zone'] via max_quicklook_y().  If this
+    fails or returns a non-positive/non-finite value, the full plotted data are
+    used as a fallback.
     """
-    Add a top twin x-axis showing nice index numbers of datetime array T.
-    """
 
-    ax_top = ax.twiny()
+    manual_limits = _manual_y_lims(args)
+    if manual_limits is not None:
+        y_min, y_max = manual_limits
+        source = "y_lims"
+    else:
+        try:
+            y_max = max_quicklook_y(
+                y_vals=y_vals,
+                x_vals=x_vals,
+                y_max_zone=args.get("y_max_zone", []),
+            )
+        except Exception:
+            y_max = np.nan
 
-    # Important: copy limits after the main plot has set them
-    ax_top.set_xlim(ax.get_xlim())
+        finite = np.asarray(y_vals)[np.isfinite(y_vals)]
 
-    locator = MaxNLocator(nbins=n_ticks, integer=True)
-    idx_ticks = locator.tick_values(0, len(T) - 1)
+        if not np.isfinite(y_max) or y_max <= 0.:
+            if finite.size > 0:
+                y_max = float(np.nanpercentile(finite, 99.0))
+                source = "full-data 99th percentile fallback"
+            else:
+                y_max = 1.0
+                source = "default fallback"
+        else:
+            source = "y_max_zone"
 
-    idx_ticks = idx_ticks.astype(int)
-    idx_ticks = idx_ticks[(idx_ticks >= 0) & (idx_ticks < len(T))]
-    idx_ticks = np.unique(idx_ticks)
+        if not np.isfinite(y_max) or y_max <= 0.:
+            y_max = 1.0
+            source = "default fallback"
 
-    ax_top.set_xticks(mdates.date2num(T[idx_ticks]))
-    ax_top.set_xticklabels(idx_ticks)
+        y_min = 0.0
 
-    return ax_top
+    if args.get("use_log_y_scale", False):
+        # LogNorm cannot use vmin=0.
+        if y_min <= 0.:
+            y_min = _safe_positive_vmin(y_vals, y_max)
+
+    if y_max <= y_min:
+        y_max = y_min * 10. if y_min > 0. else 1.0
+
+    if args.get("debug_y_max_zone", False):
+        print(
+            "-- VLDR quicklook color limits: "
+            f"vmin={y_min}, vmax={y_max}, source={source}, "
+            f"y_max_zone={args.get('y_max_zone', [])}"
+        )
+
+    return y_min, y_max
 
 
 def add_quicklook_mesh(ax, T, X, Y, args):
 
-    # y_lims = get_quicklook_y_limits(
-    #     y_vals=Y,
-    #     x_vals=X,
-    #     y_lims=args["y_lims"],
-    #     use_log=args["use_log_y_scale"],
-    # )
-    
-    y_max = max_quicklook_y(
-        y_vals=Y,
-        x_vals=X,
-        y_max_zone=args["y_max_zone"],
-    )
-
     my_cmap = get_quicklook_colormap()
 
-    # pcolormesh expects C as (len(X), len(T))
+    # pcolormesh expects C as (len(X), len(T)).  Keep a time-height copy for
+    # the y_max_zone calculation, because max_quicklook_y expects y_vals to be
+    # aligned with x_vals along the second axis.
     if Y.shape == (len(T), len(X)):
+        Y_time_height = Y
         Y_plot = Y.T
     elif Y.shape == (len(X), len(T)):
+        Y_time_height = Y.T
         Y_plot = Y
     else:
         raise ValueError(
@@ -272,13 +357,19 @@ def add_quicklook_mesh(ax, T, X, Y, args):
             f"({len(T)}, {len(X)}) or ({len(X)}, {len(T)})."
         )
 
+    y_min, y_max = _safe_vldr_color_limits(
+        y_vals=Y_time_height,
+        x_vals=X,
+        args=args,
+    )
+
     if args["use_log_y_scale"]:
         qck = ax.pcolormesh(
             T,
             X,
             Y_plot,
             cmap=my_cmap,
-            norm=LogNorm(vmin=0., vmax=y_max),
+            norm=LogNorm(vmin=y_min, vmax=y_max),
             shading="auto",
         )
         
@@ -287,7 +378,7 @@ def add_quicklook_mesh(ax, T, X, Y, args):
             T,
             X,
             Y_plot,
-            vmin=0.,
+            vmin=y_min,
             vmax=y_max,
             cmap=my_cmap,
             shading="auto",

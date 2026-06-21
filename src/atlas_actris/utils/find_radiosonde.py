@@ -11,8 +11,8 @@ import pandas as pd
 import xarray as xr
 
 from __get_T_P_profiles_from_cloudnet__ import _download_from_cloudnet  
-from __get_T_P_profiles_from_wyoming_updated__ import _download_wyoming
-from utils.select_radiosonde import select_radiosonde_filename
+from __get_T_P_profiles_from_wyoming__ import _download_wyoming
+from utils.select_radiosonde import select_radiosonde_filename, select_manual_radiosonde_file
 from utils.printouts import print_header, print_entry
 from utils.error_classes import CustomWarning
 
@@ -20,7 +20,8 @@ def find_radiosonde(caller_info, metadata):
     
     print_header("Selecting radiosonde file")
     
-    radiosonde_folder = caller_info['radiosonde_folder']
+    radiosonde_file = caller_info.get('radiosonde_file')
+    radiosonde_folder = caller_info.get('radiosonde_folder')
     rsonde_wmo_number = caller_info['rsonde_station_wmo_id']
     cloudnet_station_name = caller_info['cloudnet_station_name']
     
@@ -43,6 +44,43 @@ def find_radiosonde(caller_info, metadata):
             mid_date = mid_stamp.strftime("%d.%m.%Y")
             mid_time = mid_stamp.strftime("%H:%M:%S")
             
+            if radiosonde_file:
+                if radiosonde_folder:
+                    CustomWarning(
+                        "radiosonde_file was provided manually. "
+                        "radiosonde_folder will be ignored."
+                    )
+                    print()
+
+                radiosonde_info, status = select_manual_radiosonde_file(
+                    target=mid_time_dt64,
+                    radiosonde_file=radiosonde_file,
+                )
+
+                if status == 0:
+                    print(f"Radiosonde file manually provided: {radiosonde_info['radiosonde_file']}")
+                    print()
+
+                    caller_info['radiosonde_status'] = status
+                    radiosonde_info['measurement_time'] = mid_time_dt64
+                    radiosonde_info['radiosonde_status'] = status
+
+                    metadata['radiosonde_info'][key] = xr.DataArray(
+                        data=list(radiosonde_info.values()),
+                        dims=["parameters"],
+                        coords={"parameters": list(radiosonde_info.keys())},
+                    )
+
+                else:
+                    caller_info['radiosonde_status'] = status
+                    CustomWarning(
+                        "The manually provided radiosonde file could not be used. "
+                        "Computations which need molecular profiles will not be performed"
+                    )
+                    print()
+
+                continue
+
             wyoming_file_downloaded = False
             cloudnet_file_downloaded = False
             

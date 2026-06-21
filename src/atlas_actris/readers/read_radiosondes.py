@@ -254,6 +254,48 @@ def wyoming_filename_checks(bnames):
     if any(bad_times):
         raise Exception(f"-- Error: The time provided in at least one wyoming radiosond filename is not correct. Please revise the following files: {np.array(bnames)[bad_times]}. It should start with 'yyyymmdd_hhmm' and end with '.txt' ")
             
+def clean_meteo_height_index(meteo):
+    """Sort radiosonde profiles and remove invalid or duplicate height levels.
+
+    xarray interpolation requires the interpolation coordinate to be unique.
+    Radiosonde files can contain repeated height levels, especially after
+    rounding or unit conversion. Keep the first occurrence of each valid
+    height level and preserve the original atmospheric-parameter dimension.
+    """
+
+    if "height_asl" not in meteo.dims:
+        return meteo
+
+    meteo = meteo.sortby("height_asl")
+
+    height = meteo.height_asl.values
+    valid = np.isfinite(height)
+
+    if not np.all(valid):
+        CustomWarning(
+            "Invalid radiosonde height levels detected. "
+            "Removing NaN or infinite height values."
+        )
+        meteo = meteo.isel(height_asl=valid)
+        height = meteo.height_asl.values
+
+    if height.size == 0:
+        raise Exception(
+            "-- Error: No valid radiosonde height levels remain after cleaning."
+        )
+
+    _, unique_ind = np.unique(height, return_index=True)
+    unique_ind = np.sort(unique_ind)
+
+    if unique_ind.size < height.size:
+        CustomWarning(
+            "Duplicate radiosonde height levels detected. "
+            "Keeping the first occurrence of each height level."
+        )
+        meteo = meteo.isel(height_asl=unique_ind)
+
+    return meteo
+
 def add_number_density(meteo):
     
     height_asl = meteo.height_asl.values
@@ -351,7 +393,9 @@ def read_radiosonde_ecmwf(station_altitude, radiosonde_info):
     meteo = meteo.rename(level='height_asl')
     meteo = meteo.assign_coords(
         height_asl=height.values + station_altitude
-    ).sortby("height_asl")
+    )
+
+    meteo = clean_meteo_height_index(meteo)
     
     meteo = add_number_density(meteo)
 
@@ -368,7 +412,7 @@ def read_radiosonde_wyoming(radiosonde_info):
                          skip_footer = 0,
                          delimiter = ',', 
                          autostrip = True,
-                         usecols = np.array([1,0,2,5]), dtype = float)
+                         usecols = np.array([4, 3, 5, 8]), dtype = float)
     
     atmo_parameters = ['P', 'T', 'RH']         
         
@@ -380,6 +424,8 @@ def read_radiosonde_wyoming(radiosonde_info):
     
         
     meteo = convert_units(meteo, units = ['m_asl','hPa','C','percent'])
+
+    meteo = clean_meteo_height_index(meteo)
     
     meteo = add_number_density(meteo)
 
@@ -412,6 +458,8 @@ def read_radiosonde_scc(radiosonde_info):
         )
     
     meteo = convert_units(meteo, units = ['m_asl','hPa','K','percent'])
+
+    meteo = clean_meteo_height_index(meteo)
     
     meteo = add_number_density(meteo)
 
@@ -463,6 +511,8 @@ def read_radiosonde_ascii(caller_info, radiosonde_info):
         units = rsonde_column_units, 
         ground = rsonde_station_altitude
         )
+
+    meteo = clean_meteo_height_index(meteo)
     
     meteo = add_number_density(meteo)
 

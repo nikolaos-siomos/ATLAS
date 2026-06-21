@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.dates as mdates
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MaxNLocator, AutoMinorLocator
 
 from visualizer.plot_utils import export_plot
 from visualizer import color_lib, make_colormap
@@ -84,31 +84,19 @@ def quicklook_panel(fig, fig_coords, T, X, Y, args):
         x_tick=args["x_tick"],
     )
 
+    set_time_axis(
+        ax=ax,
+        t_tick=args["t_tick"],
+    )
+
+    add_minor_ticks(ax=ax)
+
     qck = add_quicklook_mesh(
         ax=ax,
         T=T,
         X=X,
         Y=Y,
         args=args,
-        )
-
-    set_time_axis(
-        ax=ax,
-        t_tick=args["t_tick"],
-    )
-    
-    if not args['has_time_gap']:
-        add_time_index_axis(
-            ax=ax,
-            T=T,
-        )
-
-    qck = add_quicklook_mesh(
-        ax=ax,
-        T=T,
-        X=X,
-        Y=Y,
-        args=args
     )
 
     add_colorbar(
@@ -127,6 +115,11 @@ def set_x_axis(ax, x_lims, x_tick):
 
     ax.set_yticks(x_ticks, labels=x_ticks)
     ax.set_ylim(x_lims)
+
+    try:
+        ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+    except Exception:
+        pass
 
     return ax
 
@@ -195,6 +188,11 @@ def set_time_axis(ax, t_tick=None, target_ticks=8):
         ax.xaxis.set_major_locator(major_locator)
         ax.xaxis.set_major_formatter(formatter)
 
+        try:
+            ax.xaxis.set_minor_locator(AutoMinorLocator(2))
+        except Exception:
+            pass
+
     else:
         # Manual tick spacing in minutes
         major_interval_sec = int(round(60 * t_tick))
@@ -221,27 +219,25 @@ def set_time_axis(ax, t_tick=None, target_ticks=8):
 
     return ax
 
-def add_time_index_axis(ax, T, n_ticks=8):
-    """
-    Add a top twin x-axis showing nice index numbers of datetime array T.
-    """
 
-    ax_top = ax.twiny()
+def add_minor_ticks(ax):
+    """Enable minor ticks on both axes without changing major tick positions."""
 
-    # Important: copy limits after the main plot has set them
-    ax_top.set_xlim(ax.get_xlim())
+    try:
+        ax.minorticks_on()
+    except Exception:
+        pass
 
-    locator = MaxNLocator(nbins=n_ticks, integer=True)
-    idx_ticks = locator.tick_values(0, len(T) - 1)
+    try:
+        if ax.yaxis.get_minor_locator() is None:
+            ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+    except Exception:
+        pass
 
-    idx_ticks = idx_ticks.astype(int)
-    idx_ticks = idx_ticks[(idx_ticks >= 0) & (idx_ticks < len(T))]
-    idx_ticks = np.unique(idx_ticks)
+    ax.tick_params(axis="both", which="minor", length=2.5, width=0.6)
+    ax.tick_params(axis="both", which="major", length=4.0, width=0.8)
 
-    ax_top.set_xticks(mdates.date2num(T[idx_ticks]))
-    ax_top.set_xticklabels(idx_ticks)
-
-    return ax_top
+    return ax
 
 
 def add_quicklook_mesh(ax, T, X, Y, args):

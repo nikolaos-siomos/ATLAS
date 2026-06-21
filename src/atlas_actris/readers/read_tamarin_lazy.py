@@ -16,10 +16,35 @@ import pandas as pd
 import glob
 import datetime as dt
 import xarray as xr
+import dask.array as da
 from readers.check_file_format import detect_netcdf
 from utils.error_classes import FileReaderError
 from utils.time_conversions import datetimes_to_iso
 from utils.error_classes import CustomWarning
+
+
+def _default_lazy_chunks(n_time=None):
+    """Return the same reader-level chunking used by read_licel_lazy."""
+
+    if n_time is None:
+        time_chunks = 10
+    else:
+        time_chunks = min(5, max(10, int(n_time)))
+
+    return {"time": time_chunks, "channel": 5, "bins": -1}
+
+
+def _open_dataset_lazy(nc_file):
+    """Open NetCDF lazily; actual reader chunks are applied after renaming dims."""
+
+    return xr.open_dataset(nc_file, chunks={})
+
+
+def _chunk_signal_like_licel(sig_raw):
+    if hasattr(sig_raw.data, "chunks"):
+        return sig_raw.chunk(_default_lazy_chunks(sig_raw.sizes.get("time")))
+    return sig_raw
+
 
 
 # Read measurement
@@ -98,7 +123,7 @@ def read_dataset(dir_meas: str, meas_type: str):
                                          meas_type = meas_type)
 
         else:
-            raw_data = xr.open_dataset(mfiles[k])
+            raw_data = _open_dataset_lazy(mfiles[k])
 
             if "Measurement_ID" not in raw_data.attrs:
                 raise FileReaderError("Measurement_ID parameter not found in the netcdf file. This is not a scc raw file")
@@ -143,8 +168,8 @@ def read_dataset(dir_meas: str, meas_type: str):
         shots = shots.transpose('time','channel')
 
         # Sort by time
-        sig_raw = sig_raw.sortby('time').copy()
-        shots = shots.sortby('time').copy()
+        sig_raw = _chunk_signal_like_licel(sig_raw.sortby('time'))
+        shots = shots.sortby('time')
         time_info = time_info.sort_index()
 
     return(system_info, channel_info, time_info, sig_raw, shots)
@@ -223,23 +248,23 @@ def read_signals(raw_data, time, channels, meas_type):
         if "Background_Profile" not in list(raw_data.variables):
             raise FileReaderError("--Background_Profile parameter not found. Is this really a dark measurement file?")
 
-        sig_arr = raw_data["Background_Profile"].values
+        sig_arr = raw_data["Background_Profile"].astype(float)
     else:
         if "Raw_Lidar_Data" not in list(raw_data.variables):
             raise FileReaderError("--Raw_Lidar_Data parameter not found. Is this really a non-dark measurement file?")
 
-        sig_arr = raw_data["Raw_Lidar_Data"].values
+        sig_arr = raw_data["Raw_Lidar_Data"].astype(float)
 
-    sig_arr[sig_arr >= 9.96e+36] = np.nan
+    sig_arr = sig_arr.where(sig_arr < 9.96e+36)
 
     bins = 1. + np.arange(0, sig_arr.shape[-1])
 
-    sig_raw = xr.DataArray(sig_arr,
+    sig_raw = xr.DataArray(sig_arr.data,
                            coords=[time, channels, bins], #range_sig
                            dims=['time', 'channel', 'bins']) #'range'
 
     # Sort by time
-    sig_raw = sig_raw.copy().sortby('time')
+    sig_raw = sig_raw.sortby('time')
 
     return(sig_raw)
 
@@ -247,16 +272,16 @@ def read_signals(raw_data, time, channels, meas_type):
 def read_shots(raw_data, time, channels, meas_type):
 
     if meas_type == "drk":
-        shots = np.tile(np.median(raw_data["Laser_Shots"].values, axis = 0), (len(time), 1))
+        shots = da.tile(raw_data["Laser_Shots"].median(dim=raw_data["Laser_Shots"].dims[0]).data, (len(time), 1))
     else:
-        shots = raw_data["Laser_Shots"].values
+        shots = raw_data["Laser_Shots"].data
 
     shots = xr.DataArray(shots,
                          coords=[time, channels], #range_sig
                          dims=['time', 'channel']) #'range'
 
     # Sort by time
-    shots = shots.copy().sortby('time')
+    shots = shots.sortby('time')
 
     return(shots)
 
@@ -295,7 +320,7 @@ def _open_tamarin_dataset(nc_file, group = None):
         kwargs["group"] = group
 
     try:
-        return xr.open_dataset(nc_file, **kwargs)
+        return xr.open_dataset(nc_file, chunks={}, **kwargs)
     except ValueError as exc:
         raise FileReaderError(
             "--Could not open this NetCDF4 group with xarray. "
@@ -702,7 +727,8 @@ def _profile_to_time_channel_bins(profile_var, n_channels, n_times):
     channel_dim = _find_dim(dims, {"channels", "channel", "channel_id"}, "channel")
     bin_dim = _find_dim(dims, {"points", "point", "bins", "bin", "range"}, "bin")
 
-    arr = profile_var.transpose(time_dim, channel_dim, bin_dim).values.astype(float)
+    arr = profile_var.transpose(time_dim, channel_dim, bin_dim).astype(float)
+    arr = arr.rename({time_dim: "time", channel_dim: "channel", bin_dim: "bins"})
 
     if arr.shape[0] != n_times:
         raise FileReaderError(
@@ -747,49 +773,49 @@ def _as_time_channel(arr, n_channels, n_times):
 
 
 def _laser_shots_to_time_channel(shots_var, n_channels, n_times):
-    """Read Tamarin Laser_Shots directly as a (time, channel) array.
+    """Read Tamarin Laser_Shots lazily as a (time, channel) DataArray.
 
     Tamarin stores Laser_Shots in the same group as the signal, typically with
-    dimensions such as (time, points). This function does not take medians,
+    dimensions such as (time, channels). This function does not take medians,
     sums, or totals. It only reorders axes when needed to match the SCC reader
     output format.
     """
 
-    arr = np.asarray(shots_var.values).astype(float)
-    dims = tuple(str(dim).lower() for dim in shots_var.dims)
-
-    if arr.ndim != 2:
+    if shots_var.ndim != 2:
         raise FileReaderError(
             f"--Expected Tamarin Laser_Shots to be 2D with dimensions like "
-            f"(time, points), got shape {arr.shape}"
+            f"(time, channels), got shape {shots_var.shape}"
         )
 
-    time_axis = None
-    channel_axis = None
+    dims = shots_var.dims
+    time_dim = None
+    channel_dim = None
 
-    for ax, dim in enumerate(dims):
-        if dim in ["time", "time_bck"] or "time" in dim:
-            time_axis = ax
-        if dim in ["channel", "channels", "channel_id"] or "channel" in dim:
-            channel_axis = ax
+    for dim in dims:
+        dim_l = str(dim).lower()
+        if dim_l in ["time", "time_bck"] or "time" in dim_l:
+            time_dim = dim
+        if dim_l in ["channel", "channels", "channel_id"] or "channel" in dim_l:
+            channel_dim = dim
 
-    if time_axis is None:
-        matches = [ax for ax, size in enumerate(arr.shape) if size == n_times]
+    if time_dim is None:
+        matches = [dim for dim in dims if shots_var.sizes[dim] == n_times]
         if len(matches) == 1:
-            time_axis = matches[0]
+            time_dim = matches[0]
 
-    if channel_axis is None:
-        matches = [ax for ax, size in enumerate(arr.shape) if size == n_channels and ax != time_axis]
+    if channel_dim is None:
+        matches = [dim for dim in dims if shots_var.sizes[dim] == n_channels and dim != time_dim]
         if len(matches) == 1:
-            channel_axis = matches[0]
+            channel_dim = matches[0]
 
-    if time_axis is None or channel_axis is None or time_axis == channel_axis:
+    if time_dim is None or channel_dim is None or time_dim == channel_dim:
         raise FileReaderError(
             f"--Could not identify time/channel axes for Tamarin Laser_Shots "
-            f"with dims {shots_var.dims} and shape {arr.shape}"
+            f"with dims {shots_var.dims} and shape {shots_var.shape}"
         )
 
-    arr = np.transpose(arr, (time_axis, channel_axis))
+    arr = shots_var.transpose(time_dim, channel_dim).astype(float)
+    arr = arr.rename({time_dim: "time", channel_dim: "channel"})
 
     if arr.shape != (n_times, n_channels):
         raise FileReaderError(
@@ -900,20 +926,20 @@ def read_signals_tamarin(nc_file, time, channels, meas_type):
             # Missing photon channels, for example in dark/baseline profiles,
             # are exported as synthetic zero profiles so all meas_types have the
             # same channel set.
-            sig_arr = np.zeros_like(template, dtype = float)
+            sig_arr = xr.zeros_like(template, dtype = float)
 
         sig_blocks.append(sig_arr)
 
-    sig_arr = np.concatenate(sig_blocks, axis = 1)
-    sig_arr[sig_arr >= 9.96e+36] = np.nan
+    sig_arr = xr.concat(sig_blocks, dim = 'channel')
+    sig_arr = sig_arr.where(sig_arr < 9.96e+36)
 
     bins = 1. + np.arange(0, sig_arr.shape[-1])
 
-    sig_raw = xr.DataArray(sig_arr,
+    sig_raw = xr.DataArray(sig_arr.data,
                            coords=[time, channels, bins],
                            dims=['time', 'channel', 'bins'])
 
-    sig_raw = sig_raw.copy().sortby('time')
+    sig_raw = sig_raw.sortby('time')
 
     return(sig_raw)
 
@@ -934,17 +960,17 @@ def read_shots_tamarin(nc_file, time, channels, meas_type):
     else:
         shots_arr = _laser_shots_to_time_channel(group["Laser_Shots"],
                                                  n_channels = n_channels,
-                                                 n_times = n_times)
+                                                 n_times = n_times).data
 
     # Tamarin output is always analog + photon. Duplicate the directly-read
     # per-profile shots so the shots DataArray keeps the exact same
     # (time, channel) shape as sig_raw, including synthetic photon channels.
-    shots_arr = np.tile(shots_arr, (1, _tamarin_output_multiplier(nc_file, meas_type)))
+    shots_arr = da.tile(shots_arr, (1, _tamarin_output_multiplier(nc_file, meas_type)))
 
     shots = xr.DataArray(shots_arr,
                          coords=[time, channels],
                          dims=['time', 'channel'])
 
-    shots = shots.copy().sortby('time')
+    shots = shots.sortby('time')
 
     return(shots)

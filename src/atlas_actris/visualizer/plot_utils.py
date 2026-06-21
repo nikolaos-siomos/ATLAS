@@ -889,7 +889,7 @@ def export_plot(fig, args):
     
     dpi_val = args['dpi']
 
-    dir_out = os.path.join(args['output_folder'],'plots') 
+    dir_out = os.path.join(args['plot_folder']) 
 
     fpath = os.path.join(dir_out, f"{args['filename']}.png")
             

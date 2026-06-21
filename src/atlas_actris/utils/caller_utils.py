@@ -9,7 +9,6 @@ Created on Thu Mar 20 21:43:45 2025
 import os, glob
 import numpy as np
 from visualizer import export_html
-#from ..scc_converter.readers.read_config import config
 
 def default_station_folder(parser_args):
     
@@ -33,7 +32,7 @@ def autodetect_paths(parser_args):
     explicit_folder_check = any([parser_args.get('parent_folder') is None,
                                  parser_args.get('atlas_configuration_file') is None,
                                  parser_args.get('atlas_settings_file') is None,
-                                 parser_args.get('radiosonde_folder') is None])
+                                 parser_args.get('radiosonde_folder') is None and parser_args.get('radiosonde_file') is None])
                                  
     if parser_args['main_data_folder'] is not None and explicit_folder_check:
                 
@@ -130,7 +129,7 @@ def autodetect_paths(parser_args):
                 parser_args['atlas_settings_file'] = settings_files[0]
                 print(f"--Selected settings file:\n{parser_args['atlas_settings_file']}\n")
         
-        if parser_args.get('radiosonde_folder') is None:
+        if parser_args.get('radiosonde_folder') is None and parser_args.get('radiosonde_file') is None:
         
             radiosonde_folder_option_1 = os.path.join(station_folder, 'radiosondes', parser_args['scc_lidar_id'])
             radiosonde_folder_option_2 = os.path.join(station_folder, 'radiosondes')
@@ -184,7 +183,7 @@ def export_report(caller_info):
     photon_only = file_format in ['polly_xt', 'polly_xt_first']
 
     reports_folder = os.path.join(caller_info["output_folder"], 'reports')
-    plots_folder = os.path.join(caller_info["output_folder"], 'plots')
+    plots_folder = os.path.join(caller_info["plot_folder"])
 
     os.makedirs(reports_folder, exist_ok = True)
     
@@ -194,7 +193,7 @@ def export_report(caller_info):
     export_html.QA_report(
         plots_folder=plots_folder,
         html_filepath=html_filepath,
-        photon_only=False,
+        photon_only=photon_only,
         export_all=False,
         export_docx=True,
         docx_filepath=docx_filepath,

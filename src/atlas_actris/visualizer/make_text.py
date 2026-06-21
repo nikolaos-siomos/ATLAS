@@ -207,8 +207,27 @@ class GenerateText:
             sm_expo = self.settings['smoothing_exponential']
             )
         
-        title = self.system_part + ' ' + self.channel_part + ' - ' + sm_part + '\n'+\
-            self.config_part + ' - ' + self.dateloc_part
+        title = self.system_part + ' ' + self.channel_part + '\n'+\
+            self.config_part  + ' - ' + sm_part + '\n'+\
+                self.dateloc_part
+                            
+        return title 
+    
+    def make_vldr_title(self):
+
+        sm_part = sm_text(
+            smooth = self.settings['smooth'], 
+            sm_lims = self.settings['smoothing_range'], 
+            sm_win = self.settings['smoothing_window'], 
+            sm_expo = self.settings['smoothing_exponential']
+            )
+        
+        pair_part = f"VLDR ID: {self.qa_test_info['pair']}"
+        channel_part = f"Ch R: {self.qa_test_info['ch_r']} - Ch T: {self.qa_test_info['ch_r']}"
+        
+        title = self.system_part + ' ' + pair_part + ' - ' + channel_part + '\n'+\
+            self.config_part  + ' - ' + sm_part + '\n'+\
+                self.dateloc_part
                             
         return title 
     
@@ -219,6 +238,7 @@ class GenerateText:
         mol_part = mol_text(
             rs_format = self.metadata['radiosonde_format'], 
             rs_station_name = self.caller_info['rsonde_station_name'], 
+            cloudnet_station_name = self.caller_info['cloudnet_station_name'], 
             wmo_id = self.caller_info['rsonde_station_wmo_id'], 
             rs_start_timestamp = radiosonde_timestamp
             )
@@ -248,6 +268,7 @@ class GenerateText:
         mol_part = mol_text(
             rs_format = self.metadata['radiosonde_format'], 
             rs_station_name = self.caller_info['rsonde_station_name'], 
+            cloudnet_station_name = self.caller_info['cloudnet_station_name'], 
             wmo_id = self.caller_info['rsonde_station_wmo_id'], 
             rs_start_timestamp = radiosonde_timestamp
             )
@@ -285,9 +306,17 @@ class GenerateText:
             self.metadata['channel_bandwidth']
             )
 
-        title = self.system_part + ' ' + self.channel_part + ' - ' + sm_part + ' - ' + if_part + '\n'+\
-            self.config_part + ' - ' + self.dateloc_part
-                        
+        iter_part = iter_text(
+                iters=self.qa_test_info.get("iters", np.nan),
+                sampling_time_per_sector=self.qa_test_info.get("sampling_time_per_sector", np.nan),
+            )
+        
+        title = (
+            self.system_part + ' ' + self.channel_part + ' - ' + sm_part + '\n'
+            + iter_part + ' - ' + if_part + '\n'
+            + self.config_part + ' - ' + self.dateloc_part
+        )
+                         
         return title 
     
     def make_polarization_calibration_title(self, metadata_r, metadata_t):
@@ -297,6 +326,7 @@ class GenerateText:
         mol_part = mol_text(
             rs_format = self.metadata['radiosonde_format'], 
             rs_station_name = self.caller_info['rsonde_station_name'], 
+            cloudnet_station_name = self.caller_info['cloudnet_station_name'], 
             wmo_id = self.caller_info['rsonde_station_wmo_id'], 
             rs_start_timestamp = radiosonde_timestamp
             )
@@ -730,15 +760,20 @@ def dateloc_text(start_timestamp, stop_timestamp, laser_pointing_angle):
 
 def iter_text(iters, sampling_time_per_sector):
     
-    iter_part = f'Iterations: {iters}, Sampling Time per Sector: {sampling_time_per_sector} s'.strip()
+    iter_part = f'Iterations: {iters}, Total sampling time per sector: {np.round(sampling_time_per_sector)} s'.strip()
     
     return(iter_part)
 
-def mol_text(rs_format, rs_station_name, wmo_id, rs_start_timestamp):
+def mol_text(rs_format, rs_station_name, cloudnet_station_name, wmo_id, rs_start_timestamp):
         
     start_date = rs_start_timestamp.strftime("%d.%m.%Y")
     start_time = rs_start_timestamp.strftime("%H:%M:%S")
     
-    mol_part = f'{rs_format.capitalize()} {rs_station_name} {start_date} {start_time}UT {wmo_id}'.strip()
+    if rs_format == 'ecmwf':
+        station_name = cloudnet_station_name
+    else:
+        station_name = rs_station_name
+        
+    mol_part = f'{rs_format.capitalize()} {station_name} {start_date} {start_time}UT {wmo_id}'.strip()
     
     return mol_part

@@ -182,51 +182,42 @@ def channel_limit_table(f, data, photon_only, export_all):
         f.write(f'<td style="{units_format}">{html.escape(str(units[key]))}</td>')
     f.write("</tr>\n")
     
-    if data['ray']:
-        table_metas = data['ray']
-    elif data['tlc_qua']:
-        table_metas = data['tlc_qua']
-    elif data['tlc_rin']:
-        table_metas = data['tlc_rin']
-    else:
-        table_metas = {} 
-        
-    # for key in header.keys():  
-        
-    #     table_metas.setdefault(key, "")
+    table_metas = _summary_table_metas(data)
             
-    for ch, meta in table_metas.items():
+    for ch, meta0 in table_metas.items():
         
-        atlas_to_scc_triggering(meta)
+        meta = _copy_meta_with_triggering(meta0)
               
-        if data['tlc_qua'].get(ch):
-            minimum_channel_height_qua = data['tlc_qua'][ch].get('minimum_channel_height',"")
-        else:
-            minimum_channel_height_qua = ''
-        
-        if data['tlc_rin'].get(ch):
-            minimum_channel_height_rin = data['tlc_rin'][ch].get('minimum_channel_height',"")
-        else:
-            minimum_channel_height_rin = ''
+        minimum_channel_height_qua = (
+            data.get('tlc_qua', {}).get(ch, {}).get('minimum_channel_height', "")
+        )
+        minimum_channel_height_rin = (
+            data.get('tlc_rin', {}).get(ch, {}).get('minimum_channel_height', "")
+        )
             
         meta["minimum_channel_height"] = bigger_numeric_string(
             minimum_channel_height_qua, 
             minimum_channel_height_rin
             )
         
-        is_1064 = (ch[6] == 'a' and float(ch[:4]) > 900)
+        channel_mode = ch[6] if len(ch) > 6 else ""
+        try:
+            wavelength = float(ch[:4])
+        except Exception:
+            wavelength = None
+        is_1064 = (channel_mode == 'a' and wavelength is not None and wavelength > 900)
         
-        if (ch[6] == 'a' and not is_1064):
+        if channel_mode == 'a' and not is_1064:
             meta["maximum_channel_height"] = ""
 
         normalization_flag = meta.get("normalization_flag", "")
         if normalization_flag in ["", "external", "default"]:
             meta["maximum_channel_height"] = ""
                 
-        if ch[6] == 'p' and not photon_only and not export_all:
+        if channel_mode == 'p' and not photon_only and not export_all:
             meta["minimum_channel_height"] = ""                
 
-        if ch[6] == 'a':
+        if channel_mode == 'a':
             meta["dead_time"] = ""
                
         # Table row
@@ -301,24 +292,15 @@ def channel_background_table(f, data, photon_only, export_all):
         f.write(f'<td style="{units_format}">{html.escape(str(units[key]))}</td>')
     f.write("</tr>\n")
     
-    if data['ray']:
-        table_metas = data['ray']
-    elif data['tlc_qua']:
-        table_metas = data['tlc_qua']
-    elif data['tlc_rin']:
-        table_metas = data['tlc_rin']
-    else:
-        table_metas = {}
+    table_metas = _summary_table_metas(data)
             
-    for ch, meta in table_metas.items():
+    for ch, meta0 in table_metas.items():
         
-        atlas_to_scc_triggering(meta)
+        meta = _copy_meta_with_triggering(meta0)
                     
-        meta["background_low_bin"] = str(int(float(meta["background_low_bin"])))
-        meta["background_high_bin"] = str(int(float(meta["background_high_bin"])))
-        
-        meta["background_low"] = str(int(float(meta["background_low"])))
-        meta["background_high"] = str(int(float(meta["background_high"])))  
+        for key in ["background_low_bin", "background_high_bin", "background_low", "background_high"]:
+            if key in meta:
+                meta[key] = _int_text(meta[key])
                
         # Table row
         f.write("<tr>")
@@ -411,7 +393,8 @@ def channel_polarization(f, data, photon_only, export_all):
     else:
         table_metas = {}
     
-    for pair, meta in table_metas.items():
+    for pair in sorted(table_metas.keys(), key=lambda pair: _channel_sort_key(table_metas[pair].get('atlas_channel_id_r', pair))):
+        meta = table_metas[pair]
         
         meta["vldr_residual"] = str(
             round(float(meta["vldr_residual"]), 4)
@@ -463,35 +446,88 @@ def qck_patterns(wl, qa):
     
     return pattern
 
+
+def _quicklook_channel_preference_key(item):
+    """Sort quicklook candidates within one telescope/wavelength group.
+
+    Glued channels, identified by ``g`` as the 7th channel-id character, are
+    preferred first.  The previous quicklook preference order is then preserved
+    for non-glued channels: ?ta, ?pa, ?tp, ?pp.  The full channel ID is used as
+    a stable fallback.
+    """
+    ch, path = item
+    ch = str(ch)
+    mode = ch[5:7] if len(ch) > 6 else ""
+    mode_rank = {
+        "tg": 0,
+        "pg": 1,
+        "ta": 2,
+        "pa": 3,
+        "tp": 4,
+        "pp": 5,
+    }.get(mode, 99)
+    return mode_rank, _channel_sort_key(ch), str(path)
+
+
 def _select_quicklook_images(plots_folder: str, qa):
-    """Replicates the original quicklook selection cascade exactly."""
+    """Select quicklooks per QA test, telescope type, and wavelength.
 
-    qck_images_0355 = []
-    qck_images_0532 = []
-    qck_images_1064 = []
-    
-    patterns = qck_patterns(wl = '0355', qa = qa)
-    for pattern in patterns:
-        if len(qck_images_0355) == 0:
-                qck_images_0355.extend(
-                    glob.glob(os.path.join(plots_folder, pattern))
-                    )
-    
-    patterns = qck_patterns(wl = '0532', qa = qa)
-    for pattern in patterns:
-        if len(qck_images_0532) == 0:
-            qck_images_0532.extend(
-                glob.glob(os.path.join(plots_folder, pattern))
-                )
-    
-    patterns = qck_patterns(wl = '1064', qa = qa)
-    for pattern in patterns:
-        if len(qck_images_1064) == 0:
-            qck_images_1064.extend(
-                glob.glob(os.path.join(plots_folder, pattern))
-                )
+    For every telescope type available for the requested QA test, select one
+    quicklook for each standard wavelength: 0355, 0532, and 1064.  If a
+    telescope type has no channel at any of these wavelengths, select the first
+    available channel for that telescope type instead.
+    """
 
-    return qck_images_0355 + qck_images_0532 + qck_images_1064
+    standard_wavelengths = ["0355", "0532", "1064"]
+    pattern = os.path.join(plots_folder, f'*_qck_{qa}_*.png')
+
+    candidates = []
+    qa_name_pattern = re.compile(rf'_qck_{re.escape(qa)}_(\d{{4}})')
+
+    for im in sorted(glob.glob(pattern)):
+        # Avoid matching qck_ray_pcb while collecting qck_ray.
+        if qa_name_pattern.search(os.path.basename(im)) is None:
+            continue
+
+        try:
+            meta = Image.open(im).text
+            atlas_channel_id = meta.get('atlas_channel_id', '')
+        except Exception:
+            atlas_channel_id = ''
+
+        if not atlas_channel_id:
+            continue
+
+        telescope_type = atlas_channel_id[4] if len(atlas_channel_id) > 4 else ""
+        candidates.append((telescope_type, atlas_channel_id, im))
+
+    grouped = {}
+    for telescope_type, atlas_channel_id, im in candidates:
+        grouped.setdefault(telescope_type, []).append((atlas_channel_id, im))
+
+    selected = []
+    selected_paths = set()
+
+    for telescope_type in sorted(grouped.keys()):
+        items = sorted(grouped[telescope_type], key=_quicklook_channel_preference_key)
+        found_standard = False
+
+        for wl in standard_wavelengths:
+            matches = [item for item in items if str(item[0]).startswith(wl)]
+            if matches:
+                ch, im = matches[0]
+                if im not in selected_paths:
+                    selected.append(im)
+                    selected_paths.add(im)
+                found_standard = True
+
+        if not found_standard and items:
+            ch, im = items[0]
+            if im not in selected_paths:
+                selected.append(im)
+                selected_paths.add(im)
+
+    return selected
 
 def _select_vldr_images(plots_folder: str):
     """Replicates the original quicklook selection cascade exactly."""
@@ -699,9 +735,8 @@ def QA_report(
         if data:
             f.write('<h1>Quicklooks</h1>')
             f.write('\n')
-            key_first = next((k for k in data if k.startswith("qck_")), None)
             qck_list = ['qck_ray', 'qck_ray_pcb', 'qck_tlc_qua', 'qck_tlc_rin', 'qck_pcb', 'qck_drk']
-            for ch, meta in data[key_first].items():
+            for ch in _quicklook_channel_keys(data, qck_list):
                 f.write(f'<h2>{ch}</h2>')
                 for key in qck_list:
                     if ch in data[key]:
@@ -713,7 +748,8 @@ def QA_report(
         if data["vldr"]:
             f.write('<h1>VLDR Quicklooks</h1>')
             f.write('\n')
-            for ch, meta in data["vldr"].items():
+            for ch in sorted(data["vldr"].keys(), key=_channel_sort_key):
+                meta = data["vldr"][ch]
                 f.write(f'<h2>{ch}</h2>')
                 channel_entry(f, meta, plot_width)
             
@@ -721,10 +757,10 @@ def QA_report(
         if data["ray"]:
             f.write('<h1>Rayleigh Fit</h1>')
             f.write('\n')
-            for ch, meta in data["ray"].items():
-                if ch[6] == 'p' or (ch[6] == 'a' and float(ch[:4]) > 900) or export_all == True:
-                    f.write(f'<h2>{ch}</h2>')
-                    channel_entry(f, meta, plot_width)
+            for ch in _select_preferred_channel_keys(data["ray"].keys(), preferred_mode="p", export_all=export_all):
+                meta = data["ray"][ch]
+                f.write(f'<h2>{ch}</h2>')
+                channel_entry(f, meta, plot_width)
                     
             write_page_break(f)
     
@@ -733,15 +769,15 @@ def QA_report(
             f.write('<h1>Telecover</h1>')
             f.write('\n')
 
-            for ch in  sorted(data["tlc_qua"].keys() | data["tlc_rin"].keys()):
-                if ch[6] == 'a' or photon_only or export_all == True:
-                    f.write(f'<h2>{ch}</h2>')
-                    if ch in data["tlc_qua"]:
-                        channel_entry(f, data["tlc_qua"][ch], plot_width)                    
-                    if ch in data["tlc_qua"] and ch in data["tlc_rin"]:
-                        f.write('<br>\n')
-                    if ch in data["tlc_rin"]:
-                        channel_entry(f, data["tlc_rin"][ch], plot_width)
+            telecover_channels = data["tlc_qua"].keys() | data["tlc_rin"].keys()
+            for ch in _select_preferred_channel_keys(telecover_channels, preferred_mode="a", export_all=export_all):
+                f.write(f'<h2>{ch}</h2>')
+                if ch in data["tlc_qua"]:
+                    channel_entry(f, data["tlc_qua"][ch], plot_width)                    
+                if ch in data["tlc_qua"] and ch in data["tlc_rin"]:
+                    f.write('<br>\n')
+                if ch in data["tlc_rin"]:
+                    channel_entry(f, data["tlc_rin"][ch], plot_width)
     
             write_page_break(f)
 
@@ -750,12 +786,12 @@ def QA_report(
             f.write('<h1>Polarization Calibration</h1>')
             f.write('\n')
     
-            for ch, meta in data["pcb"].items():
+            for ch in _select_preferred_pcb_keys(data["pcb"], preferred_mode="p", export_all=export_all):
+                meta = data["pcb"][ch]
                 ch_r = meta['atlas_channel_id_r']
                 ch_t = meta['atlas_channel_id_t']
-                if ch_r[6] == 'p' or (ch_r[6] == 'a' and float(ch_r[:4]) > 900) or export_all == True:
-                    f.write(f'<h2>{ch_r} to {ch_t}</h2>')
-                    channel_entry(f, meta, plot_width)
+                f.write(f'<h2>{ch_r} to {ch_t}</h2>')
+                channel_entry(f, meta, plot_width)
 
     # Optional editable document export. Conversion must never break HTML report creation.
     if export_docx:
@@ -950,14 +986,183 @@ def _polarization_table_definition():
     return header, sub_header, units
 
 
+def _channel_sort_key(ch):
+    """Sort channel IDs first by telescope type, then alphabetically.
+
+    ATLAS channel IDs are expected to look like 0355xpar, 1064zcat,
+    or 0532yvpn.  The first 4 characters are the wavelength and the
+    5th character is the telescope type.
+    """
+    ch = str(ch)
+    telescope_type = ch[4] if len(ch) > 4 else ""
+    return telescope_type, ch
+
+
+def _channel_mode(ch):
+    """Return the channel-mode discriminator: the 7th channel-id character.
+
+    Common values are ``a`` for analog, ``p`` for photon, and ``g`` for glued.
+    """
+    ch = str(ch)
+    return ch[6] if len(ch) > 6 else ""
+
+
+def _channel_mode_signature(ch):
+    """Return a channel-id signature that ignores only the 7th character.
+
+    This is used to detect true analog/photon/glued counterparts such as
+    0355xppr, 0355xpar, and 0355xpgr, where only the 7th character differs.
+    """
+    ch = str(ch)
+    if len(ch) <= 6:
+        return ch
+    return ch[:6] + "?" + ch[7:]
+
+
+def _select_preferred_channel_keys(channels, preferred_mode, export_all=False):
+    """Select channel IDs with mode preference only for true counterparts.
+
+    If export_all is True, all channels are returned.  Otherwise, channels are
+    grouped by a signature that ignores only the 7th character.  Glued channels
+    (``g`` as the 7th character) always win inside a counterpart group.  If no
+    glued channel exists, the requested preferred mode is selected only when a
+    counterpart with another analog/photon mode exists in the same group.
+    Single channels without such a counterpart are kept unchanged.
+    """
+    channels = list(channels)
+
+    if export_all:
+        return sorted(channels, key=_channel_sort_key)
+
+    grouped = {}
+    for ch in channels:
+        grouped.setdefault(_channel_mode_signature(ch), []).append(ch)
+
+    selected = []
+    for signature in sorted(grouped.keys()):
+        group = sorted(grouped[signature], key=_channel_sort_key)
+        modes = {_channel_mode(ch) for ch in group}
+
+        if "g" in modes:
+            selected.extend([ch for ch in group if _channel_mode(ch) == "g"])
+            continue
+
+        has_preferred = preferred_mode in modes
+        has_other_pair_mode = any(mode in {"a", "p"} and mode != preferred_mode for mode in modes)
+
+        if has_preferred and has_other_pair_mode:
+            selected.extend([ch for ch in group if _channel_mode(ch) == preferred_mode])
+            selected.extend([ch for ch in group if _channel_mode(ch) not in {"a", "p", "g"}])
+        else:
+            selected.extend(group)
+
+    return sorted(dict.fromkeys(selected), key=_channel_sort_key)
+
+
+def _pcb_pair_mode_signature(meta, fallback_key=""):
+    """Return a polarization-pair signature that ignores R/T 7th characters."""
+    ch_r = str(meta.get("atlas_channel_id_r", ""))
+    ch_t = str(meta.get("atlas_channel_id_t", ""))
+    if ch_r or ch_t:
+        return (_channel_mode_signature(ch_r), _channel_mode_signature(ch_t))
+    return (_channel_mode_signature(fallback_key), "")
+
+
+def _pcb_pair_mode(meta):
+    """Return the pair mode from the R channel; fallback to T channel."""
+    ch_r = str(meta.get("atlas_channel_id_r", ""))
+    ch_t = str(meta.get("atlas_channel_id_t", ""))
+    return _channel_mode(ch_r) or _channel_mode(ch_t)
+
+
+def _select_preferred_pcb_keys(pcb_data, preferred_mode="p", export_all=False):
+    """Select polarization-calibration plot keys with pair-level preference.
+
+    Glued pairs, identified by ``g`` as the 7th character of the R/T channel
+    IDs, are preferred over analog and photon pairs whenever true counterparts
+    exist.
+    """
+    if export_all:
+        return sorted(
+            pcb_data.keys(),
+            key=lambda key: _channel_sort_key(pcb_data[key].get("atlas_channel_id_r", key)),
+        )
+
+    grouped = {}
+    for key, meta in pcb_data.items():
+        grouped.setdefault(_pcb_pair_mode_signature(meta, key), []).append(key)
+
+    selected = []
+    for signature in sorted(grouped.keys()):
+        group = sorted(
+            grouped[signature],
+            key=lambda key: _channel_sort_key(pcb_data[key].get("atlas_channel_id_r", key)),
+        )
+        modes = {_pcb_pair_mode(pcb_data[key]) for key in group}
+
+        if "g" in modes:
+            selected.extend([key for key in group if _pcb_pair_mode(pcb_data[key]) == "g"])
+            continue
+
+        has_preferred = preferred_mode in modes
+        has_other_pair_mode = any(mode in {"a", "p"} and mode != preferred_mode for mode in modes)
+
+        if has_preferred and has_other_pair_mode:
+            selected.extend([key for key in group if _pcb_pair_mode(pcb_data[key]) == preferred_mode])
+            selected.extend([key for key in group if _pcb_pair_mode(pcb_data[key]) not in {"a", "p", "g"}])
+        else:
+            selected.extend(group)
+
+    return sorted(
+        dict.fromkeys(selected),
+        key=lambda key: _channel_sort_key(pcb_data[key].get("atlas_channel_id_r", key)),
+    )
+
+
+def _quicklook_channel_keys(data, qck_list):
+    """Return sorted union of channel IDs available in quicklook sections."""
+    channels = set().union(*(data.get(key, {}).keys() for key in qck_list))
+    return sorted(channels, key=_channel_sort_key)
+
+
 def _summary_table_metas(data):
-    if data.get('ray'):
-        return data['ray']
-    if data.get('tlc_qua'):
-        return data['tlc_qua']
-    if data.get('tlc_rin'):
-        return data['tlc_rin']
-    return {}
+    """Return flat per-channel metadata for the summary tables.
+
+    The summary tables must not depend on one QA test being present for every
+    channel.  Build the channel list from the union of all channel-indexed QA
+    metadata dictionaries and merge available metadata into one dict per channel.
+    """
+    selected_tests = [
+        'qck_ray',
+        'qck_ray_pcb',
+        'qck_tlc_qua',
+        'qck_tlc_rin',
+        'qck_pcb',
+        'qck_drk',
+        'ray',
+        'tlc_qua',
+        'tlc_rin',
+    ]
+
+    channels = set().union(
+        *(data.get(test, {}).keys() for test in selected_tests)
+    )
+
+    out = {}
+    for ch in sorted(channels, key=_channel_sort_key):
+        meta = {}
+
+        # Quicklook metadata is used as a fallback.  Analysis metadata is merged
+        # afterwards so test-specific fields override the fallback values when
+        # they are available.
+        for test in selected_tests:
+            qa_meta = data.get(test, {}).get(ch, {})
+            if qa_meta:
+                meta.update(qa_meta)
+
+        out[ch] = meta
+
+    return out
 
 
 def _limit_table_rows(data, photon_only, export_all):
@@ -970,18 +1175,23 @@ def _limit_table_rows(data, photon_only, export_all):
         minimum_channel_height_rin = data.get('tlc_rin', {}).get(ch, {}).get('minimum_channel_height', "")
         meta["minimum_channel_height"] = bigger_numeric_string(minimum_channel_height_qua, minimum_channel_height_rin)
 
-        is_1064 = (ch[6] == 'a' and float(ch[:4]) > 900)
-        if ch[6] == 'a' and not is_1064:
+        channel_mode = ch[6] if len(ch) > 6 else ""
+        try:
+            wavelength = float(ch[:4])
+        except Exception:
+            wavelength = None
+        is_1064 = (channel_mode == 'a' and wavelength is not None and wavelength > 900)
+        if channel_mode == 'a' and not is_1064:
             meta["maximum_channel_height"] = ""
 
         normalization_flag = meta.get("normalization_flag", "")
         if normalization_flag in ["", "external", "default"]:
             meta["maximum_channel_height"] = ""
 
-        if ch[6] == 'p' and not photon_only and not export_all:
+        if channel_mode == 'p' and not photon_only and not export_all:
             meta["minimum_channel_height"] = ""
 
-        if ch[6] == 'a':
+        if channel_mode == 'a':
             meta["dead_time"] = ""
 
         rows.append([_safe_text(meta.get(key, "")) for key in header])
@@ -1003,7 +1213,8 @@ def _background_table_rows(data, photon_only, export_all):
 def _polarization_table_rows(data, photon_only, export_all):
     header, _, _ = _polarization_table_definition()
     rows = []
-    for pair, meta0 in data.get('pcb', {}).items():
+    for pair in sorted(data.get('pcb', {}).keys(), key=lambda pair: _channel_sort_key(data.get('pcb', {}).get(pair, {}).get('atlas_channel_id_r', pair))):
+        meta0 = data.get('pcb', {})[pair]
         meta = dict(meta0)
         meta["vldr_residual"] = _float_round_text(meta.get("vldr_residual", ""), 4)
         meta["min_bsc_ratio"] = _float_round_text(meta.get("sr_limit", ""), 3)
@@ -1218,49 +1429,48 @@ def convert_report_data_to_docx(
 
     if data:
         document.add_heading("Quicklooks", level=1)
-        key_first = next((k for k in data if k.startswith("qck_")), None)
         qck_list = ['qck_ray', 'qck_ray_pcb', 'qck_tlc_qua', 'qck_tlc_rin', 'qck_pcb', 'qck_drk']
-        if key_first is not None:
-            for ch, meta in data[key_first].items():
-                document.add_heading(ch, level=2)
-                for key in qck_list:
-                    if ch in data.get(key, {}):
-                        document.add_heading(qck_text_map[key], level=3)
-                        _add_docx_picture(document, data[key][ch].get('path'))
+        for ch in _quicklook_channel_keys(data, qck_list):
+            document.add_heading(ch, level=2)
+            for key in qck_list:
+                if ch in data.get(key, {}):
+                    document.add_heading(qck_text_map[key], level=3)
+                    _add_docx_picture(document, data[key][ch].get('path'))
 
     if data.get("vldr"):
         document.add_heading("VLDR Quicklooks", level=1)
-        for ch, meta in data["vldr"].items():
+        for ch in sorted(data["vldr"].keys(), key=_channel_sort_key):
+            meta = data["vldr"][ch]
             document.add_heading(ch, level=2)
             _add_docx_picture(document, meta.get('path'))
 
     if data.get("ray"):
         document.add_heading("Rayleigh Fit", level=1)
-        for ch, meta in data["ray"].items():
-            if ch[6] == 'p' or (ch[6] == 'a' and float(ch[:4]) > 900) or export_all:
-                document.add_heading(ch, level=2)
-                _add_docx_picture(document, meta.get('path'))
+        for ch in _select_preferred_channel_keys(data["ray"].keys(), preferred_mode="p", export_all=export_all):
+            meta = data["ray"][ch]
+            document.add_heading(ch, level=2)
+            _add_docx_picture(document, meta.get('path'))
         document.add_page_break()
 
     if data.get("tlc_qua") or data.get("tlc_rin"):
         document.add_heading("Telecover", level=1)
-        for ch in sorted(data.get("tlc_qua", {}).keys() | data.get("tlc_rin", {}).keys()):
-            if ch[6] == 'a' or photon_only or export_all:
-                document.add_heading(ch, level=2)
-                if ch in data.get("tlc_qua", {}):
-                    _add_docx_picture(document, data["tlc_qua"][ch].get('path'))
-                if ch in data.get("tlc_rin", {}):
-                    _add_docx_picture(document, data["tlc_rin"][ch].get('path'))
+        telecover_channels = data.get("tlc_qua", {}).keys() | data.get("tlc_rin", {}).keys()
+        for ch in _select_preferred_channel_keys(telecover_channels, preferred_mode="a", export_all=export_all):
+            document.add_heading(ch, level=2)
+            if ch in data.get("tlc_qua", {}):
+                _add_docx_picture(document, data["tlc_qua"][ch].get('path'))
+            if ch in data.get("tlc_rin", {}):
+                _add_docx_picture(document, data["tlc_rin"][ch].get('path'))
         document.add_page_break()
 
     if data.get("pcb"):
         document.add_heading("Polarization Calibration", level=1)
-        for ch, meta in data["pcb"].items():
+        for ch in _select_preferred_pcb_keys(data["pcb"], preferred_mode="p", export_all=export_all):
+            meta = data["pcb"][ch]
             ch_r = meta.get('atlas_channel_id_r', '')
             ch_t = meta.get('atlas_channel_id_t', '')
-            if len(ch_r) >= 7 and (ch_r[6] == 'p' or (ch_r[6] == 'a' and float(ch_r[:4]) > 900) or export_all):
-                document.add_heading(f"{ch_r} to {ch_t}", level=2)
-                _add_docx_picture(document, meta.get('path'))
+            document.add_heading(f"{ch_r} to {ch_t}", level=2)
+            _add_docx_picture(document, meta.get('path'))
 
     document.save(docx_filepath)
 

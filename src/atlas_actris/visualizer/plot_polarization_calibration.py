@@ -125,7 +125,14 @@ def signal_panel(fig, coords, X, Y, E, args):
     ax.set_xlabel(get_vertical_axis_label(args["vertical_scale"]))
     ax.xaxis.set_minor_locator(MultipleLocator(x_tick / 2.0))
 
-    ax.set_ylim(_get_signal_y_limits(Y, args.get("y_lims_signals", [])))
+    ax.set_ylim(
+        _get_signal_y_limits(
+            X=X,
+            Y=Y,
+            x_lims=args["x_lims_signals"],
+            y_lims=args.get("y_lims_signals", []),
+        )
+    )
     ax.set_ylabel("Signal")
 
     ax.grid(which="both")
@@ -143,19 +150,49 @@ def signal_panel(fig, coords, X, Y, E, args):
     return ax
 
 
-def _get_signal_y_limits(Y, y_lims):
+def _get_signal_y_limits(X, Y, x_lims, y_lims):
+    """
+    Return signal-panel y limits.
+
+    If explicit finite y limits are provided, keep using them. Otherwise,
+    estimate the maximum signal only from finite points inside the displayed
+    x-axis range. This avoids near-range/invalid/out-of-panel values setting
+    the y-axis scale.
+    """
+
     if y_lims is not None and len(y_lims) == 2:
         if y_lims[0] is not None and y_lims[1] is not None:
             y_lims = np.asarray(y_lims, dtype=float)
             if np.isfinite(y_lims).all():
                 return y_lims
 
+    x_lims = np.asarray(x_lims, dtype=float)
+    x_min = np.nanmin(x_lims)
+    x_max = np.nanmax(x_lims)
+
     finite_max = []
-    for values in Y.values():
-        values = np.asarray(values, dtype=float)
-        if values.size == 0 or np.isnan(values).all():
+
+    for key, values in Y.items():
+        if key not in X:
             continue
-        finite_max.append(np.nanmax(values))
+
+        x_vals = np.asarray(X[key], dtype=float)
+        values = np.asarray(values, dtype=float)
+
+        if x_vals.shape != values.shape or values.size == 0:
+            continue
+
+        plot_mask = (
+            np.isfinite(x_vals)
+            & np.isfinite(values)
+            & (x_vals >= x_min)
+            & (x_vals <= x_max)
+        )
+
+        if not np.any(plot_mask):
+            continue
+
+        finite_max.append(np.nanmax(values[plot_mask]))
 
     if len(finite_max) == 0:
         return [-1.0, 1.0]

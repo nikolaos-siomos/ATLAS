@@ -294,11 +294,10 @@ def add_parameter(
     """
     Add or replace one parameter row in pol_cal_info.
 
-    pci expected dims:
-        parameters, pair
-
-    values may be a pair DataArray, a sequence with one value per pair, or a scalar.
-    String metadata such as ratio_type is preserved as object dtype.
+    pol_cal_info is metadata: it is not chunked and it has mixed/object dtype.
+    Therefore values must be materialized before concatenation. Keeping a
+    Dask-backed object row here triggers Dask's object-dtype auto-rechunking
+    limitation. Full profile-like products remain lazy outside pol_cal_info.
     """
 
     values = _as_pair_dataarray(values, pci.pair, name)
@@ -313,14 +312,22 @@ def add_parameter(
             f"Cannot store '{name}' in pol_cal_info because it has no pair dimension."
         )
 
-    if hasattr(values.data, "compute"):
-        values = values.compute()
+    # Materialize only this small pair-level metadata row.
+    # This is intentional: pol_cal_info is object metadata, not a lazy profile.
+    values = values.compute()
 
-    new_row = values.assign_coords(pair=pci.pair).expand_dims(parameters=[name])
-    new_row = new_row.transpose("parameters", "pair").astype(object)
+    # Make sure the existing metadata table is also eager before object concat.
+    # If it is already NumPy-backed, this is effectively a no-op.
+    pci = pci.compute()
 
-    if hasattr(pci.data, "compute"):
-        pci = pci.compute()
+    new_row = (
+        values
+        .assign_coords(pair=pci.pair)
+        .expand_dims(parameters=[name])
+        .transpose("parameters", "pair")
+        .astype(object)
+        .compute()
+    )
 
     if name in pci.parameters.values:
         pci = pci.drop_sel(parameters=name)
@@ -331,7 +338,6 @@ def add_parameter(
         join="outer",
         combine_attrs="override",
     )
-
 
 def append_or_replace_pairs(
     existing: Optional[xr.DataArray],
@@ -477,6 +483,27 @@ def _ensure_molecular_output_dicts(output_data: Dict[str, Dict[str, Any]]) -> No
     output_data.setdefault("molecular_info", {})
 
 
+def _resolve_qa_alias(
+    output_data: Dict[str, Dict[str, Any]],
+    requested_key: str,
+    loading_map: Optional[Dict[str, str]] = None,
+    required_store: str = "profile",
+) -> Optional[str]:
+    """Return the actual key for requested_key, honoring loading_map aliases."""
+
+    loading_map = loading_map or {}
+    store = output_data.get(required_store, {})
+
+    if requested_key in store:
+        return requested_key
+
+    mapped_key = loading_map.get(requested_key)
+    if mapped_key in store:
+        return mapped_key
+
+    return None
+
+
 def _with_singleton_time(
     da: xr.DataArray,
     template: Optional[xr.DataArray] = None,
@@ -513,21 +540,53 @@ def _with_singleton_time(
     return da.transpose(*preferred, *other)
 
 
-def _time_mean_and_error(
+def _drop_singleton_time(
+    da: xr.DataArray,
+    name: str = "array",
+) -> xr.DataArray:
+    """
+    Drop singleton time dimension from mean products.
+
+    Mean products in this pipeline may still have dims:
+        time, channel, bins
+    or:
+        time, pair, bins
+
+    where time has size 1. The singleton time coordinate must be removed
+    before combining different QA tests such as pcb_p45 and pcb_m45, because
+    their singleton time coordinates are different and xarray would align
+    them by time.
+    """
+
+    if "time" not in da.dims:
+        return da
+
+    if da.sizes["time"] != 1:
+        raise ValueError(
+            f"Cannot drop time from {name}: expected singleton time dimension, "
+            f"got {da.sizes['time']} time entries."
+        )
+
+    return da.squeeze("time", drop=True)
+
+
+def _drop_singleton_time_from_pair(
     values: xr.DataArray,
     errors: xr.DataArray,
 ) -> Tuple[xr.DataArray, xr.DataArray]:
-    """Average over time and propagate independent errors of the mean."""
+    """
+    Compatibility wrapper for mean products.
 
-    if "time" not in values.dims:
-        return values, errors
+    The name is kept because several helpers still call this function, but
+    with the current pipeline profile_mean/profile_error_mean are already
+    averaged. Therefore this function no longer averages over time. It only
+    drops singleton time dimensions to prevent xarray alignment issues.
+    """
 
-    values_m_time = values.mean("time", skipna=True)
-    n_time = values.count("time")
-    errors_m_time = np.sqrt((errors**2).sum("time", skipna=True)) / n_time
+    values = _drop_singleton_time(values, name="values")
+    errors = _drop_singleton_time(errors, name="errors")
 
-    return values_m_time, errors_m_time
-
+    return values, errors
 
 def _product_sqrt_error(
     a: xr.DataArray,
@@ -745,6 +804,20 @@ def _finite_or_default(values: xr.DataArray, defaults: xr.DataArray) -> xr.DataA
     return values.where(np.isfinite(values), defaults)
 
 
+def _channel_to_pair_GH(
+    da: xr.DataArray,
+    defaults: xr.DataArray,
+    pair_ids: Sequence[str],
+    name: str,
+) -> xr.DataArray:
+    """Convert a channel-selected G/H row to pair coordinates."""
+
+    da = da.assign_coords(channel=list(pair_ids)).rename({"channel": "pair"})
+    da = da.assign_coords(pair=list(pair_ids)).rename(name)
+
+    return _finite_or_default(da, defaults.rename(name))
+
+
 def _channel_info_GH_for_pairs(
     channel_info_qa: xr.DataArray,
     ch_r: Sequence[str],
@@ -774,16 +847,11 @@ def _channel_info_GH_for_pairs(
             "Could not read G/H from channel_info for the requested channel pairs."
         ) from exc
 
-    def _channel_to_pair(da: xr.DataArray, defaults: xr.DataArray, name: str) -> xr.DataArray:
-        da = da.assign_coords(channel=list(pair_ids)).rename({"channel": "pair"})
-        da = da.assign_coords(pair=list(pair_ids)).rename(name)
-        return _finite_or_default(da, defaults.rename(name))
-
     return (
-        _channel_to_pair(G_R, G_R_default, "G_R"),
-        _channel_to_pair(G_T, G_T_default, "G_T"),
-        _channel_to_pair(H_R, H_R_default, "H_R"),
-        _channel_to_pair(H_T, H_T_default, "H_T"),
+        _channel_to_pair_GH(G_R, G_R_default, pair_ids, "G_R"),
+        _channel_to_pair_GH(G_T, G_T_default, pair_ids, "G_T"),
+        _channel_to_pair_GH(H_R, H_R_default, pair_ids, "H_R"),
+        _channel_to_pair_GH(H_T, H_T_default, pair_ids, "H_T"),
     )
 
 
@@ -857,12 +925,14 @@ def _find_eta_for_pairs(
     ch_t: Sequence[str],
     calibrated_pair_ids: Sequence[str],
 ) -> Tuple[xr.DataArray, xr.DataArray]:
-    """Find pcb/pcb_aux eta values and align them to calibrated_pair_ids.
+    """Find scalar pcb/pcb_aux eta values and align to calibrated_pair_ids.
 
-    Only eta entries created under the combined calibration keys ("pcb" and
-    "pcb_aux") are valid sources.  The returned eta arrays are time-free so
-    they broadcast over time-resolved ray_pcb profiles without xarray aligning
-    incompatible calibration and measurement time coordinates.
+    The calibration-factor stage stores the calibration-region eta value and
+    its SEM in output_data["pol_cal_info"] under the combined calibration keys
+    ("pcb" and "pcb_aux") as ratio_type="eta" entries.  These scalar values
+    are the calibration factors that ray_pcb signal ratios should be divided
+    by.  The eta profiles stored in pol_cal_ratio are intentionally not used
+    here, because ray_pcb must not be calibrated by a bin-resolved eta profile.
     """
 
     eta_pair_ids = [
@@ -870,66 +940,75 @@ def _find_eta_for_pairs(
         for r, t in zip(ch_r, ch_t)
     ]
 
+    info_store = output_data.get("pol_cal_info", {})
     eta_sources = ["pcb", "pcb_aux"]
     eta_values = []
     eta_errors = []
 
     for eta_id, calibrated_id in zip(eta_pair_ids, calibrated_pair_ids):
-        eta_da = None
-        eta_err_da = None
+        eta_value = None
+        eta_error = None
 
         for source in eta_sources:
-            ratio_store = output_data.get("pol_cal_ratio", {})
-            error_store = output_data.get("pol_cal_ratio_error", {})
-
-            if source not in ratio_store or source not in error_store:
+            if source not in info_store:
                 continue
 
-            candidate = ratio_store[source]
-            candidate_err = error_store[source]
-
-            if "ratio" in candidate.dims:
-                candidate = candidate.rename({"ratio": "pair"})
-            if "ratio" in candidate_err.dims:
-                candidate_err = candidate_err.rename({"ratio": "pair"})
-
-            if "pair" not in candidate.dims or eta_id not in candidate.pair.values:
+            source_info = _filter_info_with_ratio_type(info_store[source])
+            if source_info is None or source_info.sizes.get("pair", 0) == 0:
+                continue
+            if "pair" not in source_info.dims or eta_id not in source_info.pair.values:
                 continue
 
-            eta_da = candidate.sel(pair=eta_id)
-            eta_err_da = candidate_err.sel(pair=eta_id)
+            source_eta_ids = _select_pairs_by_type(source_info, "eta")
+            if eta_id not in source_eta_ids:
+                continue
 
-            # Calibration products must not impose their calibration time
-            # coordinate on time-resolved ray_pcb products.
-            if "time" in eta_da.dims:
-                if eta_da.sizes.get("time", 0) == 1:
-                    eta_da = eta_da.isel(time=0, drop=True)
-                    eta_err_da = eta_err_da.isel(time=0, drop=True)
-                else:
-                    eta_da = eta_da.mean("time", skipna=True)
-                    eta_err_da = np.sqrt((eta_err_da**2).sum("time", skipna=True)) / eta_err_da.count("time")
+            if "mean" not in source_info.parameters.values:
+                raise KeyError(
+                    f"Eta entry {eta_id!r} in pol_cal_info[{source!r}] has no 'mean' row."
+                )
+            if "sem" not in source_info.parameters.values:
+                raise KeyError(
+                    f"Eta entry {eta_id!r} in pol_cal_info[{source!r}] has no 'sem' row."
+                )
 
+            eta_value = (
+                source_info
+                .sel(parameters="mean", pair=eta_id)
+                .astype("float64")
+                .reset_coords(drop=True)
+            )
+            eta_error = (
+                source_info
+                .sel(parameters="sem", pair=eta_id)
+                .astype("float64")
+                .reset_coords(drop=True)
+            )
             break
 
-        if eta_da is None or eta_err_da is None:
+        if eta_value is None or eta_error is None:
             continue
 
-        eta_values.append(eta_da.expand_dims(pair=[calibrated_id]))
-        eta_errors.append(eta_err_da.expand_dims(pair=[calibrated_id]))
+        eta_values.append(
+            eta_value.expand_dims(pair=[calibrated_id]).rename("eta")
+        )
+        eta_errors.append(
+            eta_error.expand_dims(pair=[calibrated_id]).rename("eta_error")
+        )
 
     if not eta_values:
-        raise KeyError("No matching eta entries found in pcb/pcb_aux for ray_pcb channel pairs.")
+        raise KeyError(
+            "No matching scalar eta entries found in pcb/pcb_aux pol_cal_info "
+            "for ray_pcb channel pairs. Run compute_calibration_factor first."
+        )
 
-    eta = xr.concat(eta_values, dim="pair")
-    eta_error = xr.concat(eta_errors, dim="pair")
+    eta = xr.concat(eta_values, dim="pair").astype("float64")
+    eta_error = xr.concat(eta_errors, dim="pair").astype("float64")
 
-    preferred = [dim for dim in ["pair", "bins"] if dim in eta.dims]
-    other = [dim for dim in eta.dims if dim not in preferred]
-    eta = eta.transpose(*preferred, *other)
-    eta_error = eta_error.transpose(*preferred, *other)
+    eta = eta.transpose("pair")
+    eta_error = eta_error.transpose("pair")
 
     return eta, eta_error
-
 
 
 def _collect_eta_pairs_from_pcb(
@@ -994,10 +1073,12 @@ def pldr_error(
     delta_p_err_ulim: float = 0.025,
 ):
     """
-    Calculate PLDR error lookup for each pair.
+    Calculate PLDR error lookup for each pair lazily.
 
-    delta_m and delta_v_err must be pair-based DataArrays. Missing pairs are
-    retained through outer alignment and produce NaNs in the output.
+    The previous implementation looped over pairs and extracted .values from
+    argmax/argmin results, which forced computation. This version keeps the
+    lookup table and the sr_limit selection lazy by using vectorized xarray
+    operations along the R dimension.
     """
 
     if "pair" not in delta_m.dims:
@@ -1047,32 +1128,48 @@ def pldr_error(
     delta_p_err = delta_p_err.transpose("delta_p", "R", "pair")
 
     last_delta_p_err = delta_p_err.isel(delta_p=-1)
-    min_bsc_values = []
+    valid = last_delta_p_err.notnull().any("R")
 
-    for pair in delta_p_err.pair.values:
-        row = last_delta_p_err.sel(pair=pair)
+    # Vectorized R-position lookup. Filling NaNs avoids argmax/argmin failures
+    # on partially missing rows. Fully missing rows have no valid SR solution
+    # and are masked to NaN below.
+    idx_max = last_delta_p_err.fillna(-np.inf).argmax(dim="R", skipna=False)
+    idx_min = last_delta_p_err.fillna(np.inf).argmin(dim="R", skipna=False)
 
-        if row.isnull().all():
-            min_bsc_values.append(np.nan)
-            continue
+    # Avoid R.isel(R=idx_max).  R is a 1D coordinate-backed DataArray, while
+    # idx_max/idx_min can carry remaining dimensions such as ("pair",).  Some
+    # xarray/pandas versions fail on that vectorized coordinate-indexing path.
+    R_values = np.asarray(R.values)
+    idx_max_values = np.asarray(idx_max.values).astype(int)
+    idx_min_values = np.asarray(idx_min.values).astype(int)
 
-        dv = float(delta_v_err.sel(pair=pair).values)
-
-        if dv > 0.0001:
-            idx = int(row.argmax(dim="R", skipna=True).values)
-            min_bsc_values.append(float(R.isel(R=idx).values))
-        elif dv < -0.0001:
-            idx = int(row.argmin(dim="R", skipna=True).values)
-            min_bsc_values.append(float(R.isel(R=idx).values))
-        else:
-            min_bsc_values.append(1.01)
-
-    min_bsc_ratio = xr.DataArray(
-        min_bsc_values,
-        dims=["pair"],
-        coords={"pair": delta_p_err.pair.values},
-        name="sr_limit",
+    sr_max = xr.DataArray(
+        R_values[idx_max_values],
+        dims=idx_max.dims,
+        coords=idx_max.coords,
+        name="sr_max",
     )
+    sr_min = xr.DataArray(
+        R_values[idx_min_values],
+        dims=idx_min.dims,
+        coords=idx_min.coords,
+        name="sr_min",
+    )
+
+    sr_default = xr.full_like(delta_v_err.astype("float64"), 1.01)
+    sr_nan = xr.full_like(delta_v_err.astype("float64"), np.nan)
+
+    min_bsc_ratio = xr.where(
+        delta_v_err > 0.0001,
+        sr_max,
+        xr.where(delta_v_err < -0.0001, sr_min, sr_default),
+    )
+
+    # If the PLDR-error curve has no finite values along R, the SR limit is
+    # not derivable.  Treat it like an out-of-range / too-large case and keep
+    # the stored sr_limit as NaN.
+    min_bsc_ratio = min_bsc_ratio.where(valid, sr_nan)
+    min_bsc_ratio = min_bsc_ratio.rename("sr_limit")
 
     return delta_p_err, delta_p, R, min_bsc_ratio
 
@@ -1093,277 +1190,469 @@ def epsilon_angle(
     return epsilon.rename("epsilon")
 
 
+
+def add_parameters(
+    info: xr.DataArray,
+    parameters: Dict[str, Any],
+) -> xr.DataArray:
+    """Add several parameter rows to pol_cal_info."""
+
+    for name, values in parameters.items():
+        info = add_parameter(info, name=name, values=values)
+
+    return info
+
+
+def add_region_stats_to_info(
+    info: xr.DataArray,
+    values: xr.DataArray,
+    z_pair: xr.DataArray,
+    averaging_range,
+    ratio_type: str,
+) -> xr.DataArray:
+    """Add regional mean, regional SEM, and ratio_type to pol_cal_info."""
+
+    mean = mean_in_region(
+        da=values,
+        z=z_pair,
+        averaging_range=averaging_range,
+    )
+
+    sem = sem_in_region(
+        da=values,
+        z=z_pair,
+        averaging_range=averaging_range,
+    )
+
+    return add_parameters(
+        info,
+        {
+            "mean": mean,
+            "sem": sem,
+            "ratio_type": ratio_type,
+        },
+    )
+
+
+def store_pol_cal_mean_product(
+    output_data: Dict[str, Dict[str, Any]],
+    key: str,
+    values: xr.DataArray,
+    errors: xr.DataArray,
+    info: xr.DataArray,
+) -> None:
+    """Store one mean polarization-calibration product."""
+
+    output_data["pol_cal_ratio_mean"][key] = append_or_replace_pairs(
+        output_data["pol_cal_ratio_mean"].get(key),
+        values.rename("ratio"),
+    )
+
+    output_data["pol_cal_ratio_error_mean"][key] = append_or_replace_pairs(
+        output_data["pol_cal_ratio_error_mean"].get(key),
+        errors.rename("ratio_error"),
+    )
+
+    output_data["pol_cal_info"][key] = append_or_replace_info(
+        output_data["pol_cal_info"].get(key),
+        info,
+    )
+
+
+def pair_info_from_base(
+    pci_base: xr.DataArray,
+    ch_r: Sequence[str],
+    ch_t: Sequence[str],
+    type_index: str,
+    ratio_type: str,
+) -> Tuple[List[str], xr.DataArray]:
+    """Create derived pair ids and matching pol_cal_info."""
+
+    pair_ids = [
+        make_ratio_id(r, t, type_index=type_index)
+        for r, t in zip(ch_r, ch_t)
+    ]
+
+    info = _pair_info_for_channels(
+        pci=pci_base,
+        ch_r=ch_r,
+        ch_t=ch_t,
+        pair_ids=pair_ids,
+        ratio_type=ratio_type,
+    )
+
+    return pair_ids, info
+
+
+def ratio_from_channel_pairs(
+    sig: xr.DataArray,
+    sig_err: xr.DataArray,
+    ch_r: Sequence[str],
+    ch_t: Sequence[str],
+    info: xr.DataArray,
+    average_time: bool = True,
+) -> Tuple[xr.DataArray, xr.DataArray]:
+    """Create pair-based ratio and propagated ratio error."""
+
+    sig_r = sig.sel(channel=ch_r)
+    sig_t = sig.sel(channel=ch_t)
+    sig_r_err = sig_err.sel(channel=ch_r)
+    sig_t_err = sig_err.sel(channel=ch_t)
+
+    if average_time:
+        # Mean products are already averaged and only carry singleton time.
+        # Drop it before pair operations to avoid time-coordinate alignment issues.
+        sig_r, sig_r_err = _drop_singleton_time_from_pair(sig_r, sig_r_err)
+        sig_t, sig_t_err = _drop_singleton_time_from_pair(sig_t, sig_t_err)
+
+    ratio = simple_ratio(
+        numerator=sig_r,
+        denominator=sig_t,
+        info=info,
+    )
+
+    ratio_error = ratio_error_independent(
+        numerator=sig_r,
+        denominator=sig_t,
+        numerator_error=sig_r_err,
+        denominator_error=sig_t_err,
+        ratio_values=ratio,
+        info=info,
+    )
+
+    return ratio.rename("ratio"), ratio_error.rename("ratio_error")
+
+
+def mean_gain_ratio_from_profiles(
+    qa_test: str,
+    profiles: Dict[str, xr.DataArray],
+    profile_errors: Dict[str, xr.DataArray],
+    channel_info: Dict[str, xr.DataArray],
+    pol_cal_info: Dict[str, xr.DataArray],
+    vertical_scale: Dict[str, xr.DataArray],
+    averaging_range,
+) -> Optional[Tuple[xr.DataArray, xr.DataArray, xr.DataArray]]:
+    """Build one individual +/-45 mean gain-ratio product."""
+
+    required_stores = [profiles, profile_errors, channel_info, pol_cal_info, vertical_scale]
+    if any(qa_test not in store for store in required_stores):
+        return None
+
+    pci_base = _base_pol_cal_pairs(pol_cal_info[qa_test])
+    ch_r, ch_t = _read_channels_from_info(pci_base)
+
+    if len(ch_r) == 0:
+        return None
+
+    _, info = pair_info_from_base(
+        pci_base=pci_base,
+        ch_r=ch_r,
+        ch_t=ch_t,
+        type_index="g",
+        ratio_type="gain_ratio",
+    )
+
+    ratio, ratio_error = ratio_from_channel_pairs(
+        sig=profiles[qa_test],
+        sig_err=profile_errors[qa_test],
+        ch_r=ch_r,
+        ch_t=ch_t,
+        info=info,
+    )
+
+    z_pair = channels_to_pairs(
+        vertical_scale[qa_test].sel(channel=ch_r),
+        info,
+    )
+
+    info = add_region_stats_to_info(
+        info=info,
+        values=ratio,
+        z_pair=z_pair,
+        averaging_range=averaging_range,
+        ratio_type="gain_ratio",
+    )
+
+    return ratio, ratio_error, info
+
+
+def mean_gain_ratio_inputs_exist(
+    output_data: Dict[str, Dict[str, Any]],
+    vertical_scale: Dict[str, xr.DataArray],
+    p45_key: str,
+    m45_key: str,
+) -> bool:
+    """Check whether combined gain-ratio inputs exist."""
+
+    return (
+        p45_key in output_data["pol_cal_ratio_mean"]
+        and m45_key in output_data["pol_cal_ratio_mean"]
+        and p45_key in output_data["pol_cal_ratio_error_mean"]
+        and m45_key in output_data["pol_cal_ratio_error_mean"]
+        and p45_key in output_data["pol_cal_info"]
+        and m45_key in output_data["pol_cal_info"]
+        and p45_key in vertical_scale
+        and m45_key in vertical_scale
+    )
+
+
+def build_combined_gain_ratio(
+    output_data: Dict[str, Dict[str, Any]],
+    vertical_scale: Dict[str, xr.DataArray],
+    target_key: str,
+    p45_key: str,
+    m45_key: str,
+    averaging_range,
+) -> Optional[Tuple[xr.DataArray, xr.DataArray, xr.DataArray]]:
+    """Build combined pcb/pcb_aux eta_s from +45 and -45 gain ratios."""
+
+    if not mean_gain_ratio_inputs_exist(output_data, vertical_scale, p45_key, m45_key):
+        return None
+
+    ratio_store = output_data["pol_cal_ratio_mean"]
+    error_store = output_data["pol_cal_ratio_error_mean"]
+    info_store = output_data["pol_cal_info"]
+
+    pci_p45 = info_store[p45_key]
+    pci_m45 = info_store[m45_key]
+
+    p45_gain_ids = _select_pairs_by_type(pci_p45, "gain_ratio")
+    m45_gain_ids = _select_pairs_by_type(pci_m45, "gain_ratio")
+    gain_ids = [pair_id for pair_id in p45_gain_ids if pair_id in m45_gain_ids]
+
+    if len(gain_ids) == 0:
+        return None
+
+    ratio_p45 = ratio_store[p45_key].sel(pair=gain_ids)
+    ratio_m45 = ratio_store[m45_key].sel(pair=gain_ids)
+    ratio_p45_error = error_store[p45_key].sel(pair=gain_ids)
+    ratio_m45_error = error_store[m45_key].sel(pair=gain_ids)
+
+    # Defensive compatibility with older intermediates that still carry time.
+    ratio_p45, ratio_p45_error = _drop_singleton_time_from_pair(ratio_p45, ratio_p45_error)
+    ratio_m45, ratio_m45_error = _drop_singleton_time_from_pair(ratio_m45, ratio_m45_error)
+
+    info_p45 = pci_p45.sel(pair=gain_ids)
+    info_m45 = pci_m45.sel(pair=gain_ids)
+
+    ch_r_p45, ch_t_p45 = _read_channels_from_info(info_p45)
+    ch_r_m45, ch_t_m45 = _read_channels_from_info(info_m45)
+
+    if ch_r_p45 != ch_r_m45 or ch_t_p45 != ch_t_m45:
+        raise ValueError(
+            f"Gain-ratio channel mismatch between {p45_key} and {m45_key} "
+            f"for pairs {gain_ids}."
+        )
+
+    ch_r = ch_r_p45
+    ch_t = ch_t_p45
+
+    z_pair_p45 = channels_to_pairs(
+        vertical_scale[p45_key].sel(channel=ch_r),
+        info_p45,
+    )
+    z_pair_m45 = channels_to_pairs(
+        vertical_scale[m45_key].sel(channel=ch_r),
+        info_m45,
+    )
+
+    if not z_pair_p45.broadcast_equals(z_pair_m45):
+        CustomWarning(
+            f"Skipping combined gain ratio for {target_key}: "
+            f"vertical scales of {p45_key} and {m45_key} do not match."
+        )
+        return None
+
+    eta_s_product = ratio_p45 * ratio_m45
+    eta_s = np.sqrt(eta_s_product.where(eta_s_product >= 0))
+    eta_s = eta_s.assign_coords(pair=gain_ids).rename("ratio")
+
+    eta_s_error = _product_sqrt_error(
+        ratio_p45,
+        ratio_p45_error,
+        ratio_m45,
+        ratio_m45_error,
+        eta_s,
+    )
+    eta_s_error = eta_s_error.assign_coords(pair=gain_ids).rename("ratio_error")
+
+    info = _pair_info_for_channels(
+        pci=info_p45,
+        ch_r=ch_r,
+        ch_t=ch_t,
+        pair_ids=gain_ids,
+        ratio_type="gain_ratio",
+    )
+
+    epsilon = epsilon_angle(
+        eta_p45=ratio_p45.assign_coords(pair=gain_ids),
+        eta_m45=ratio_m45.assign_coords(pair=gain_ids),
+        kappa=1.0,
+    )
+
+    info = add_parameters(
+        info,
+        {
+            "mean": mean_in_region(eta_s, z_pair_p45, averaging_range),
+            "sem": sem_in_region(eta_s, z_pair_p45, averaging_range),
+            "epsilon": mean_in_region(epsilon, z_pair_p45, averaging_range),
+            "epsilon_error": sem_in_region(epsilon, z_pair_p45, averaging_range),
+            "ratio_type": "gain_ratio",
+        },
+    )
+
+    return eta_s, eta_s_error, info
+
+
+def calibration_factor_products(
+    eta_s: xr.DataArray,
+    eta_s_error: xr.DataArray,
+    pci_gain: xr.DataArray,
+    gain_ids: Sequence[str],
+) -> List[Dict[str, Any]]:
+    """Build eta_s_f and eta products from combined gain-ratio eta_s."""
+
+    ch_r, ch_t = _read_channels_from_info(pci_gain)
+
+    eta_s_f_ids = [
+        make_ratio_id(r, t, type_index="f")
+        for r, t in zip(ch_r, ch_t)
+    ]
+    eta_ids = [
+        make_ratio_id(r, t, type_index="e")
+        for r, t in zip(ch_r, ch_t)
+    ]
+
+    trans_ratio = _numeric_parameter(
+        pci=pci_gain,
+        parameter="R_to_T_transmission_ratio",
+        pair_ids=gain_ids,
+        default=1.0,
+    ).assign_coords(pair=gain_ids)
+
+    K = _numeric_parameter(
+        pci=pci_gain,
+        parameter="K",
+        pair_ids=gain_ids,
+        default=1.0,
+    ).assign_coords(pair=gain_ids)
+
+    eta_s_f = eta_s / trans_ratio
+    eta_s_f_error = eta_s_error / np.abs(trans_ratio)
+
+    eta = eta_s_f / K
+    eta_error = eta_s_f_error / np.abs(K)
+
+    return [
+        {
+            "ratio_type": "eta_s_f",
+            "pair_ids": eta_s_f_ids,
+            "values": eta_s_f,
+            "errors": eta_s_f_error,
+            "ch_r": ch_r,
+            "ch_t": ch_t,
+        },
+        {
+            "ratio_type": "eta",
+            "pair_ids": eta_ids,
+            "values": eta,
+            "errors": eta_error,
+            "ch_r": ch_r,
+            "ch_t": ch_t,
+        },
+    ]
+
+
+def inherit_entries(
+    output_data: Dict[str, Dict[str, Any]],
+    target_key: str,
+    source_keys: Sequence[str],
+    store_keys: Sequence[str],
+    overwrite: bool = False,
+) -> None:
+    """Copy selected store entries from the first available source key."""
+
+    for store_key in store_keys:
+        if store_key not in output_data:
+            continue
+
+        store = output_data[store_key]
+        if not overwrite and target_key in store:
+            continue
+
+        for source_key in source_keys:
+            if source_key in store:
+                store[target_key] = store[source_key]
+                break
+
+
+def inherit_pcb_coordinate_entries(
+    output_data: Dict[str, Dict[str, Any]],
+    target_key: str,
+    p45_key: str,
+    m45_key: str,
+) -> None:
+    """Let combined pcb/pcb_aux keys inherit range/height entries."""
+
+    inherit_entries(
+        output_data=output_data,
+        target_key=target_key,
+        source_keys=[p45_key, m45_key],
+        store_keys=["range", "height_agl", "height_asl"],
+        overwrite=False,
+    )
+
+
 def compute_gain_ratio(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
-    """
-    Compute gain ratios for pcb/pcb_aux +/-45 QA tests.
-
-    The reflected and transmitted signals are averaged over time before the
-    ratio is formed.  The saved pol_cal_ratio and pol_cal_ratio_error products
-    are time-free arrays with dimensions (pair, bins).
-
-    In addition to the individual +/-45 gain ratios, this function now also
-    creates the combined calibration QA tests:
-        pcb      from pcb_p45 / pcb_m45
-        pcb_aux  from pcb_aux_p45 / pcb_aux_m45
-
-    The combined entries are stored as ratio_type="gain_ratio" with g IDs and
-    correspond to eta_s = sqrt(gain_ratio_p45 * gain_ratio_m45).  The
-    calibration-factor stage can therefore start directly from pcb/pcb_aux
-    gain_ratio products.
-    """
+    """Compute mean gain ratios for pcb/pcb_aux +/-45 QA tests."""
 
     output_data = shallow_copy(input_data)
-    _ensure_pol_cal_output_dicts(output_data)
-
-    vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
-    vertical_scale = output_data[vertical_scale_name]
-
-    profiles = output_data["profile"]
-    profile_errors = output_data["profile_error"]
-    channel_info = output_data["channel_info"]
-    pol_cal_info = output_data["pol_cal_info"]
-
-    allowed_qa_tests = [
-        "pcb_p45",
-        "pcb_m45",
-        "pcb_aux_p45",
-        "pcb_aux_m45",
-    ]
-
+    vertical_scale = output_data[processing_info["caller_info"]["vertical_scale"]]
     averaging_range = processing_info["settings_info"]["pcb"]["calibration_region"]
 
-    for qa_test in allowed_qa_tests:
-        if qa_test not in profiles:
-            continue
-        if qa_test not in channel_info:
-            continue
-        if qa_test not in pol_cal_info:
-            continue
-        if qa_test not in vertical_scale:
-            continue
-        if qa_test not in profile_errors:
-            continue
+    individual_tests = ["pcb_p45", "pcb_m45", "pcb_aux_p45", "pcb_aux_m45"]
+    combined_tests = {"pcb": ("pcb_p45", "pcb_m45"), "pcb_aux": ("pcb_aux_p45", "pcb_aux_m45")}
 
-        z = vertical_scale[qa_test]
-        sig = profiles[qa_test]
-        sig_err = profile_errors[qa_test]
-        pci_base = _base_pol_cal_pairs(output_data["pol_cal_info"][qa_test])
-
-        ch_r, ch_t = _read_channels_from_info(pci_base)
-        pair_ids = [
-            make_ratio_id(numerator, denominator, type_index="g")
-            for numerator, denominator in zip(ch_r, ch_t)
-        ]
-
-        if len(pair_ids) == 0:
-            continue
-
-        pci = _pair_info_for_channels(
-            pci=pci_base,
-            ch_r=ch_r,
-            ch_t=ch_t,
-            pair_ids=pair_ids,
-            ratio_type="gain_ratio",
-        )
-
-        sig_r = sig.sel(channel=ch_r)
-        sig_t = sig.sel(channel=ch_t)
-        sig_r_err = sig_err.sel(channel=ch_r)
-        sig_t_err = sig_err.sel(channel=ch_t)
-
-        # Average signals first, then form the ratio. This improves the SNR of
-        # photon-counting channels compared with averaging noisy ratios.
-        sig_r_m_time, sig_r_err_m_time = _time_mean_and_error(sig_r, sig_r_err)
-        sig_t_m_time, sig_t_err_m_time = _time_mean_and_error(sig_t, sig_t_err)
-
-        ratio_da = simple_ratio(
-            numerator=sig_r_m_time,
-            denominator=sig_t_m_time,
-            info=pci,
-        )
-
-        ratio_error_da = ratio_error_independent(
-            numerator=sig_r_m_time,
-            denominator=sig_t_m_time,
-            numerator_error=sig_r_err_m_time,
-            denominator_error=sig_t_err_m_time,
-            ratio_values=ratio_da,
-            info=pci,
-        )
-
-        z_r = z.sel(channel=ch_r)
-        z_pair = channels_to_pairs(z_r, pci)
-
-        ratio_m_bins = mean_in_region(
-            da=ratio_da,
-            z=z_pair,
+    for qa_test in individual_tests:
+        product = mean_gain_ratio_from_profiles(
+            qa_test=qa_test,
+            profiles=output_data["profile_mean"],
+            profile_errors=output_data["profile_error_mean"],
+            channel_info=output_data["channel_info"],
+            pol_cal_info=output_data["pol_cal_info"],
+            vertical_scale=vertical_scale,
             averaging_range=averaging_range,
         )
 
-        ratio_error_m_bins = sem_in_region(
-            da=ratio_da,
-            z=z_pair,
+        if product is None:
+            continue
+
+        ratio, ratio_error, info = product
+        store_pol_cal_mean_product(output_data, qa_test, ratio, ratio_error, info)
+
+    for target_key, (p45_key, m45_key) in combined_tests.items():
+        product = build_combined_gain_ratio(
+            output_data=output_data,
+            vertical_scale=vertical_scale,
+            target_key=target_key,
+            p45_key=p45_key,
+            m45_key=m45_key,
             averaging_range=averaging_range,
         )
 
-        pci = add_parameter(pci=pci, name="mean", values=ratio_m_bins)
-        pci = add_parameter(pci=pci, name="sem", values=ratio_error_m_bins)
-        pci = add_parameter(pci=pci, name="ratio_type", values="gain_ratio")
-
-        output_data["pol_cal_ratio"][qa_test] = append_or_replace_pairs(
-            output_data["pol_cal_ratio"].get(qa_test),
-            ratio_da.rename("ratio"),
-        )
-        output_data["pol_cal_ratio_error"][qa_test] = append_or_replace_pairs(
-            output_data["pol_cal_ratio_error"].get(qa_test),
-            ratio_error_da.rename("ratio_error"),
-        )
-        output_data["pol_cal_info"][qa_test] = append_or_replace_info(
-            output_data["pol_cal_info"].get(qa_test),
-            pci,
-        )
-
-    # Build combined pcb / pcb_aux gain-ratio products here, so downstream
-    # calibration-factor calculation only needs the combined QA test.
-    assign_pcb = {
-        "pcb": ("pcb_p45", "pcb_m45"),
-        "pcb_aux": ("pcb_aux_p45", "pcb_aux_m45"),
-    }
-
-    for target_key, (p45, m45) in assign_pcb.items():
-        if p45 not in output_data["pol_cal_ratio"] or m45 not in output_data["pol_cal_ratio"]:
-            continue
-        if p45 not in output_data["pol_cal_ratio_error"] or m45 not in output_data["pol_cal_ratio_error"]:
-            continue
-        if p45 not in output_data["pol_cal_info"] or m45 not in output_data["pol_cal_info"]:
-            continue
-        if p45 not in vertical_scale or m45 not in vertical_scale:
+        if product is None:
             continue
 
-        pci_p45 = output_data["pol_cal_info"][p45]
-        pci_m45 = output_data["pol_cal_info"][m45]
-
-        p45_gain_ids = _select_pairs_by_type(pci_p45, "gain_ratio")
-        m45_gain_ids = _select_pairs_by_type(pci_m45, "gain_ratio")
-        gain_ids = [pid for pid in p45_gain_ids if pid in m45_gain_ids]
-
-        if len(gain_ids) == 0:
-            continue
-
-        ratio_p45 = output_data["pol_cal_ratio"][p45].sel(pair=gain_ids)
-        ratio_p45_err = output_data["pol_cal_ratio_error"][p45].sel(pair=gain_ids)
-        ratio_m45 = output_data["pol_cal_ratio"][m45].sel(pair=gain_ids)
-        ratio_m45_err = output_data["pol_cal_ratio_error"][m45].sel(pair=gain_ids)
-
-        eta_s_p45, eta_s_p45_error = _time_mean_and_error(
-            ratio_p45,
-            ratio_p45_err,
-        )
-        eta_s_m45, eta_s_m45_error = _time_mean_and_error(
-            ratio_m45,
-            ratio_m45_err,
-        )
-
-        pci_gain = pci_p45.sel(pair=gain_ids)
-        pci_gain_m45 = pci_m45.sel(pair=gain_ids)
-
-        ch_r_p45, ch_t_p45 = _read_channels_from_info(pci_gain)
-        ch_r_m45, ch_t_m45 = _read_channels_from_info(pci_gain_m45)
-
-        if ch_r_p45 != ch_r_m45 or ch_t_p45 != ch_t_m45:
-            raise ValueError(
-                f"Gain-ratio channel mismatch between {p45} and {m45} "
-                f"for pairs {gain_ids}."
-            )
-
-        ch_r, ch_t = ch_r_p45, ch_t_p45
-
-        z_p45 = vertical_scale[p45].sel(channel=ch_r)
-        z_m45 = vertical_scale[m45].sel(channel=ch_r)
-
-        z_pair_p45 = channels_to_pairs(z_p45, pci_gain)
-        z_pair_m45 = channels_to_pairs(z_m45, pci_gain_m45)
-
-        if not z_pair_p45.broadcast_equals(z_pair_m45):
-            CustomWarning(
-                f"Skipping combined gain ratio for {target_key}: "
-                f"vertical scales of {p45} and {m45} do not match."
-            )
-            continue
-
-        eta_s_product = eta_s_p45 * eta_s_m45
-        eta_s = np.sqrt(eta_s_product.where(eta_s_product >= 0))
-        eta_s_error = _product_sqrt_error(
-            eta_s_p45,
-            eta_s_p45_error,
-            eta_s_m45,
-            eta_s_m45_error,
-            eta_s,
-        )
-
-        eta_s = eta_s.assign_coords(pair=gain_ids).rename("ratio")
-        eta_s_error = eta_s_error.assign_coords(pair=gain_ids).rename("ratio_error")
-
-        combined_info = _pair_info_for_channels(
-            pci=pci_gain,
-            ch_r=ch_r,
-            ch_t=ch_t,
-            pair_ids=gain_ids,
-            ratio_type="gain_ratio",
-        )
-
-        eta_s_m_bins = mean_in_region(
-            da=eta_s,
-            z=z_pair_p45,
-            averaging_range=averaging_range,
-        )
-        eta_s_error_m_bins = sem_in_region(
-            da=eta_s,
-            z=z_pair_p45,
-            averaging_range=averaging_range,
-        )
-
-        # Epsilon belongs to the combined pcb / pcb_aux gain-ratio entries.
-        # It is calculated from the +45 and -45 gain ratios, treating them as
-        # eta_p45 and eta_m45, and only its calibration-region mean is stored
-        # in pol_cal_info. No epsilon profile is stored.
-        epsilon = epsilon_angle(
-            eta_p45=eta_s_p45.assign_coords(pair=gain_ids),
-            eta_m45=eta_s_m45.assign_coords(pair=gain_ids),
-            kappa=1.0,
-        )
-        epsilon_m_bins = mean_in_region(
-            da=epsilon,
-            z=z_pair_p45,
-            averaging_range=averaging_range,
-        )
-
-        epsilon_error_m_bins = sem_in_region(
-            da=epsilon,
-            z=z_pair_p45,
-            averaging_range=averaging_range,
-        )
-        
-        combined_info = add_parameter(combined_info, name="mean", values=eta_s_m_bins)
-        combined_info = add_parameter(combined_info, name="sem", values=eta_s_error_m_bins)
-        combined_info = add_parameter(combined_info, name="epsilon", values=epsilon_m_bins)
-        combined_info = add_parameter(combined_info, name="epsilon_error", values=epsilon_error_m_bins)
-        combined_info = add_parameter(combined_info, name="ratio_type", values="gain_ratio")
-
-        output_data["pol_cal_ratio"][target_key] = append_or_replace_pairs(
-            output_data["pol_cal_ratio"].get(target_key),
-            eta_s,
-        )
-        output_data["pol_cal_ratio_error"][target_key] = append_or_replace_pairs(
-            output_data["pol_cal_ratio_error"].get(target_key),
-            eta_s_error,
-        )
-        output_data["pol_cal_info"][target_key] = append_or_replace_info(
-            output_data["pol_cal_info"].get(target_key),
-            combined_info,
+        ratio, ratio_error, info = product
+        store_pol_cal_mean_product(output_data, target_key, ratio, ratio_error, info)
+        inherit_pcb_coordinate_entries(
+            output_data=output_data,
+            target_key=target_key,
+            p45_key=p45_key,
+            m45_key=m45_key,
         )
 
     print_entry("Gain ratio calculation complete!")
@@ -1374,256 +1663,174 @@ def compute_calibration_factor(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
-    """
-    Compute calibration products from combined pcb/pcb_aux gain ratios.
-
-    This stage now expects compute_gain_ratio() to have already created the
-    combined calibration QA tests:
-        pcb
-        pcb_aux
-
-    The existing ratio_type="gain_ratio" entries in those keys are loaded as
-    eta_s.  The function then continues from that point and stores:
-        eta_s_f : eta_s corrected by R_to_T_transmission_ratio, using f IDs
-        eta     : eta_s_f corrected by K, using e IDs
-
-    The original +/-45 products are not modified here.
-    """
-
-    target_keys = ["pcb", "pcb_aux"]
+    """Compute eta_s_f and eta from combined pcb/pcb_aux mean gain ratios."""
 
     output_data = shallow_copy(input_data)
-    _ensure_pol_cal_output_dicts(output_data)
-
-    vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
-    vertical_scale = output_data[vertical_scale_name]
-
-    pol_cal_ratio = output_data["pol_cal_ratio"]
-    pol_cal_ratio_error = output_data["pol_cal_ratio_error"]
-    pol_cal_info = output_data["pol_cal_info"]
-
+    vertical_scale = output_data[processing_info["caller_info"]["vertical_scale"]]
     averaging_range = processing_info["settings_info"]["pcb"]["calibration_region"]
 
-    # Use the original +/-45 vertical scales only as a source of the bin-height
-    # grid for region statistics.  The calibration quantities themselves are
-    # read only from the combined pcb / pcb_aux QA-test keys.
-    vertical_reference = {
-        "pcb": "pcb_p45",
-        "pcb_aux": "pcb_aux_p45",
-    }
+    vertical_reference = {"pcb": "pcb_p45", "pcb_aux": "pcb_aux_p45"}
 
-    def _add_region_stats(
-        info: xr.DataArray,
-        values: xr.DataArray,
-        errors: xr.DataArray,
-        z_pair: xr.DataArray,
-        ratio_type: str,
-    ) -> xr.DataArray:
-        """Attach mean, sem, and ratio_type rows to a pol_cal_info object."""
-
-        values_m_bins = mean_in_region(
-            da=values,
-            z=z_pair,
-            averaging_range=averaging_range,
-        )
-        errors_m_bins = sem_in_region(
-            da=values,
-            z=z_pair,
-            averaging_range=averaging_range,
-        )
-
-        info = add_parameter(info, name="mean", values=values_m_bins)
-        info = add_parameter(info, name="sem", values=errors_m_bins)
-        info = add_parameter(info, name="ratio_type", values=ratio_type)
-
-        return info
-
-    def _store_product(
-        key: str,
-        values: xr.DataArray,
-        errors: xr.DataArray,
-        info: xr.DataArray,
-    ) -> None:
-        """Append or replace one product family in the output dictionaries."""
-
-        output_data["pol_cal_ratio"][key] = append_or_replace_pairs(
-            output_data["pol_cal_ratio"].get(key),
-            values,
-        )
-        output_data["pol_cal_ratio_error"][key] = append_or_replace_pairs(
-            output_data["pol_cal_ratio_error"].get(key),
-            errors,
-        )
-        output_data["pol_cal_info"][key] = append_or_replace_info(
-            output_data["pol_cal_info"].get(key),
-            info,
-        )
-
-    for target_key in target_keys:
-        if target_key not in pol_cal_ratio:
+    for target_key in ["pcb", "pcb_aux"]:
+        if target_key not in output_data["pol_cal_ratio_mean"]:
             continue
-        if target_key not in pol_cal_ratio_error:
+        if target_key not in output_data["pol_cal_ratio_error_mean"]:
             continue
-        if target_key not in pol_cal_info:
+        if target_key not in output_data["pol_cal_info"]:
             continue
 
-        pci_gain_store = pol_cal_info[target_key]
-        gain_ids = _select_pairs_by_type(pci_gain_store, "gain_ratio")
+        info_store = output_data["pol_cal_info"][target_key]
+        gain_ids = _select_pairs_by_type(info_store, "gain_ratio")
 
         if len(gain_ids) == 0:
             continue
 
-        eta_s = pol_cal_ratio[target_key].sel(pair=gain_ids).rename("ratio")
-        eta_s_error = pol_cal_ratio_error[target_key].sel(pair=gain_ids).rename("ratio_error")
-        pci_gain = pci_gain_store.sel(pair=gain_ids)
+        eta_s = output_data["pol_cal_ratio_mean"][target_key].sel(pair=gain_ids).rename("ratio")
+        eta_s_error = output_data["pol_cal_ratio_error_mean"][target_key].sel(pair=gain_ids).rename("ratio_error")
+        pci_gain = info_store.sel(pair=gain_ids)
 
-        # Defensive time handling for older intermediate files.  New combined
-        # gain-ratio products are time-free.
-        eta_s, eta_s_error = _time_mean_and_error(eta_s, eta_s_error)
-
-        ch_r, ch_t = _read_channels_from_info(pci_gain)
-
-        eta_s_f_ids = [
-            make_ratio_id(r, t, type_index="f")
-            for r, t in zip(ch_r, ch_t)
-        ]
-        eta_ids = [
-            make_ratio_id(r, t, type_index="e")
-            for r, t in zip(ch_r, ch_t)
-        ]
-
-        trans_ratio = _numeric_parameter(
-            pci=pci_gain,
-            parameter="R_to_T_transmission_ratio",
-            pair_ids=gain_ids,
-            default=1.0,
-        )
-        K = _numeric_parameter(
-            pci=pci_gain,
-            parameter="K",
-            pair_ids=gain_ids,
-            default=1.0,
-        )
-
-        trans_ratio = trans_ratio.assign_coords(pair=gain_ids)
-        K = K.assign_coords(pair=gain_ids)
-
-        eta_s_f = eta_s / trans_ratio
-        eta_s_f_error = eta_s_error / np.abs(trans_ratio)
-
-        eta = eta_s_f / K
-        eta_error = eta_s_f_error / np.abs(K)
-
-        product_specs = [
-            {
-                "ratio_type": "eta_s_f",
-                "pair_ids": eta_s_f_ids,
-                "values": eta_s_f,
-                "errors": eta_s_f_error,
-            },
-            {
-                "ratio_type": "eta",
-                "pair_ids": eta_ids,
-                "values": eta,
-                "errors": eta_error,
-            },
-        ]
+        eta_s, eta_s_error = _drop_singleton_time_from_pair(eta_s, eta_s_error)
+        products = calibration_factor_products(eta_s, eta_s_error, pci_gain, gain_ids)
 
         z_pair_gain = None
-        z_source = vertical_reference.get(target_key)
+        z_source = vertical_reference[target_key]
+
         if z_source in vertical_scale:
-            z_r = vertical_scale[z_source].sel(channel=ch_r)
-            z_pair_gain = channels_to_pairs(z_r, pci_gain)
+            ch_r, _ = _read_channels_from_info(pci_gain)
+            z_pair_gain = channels_to_pairs(
+                vertical_scale[z_source].sel(channel=ch_r),
+                pci_gain,
+            )
         else:
             CustomWarning(
                 f"No vertical scale reference found for {target_key}; "
                 "eta_s_f/eta mean and sem will not be added."
             )
 
-        for spec in product_specs:
-            ratio_type = spec["ratio_type"]
-            pair_ids = spec["pair_ids"]
-
-            values_for_stats = spec["values"].assign_coords(pair=pair_ids).rename("ratio")
-            errors_for_stats = spec["errors"].assign_coords(pair=pair_ids).rename("ratio_error")
+        for product in products:
+            pair_ids = product["pair_ids"]
+            ratio_type = product["ratio_type"]
+            values = product["values"].assign_coords(pair=pair_ids).rename("ratio")
+            errors = product["errors"].assign_coords(pair=pair_ids).rename("ratio_error")
 
             info = _pair_info_for_channels(
                 pci=pci_gain,
-                ch_r=ch_r,
-                ch_t=ch_t,
+                ch_r=product["ch_r"],
+                ch_t=product["ch_t"],
                 pair_ids=pair_ids,
                 ratio_type=ratio_type,
             )
 
             if z_pair_gain is not None:
-                z_pair = z_pair_gain.assign_coords(pair=pair_ids)
-                info = _add_region_stats(
+                info = add_region_stats_to_info(
                     info=info,
-                    values=values_for_stats,
-                    errors=errors_for_stats,
-                    z_pair=z_pair,
+                    values=values,
+                    z_pair=z_pair_gain.assign_coords(pair=pair_ids),
+                    averaging_range=averaging_range,
                     ratio_type=ratio_type,
                 )
             else:
                 info = add_parameter(info, name="ratio_type", values=ratio_type)
 
-            _store_product(
-                key=target_key,
-                values=values_for_stats,
-                errors=errors_for_stats,
-                info=info,
-            )
+            store_pol_cal_mean_product(output_data, target_key, values, errors, info)
 
     print_entry("Calibration factor calculation complete!")
-
     return output_data
 
-def compute_calibrated_ratio(
+
+def store_pol_cal_product(
+    output_data: Dict[str, Dict[str, Any]],
+    key: str,
+    values: xr.DataArray,
+    errors: xr.DataArray,
+    mean: bool = False,
+) -> None:
+    """Store one polarization-calibration ratio product."""
+
+    ratio_key = "pol_cal_ratio_mean" if mean else "pol_cal_ratio"
+    error_key = "pol_cal_ratio_error_mean" if mean else "pol_cal_ratio_error"
+
+    output_data[ratio_key][key] = append_or_replace_pairs(
+        output_data[ratio_key].get(key),
+        values.rename("ratio"),
+    )
+
+    output_data[error_key][key] = append_or_replace_pairs(
+        output_data[error_key].get(key),
+        errors.rename("ratio_error"),
+    )
+
+
+def store_pol_cal_info(
+    output_data: Dict[str, Dict[str, Any]],
+    key: str,
+    info: xr.DataArray,
+) -> None:
+    """Store one polarization-calibration info product."""
+
+    output_data["pol_cal_info"][key] = append_or_replace_info(
+        output_data["pol_cal_info"].get(key),
+        info,
+    )
+
+
+def get_ray_pcb_alias(
+    output_data: Dict[str, Dict[str, Any]],
     processing_info: Dict[str, Any],
-    input_data: Dict[str, Dict[str, Any]],
-) -> Dict[str, Dict[str, Any]]:
+    required_store: str,
+) -> Optional[str]:
+    """Resolve the ray_pcb key for a selected store."""
+
+    loading_map = processing_info["caller_info"].get("loading_map", {})
+
+    return _resolve_qa_alias(
+        output_data=output_data,
+        requested_key="ray_pcb",
+        loading_map=loading_map,
+        required_store=required_store,
+    )
+
+
+
+
+def get_ray_pcb_io_keys(
+    output_data: Dict[str, Dict[str, Any]],
+    processing_info: Dict[str, Any],
+    required_store: str,
+) -> Tuple[Optional[str], Optional[str]]:
+    """Return input key and output key for ray_pcb-style products.
+
+    If ray_pcb exists in the requested input store, read from and write to
+    ray_pcb. Otherwise the alias/resolved key is used for both reading and
+    writing, typically ray. This avoids creating synthetic ray_pcb entries
+    when the original data only contains ray.
     """
-    Compute calibrated ratios for ray_pcb.
 
-    Valid channel combinations are taken only from existing eta entries under
-    the combined pcb/pcb_aux calibration keys.  If no eta products exist, this
-    function leaves the input unchanged.
+    qa_alias = get_ray_pcb_alias(
+        output_data=output_data,
+        processing_info=processing_info,
+        required_store=required_store,
+    )
 
-    Two calculation branches are used:
-        1. time-resolved branch, saved in pol_cal_ratio/pol_cal_ratio_error;
-        2. signal-time-averaged branch, used only for pol_cal_info mean/sem.
+    if qa_alias is None:
+        return None, None
 
-    The metadata branch averages reflected/transmitted signals first, then
-    forms the ratio and applies the same eta and ideal-GH correction.  This
-    avoids averaging noisy ratios over time.
-    """
+    store = output_data.get(required_store, {})
+    qa_store = "ray_pcb" if "ray_pcb" in store else qa_alias
 
-    output_data = shallow_copy(input_data)
-    _ensure_pol_cal_output_dicts(output_data)
+    return qa_alias, qa_store
 
-    vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
-    vertical_scale = output_data[vertical_scale_name]
 
-    qa_test = "ray_pcb"
-
-    profiles = output_data["profile"]
-    profile_errors = output_data["profile_error"]
-
-    if qa_test not in profiles:
-        return output_data
-    if qa_test not in vertical_scale:
-        return output_data
-    if qa_test not in profile_errors:
-        return output_data
+def collect_ray_pcb_eta_inputs(
+    output_data: Dict[str, Dict[str, Any]],
+    sig: xr.DataArray,
+) -> Optional[Tuple[List[str], List[str], List[str], xr.DataArray]]:
+    """Collect eta-based channel pairs that are available in a signal array."""
 
     ch_r, ch_t, eta_ids, eta_info = _collect_eta_pairs_from_pcb(output_data)
+
     if len(eta_ids) == 0:
-        print_entry("Calibrated ratio calculation skipped: no pcb/pcb_aux eta entries found.")
-        return output_data
-    
-    sig = profiles[qa_test]
-    sig_err = profile_errors[qa_test]
-    z = vertical_scale[qa_test]
+        return None
 
     available_channels = set(sig.channel.values.tolist())
     keep = [
@@ -1632,20 +1839,34 @@ def compute_calibrated_ratio(
     ]
 
     if len(keep) == 0:
-        print_entry("Calibrated ratio calculation skipped: no eta channel pairs found in ray_pcb profiles.")
-        return output_data
+        return None
 
     ch_r = [ch_r[i] for i in keep]
     ch_t = [ch_t[i] for i in keep]
     eta_ids = [eta_ids[i] for i in keep]
     eta_info = eta_info.isel(pair=keep)
 
+    return ch_r, ch_t, eta_ids, eta_info
+
+
+def build_calibrated_ratio_product(
+    output_data: Dict[str, Dict[str, Any]],
+    sig: xr.DataArray,
+    sig_err: xr.DataArray,
+    ch_r: Sequence[str],
+    ch_t: Sequence[str],
+    eta_ids: Sequence[str],
+    eta_info: xr.DataArray,
+    average_time: bool = False,
+) -> Optional[Tuple[xr.DataArray, xr.DataArray, xr.DataArray, List[str], List[str]]]:
+    """Build calibrated_ratio from signal ratios, scalar eta, and ideal GH."""
+
     pair_ids = [
         replace_ratio_id_type(eta_id, old_type_index="e", new_type_index="d")
         for eta_id in eta_ids
     ]
 
-    pci = _pair_info_for_channels(
+    info = _pair_info_for_channels(
         pci=eta_info,
         ch_r=ch_r,
         ch_t=ch_t,
@@ -1653,28 +1874,13 @@ def compute_calibrated_ratio(
         ratio_type="calibrated_ratio",
     )
 
-    sig_r = sig.sel(channel=ch_r)
-    sig_t = sig.sel(channel=ch_t)
-    sig_r_err = sig_err.sel(channel=ch_r)
-    sig_t_err = sig_err.sel(channel=ch_t)
-
-    # ------------------------------------------------------------------
-    # 1) Time-resolved product branch: store these profiles unchanged in
-    #    pol_cal_ratio/pol_cal_ratio_error.
-    # ------------------------------------------------------------------
-    uncalibrated = simple_ratio(
-        numerator=sig_r,
-        denominator=sig_t,
-        info=pci,
-    )
-
-    uncalibrated_error = ratio_error_independent(
-        numerator=sig_r,
-        denominator=sig_t,
-        numerator_error=sig_r_err,
-        denominator_error=sig_t_err,
-        ratio_values=uncalibrated,
-        info=pci,
+    uncalibrated, uncalibrated_error = ratio_from_channel_pairs(
+        sig=sig,
+        sig_err=sig_err,
+        ch_r=ch_r,
+        ch_t=ch_t,
+        info=info,
+        average_time=average_time,
     )
 
     eta, eta_error = _find_eta_for_pairs(
@@ -1684,17 +1890,15 @@ def compute_calibrated_ratio(
         calibrated_pair_ids=pair_ids,
     )
 
-    eta = eta_info.sel({"parameters":"eta","pair":pair_ids})
-    eta_error = eta_info.sel({"parameters":"eta_error","pair":pair_ids})
-
-    # Keep only pairs for which eta was found.
     pair_ids_found = list(eta.pair.values)
+    if len(pair_ids_found) == 0:
+        return None
+
     uncalibrated = uncalibrated.sel(pair=pair_ids_found)
     uncalibrated_error = uncalibrated_error.sel(pair=pair_ids_found)
-    pci = pci.sel(pair=pair_ids_found)
+    info = info.sel(pair=pair_ids_found)
 
-    ch_r_found = pci.sel(parameters="ch_r").values.tolist()
-    ch_t_found = pci.sel(parameters="ch_t").values.tolist()
+    ch_r_found, ch_t_found = _read_channels_from_info(info)
 
     calibrated = uncalibrated / eta
     calibrated_error = _division_error(
@@ -1720,169 +1924,35 @@ def compute_calibrated_ratio(
         H_T=H_T,
     )
 
-    calibrated = calibrated.rename("ratio")
-    calibrated_error = calibrated_error.rename("ratio_error")
-
-    pci = _add_GH_to_info(
-        info=pci,
+    info = _add_GH_to_info(
+        info=info,
         G_R=G_R,
         G_T=G_T,
         H_R=H_R,
         H_T=H_T,
     )
 
-    # ------------------------------------------------------------------
-    # 2) Metadata branch: average the signals first, then form/correct the
-    #    ratio and finally average over bins.  This branch is pair-only and
-    #    is stored only in pol_cal_info.
-    # ------------------------------------------------------------------
-    sig_r_m_time, sig_r_err_m_time = _time_mean_and_error(
-        sig_r.sel(channel=ch_r_found),
-        sig_r_err.sel(channel=ch_r_found),
-    )
-    sig_t_m_time, sig_t_err_m_time = _time_mean_and_error(
-        sig_t.sel(channel=ch_t_found),
-        sig_t_err.sel(channel=ch_t_found),
+    return (
+        calibrated.rename("ratio"),
+        calibrated_error.rename("ratio_error"),
+        info,
+        ch_r_found,
+        ch_t_found,
     )
 
-    uncalibrated_m_time = simple_ratio(
-        numerator=sig_r_m_time,
-        denominator=sig_t_m_time,
-        info=pci,
-    )
-    uncalibrated_error_m_time = ratio_error_independent(
-        numerator=sig_r_m_time,
-        denominator=sig_t_m_time,
-        numerator_error=sig_r_err_m_time,
-        denominator_error=sig_t_err_m_time,
-        ratio_values=uncalibrated_m_time,
-        info=pci,
-    )
 
-    eta_m_time = eta.sel(pair=pair_ids_found)
-    eta_error_m_time = eta_error.sel(pair=pair_ids_found)
-
-    calibrated_m_time = uncalibrated_m_time / eta_m_time
-    calibrated_error_m_time = _division_error(
-        numerator=uncalibrated_m_time,
-        numerator_error=uncalibrated_error_m_time,
-        denominator=eta_m_time,
-        denominator_error=eta_error_m_time,
-        quotient=calibrated_m_time,
-    )
-
-    calibrated_m_time, calibrated_error_m_time = _GH_correct_ratio(
-        ratio=calibrated_m_time,
-        ratio_error=calibrated_error_m_time,
-        G_R=G_R,
-        G_T=G_T,
-        H_R=H_R,
-        H_T=H_T,
-    )
-
-    z_r = z.sel(channel=ch_r_found)
-    z_pair = channels_to_pairs(z_r, pci)
-
-    calibrated_m_bins = mean_in_region(
-        da=calibrated_m_time,
-        z=z_pair,
-        averaging_range=processing_info["settings_info"]["pcb"]["rayleigh_region"],
-    )
-    calibrated_error_m_bins = sem_in_region(
-        da=calibrated_m_time,
-        z=z_pair,
-        averaging_range=processing_info["settings_info"]["pcb"]["rayleigh_region"],
-    )
-
-    pci = add_parameter(pci=pci, name="mean", values=calibrated_m_bins)
-    pci = add_parameter(pci=pci, name="sem", values=calibrated_error_m_bins)
-    pci = add_parameter(pci=pci, name="ratio_type", values="calibrated_ratio")
-
-    output_data["pol_cal_ratio"][qa_test] = append_or_replace_pairs(
-        output_data["pol_cal_ratio"].get(qa_test),
-        calibrated,
-    )
-    output_data["pol_cal_ratio_error"][qa_test] = append_or_replace_pairs(
-        output_data["pol_cal_ratio_error"].get(qa_test),
-        calibrated_error,
-    )
-    output_data["pol_cal_info"][qa_test] = append_or_replace_info(
-        output_data["pol_cal_info"].get(qa_test),
-        pci,
-    )
-
-    print_entry("Calibrated ratio calculation complete!")
-    return output_data
-
-
-def compute_vldr(
-    processing_info: Dict[str, Any],
-    input_data: Dict[str, Dict[str, Any]],
-) -> Dict[str, Dict[str, Any]]:
-    """
-    Compute VLDR for ray_pcb directly from ray_pcb signal ratios.
-
-    This function intentionally does not use the stored calibrated_ratio
-    profiles as input, because those profiles have already received the
-    ideal-GH correction in compute_calibrated_ratio().  Instead, VLDR is
-    calculated as:
-
-        ray_pcb signal ratio -> eta calibration -> one real-GH correction
-
-    Two calculation branches are used:
-        1. time-resolved branch, saved in pol_cal_ratio/pol_cal_ratio_error;
-        2. signal-time-averaged branch, used only for pol_cal_info mean/sem,
-           vldr_residual, and sr_limit.
-
-    The metadata branch averages reflected/transmitted signals first, then
-    forms ratios and averages over bins.  No time averaging of an already
-    formed ratio/VLDR is used for pol_cal_info.
-    """
-
-    output_data = shallow_copy(input_data)
-    _ensure_pol_cal_output_dicts(output_data)
-
-    vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
-    vertical_scale = output_data[vertical_scale_name]
-
-    qa_test = "ray_pcb"
-
-    if qa_test not in vertical_scale:
-        print_entry(f"VLDR calculation skipped: no {qa_test} vertical scale found.")
-        return output_data
-    if qa_test not in output_data.get("channel_info", {}):
-        print_entry(f"VLDR calculation skipped: no {qa_test} channel_info found.")
-        return output_data
-    if qa_test not in output_data.get("profile", {}):
-        print_entry(f"VLDR calculation skipped: no {qa_test} profiles found.")
-        return output_data
-    if qa_test not in output_data.get("profile_error", {}):
-        print_entry(f"VLDR calculation skipped: no {qa_test} profile errors found.")
-        return output_data
-
-    ch_r, ch_t, eta_ids, eta_info = _collect_eta_pairs_from_pcb(output_data)
-    if len(eta_ids) == 0:
-        print_entry("VLDR calculation skipped: no pcb/pcb_aux eta entries found.")
-        return output_data
-
-    sig = output_data["profile"][qa_test]
-    sig_err = output_data["profile_error"][qa_test]
-    z = vertical_scale[qa_test]
-
-    available_channels = set(sig.channel.values.tolist())
-    keep = [
-        i for i, (r, t) in enumerate(zip(ch_r, ch_t))
-        if r in available_channels and t in available_channels
-    ]
-
-    if len(keep) == 0:
-        print_entry("VLDR calculation skipped: no eta channel pairs found in ray_pcb profiles.")
-        return output_data
-
-    ch_r = [ch_r[i] for i in keep]
-    ch_t = [ch_t[i] for i in keep]
-    eta_ids = [eta_ids[i] for i in keep]
-    eta_info = eta_info.isel(pair=keep)
+def build_vldr_product(
+    output_data: Dict[str, Dict[str, Any]],
+    sig: xr.DataArray,
+    sig_err: xr.DataArray,
+    channel_info_qa: xr.DataArray,
+    ch_r: Sequence[str],
+    ch_t: Sequence[str],
+    eta_ids: Sequence[str],
+    eta_info: xr.DataArray,
+    average_time: bool = False,
+) -> Optional[Tuple[xr.DataArray, xr.DataArray, xr.DataArray, List[str], List[str]]]:
+    """Build VLDR from signal ratios, scalar eta, and real GH."""
 
     calibrated_ids = [
         replace_ratio_id_type(eta_id, old_type_index="e", new_type_index="d")
@@ -1893,7 +1963,7 @@ def compute_vldr(
         for calibrated_id in calibrated_ids
     ]
 
-    pci_cal = _pair_info_for_channels(
+    cal_info = _pair_info_for_channels(
         pci=eta_info,
         ch_r=ch_r,
         ch_t=ch_t,
@@ -1901,36 +1971,13 @@ def compute_vldr(
         ratio_type="calibrated_ratio",
     )
 
-    vldr_info = _pair_info_for_channels(
-        pci=pci_cal,
+    uncalibrated, uncalibrated_error = ratio_from_channel_pairs(
+        sig=sig,
+        sig_err=sig_err,
         ch_r=ch_r,
         ch_t=ch_t,
-        pair_ids=vldr_ids,
-        ratio_type="vldr",
-    )
-
-    sig_r = sig.sel(channel=ch_r)
-    sig_t = sig.sel(channel=ch_t)
-    sig_r_err = sig_err.sel(channel=ch_r)
-    sig_t_err = sig_err.sel(channel=ch_t)
-
-    # ------------------------------------------------------------------
-    # 1) Time-resolved product branch: build the calibrated ratio from
-    #    raw signal ratios, then apply the real GH correction exactly once.
-    # ------------------------------------------------------------------
-    uncalibrated = simple_ratio(
-        numerator=sig_r,
-        denominator=sig_t,
-        info=pci_cal,
-    )
-
-    uncalibrated_error = ratio_error_independent(
-        numerator=sig_r,
-        denominator=sig_t,
-        numerator_error=sig_r_err,
-        denominator_error=sig_t_err,
-        ratio_values=uncalibrated,
-        info=pci_cal,
+        info=cal_info,
+        average_time=average_time,
     )
 
     eta, eta_error = _find_eta_for_pairs(
@@ -1940,20 +1987,21 @@ def compute_vldr(
         calibrated_pair_ids=calibrated_ids,
     )
 
-    # Keep only pairs for which eta was found.
-    pair_ids_found = list(eta.pair.values)
-    uncalibrated = uncalibrated.sel(pair=pair_ids_found)
-    uncalibrated_error = uncalibrated_error.sel(pair=pair_ids_found)
-    pci_cal_found = pci_cal.sel(pair=pair_ids_found)
+    calibrated_ids_found = list(eta.pair.values)
+    if len(calibrated_ids_found) == 0:
+        return None
 
-    ch_r_found, ch_t_found = _read_channels_from_info(pci_cal_found)
+    uncalibrated = uncalibrated.sel(pair=calibrated_ids_found)
+    uncalibrated_error = uncalibrated_error.sel(pair=calibrated_ids_found)
+    cal_info = cal_info.sel(pair=calibrated_ids_found)
 
-    channel_info_qa = output_data["channel_info"][qa_test]
+    ch_r_found, ch_t_found = _read_channels_from_info(cal_info)
+
     G_R, G_T, H_R, H_T = _channel_info_GH_for_pairs(
         channel_info_qa=channel_info_qa,
         ch_r=ch_r_found,
         ch_t=ch_t_found,
-        pair_ids=pair_ids_found,
+        pair_ids=calibrated_ids_found,
     )
 
     calibrated = uncalibrated / eta
@@ -1976,161 +2024,321 @@ def compute_vldr(
 
     vldr_ids_found = [
         replace_ratio_id_type(calibrated_id, old_type_index="d", new_type_index="v")
-        for calibrated_id in pair_ids_found
+        for calibrated_id in calibrated_ids_found
     ]
 
     vldr = vldr.assign_coords(pair=vldr_ids_found).rename("ratio")
     vldr_error = vldr_error.assign_coords(pair=vldr_ids_found).rename("ratio_error")
 
-    vldr_info = _add_GH_to_info(
-        info=vldr_info,
-        G_R=G_R.assign_coords(pair=vldr_ids_found).reindex(pair=vldr_ids),
-        G_T=G_T.assign_coords(pair=vldr_ids_found).reindex(pair=vldr_ids),
-        H_R=H_R.assign_coords(pair=vldr_ids_found).reindex(pair=vldr_ids),
-        H_T=H_T.assign_coords(pair=vldr_ids_found).reindex(pair=vldr_ids),
+    info = _pair_info_for_channels(
+        pci=cal_info,
+        ch_r=ch_r_found,
+        ch_t=ch_t_found,
+        pair_ids=vldr_ids_found,
+        ratio_type="vldr",
     )
 
-    # ------------------------------------------------------------------
-    # 2) Metadata branch: recompute from signal-time-averaged profiles.
-    #    This mirrors compute_calibrated_ratio's signal-ratio workflow, but
-    #    it applies only the real GH correction used for the VLDR product.
-    # ------------------------------------------------------------------
-    sig_r_m_time, sig_r_err_m_time = _time_mean_and_error(
-        sig.sel(channel=ch_r_found),
-        sig_err.sel(channel=ch_r_found),
-    )
-    sig_t_m_time, sig_t_err_m_time = _time_mean_and_error(
-        sig.sel(channel=ch_t_found),
-        sig_err.sel(channel=ch_t_found),
+    info = _add_GH_to_info(
+        info=info,
+        G_R=G_R.assign_coords(pair=vldr_ids_found),
+        G_T=G_T.assign_coords(pair=vldr_ids_found),
+        H_R=H_R.assign_coords(pair=vldr_ids_found),
+        H_T=H_T.assign_coords(pair=vldr_ids_found),
     )
 
-    uncalibrated_m_time = simple_ratio(
-        numerator=sig_r_m_time,
-        denominator=sig_t_m_time,
-        info=pci_cal_found,
-    )
-    uncalibrated_error_m_time = ratio_error_independent(
-        numerator=sig_r_m_time,
-        denominator=sig_t_m_time,
-        numerator_error=sig_r_err_m_time,
-        denominator_error=sig_t_err_m_time,
-        ratio_values=uncalibrated_m_time,
-        info=pci_cal_found,
-    )
+    return vldr, vldr_error, info, ch_r_found, ch_t_found
 
-    eta_m_time = eta.sel(pair=pair_ids_found)
-    eta_error_m_time = eta_error.sel(pair=pair_ids_found)
 
-    calibrated_m_time = uncalibrated_m_time / eta_m_time
-    calibrated_error_m_time = _division_error(
-        numerator=uncalibrated_m_time,
-        numerator_error=uncalibrated_error_m_time,
-        denominator=eta_m_time,
-        denominator_error=eta_error_m_time,
-        quotient=calibrated_m_time,
-    )
+def add_vldr_residual_to_info(
+    processing_info: Dict[str, Any],
+    output_data: Dict[str, Dict[str, Any]],
+    info: xr.DataArray,
+    vldr_mean: xr.DataArray,
+    qa_test: str,
+) -> xr.DataArray:
+    """Add vldr_residual and sr_limit rows if matching MLDR info exists."""
 
-    vldr_m_time, vldr_error_m_time = _GH_correct_ratio(
-        ratio=calibrated_m_time,
-        ratio_error=calibrated_error_m_time,
-        G_R=G_R,
-        G_T=G_T,
-        H_R=H_R,
-        H_T=H_T,
-    )
+    molecular_info = output_data.get("molecular_info", {})
 
-    vldr_m_time = vldr_m_time.assign_coords(pair=vldr_ids_found).rename("ratio")
-    vldr_error_m_time = vldr_error_m_time.assign_coords(pair=vldr_ids_found).rename("ratio_error")
+    if qa_test not in molecular_info:
+        CustomWarning(f"VLDR residual skipped: no molecular_info entry for {qa_test}.")
+        return info
 
-    z_r = z.sel(channel=ch_r_found)
-    z_pair_stats = channels_to_pairs(
-        z_r,
-        vldr_info.sel(pair=vldr_ids_found),
-    )
-
-    vldr_m_bins_store = mean_in_region(
-        da=vldr_m_time,
-        z=z_pair_stats,
-        averaging_range=processing_info["settings_info"]["pcb"]["rayleigh_region"],
-    )
-    vldr_error_m_bins_store = sem_in_region(
-        da=vldr_m_time,
-        z=z_pair_stats,
-        averaging_range=processing_info["settings_info"]["pcb"]["rayleigh_region"],
-    )
-
-    # Reindex to the full VLDR id list so missing metadata pairs become NaN.
-    vldr_m_bins_store = vldr_m_bins_store.reindex(pair=vldr_ids)
-    vldr_error_m_bins_store = vldr_error_m_bins_store.reindex(pair=vldr_ids)
-
-    vldr_info = add_parameter(vldr_info, name="mean", values=vldr_m_bins_store)
-    vldr_info = add_parameter(vldr_info, name="sem", values=vldr_error_m_bins_store)
+    mldr_info = molecular_info[qa_test]
+    if "mean" not in mldr_info.parameters.values:
+        CustomWarning(
+            f"VLDR residual skipped: molecular_info[{qa_test!r}] has no mean row."
+        )
+        return info
 
     mldr_ids = [
         replace_ratio_id_type(vldr_id, old_type_index="v", new_type_index="m")
-        for vldr_id in vldr_ids
+        for vldr_id in vldr_mean.pair.values
     ]
 
-    molecular_info = output_data.get("molecular_info", {})
-    if qa_test in molecular_info:
-        mldr_info = molecular_info[qa_test]
-        if "mean" in mldr_info.parameters.values:
-            mldr_m_bins = (
-                mldr_info
-                .sel(parameters="mean")
-                .reindex(pair=mldr_ids)
-                .assign_coords(pair=vldr_ids)
-                .astype("float64")
-                .rename("mldr_mean")
-            )
-
-            residual = (vldr_m_bins_store - mldr_m_bins) / (
-                1.0 - vldr_m_bins_store * mldr_m_bins
-            )
-
-            err_p = processing_info["settings_info"]["pcb"].get(
-                "pldr_error_threshold",
-                0.025,
-            )
-            _, _, _, sr_lim = pldr_error(
-                delta_m=mldr_m_bins,
-                delta_v_err=residual,
-                delta_p_err_ulim=err_p,
-            )
-
-            vldr_info = add_parameter(
-                vldr_info,
-                name="vldr_residual",
-                values=residual,
-            )
-            vldr_info = add_parameter(
-                vldr_info,
-                name="sr_limit",
-                values=sr_lim,
-            )
-        else:
-            CustomWarning(
-                f"VLDR residual skipped: molecular_info[{qa_test!r}] has no mean row."
-            )
-    else:
-        CustomWarning(
-            f"VLDR residual skipped: no molecular_info entry for {qa_test}."
-        )
-
-    vldr_info = add_parameter(vldr_info, name="ratio_type", values="vldr")
-
-    output_data["pol_cal_ratio"][qa_test] = append_or_replace_pairs(
-        output_data["pol_cal_ratio"].get(qa_test),
-        vldr,
+    mldr_mean = (
+        mldr_info
+        .sel(parameters="mean")
+        .reindex(pair=mldr_ids)
+        .assign_coords(pair=vldr_mean.pair.values)
+        .astype("float64")
+        .rename("mldr_mean")
     )
-    output_data["pol_cal_ratio_error"][qa_test] = append_or_replace_pairs(
-        output_data["pol_cal_ratio_error"].get(qa_test),
-        vldr_error,
+
+    residual = (vldr_mean - mldr_mean) / (1.0 - vldr_mean * mldr_mean)
+
+    err_p = processing_info["settings_info"]["pcb"].get(
+        "pldr_error_threshold",
+        0.025,
     )
-    output_data["pol_cal_info"][qa_test] = append_or_replace_info(
-        output_data["pol_cal_info"].get(qa_test),
-        vldr_info,
+
+    _, _, _, sr_limit = pldr_error(
+        delta_m=mldr_mean,
+        delta_v_err=residual,
+        delta_p_err_ulim=err_p,
     )
+    
+    residual = residual.reset_coords(drop=True)
+    sr_limit = sr_limit.reset_coords(drop=True)
+
+    return add_parameters(
+        info,
+        {
+            "vldr_residual": residual,
+            "sr_limit": sr_limit,
+        },
+    )
+
+
+def compute_mean_calibrated_ratio(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Compute mean calibrated_ratio products and pol_cal_info metadata."""
+
+    output_data = shallow_copy(input_data)
+    vertical_scale = output_data[processing_info["caller_info"]["vertical_scale"]]
+    averaging_range = processing_info["settings_info"]["pcb"]["rayleigh_region"]
+
+    qa_alias, qa_store = get_ray_pcb_io_keys(
+        output_data,
+        processing_info,
+        required_store="profile_mean",
+    )
+    if qa_alias is None:
+        return output_data
+    if qa_alias not in output_data["profile_error_mean"] or qa_alias not in vertical_scale:
+        return output_data
+
+    sig = output_data["profile_mean"][qa_alias]
+    sig_err = output_data["profile_error_mean"][qa_alias]
+
+    eta_inputs = collect_ray_pcb_eta_inputs(output_data, sig)
+    if eta_inputs is None:
+        print_entry("Mean calibrated ratio calculation skipped: no usable pcb/pcb_aux eta pairs found.")
+        return output_data
+
+    ch_r, ch_t, eta_ids, eta_info = eta_inputs
+    product = build_calibrated_ratio_product(
+        output_data=output_data,
+        sig=sig,
+        sig_err=sig_err,
+        ch_r=ch_r,
+        ch_t=ch_t,
+        eta_ids=eta_ids,
+        eta_info=eta_info,
+        average_time=True,
+    )
+    if product is None:
+        return output_data
+
+    ratio, ratio_error, info, ch_r_found, _ = product
+    z_pair = channels_to_pairs(vertical_scale[qa_alias].sel(channel=ch_r_found), info)
+
+    info = add_region_stats_to_info(
+        info=info,
+        values=ratio,
+        z_pair=z_pair,
+        averaging_range=averaging_range,
+        ratio_type="calibrated_ratio",
+    )
+
+    store_pol_cal_mean_product(output_data, qa_store, ratio, ratio_error, info)
+
+    print_entry("Mean calibrated ratio calculation complete!")
+    return output_data
+
+
+def compute_calibrated_ratio(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Compute time-resolved calibrated_ratio products lazily."""
+
+    output_data = shallow_copy(input_data)
+
+    qa_alias, qa_store = get_ray_pcb_io_keys(
+        output_data,
+        processing_info,
+        required_store="profile",
+    )
+    if qa_alias is None:
+        return output_data
+    if qa_alias not in output_data["profile_error"]:
+        return output_data
+
+    sig = output_data["profile"][qa_alias]
+    sig_err = output_data["profile_error"][qa_alias]
+
+    eta_inputs = collect_ray_pcb_eta_inputs(output_data, sig)
+    if eta_inputs is None:
+        print_entry("Calibrated ratio calculation skipped: no usable pcb/pcb_aux eta pairs found.")
+        return output_data
+
+    ch_r, ch_t, eta_ids, eta_info = eta_inputs
+    product = build_calibrated_ratio_product(
+        output_data=output_data,
+        sig=sig,
+        sig_err=sig_err,
+        ch_r=ch_r,
+        ch_t=ch_t,
+        eta_ids=eta_ids,
+        eta_info=eta_info,
+        average_time=False,
+    )
+    if product is None:
+        return output_data
+
+    ratio, ratio_error, _, _, _ = product
+    store_pol_cal_product(output_data, qa_store, ratio, ratio_error, mean=False)
+
+    print_entry("Calibrated ratio calculation complete!")
+    return output_data
+
+
+def compute_mean_vldr(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Compute mean VLDR products and pol_cal_info metadata."""
+
+    output_data = shallow_copy(input_data)
+    vertical_scale = output_data[processing_info["caller_info"]["vertical_scale"]]
+    averaging_range = processing_info["settings_info"]["pcb"]["rayleigh_region"]
+
+    qa_alias, qa_store = get_ray_pcb_io_keys(
+        output_data,
+        processing_info,
+        required_store="profile_mean",
+    )
+    if qa_alias is None:
+        return output_data
+    if qa_alias not in output_data["profile_error_mean"]:
+        return output_data
+    if qa_alias not in output_data["channel_info"]:
+        print_entry(f"Mean VLDR calculation skipped: no {qa_alias} channel_info found.")
+        return output_data
+    if qa_alias not in vertical_scale:
+        print_entry(f"Mean VLDR calculation skipped: no {qa_alias} vertical scale found.")
+        return output_data
+
+    sig = output_data["profile_mean"][qa_alias]
+    sig_err = output_data["profile_error_mean"][qa_alias]
+
+    eta_inputs = collect_ray_pcb_eta_inputs(output_data, sig)
+    if eta_inputs is None:
+        print_entry("Mean VLDR calculation skipped: no usable pcb/pcb_aux eta pairs found.")
+        return output_data
+
+    ch_r, ch_t, eta_ids, eta_info = eta_inputs
+    product = build_vldr_product(
+        output_data=output_data,
+        sig=sig,
+        sig_err=sig_err,
+        channel_info_qa=output_data["channel_info"][qa_alias],
+        ch_r=ch_r,
+        ch_t=ch_t,
+        eta_ids=eta_ids,
+        eta_info=eta_info,
+        average_time=True,
+    )
+    if product is None:
+        return output_data
+
+    ratio, ratio_error, info, ch_r_found, _ = product
+    z_pair = channels_to_pairs(vertical_scale[qa_alias].sel(channel=ch_r_found), info)
+
+    vldr_mean = mean_in_region(ratio, z_pair, averaging_range)
+    vldr_sem = sem_in_region(ratio, z_pair, averaging_range)
+
+    info = add_parameters(
+        info,
+        {
+            "mean": vldr_mean,
+            "sem": vldr_sem,
+            "ratio_type": "vldr",
+        },
+    )
+    info = add_vldr_residual_to_info(
+        processing_info=processing_info,
+        output_data=output_data,
+        info=info,
+        vldr_mean=vldr_mean,
+        qa_test=qa_store,
+    )
+
+    store_pol_cal_mean_product(output_data, qa_store, ratio, ratio_error, info)
+
+    print_entry("Mean VLDR calculation complete!")
+    return output_data
+
+
+def compute_vldr(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Compute time-resolved VLDR products lazily."""
+
+    output_data = shallow_copy(input_data)
+
+    qa_alias, qa_store = get_ray_pcb_io_keys(
+        output_data,
+        processing_info,
+        required_store="profile",
+    )
+    if qa_alias is None:
+        return output_data
+    if qa_alias not in output_data["profile_error"]:
+        return output_data
+    if qa_alias not in output_data["channel_info"]:
+        print_entry(f"VLDR calculation skipped: no {qa_alias} channel_info found.")
+        return output_data
+
+    sig = output_data["profile"][qa_alias]
+    sig_err = output_data["profile_error"][qa_alias]
+
+    eta_inputs = collect_ray_pcb_eta_inputs(output_data, sig)
+    if eta_inputs is None:
+        print_entry("VLDR calculation skipped: no usable pcb/pcb_aux eta pairs found.")
+        return output_data
+
+    ch_r, ch_t, eta_ids, eta_info = eta_inputs
+    product = build_vldr_product(
+        output_data=output_data,
+        sig=sig,
+        sig_err=sig_err,
+        channel_info_qa=output_data["channel_info"][qa_alias],
+        ch_r=ch_r,
+        ch_t=ch_t,
+        eta_ids=eta_ids,
+        eta_info=eta_info,
+        average_time=False,
+    )
+    if product is None:
+        return output_data
+
+    ratio, ratio_error, _, _, _ = product
+    store_pol_cal_product(output_data, qa_store, ratio, ratio_error, mean=False)
 
     print_entry("VLDR calculation complete!")
     return output_data
@@ -2166,33 +2374,40 @@ def compute_mldr(
     vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
     vertical_scale = output_data[vertical_scale_name]
 
-    qa_test = "ray_pcb"
+    qa_test_alias, qa_store = get_ray_pcb_io_keys(
+        output_data=output_data,
+        processing_info=processing_info,
+        required_store="profile",
+    )
+    if qa_test_alias is None:
+        return output_data
 
     molec_store = output_data.get("molecular", output_data.get("molec", {}))
     pol_cal_info = output_data.get("pol_cal_info", {})
 
-    if qa_test not in molec_store:
+    if qa_test_alias not in molec_store:
         print_entry("MLDR calculation skipped: no ray_pcb molecular profiles found.")
         return output_data
-    if qa_test not in vertical_scale:
+    if qa_test_alias not in vertical_scale:
         print_entry("MLDR calculation skipped: no ray_pcb vertical scale found.")
         return output_data
-    if qa_test not in pol_cal_info:
-        print_entry("MLDR calculation skipped: no ray_pcb pol_cal_info found.")
+    qa_info_key = qa_store if qa_store in pol_cal_info else qa_test_alias
+    if qa_info_key not in pol_cal_info:
+        print_entry(f"MLDR calculation skipped: no {qa_store} pol_cal_info found.")
         return output_data
 
-    molec = molec_store[qa_test]
+    molec = molec_store[qa_test_alias]
     if "opto_parameters" in molec.dims:
         molec = molec.sel(opto_parameters="atten_bsc")
-    z = vertical_scale[qa_test]
+    z = vertical_scale[qa_test_alias]
 
     if "channel" not in molec.dims:
         raise ValueError(
-            f"MLDR molecular input for {qa_test} must have a channel dimension. "
+            f"MLDR molecular input for {qa_test_alias} must have a channel dimension. "
             f"Found dims: {molec.dims}."
         )
 
-    pci_base = _base_pol_cal_pairs(pol_cal_info[qa_test])
+    pci_base = _base_pol_cal_pairs(pol_cal_info[qa_info_key])
     ch_r, ch_t = _read_channels_from_info(pci_base)
 
     available_channels = set(molec.channel.values.tolist())
@@ -2269,12 +2484,12 @@ def compute_mldr(
     mldr_info = add_parameter(mldr_info, name="mean", values=mldr_m_bins)
     mldr_info = add_parameter(mldr_info, name="ratio_type", values="mldr")
 
-    output_data["molecular_ratio"][qa_test] = append_or_replace_pairs(
-        output_data["molecular_ratio"].get(qa_test),
+    output_data["molecular_ratio"][qa_store] = append_or_replace_pairs(
+        output_data["molecular_ratio"].get(qa_store),
         mldr,
     )
-    output_data["molecular_info"][qa_test] = append_or_replace_info(
-        output_data["molecular_info"].get(qa_test),
+    output_data["molecular_info"][qa_store] = append_or_replace_info(
+        output_data["molecular_info"].get(qa_store),
         mldr_info,
     )
 

@@ -177,31 +177,3 @@ def special_path_rules(caller_info):
     caller_info["paths"] = paths
 
     return caller_info
-
-# def special_path_rules(caller_info):
-
-#     if caller_info["raw_file_format"] in ["scc","tamarin"]:
-    
-#         infered = ["abs_drk_ray", "abs_drk_ray_pcb", "abs_drk_dtm", "abs_drk_trg"]
-#         for key in infered:
-#             key_m = key.replace("abs_drk_", "abs_", 1)
-#             if caller_info[key] == None and caller_info[key_m] != None:
-#                 caller_info[key] = caller_info[key_m]
-        
-#         pairs = {"abs_drk_tlc": "abs_tlc_north",
-#                  "abs_drk_tlc_rin": "abs_tlc_rin_inner",
-#                  "abs_drk_pcb": "abs_pcb_p45",
-#                  "abs_drk_pcb_aux": "abs_pcb_aux_p45"}
-#         for key, paired in pairs.items():
-#             if caller_info[key] == None and caller_info[paired] != None:
-#                 caller_info[key] = caller_info[paired]
-        
-#     if caller_info["raw_file_format"] == "polly_xt":
-        
-#         pairs = {"abs_pcb_p45": "abs_ray",
-#                  "abs_pcb_m45": "abs_ray"}
-#         for key, paired in pairs.items():
-#             if caller_info[key] == None and caller_info[paired] != None:
-#                 caller_info[key] = caller_info[paired]
-    
-#     return(caller_info)

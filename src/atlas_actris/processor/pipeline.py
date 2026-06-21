@@ -33,8 +33,8 @@ from utils.printouts import print_header
 from dataclasses import dataclass
 from collections import defaultdict
 
-from processor.handle_overflows_lazy import compute_check_for_overflows
-from processor.signal_flagging_lazy import compute_detect_saturation
+from processor.handle_overflows import compute_check_for_overflows
+from processor.signal_flagging import compute_detect_saturation
 from processor.signal_trimming import (
     compute_slice_and_exclude, 
     compute_screen_low_shots,
@@ -55,6 +55,7 @@ from processor.signal_processing import (
     compute_smoothing_dark,
     compute_dark_correction,
     compute_signal_noise,
+    compute_signal_smoothing,
     compute_mean_arrays,
     )
 
@@ -65,7 +66,7 @@ from processor.signal_gluing import (
     compute_gluing,
     )
 
-from processor.pol_cal_calculations_lazy import (
+from processor.pol_cal_calculations import (
     compute_gain_ratio,
     compute_calibration_factor,
     compute_calibrated_ratio,
@@ -180,6 +181,10 @@ class Processor():
             "signal_noise_calculation":{
                 "function":compute_signal_noise,
                 "header":"Signal noise calculation"
+                },
+            "signal_smoothing":{
+                "function":compute_signal_smoothing,
+                "header":"Signal smoothing"
                 },
             "gluing_region":{
                 "function":compute_gluing_region,

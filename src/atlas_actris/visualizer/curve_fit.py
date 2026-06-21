@@ -122,6 +122,33 @@ def durbin_watson(residuals):
     diff = np.diff(residuals)
     
     return np.sum(diff ** 2) / np.sum(residuals ** 2)
+
+
+def coord_step(x):
+    """Return a robust positive coordinate step from finite adjacent values.
+
+    Some channels can have NaNs at the beginning or end of the vertical
+    coordinate. Using x[1] - x[0] then produces NaN and invalidates all
+    candidate fit windows. This helper keeps the original bin grid unchanged
+    and only ignores invalid coordinate pairs when estimating dx.
+    """
+
+    x = np.asarray(x, dtype=float)
+
+    if x.size < 2:
+        raise ValueError("Coordinate array must contain at least two points.")
+
+    dx = np.diff(x)
+    valid_dx = np.isfinite(dx) & (dx > 0.)
+
+    if not np.any(valid_dx):
+        finite_count = np.count_nonzero(np.isfinite(x))
+        raise ValueError(
+            "Could not calculate a finite positive coordinate step from x. "
+            f"finite_x={finite_count}/{x.size}"
+        )
+
+    return np.nanmedian(dx[valid_dx])
     
     
 def cross_crit_x_mask(x, start, end, cursor, 
@@ -265,6 +292,8 @@ def get_array_coords(x, keyw_args):
     return(win, mid)
     
 def region_calculations(x, y1, y2, win, mid):
+
+    dx = coord_step(x)
     
     data_keys = [
         "y1_rc_avg",
@@ -306,7 +335,7 @@ def region_calculations(x, y1, y2, win, mid):
             
             mask_y = (y1[mask_x] == y1[mask_x]) & (y2[mask_x] == y2[mask_x])
                         
-            if np.sum(mask_y) >= 0.95 * win[i] / (x[1] - x[0]):
+            if np.sum(mask_y) >= 0.95 * win[i] / dx:
                 
                 # RC section
                 x_region = x[mask_x][mask_y]
