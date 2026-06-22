@@ -16,7 +16,7 @@ from processor.packaging import collect_metadata
 from visualizer.plot_quicklook import generate_plot
 from visualizer.make_text import GenerateText, Libraries
 from visualizer.plot_utils import (
-    prepare_folder, smoothing_2D, collect_dict,
+    prepare_folder, smoothing_2D,
     convert_m_to_km, perform_color_reduction, 
     add_plot_metadata, insert_nan_time_gaps, slice_time
     )

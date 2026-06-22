@@ -20,5 +20,7 @@ def ask_clean_cache(caller_info):
     if answer in ["y", "yes"]:
         shutil.rmtree(cache_path)
         print(f"-- Deleted cache folder: {cache_path}")
+        print()
     else:
         print(f"-- Kept cache folder: {cache_path}")
+        print()

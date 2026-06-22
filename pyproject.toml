@@ -18,15 +18,38 @@ readme = "README.md"
 requires-python = ">=3.9,<3.14"
 
 dependencies = [
-    "numpy>=1.26.4; python_version < '3.13'",
-    "numpy>=2.1.3; python_version >= '3.13'",
-    "scipy>=1.13.0; python_version < '3.13'",
-    "scipy>=1.14.1; python_version >= '3.13'",
-    "netCDF4>=1.6.3; python_version < '3.12'",
-    "netCDF4>=1.7.2; python_version >= '3.12'",
-    "dask>=2024.8.0; python_version < '3.13'",
-    "dask>=2024.12.0; python_version >= '3.13'",
-    "arc-actris>=1.1.0",
+    # Core numerical stack
+    "numpy>=1.26.4,<3; python_version < '3.13'",
+    "numpy>=2.1.3,<3; python_version >= '3.13'",
+
+    "scipy>=1.13.0,<2; python_version < '3.13'",
+    "scipy>=1.14.1,<2; python_version >= '3.13'",
+
+    "pandas>=2.2.0,<3",
+    "xarray>=2024.7.0,<2026",
+
+    # NetCDF / HDF / lidar file support
+    "netCDF4>=1.6.3,<2",
+    "h5py>=3.10.0,<4",
+    "h5netcdf>=1.3,<2",
+
+    # Lazy processing and cache storage
+    "dask>=2024.8.0,<2026; python_version < '3.13'",
+    "dask>=2024.12.0,<2026; python_version >= '3.13'",
+    "zarr>=2.18.0,<3",
+
+    # ACTRIS molecular calculations
+    "arc-actris>=1.1.0,<2",
+
+    # Download / web access
+    "requests>=2.31.0,<3",
+
+    # Plotting
+    "matplotlib>=3.8.0,<4",
+    "Pillow>=10.0.0,<12",
+
+    # DOCX report export
+    "python-docx>=1.1.0,<2",
 ]
 
 classifiers = [
@@ -46,6 +69,10 @@ docs = [
     "mkdocs-material>=9,<10",
 ]
 
+dev = [
+    "pytest>=8,<9",
+]
+
 [project.urls]
 Homepage = "https://github.com/nikolaos-siomos/ATLAS"
 Issues = "https://github.com/nikolaos-siomos/ATLAS/issues"
@@ -55,6 +82,7 @@ Issues = "https://github.com/nikolaos-siomos/ATLAS/issues"
 # ----------------------------------------------------------
 [project.scripts]
 atlas = "atlas_actris.cli:main"
+atlas-smoke-test = "atlas_actris.testing.smoke_test:main"
 
 # ----------------------------------------------------------
 # Setuptools configuration for src/atlas_actris layout

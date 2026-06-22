@@ -1,0 +1,130 @@
+{
+  "16622|202312210600|bufr": {
+    "cached_at_utc": "2026-06-19 14:05:32",
+    "datetime_utc": "2023-12-21 06:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "bufr",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=bufr&datetime=2023-12-21+06%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312210600|temp": {
+    "cached_at_utc": "2026-06-19 14:05:42",
+    "datetime_utc": "2023-12-21 06:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "temp",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=temp&datetime=2023-12-21+06%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312210900|bufr": {
+    "cached_at_utc": "2026-06-19 14:05:02",
+    "datetime_utc": "2023-12-21 09:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "bufr",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=bufr&datetime=2023-12-21+09%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312210900|temp": {
+    "cached_at_utc": "2026-06-19 14:05:10",
+    "datetime_utc": "2023-12-21 09:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "temp",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=temp&datetime=2023-12-21+09%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312211200|bufr": {
+    "cached_at_utc": "2026-06-19 14:04:29",
+    "datetime_utc": "2023-12-21 12:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "bufr",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=bufr&datetime=2023-12-21+12%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312211200|temp": {
+    "cached_at_utc": "2026-06-19 14:04:36",
+    "datetime_utc": "2023-12-21 12:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "temp",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=temp&datetime=2023-12-21+12%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312211500|bufr": {
+    "cached_at_utc": "2026-06-19 14:03:56",
+    "datetime_utc": "2023-12-21 15:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "bufr",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=bufr&datetime=2023-12-21+15%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312211500|temp": {
+    "cached_at_utc": "2026-06-19 14:04:04",
+    "datetime_utc": "2023-12-21 15:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "temp",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=temp&datetime=2023-12-21+15%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312211800|bufr": {
+    "cached_at_utc": "2026-06-19 14:04:12",
+    "datetime_utc": "2023-12-21 18:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "bufr",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=bufr&datetime=2023-12-21+18%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312211800|temp": {
+    "cached_at_utc": "2026-06-19 14:04:20",
+    "datetime_utc": "2023-12-21 18:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "temp",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=temp&datetime=2023-12-21+18%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312212100|bufr": {
+    "cached_at_utc": "2026-06-19 14:04:45",
+    "datetime_utc": "2023-12-21 21:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "bufr",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=bufr&datetime=2023-12-21+21%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312212100|temp": {
+    "cached_at_utc": "2026-06-19 14:04:54",
+    "datetime_utc": "2023-12-21 21:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "temp",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=temp&datetime=2023-12-21+21%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312220000|bufr": {
+    "cached_at_utc": "2026-06-19 14:05:17",
+    "datetime_utc": "2023-12-22 00:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "bufr",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=bufr&datetime=2023-12-22+00%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312220000|temp": {
+    "cached_at_utc": "2026-06-19 14:05:25",
+    "datetime_utc": "2023-12-22 00:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "temp",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=temp&datetime=2023-12-22+00%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312220300|bufr": {
+    "cached_at_utc": "2026-06-19 14:05:50",
+    "datetime_utc": "2023-12-22 03:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "bufr",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=bufr&datetime=2023-12-22+03%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  },
+  "16622|202312220300|temp": {
+    "cached_at_utc": "2026-06-19 14:05:59",
+    "datetime_utc": "2023-12-22 03:00:00",
+    "message": "Empty response from Wyoming",
+    "source": "temp",
+    "url": "https://weather.uwyo.edu/cgi-bin/bufrraob.py?src=temp&datetime=2023-12-22+03%3A00%3A00&id=16622&type=TEXT%3ACSV",
+    "wmo_id": "16622"
+  }
+}

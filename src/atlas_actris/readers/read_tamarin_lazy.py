@@ -308,27 +308,28 @@ def _decode_nc_value(value):
     return value
 
 
-def _open_tamarin_dataset(nc_file, group = None):
-    """Open a Tamarin NetCDF group with xarray.
-
-    Note: hierarchical NetCDF4 groups require an xarray backend such as
-    netcdf4 or h5netcdf. This avoids importing h5py directly.
-    """
+def _open_tamarin_dataset(nc_file, group=None):
+    """Open a Tamarin NetCDF group with xarray using the h5netcdf backend."""
 
     kwargs = {}
     if group is not None:
         kwargs["group"] = group
 
     try:
-        return xr.open_dataset(nc_file, chunks={}, **kwargs)
-    except ValueError as exc:
+        return xr.open_dataset(
+            nc_file,
+            engine="h5netcdf",
+            chunks={},
+            cache=False,
+            **kwargs,
+        )
+    except Exception as exc:
         raise FileReaderError(
-            "--Could not open this NetCDF4 group with xarray. "
-            "Install an xarray NetCDF4-capable backend, e.g. netCDF4 or h5netcdf, "
-            "or use the h5py-based reader."
+            "--Could not open this Tamarin NetCDF4 group with xarray/h5netcdf. "
+            "Check that h5netcdf is installed and that the file is readable."
         ) from exc
-
-
+        
+        
 def _try_open_tamarin_group(nc_file, group_path):
     try:
         return _open_tamarin_dataset(nc_file, group = group_path)

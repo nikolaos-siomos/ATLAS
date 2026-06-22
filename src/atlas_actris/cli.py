@@ -1,8 +1,20 @@
 from pathlib import Path
+import os
 import runpy
 import sys
 
+
 def main():
+    # Use a non-interactive Matplotlib backend for normal terminal/batch runs.
+    # This prevents TkAgg cleanup warnings in clean environments.
+    #
+    # Important:
+    # - setdefault means users can override it, e.g.:
+    #     MPLBACKEND=QtAgg atlas call_atlas.ini
+    # - Spyder/debug runs that call __call_atlas_interactive__.py directly
+    #   will not be affected by this CLI default.
+    os.environ.setdefault("MPLBACKEND", "Agg")
+
     script_path = Path(__file__).with_name("__call_atlas_interactive__.py")
     script_dir = str(script_path.parent.resolve())
 

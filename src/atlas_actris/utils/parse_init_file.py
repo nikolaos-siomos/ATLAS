@@ -92,8 +92,9 @@ humidity_units = ["percent", "fraction"]
 
 SCHEMA: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
-    "export_hoi_cfg":            {"dtype": str, "default": "0",  "is_list": False, "category": "optional", "allowed": ["0", "1", "2"]},
-    "scc_configuration_id":      {"dtype": str, "default": None, "is_list": False, "category": "optional"},
+    "scc_compatible_format":     {"dtype": bool, "default": False, "is_list": False, "category": "optional"},
+    "export_hoi_cfg":            {"dtype": str,  "default": "0",   "is_list": False, "category": "optional", "allowed": ["0", "1", "2"]},
+    "scc_configuration_id":      {"dtype": str,  "default": None,  "is_list": False, "category": "optional"},
 
     "parent_folder":             {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "dir"},
     "atlas_configuration_file":  {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "file"},
@@ -107,7 +108,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "dpi":                 {"dtype": int,  "default": 300,        "is_list": False, "category": "optional"},
     "color_reduction":     {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
     "output_folder":       {"dtype": str,  "default": None,       "is_list": False, "category": "optional"},
-    "overwrite_output":   {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
+    "overwrite_output":    {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
     "expert_analyst":      {"dtype": str,  "default": None,       "is_list": False, "category": "optional"},
     "debug_signals":       {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
     "export_netcdf":       {"dtype": bool, "default": True,       "is_list": False, "category": "optional"},
@@ -166,7 +167,41 @@ explicit_path_keys = {
     "atlas_settings_file",
     "radiosonde_folder",
     "radiosonde_file",
+    "output_folder",
 }
+
+
+
+def _raise_unknown_init_parameter_errors(config: configparser.ConfigParser) -> None:
+    """Raise ConfigError if the call_atlas INI contains keys outside SCHEMA.
+
+    The check is performed on the raw ConfigParser object before defaults are
+    filled, so even empty declarations such as ``unknown_key =`` are caught.
+    Section names are not constrained here because this parser historically
+    accepts known keys from any section.
+    """
+
+    schema_keys = set(SCHEMA.keys())
+    unknown = []
+
+    for section in config.sections():
+        for key in config[section].keys():
+            key_str = str(key).strip()
+            if key_str not in schema_keys:
+                unknown.append((section, key_str))
+
+    if not unknown:
+        return
+
+    unknown_lines = "\n".join(
+        f"  - [{section}] {key}" for section, key in unknown
+    )
+
+    raise ConfigError(
+        "Initialization file contains parameter(s) that are not defined in the "
+        "ATLAS initialization schema. Empty declarations are also invalid.\n"
+        f"Unknown parameter(s):\n{unknown_lines}"
+    )
 
 tlc_qua_subfolders = ["north", "east", "south", "west"]
 tlc_rin_subfolders = ["inner", "outer"]
@@ -179,6 +214,62 @@ pcb_subfolders = ["p45", "m45", "+45", "-45"]
 
 def _is_empty_scalar(v: Any) -> bool:
     return v is None or (isinstance(v, str) and v.strip() == "")
+
+
+def _ini_root(filepath: str) -> str:
+    """Return the absolute folder containing the call_atlas INI file."""
+
+    return os.path.normpath(os.path.dirname(os.path.abspath(filepath)))
+
+
+def _path_relative_to_ini_root(path: str, filepath: str) -> str:
+    """Resolve a path relative to the call_atlas INI folder if needed."""
+
+    path = os.path.expanduser(str(path))
+
+    if not os.path.isabs(path):
+        path = os.path.join(_ini_root(filepath), path)
+
+    return os.path.normpath(path)
+
+
+def _resolve_explicit_paths_relative_to_ini(
+    parser_args: Dict[str, Any],
+    filepath: str,
+) -> Dict[str, Any]:
+    """Resolve explicit path entries relative to the call_atlas INI folder.
+
+    This applies only to the user-facing explicit path entries, including
+    ``output_folder``.  Relative QA measurement paths such as ``ray`` and
+    ``pcb`` keep their existing behavior: they are resolved relative to
+    ``parent_folder`` later.
+    """
+
+    for key in explicit_path_keys:
+        value = parser_args.get(key)
+
+        if value is None:
+            continue
+
+        if isinstance(value, str) and value.strip() == "":
+            parser_args[key] = None
+            continue
+
+        parser_args[key] = _path_relative_to_ini_root(value, filepath)
+
+    return parser_args
+
+
+def _base_folder_from_parent_folder(parent_folder: str) -> str:
+    """Return the folder one level above parent_folder.
+
+    Example
+    -------
+    /my_drive/station_id/input_data -> /my_drive/station_id
+    """
+
+    parent_folder = os.path.normpath(os.path.abspath(os.path.expanduser(str(parent_folder))))
+    return os.path.normpath(os.path.dirname(parent_folder))
 
 
 def _convert_scalar(raw: Optional[str], expected: type, name: str) -> Optional[Union[str, int, float, bool]]:
@@ -559,22 +650,27 @@ def _enforce_mandatory_and_recommended(parser_args: Dict[str, Any]) -> None:
 
 def _resolve_default_base_paths(parser_args: Dict[str, Any], filepath: str) -> Dict[str, Any]:
     """
-    Resolve default folders relative to the initialization file location.
+    Resolve default folders.
 
-    The old user-facing ``main_data_folder`` parameter has been retired.
-    Internally, keep ``main_data_folder`` equal to the folder containing the
-    initialization file so that existing downstream autodetection helpers can
-    continue to use it.
+    Explicit paths may be absolute or relative to the folder containing the
+    call_atlas INI file.  The old user-facing ``main_data_folder`` parameter has
+    been retired.  Internally, keep ``main_data_folder`` equal to the INI folder
+    for compatibility with downstream helpers.
 
-    Default layout, relative to the initialization file folder::
+    Defaults
+    --------
+    parent_folder:
+        <ini_folder>/input_data
 
-        ./input_data
-        ./radiosondes
-        ./configurations/config_file.ini                         (export_hoi_cfg = 0)
-        ./configurations/config_file_{scc_configuration_id}.ini  (export_hoi_cfg = 1 or 2)
+    radiosonde_folder:
+        <base_folder>/radiosondes
+
+    where <base_folder> is the folder one level above parent_folder.  For
+    example, if parent_folder is /my_drive/station_id/input_data, then
+    radiosonde_folder becomes /my_drive/station_id/radiosondes.
     """
 
-    init_folder = os.path.normpath(os.path.dirname(os.path.abspath(filepath)))
+    init_folder = _ini_root(filepath)
 
     # Retained only as an internal compatibility value for autodetect_paths and
     # downstream code that may still expect this key in caller_info.
@@ -582,12 +678,15 @@ def _resolve_default_base_paths(parser_args: Dict[str, Any], filepath: str) -> D
 
     if parser_args.get("parent_folder") is None:
         parser_args["parent_folder"] = os.path.join(init_folder, "input_data")
+    else:
+        parser_args["parent_folder"] = os.path.normpath(parser_args["parent_folder"])
+
+    base_folder = _base_folder_from_parent_folder(parser_args["parent_folder"])
 
     if parser_args.get("radiosonde_folder") is None and parser_args.get("radiosonde_file") is None:
-        parser_args["radiosonde_folder"] = os.path.join(init_folder, "radiosondes")
+        parser_args["radiosonde_folder"] = os.path.join(base_folder, "radiosondes")
 
     return parser_args
-
 
 def _resolve_default_configuration_file(
     parser_args: Dict[str, Any],
@@ -599,18 +698,29 @@ def _resolve_default_configuration_file(
     """
     Resolve the default ATLAS configuration file.
 
+    The default configuration folder is placed next to parent_folder, not next
+    to the call_atlas INI file.  For example:
+
+        parent_folder = /my_drive/station_id/input_data
+        cfg_folder    = /my_drive/station_id/configurations
+
     For export_hoi_cfg == "0", the local default must already exist:
-        ./configurations/config_file.ini
+        <cfg_folder>/config_file.ini
 
     For export_hoi_cfg == "1" or "2", the configuration file is expected to be
     downloaded/exported later, so only the target filename is prepared here:
-        ./configurations/config_file_{scc_configuration_id}.ini
+        <cfg_folder>/config_file_{scc_configuration_id}.ini
     """
 
     export_hoi_cfg = parser_args.get("export_hoi_cfg")
     atlas_configuration_file = parser_args.get("atlas_configuration_file")
-    init_folder = os.path.normpath(os.path.dirname(os.path.abspath(filepath)))
-    cfg_folder = os.path.join(init_folder, "configurations")
+
+    parent_folder = parser_args.get("parent_folder")
+    if parent_folder is None:
+        parent_folder = os.path.join(_ini_root(filepath), "input_data")
+
+    base_folder = _base_folder_from_parent_folder(parent_folder)
+    cfg_folder = os.path.join(base_folder, "configurations")
 
     if export_hoi_cfg == "0" and atlas_configuration_file is None:
         default_cfg = os.path.join(cfg_folder, "config_file.ini")
@@ -638,6 +748,20 @@ def _resolve_default_configuration_file(
                 "SCC configuration file."
             )
 
+        if os.path.exists(cfg_folder) and not os.path.isdir(cfg_folder):
+            raise ConfigError(
+                "The configurations path needed for atlas_configuration_file "
+                f"exists but is not a directory: {cfg_folder}"
+            )
+
+        try:
+            os.makedirs(cfg_folder, exist_ok=True)
+        except Exception as exc:
+            raise ConfigError(
+                "The configurations folder needed for atlas_configuration_file "
+                f"could not be created: {cfg_folder}"
+            ) from exc
+
         parser_args["atlas_configuration_file"] = os.path.join(
             cfg_folder,
             f"config_file_{scc_configuration_id}.ini",
@@ -651,7 +775,23 @@ def _absolute_paths_exist_check(parser_args: Dict[str, Any]) -> Dict[str, Any]:
         path = parser_args.get(key)
 
         if meta.get("check_path") in ["dir", "file"] and path is not None:
-            path = os.path.normpath(path)
+            path = os.path.normpath(os.path.expanduser(str(path)))
+
+            if key == "radiosonde_folder":
+                if os.path.exists(path) and not os.path.isdir(path):
+                    raise ConfigError(
+                        f"{key} is provided but points to an existing file, not a directory: {path}"
+                    )
+
+                try:
+                    os.makedirs(path, exist_ok=True)
+                except Exception as exc:
+                    raise ConfigError(
+                        f"{key} does not point to an existing path and could not be created: {path}"
+                    ) from exc
+
+                parser_args[key] = path
+                continue
 
             if not os.path.exists(path):
                 raise ConfigError(
@@ -673,7 +813,6 @@ def _absolute_paths_exist_check(parser_args: Dict[str, Any]) -> Dict[str, Any]:
             parser_args[key] = path
 
     return parser_args
-
 
 def _relative_paths_exist_check(parser_args: Dict[str, Any]) -> Dict[str, Any]:
 
@@ -1176,6 +1315,7 @@ def read_ini_file(filepath: str) -> Dict[str, Any]:
     """Read, convert, expand from scalar defaults, compute simple defaults, validate, and return dict."""
 
     config = configparser.ConfigParser(allow_no_value=True, strict=True)
+    config.optionxform = str
 
     read_files = config.read(filepath, encoding="utf-8")
 
@@ -1184,6 +1324,8 @@ def read_ini_file(filepath: str) -> Dict[str, Any]:
             f"INI file not found or unreadable: {filepath}\n"
             "Make sure the encoding is utf-8"
         )
+
+    _raise_unknown_init_parameter_errors(config)
 
     parser_args: Dict[str, Any] = {}
 
@@ -1393,7 +1535,11 @@ def parse_call_atlas_ini(filepath: str, debug: bool = False) -> Dict[str, Any]:
     # 2) Enforce mandatory/recommended
     _enforce_mandatory_and_recommended(parser_args)
 
-    # 3) Resolve default base folders relative to the initialization file.
+    # 2b) Resolve explicit absolute/relative path entries.  Relative paths are
+    # interpreted with respect to the folder containing this initialization file.
+    parser_args = _resolve_explicit_paths_relative_to_ini(parser_args, filepath)
+
+    # 3) Resolve default base folders.
     # The old user-facing main_data_folder parameter is no longer read from
     # the INI, but an internal compatibility value is still populated.
     parser_args = _resolve_default_base_paths(parser_args, filepath)
@@ -1409,7 +1555,7 @@ def parse_call_atlas_ini(filepath: str, debug: bool = False) -> Dict[str, Any]:
     _scc_configuration_id_check(parser_args)
 
     # 5c) If no configuration file was provided and local config export is used,
-    # fall back to ./configurations/config_file.ini relative to the INI folder.
+    # fall back to <parent_folder_parent>/configurations/config_file.ini.
     parser_args = _resolve_default_configuration_file(
         parser_args,
         filepath,

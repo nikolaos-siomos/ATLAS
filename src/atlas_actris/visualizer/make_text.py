@@ -222,8 +222,8 @@ class GenerateText:
             sm_expo = self.settings['smoothing_exponential']
             )
         
-        pair_part = f"VLDR ID: {self.qa_test_info['pair']}"
-        channel_part = f"Ch R: {self.qa_test_info['ch_r']} - Ch T: {self.qa_test_info['ch_r']}"
+        pair_part = f"VLDR ID: {self.qa_test_info['pair'].upper()}"
+        channel_part = f"Ch R: {self.qa_test_info['ch_r']} - Ch T: {self.qa_test_info['ch_t']}"
         
         title = self.system_part + ' ' + pair_part + ' - ' + channel_part + '\n'+\
             self.config_part  + ' - ' + sm_part + '\n'+\

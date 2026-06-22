@@ -710,9 +710,7 @@ def special_config_checks(config_info):
     
     # Check if the data aqcuisition range is empty for any analogue channel
     for i, ch in enumerate(config_info["recorder_channel_id"]):
-        print(i, ch, "bins =", config_info["bins"][i])
         for key in necesary_channel_parameters:
-            print(i,ch,key)
             
             val = config_info[key][i]
             if val is None:

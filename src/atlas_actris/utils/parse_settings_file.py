@@ -189,6 +189,49 @@ recognized_sections = {'qck': "quicklooks",
                        'tlc_rin': "ring_telecover",
                        'pcb': "polarization_calibration"}
 
+
+
+def _settings_section_to_schema_key() -> Dict[str, str]:
+    """Return mapping from INI section names to internal settings schema keys."""
+
+    return {section: key for key, section in recognized_sections.items()}
+
+
+def _raise_unknown_settings_parameter_errors(config: configparser.ConfigParser) -> None:
+    """Raise ConfigError if the settings INI contains keys outside SCHEMA.
+
+    This is performed on the raw ConfigParser object before defaults are filled,
+    so even empty declarations such as ``unknown_key =`` are caught.
+    """
+
+    section_to_key = _settings_section_to_schema_key()
+    unknown = []
+
+    for section in config.sections():
+        if section not in section_to_key:
+            continue
+
+        schema_key = section_to_key[section]
+        schema_keys = set(SCHEMA[schema_key].keys())
+
+        for key in config[section].keys():
+            key_str = str(key).strip()
+            if key_str not in schema_keys:
+                unknown.append((section, key_str))
+
+    if not unknown:
+        return
+
+    unknown_lines = "\n".join(
+        f"  - [{section}] {key}" for section, key in unknown
+    )
+
+    raise ConfigError(
+        "Settings file contains parameter(s) that are not defined in the "
+        "ATLAS settings schema. Empty declarations are also invalid.\n"
+        f"Unknown parameter(s):\n{unknown_lines}"
+    )
+
 # -------------------------------------------------------------------
 # Utilities
 # -------------------------------------------------------------------
@@ -329,6 +372,7 @@ def read_ini_file(filepath: str)  -> Dict[str, Any]:
 
         """Read, convert, expand from scalar defaults, compute simple defaults, validate, and return dict."""
         config = configparser.ConfigParser(allow_no_value=True, strict=True)
+        config.optionxform = str
     
         read_files = config.read(filepath, encoding="utf-8")
     
@@ -342,6 +386,8 @@ def read_ini_file(filepath: str)  -> Dict[str, Any]:
             for section in recognized_sections.values():
                 if section not in config.sections():
                     CustomWarning(f"{section} section not found in the settings file")
+
+            _raise_unknown_settings_parameter_errors(config)
     
         parser_args: Dict[str, Any] = {}
         

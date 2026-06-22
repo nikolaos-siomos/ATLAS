@@ -235,6 +235,7 @@ def _print_stage_size_estimate(stage_name: str, estimate: Dict[str, Any]) -> Non
         f"pickle metadata: {estimate['pickle_human']}, "
         f"entries: {estimate['entries']})"
     )
+    print()
 
 
 def _dask_chunks_for_obj(obj: Union[xr.DataArray, xr.Dataset]) -> Optional[Dict[str, int]]:
@@ -658,6 +659,8 @@ def delete_exported_stage(
 
     shutil.rmtree(stage_path)
     print(f"-- Deleted exported processing stage: {stage_path}")
+    print()
+
     return stage_path
 
 
@@ -699,6 +702,8 @@ def delete_all_exported_stages(
 
     shutil.rmtree(root)
     print(f"-- Deleted all exported processing stages: {root}")
+    print()
+
     return root
 
 

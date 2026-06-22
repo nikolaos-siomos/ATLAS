@@ -66,7 +66,8 @@ scc_info = export_scc_config(
     scc_configuration_id = caller_info['scc_configuration_id'], 
     atlas_configuration_file = caller_info['atlas_configuration_file'], 
     export_hoi_cfg = caller_info['export_hoi_cfg'],
-    output_folder = caller_info['output_folder']
+    output_folder = caller_info['output_folder'],
+    scc_compatible_format = caller_info['scc_compatible_format']
     )
 
 # Parse the configuration file

@@ -750,7 +750,7 @@ def QA_report(
             f.write('\n')
             for ch in sorted(data["vldr"].keys(), key=_channel_sort_key):
                 meta = data["vldr"][ch]
-                f.write(f'<h2>{ch}</h2>')
+                f.write(f'<h2>{ch.upper()}</h2>')
                 channel_entry(f, meta, plot_width)
             
         # Rayleigh-Fit plots
@@ -1441,7 +1441,7 @@ def convert_report_data_to_docx(
         document.add_heading("VLDR Quicklooks", level=1)
         for ch in sorted(data["vldr"].keys(), key=_channel_sort_key):
             meta = data["vldr"][ch]
-            document.add_heading(ch, level=2)
+            document.add_heading(ch.upper(), level=2)
             _add_docx_picture(document, meta.get('path'))
 
     if data.get("ray"):

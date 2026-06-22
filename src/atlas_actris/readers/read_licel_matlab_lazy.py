@@ -274,7 +274,16 @@ def read_channels(buffer):
     channel_info.loc[:, info_columns] = arr_head.loc[:, info_columns].copy().values.astype(object)
 
     mask_an = channel_info.loc[:,'acquisition_mode'].values == "0"
-    channel_info.loc[mask_an, 'data_acquisition_range'] = (1000. * channel_info.loc[mask_an, 'data_acquisition_range'].astype(float))
+    
+    channel_info["data_acquisition_range"] = pd.to_numeric(
+        channel_info["data_acquisition_range"],
+        errors="coerce",
+        )
+    
+    channel_info.loc[mask_an, "data_acquisition_range"] = (
+        1000.0 * channel_info.loc[mask_an, "data_acquisition_range"]
+    )
+
     channel_info.loc[~mask_an, 'data_acquisition_range'] = None
 
     wave = np.array(list(np.char.split(arr_head.wave_pol.values.astype('str'),
@@ -286,7 +295,11 @@ def read_channels(buffer):
     
     channel_info.loc[:,'dead_time_correction_type'] = 0. # default for Licel
 
-    channel_info.loc[:,'bins'] = channel_info.loc[:,'bins'].astype(int) # convert to int
+    channel_info.loc[mask_an, "data_acquisition_range"] = (
+        1000.0 * channel_info.loc[mask_an, "data_acquisition_range"]
+    )
+    
+    channel_info["bins"] = channel_info["bins"].astype(int)
 
     channel_info["acquisition_mode"] = channel_info["acquisition_mode"].astype("object")
     channel_info.loc[mask_an,'acquisition_mode'] = "a" # convert to atlas nomenclature

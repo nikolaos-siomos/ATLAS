@@ -447,19 +447,15 @@ def select_dark_block_closest_to_signal(
 
     Returns
     -------
-    drk_selected : xr.DataArray
-        Full drk if no separated blocks exist.
-        Sliced drk block if separated blocks exist.
-
     best_start_time : np.datetime64
-        Start time of returned drk array.
+        Start time of the selected dark interval.
 
     best_end_time : np.datetime64
-        End time of returned drk array.
+        End time of the selected dark interval.
 
     is_block : bool
-        False if the full/original drk array was returned.
-        True if drk was sliced to one selected time block.
+        False if the full/original dark measurement should be used.
+        True if the dark measurement should be sliced to one selected time block.
     """
 
     if time_dim not in sig.dims:
@@ -480,11 +476,11 @@ def select_dark_block_closest_to_signal(
     drk_time = drk[time_dim]
 
     # Single dark profile: no block selection possible.
-    # Return the full drk.
+    # Return False because no separated dark block was selected.
     if drk.sizes[time_dim] == 1:
         start_time = drk_time.values[0]
         end_time = drk_time.values[0]
-        return drk, start_time, end_time, False
+        return start_time, end_time, False
 
     gaps = drk_time.diff(time_dim)
     max_gap_td = np.timedelta64(pd.Timedelta(max_gap).value, "ns")

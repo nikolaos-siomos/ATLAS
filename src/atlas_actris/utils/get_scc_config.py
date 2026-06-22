@@ -110,6 +110,16 @@ def parse_args() -> argparse.Namespace:
         default="./scc_hoi",       # None if not given
         help="The path to the exported ini file"
     )
+    parser.add_argument(
+        "--scc_compatible_format",
+        "--scc_format",
+        action="store_true",
+        default=False,
+        help=(
+            "If provided, use the SCC channel IDs directly as recorder_channel_id "
+            "values and skip the interactive recorder_channel_id prompt."
+        ),
+    )
         
     args = parser.parse_args()
     scc_configuration_id = args.scc_configuration_id
@@ -161,6 +171,29 @@ def validate_string(
         )
 
     return str(value)
+
+
+def validate_bool(value, *, var_name: str = "value") -> bool:
+    """Validate and normalize bool-like values."""
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, (str, np.str_)):
+        value_str = str(value).strip().lower()
+        if value_str in ["true", "1", "yes", "y", "on"]:
+            return True
+        if value_str in ["false", "0", "no", "n", "off", ""]:
+            return False
+
+    if isinstance(value, (int, np.integer)) and value in [0, 1]:
+        return bool(value)
+
+    raise ValueError(
+        f"{var_name} must be a boolean or one of true/false, 1/0, yes/no; "
+        f"got {value!r}"
+    )
+
 
 def download_with_auth(url: str, folder: str, username: str, password: str, filename: str = None) -> str:
     folder_path = Path(folder)
@@ -286,6 +319,19 @@ def _copy_atlas_keys(data: Dict[str, Dict[str, List]], atlas_section: str) -> Di
         orig_section = internal_map[atlas_section][key][0]
         orig_key = internal_map[atlas_section][key][1]
         data[atlas_section][key] = data[orig_section][orig_key]
+
+        # Keep the same existence checks as for all other mapped parameters.
+        # Only after the value has been copied successfully, replace empty
+        # zenith_angle entries by the ATLAS default vertical-pointing value.
+        if atlas_section == "atlas_system" and key == "zenith_angle":
+            values = data[atlas_section][key]
+            if isinstance(values, list):
+                data[atlas_section][key] = [
+                    "0." if v is None or str(v).strip() == "" else v
+                    for v in values
+                ]
+            elif values is None or str(values).strip() == "":
+                data[atlas_section][key] = "0."
     
     return(data)
 
@@ -575,26 +621,49 @@ def _exclude_undifined_scc_channels(data: Dict[str, Dict[str, List[str]]]) -> Di
     
     return(data)
 
-def _get_recorder_channel_id(data: Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[str, List[str]]]:
+def _get_recorder_channel_id(
+    data: Dict[str, Dict[str, List[str]]],
+    scc_compatible_format: bool = False,
+) -> Dict[str, Dict[str, List[str]]]:
     data = _sort_atlas_channels_by_atlas_id(data)
 
     atlas_channel_id = data["atlas_channels"]["atlas_channel_id"]
     scc_channel_id = data["atlas_channels"]["scc_channel_id"]
-    
+
+    if scc_compatible_format:
+        recorder_channel_id = [str(ch) for ch in scc_channel_id]
+        data["atlas_channels"]["recorder_channel_id"] = recorder_channel_id
+
+        print(
+            "-- SCC-compatible format requested. "
+            "Using scc_channel_id values as recorder_channel_id values."
+        )
+        print("Final channel list:")
+        for scc_id, atlas_id, rec_id in zip(scc_channel_id, atlas_channel_id, recorder_channel_id):
+            print(f"    -- {scc_id} [{atlas_id}] --> {rec_id}")
+
+        if len(recorder_channel_id) != len(set(recorder_channel_id)):
+            raise ConfigError(
+                f"Duplicates detected in the SCC-derived recorder_channel_id values: "
+                f"{recorder_channel_id}"
+            )
+
+        return data
+
     recorder_channel_id = []
     print("--Input: Provide recorder_channel_id values for each scc_channel_d: (leave empty and press Enter to exclude a channel): ")
     for scc_id, atlas_id in zip(scc_channel_id, atlas_channel_id):
         print(f"    -- {scc_id} [{atlas_id}]:", end = "", flush = True)
         rec_id = input()
         recorder_channel_id.append(rec_id)  # could be "" if the user just presses Enter
-    
+
     if all(v == "" for v in recorder_channel_id):
         CustomWarning("No recorder_channel_id was provided. Please fill in the recorder_channel_id manually in the config exported file")
     else:
         data["atlas_channels"]["recorder_channel_id"] = recorder_channel_id
-        
+
         mask = [ch != "" for ch in recorder_channel_id]
-        
+
         for key in data["atlas_channels"].keys():
             values = data["atlas_channels"][key]
             data["atlas_channels"][key] = [val for val, keep in zip(values, mask) if keep]
@@ -605,13 +674,13 @@ def _get_recorder_channel_id(data: Dict[str, Dict[str, List[str]]]) -> Dict[str,
                 print(f"    -- {scc_id} [{atlas_id}] --> {rec_id}")
             else:
                 print(f"    -- {scc_id} [{atlas_id}] --> Excluded!")
-                
-        rec_ch_id = recorder_channel_id
-        if "" in recorder_channel_id:
+
+        rec_ch_id = recorder_channel_id.copy()
+        if "" in rec_ch_id:
             rec_ch_id.remove("")
             if len(rec_ch_id) != len(set(rec_ch_id)):
-                raise ConfigError(f"Duplicates detected in the provided recorder_channel_id values: {recorder_channel_id}")    
-    
+                raise ConfigError(f"Duplicates detected in the provided recorder_channel_id values: {recorder_channel_id}")
+
     return(data)
     
 def ensure_file(path_str: str):
@@ -839,6 +908,7 @@ def export_scc_config(scc_configuration_id: str,
                       atlas_configuration_file: str, 
                       export_hoi_cfg: str, 
                       output_folder: str,
+                      scc_compatible_format: bool = False,
                       debug: bool = False) -> Dict[str, Dict[str, List[str]]]:
     
     if scc_configuration_id != None:
@@ -846,6 +916,10 @@ def export_scc_config(scc_configuration_id: str,
         validate_string(scc_configuration_id,     var_name = "scc_configuration_id")
         validate_string(output_folder,            var_name = "output_folder")
         validate_string(export_hoi_cfg,           var_name = "export_hoi_cfg", allowed_values = ["0", "1", "2"])
+        scc_compatible_format = validate_bool(
+            scc_compatible_format,
+            var_name = "scc_compatible_format",
+        )
     
         if export_hoi_cfg == "1" or (export_hoi_cfg == "2" and not Path(atlas_configuration_file).exists()):
             
@@ -877,7 +951,10 @@ def export_scc_config(scc_configuration_id: str,
         
             data = _get_GH(data)    
         
-            data = _get_recorder_channel_id(data)    
+            data = _get_recorder_channel_id(
+                data,
+                scc_compatible_format = scc_compatible_format,
+            )    
                 
             if debug:
                 pprint(data)
