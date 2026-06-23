@@ -18,13 +18,6 @@ The package is tested with a bundled smoke-test dataset through `pytest` and Git
 
 ## Installation
 
-Clone the repository and enter the project folder:
-
-```bash
-git clone <repository-url>
-cd ATLAS
-```
-
 Create and activate a Python environment. For example, using conda or miniforge:
 
 ```bash
@@ -32,19 +25,24 @@ conda create -n atlas_box python=3.13 pip
 conda activate atlas_box
 ```
 
-Install ATLAS locally:
+Clone or just download and extract the repository:
 
 ```bash
-python -m pip install .
+git clone <repository-url>
 ```
 
-This installs the package and exposes the `atlas` command in the active environment.
+Enter the top level of the cloned/extracted project folder (the folder name can be different than in the example).
+```bash
+cd atlas_dev
+```
 
-For users who want to keep the source tree editable while working with ATLAS, use editable installation instead:
+Install ATLAS locally by typing the following command inside the project folder:
 
 ```bash
 python -m pip install -e .
 ```
+
+This installs the package and exposes the `atlas` command in the active environment. Using the -e option keeps the source tree editable while working with ATLAS locally.
 
 ## Developer installation
 
@@ -75,8 +73,13 @@ python -m pip check
 ```
 
 ## Minimal usage
+Activate the Python environment where ATLAS is installed. For example, using conda or miniforge:
 
-Run ATLAS from the command line by providing an initialization file:
+```bash
+conda activate atlas_box
+```
+
+Run ATLAS from the command line by providing the path to the initialization file:
 
 ```bash
 atlas -i /path/to/call_atlas.ini
@@ -88,13 +91,23 @@ or equivalently:
 atlas --ini_file /path/to/call_atlas.ini
 ```
 
-To check the available command-line options:
+To check the available command-line options type:
 
 ```bash
 atlas -h
 ```
 
-ATLAS expects an initialization file that points to the measurement data, configuration file, settings file, radiosonde or atmospheric input, and output folder. Detailed configuration and settings documentation is provided in the MkDocs documentation.
+ATLAS expects an initialization file that points to the parent folder (input lidar data), configuration file (channel/system configuration), settings file (QA test options), radiosonde or atmospheric input, and output folder where files are exported. Detailed configuration and settings documentation is provided in the MkDocs documentation.
+
+For command-line execution, the `atlas` entry point uses a non-interactive plotting backend by default, which is suitable for terminal runs and automated tests. IDE workflows can still use the plotting backend configured in the active environment.
+
+## Run ATLAS from an IDE
+It is also possible to run atlas by opening the following directly in an IDE (e.g. Spyder):
+
+```text
+src/atlas_actris/__call_atlas_interactive__.py
+```
+Please make sure the IDE uses the same Python environment where ATLAS was installed.
 
 ## Smoke testing
 
@@ -183,25 +196,3 @@ mkdocs build
 
 The generated site will be written to the `site/` folder, which should not be committed to Git.
 
-## Development notes
-
-The package uses a `src` layout:
-
-```text
-src/
-└── atlas_actris/
-```
-
-For development in Spyder or another IDE, make sure the IDE uses the same Python environment where ATLAS was installed with:
-
-```bash
-python -m pip install -e .
-```
-
-The main interactive script can be opened directly in the IDE at:
-
-```text
-src/atlas_actris/__call_atlas_interactive__.py
-```
-
-For command-line execution, the `atlas` entry point uses a non-interactive plotting backend by default, which is suitable for terminal runs and automated tests. IDE workflows can still use the plotting backend configured in the active environment.

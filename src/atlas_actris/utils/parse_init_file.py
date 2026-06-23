@@ -161,6 +161,134 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "rsonde_station_wmo_id":    {"dtype": int,   "default": None,     "is_list": False, "category": "optional", "min": 0},
 }
 
+
+# -------------------------------------------------------------------
+# INI SECTION LAYOUT
+#
+# The initialization parser stores all values in a flat caller_info dict.
+# Sections are used only to validate user-facing INI files and to keep the
+# templates/documentation organized.  Section names are intentionally strict
+# lowercase strings.  Valid keys are still defined exclusively by SCHEMA.
+# -------------------------------------------------------------------
+
+INIT_FILE_SECTIONS: Dict[str, List[str]] = {
+    "configuration": [
+        "scc_compatible_format",
+        "export_hoi_cfg",
+        "scc_configuration_id",
+    ],
+    "explicit_paths": [
+        "parent_folder",
+        "atlas_configuration_file",
+        "atlas_settings_file",
+        "radiosonde_folder",
+        "radiosonde_file",
+        "output_folder",
+    ],
+    "general_options": [
+        "process",
+        "process_qck",
+        "vertical_scale",
+        "dpi",
+        "color_reduction",
+        "overwrite_output",
+        "expert_analyst",
+        "debug_signals",
+        "export_netcdf",
+        "export_all",
+    ],
+    "filter_channels": [
+        "exclude_channels",
+        "exclude_telescope_type",
+        "exclude_channel_type",
+        "exclude_acquisition_mode",
+        "exclude_channel_subtype",
+    ],
+    "trimming_options": [
+        "max_height_agl",
+        "low_shot_threshold",
+        "trim_overflows",
+        "ray_averaging_rate",
+        "ray_averaging_threshold",
+        "ray_qck_averaging_rate",
+        "ray_qck_averaging_threshold",
+        "max_adjacent_overflows",
+        "slice_measurement",
+        "exclude_measurement",
+    ],
+    "explicit_folders": [
+        "ray",
+        "nrm",
+        "pcb",
+        "tlc",
+        "tlc_rin",
+        "drk",
+        "trg",
+        "dtm",
+        "nsf",
+        "ray_pcb",
+        "nrm_pcb",
+        "pcb_aux",
+        "cam",
+    ],
+    "parsing_options": [
+        "files_per_sector",
+        "files_per_ring",
+        "files_per_set",
+        "rsonde_skip_header",
+        "rsonde_skip_footer",
+        "rsonde_delimiter",
+        "rsonde_column_index",
+        "rsonde_column_units",
+        "rsonde_station_latitude",
+        "rsonde_station_longitude",
+        "rsonde_station_altitude",
+        "cloudnet_station_name",
+        "rsonde_station_name",
+        "rsonde_station_wmo_id",
+    ],
+}
+
+
+def _init_key_to_section() -> Dict[str, str]:
+    key_to_section: Dict[str, str] = {}
+    duplicates: List[str] = []
+
+    for section, keys in INIT_FILE_SECTIONS.items():
+        for key in keys:
+            if key in key_to_section:
+                duplicates.append(key)
+            key_to_section[key] = section
+
+    if duplicates:
+        raise ConfigError(
+            "Internal initialization section layout contains duplicated key(s): "
+            f"{sorted(set(duplicates))}"
+        )
+
+    schema_keys = set(SCHEMA.keys())
+    section_keys = set(key_to_section.keys())
+
+    missing = schema_keys - section_keys
+    unknown = section_keys - schema_keys
+
+    if missing:
+        raise ConfigError(
+            "Internal initialization section layout is missing schema key(s): "
+            f"{sorted(missing)}"
+        )
+
+    if unknown:
+        raise ConfigError(
+            "Internal initialization section layout contains key(s) not present "
+            f"in SCHEMA: {sorted(unknown)}"
+        )
+
+    return key_to_section
+
+
+INIT_KEY_TO_SECTION = _init_key_to_section()
+
 explicit_path_keys = {
     "parent_folder",
     "atlas_configuration_file",
@@ -172,36 +300,90 @@ explicit_path_keys = {
 
 
 
-def _raise_unknown_init_parameter_errors(config: configparser.ConfigParser) -> None:
-    """Raise ConfigError if the call_atlas INI contains keys outside SCHEMA.
+def _raise_init_section_and_parameter_errors(config: configparser.ConfigParser) -> None:
+    """Validate sections, unknown parameters, and key placement.
 
-    The check is performed on the raw ConfigParser object before defaults are
-    filled, so even empty declarations such as ``unknown_key =`` are caught.
-    Section names are not constrained here because this parser historically
-    accepts known keys from any section.
+    Valid parameter names are defined only by SCHEMA.  INIT_FILE_SECTIONS only
+    defines where valid keys are allowed to appear in user-facing INI files.
+    The returned caller_info dictionary remains flat and section-independent.
     """
 
+    allowed_sections = set(INIT_FILE_SECTIONS.keys())
     schema_keys = set(SCHEMA.keys())
-    unknown = []
+
+    unknown_sections: List[str] = []
+    unknown_parameters: List[tuple[str, str]] = []
+    misplaced_parameters: List[tuple[str, str, str]] = []
+    duplicate_parameters: List[tuple[str, str, str]] = []
+    seen_parameters: Dict[str, str] = {}
 
     for section in config.sections():
+        if section not in allowed_sections:
+            unknown_sections.append(section)
+            continue
+
         for key in config[section].keys():
             key_str = str(key).strip()
+
             if key_str not in schema_keys:
-                unknown.append((section, key_str))
+                unknown_parameters.append((section, key_str))
+                continue
 
-    if not unknown:
-        return
+            expected_section = INIT_KEY_TO_SECTION[key_str]
 
-    unknown_lines = "\n".join(
-        f"  - [{section}] {key}" for section, key in unknown
-    )
+            if section != expected_section:
+                misplaced_parameters.append((section, key_str, expected_section))
 
-    raise ConfigError(
-        "Initialization file contains parameter(s) that are not defined in the "
-        "ATLAS initialization schema. Empty declarations are also invalid.\n"
-        f"Unknown parameter(s):\n{unknown_lines}"
-    )
+            previous_section = seen_parameters.get(key_str)
+            if previous_section is not None:
+                duplicate_parameters.append((key_str, previous_section, section))
+            else:
+                seen_parameters[key_str] = section
+
+    messages: List[str] = []
+
+    if unknown_sections:
+        messages.append(
+            "Unknown initialization section(s). Section names are strict "
+            "lowercase values and must be one of: "
+            f"{sorted(allowed_sections)}\n"
+            + "\n".join(f"  - [{section}]" for section in unknown_sections)
+        )
+
+    if unknown_parameters:
+        messages.append(
+            "Initialization file contains parameter(s) that are not defined "
+            "in the ATLAS initialization schema. Empty declarations are also "
+            "invalid.\n"
+            + "\n".join(
+                f"  - [{section}] {key}"
+                for section, key in unknown_parameters
+            )
+        )
+
+    if misplaced_parameters:
+        messages.append(
+            "Initialization file contains valid parameter(s) under the wrong "
+            "section. Move them to the expected section shown below.\n"
+            + "\n".join(
+                f"  - [{section}] {key}  -> expected [{expected}]"
+                for section, key, expected in misplaced_parameters
+            )
+        )
+
+    if duplicate_parameters:
+        messages.append(
+            "Initialization file contains duplicate parameter(s) across "
+            "sections. Each parameter may be declared only once.\n"
+            + "\n".join(
+                f"  - {key}: [{first}] and [{second}]"
+                for key, first, second in duplicate_parameters
+            )
+        )
+
+    if messages:
+        raise ConfigError("\n\n".join(messages))
+
 
 tlc_qua_subfolders = ["north", "east", "south", "west"]
 tlc_rin_subfolders = ["inner", "outer"]
@@ -1325,7 +1507,7 @@ def read_ini_file(filepath: str) -> Dict[str, Any]:
             "Make sure the encoding is utf-8"
         )
 
-    _raise_unknown_init_parameter_errors(config)
+    _raise_init_section_and_parameter_errors(config)
 
     parser_args: Dict[str, Any] = {}
 

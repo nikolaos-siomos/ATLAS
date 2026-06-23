@@ -82,7 +82,6 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "y_lims":      {"dtype": float,   "default": [],       "is_list": True},
 
     "use_lin_y_scale":             {"dtype": bool,    "default": False,     "is_list": False},
-    "cross_check_lower_limit":     {"dtype": float,   "default": None,      "is_list": False},
     "normalization_region":        {"dtype": float,   "default": [6.,8.],   "is_list": True,  "min": 0.,   "max": 50.},
     
     "molecular_mask_region":                {"dtype": float,   "default": [2., 34.], "is_list": True,  "min": 0.,    "max": 150.},
@@ -92,7 +91,7 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "first_derivative_threshold":           {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
     "second_derivative_threshold":          {"dtype": float,   "default": 2.,        "is_list": False, "min": 0.5,   "max": 5.},
     "shapiro_wilk_threshold":               {"dtype": float,   "default": 0.05,      "is_list": False, "min": 0.,    "max": 1.},
-    "cross_criterium_threshold":            {"dtype": float,   "default": 1.,        "is_list": False, "min": 0.5,   "max": 5.},
+    "cross_criterion_threshold":            {"dtype": float,   "default": 1.,        "is_list": False, "min": 0.5,   "max": 5.},
     "durbin_watson_threshold":              {"dtype": float,   "default": [1., 3.],  "is_list": True,  "min": 0.,    "max": 4.},
     "absolute_extinction_error_threshold":  {"dtype": float,   "default": 10.,       "is_list": False, "min": 0.,    "max": 100.},
     "isolated_point_radius":                {"dtype": int,     "default": 2,         "is_list": False, "min": 0,     "max": 10},

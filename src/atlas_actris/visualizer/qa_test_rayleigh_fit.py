@@ -40,7 +40,7 @@ key_translation = {
     "first_derivative_threshold": "first_derivative_threshold",
     "second_derivative_threshold": "second_derivative_threshold",
     "shapiro_wilk_threshold": "shapiro_wilk_threshold",
-    "cross_criterium_threshold": "cross_criterion_threshold",
+    "cross_criterion_threshold": "cross_criterion_threshold",
     "durbin_watson_threshold": "durbin_watson_threshold",
 }
 
