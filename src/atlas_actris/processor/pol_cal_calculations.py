@@ -930,9 +930,9 @@ def _find_eta_for_pairs(
     The calibration-factor stage stores the calibration-region eta value and
     its SEM in output_data["pol_cal_info"] under the combined calibration keys
     ("pcb" and "pcb_aux") as ratio_type="eta" entries.  These scalar values
-    are the calibration factors that ray_pcb signal ratios should be divided
+    are the calibration factors that ray signal ratios should be divided
     by.  The eta profiles stored in pol_cal_ratio are intentionally not used
-    here, because ray_pcb must not be calibrated by a bin-resolved eta profile.
+    here, because ray must not be calibrated by a bin-resolved eta profile.
     """
 
     eta_pair_ids = [
@@ -999,7 +999,7 @@ def _find_eta_for_pairs(
     if not eta_values:
         raise KeyError(
             "No matching scalar eta entries found in pcb/pcb_aux pol_cal_info "
-            "for ray_pcb channel pairs. Run compute_calibration_factor first."
+            "for ray channel pairs. Run compute_calibration_factor first."
         )
 
     eta = xr.concat(eta_values, dim="pair").astype("float64")
@@ -1017,7 +1017,7 @@ def _collect_eta_pairs_from_pcb(
     """Collect eta channel combinations from pcb/pcb_aux pol_cal_info.
 
     Returns ch_r, ch_t, eta_pair_ids, eta_info.  These eta entries are the
-    authoritative source of the channel combinations used by ray_pcb calibrated
+    authoritative source of the channel combinations used by ray calibrated
     ratio and VLDR calculations.
     """
 
@@ -1774,18 +1774,18 @@ def store_pol_cal_info(
     )
 
 
-def get_ray_pcb_alias(
+def get_ray_alias(
     output_data: Dict[str, Dict[str, Any]],
     processing_info: Dict[str, Any],
     required_store: str,
 ) -> Optional[str]:
-    """Resolve the ray_pcb key for a selected store."""
+    """Resolve the ray key for a selected store."""
 
     loading_map = processing_info["caller_info"].get("loading_map", {})
 
     return _resolve_qa_alias(
         output_data=output_data,
-        requested_key="ray_pcb",
+        requested_key="ray",
         loading_map=loading_map,
         required_store=required_store,
     )
@@ -1793,20 +1793,20 @@ def get_ray_pcb_alias(
 
 
 
-def get_ray_pcb_io_keys(
+def get_ray_io_keys(
     output_data: Dict[str, Dict[str, Any]],
     processing_info: Dict[str, Any],
     required_store: str,
 ) -> Tuple[Optional[str], Optional[str]]:
-    """Return input key and output key for ray_pcb-style products.
+    """Return input key and output key for ray-style products.
 
-    If ray_pcb exists in the requested input store, read from and write to
-    ray_pcb. Otherwise the alias/resolved key is used for both reading and
-    writing, typically ray. This avoids creating synthetic ray_pcb entries
+    If ray exists in the requested input store, read from and write to
+    ray. Otherwise the alias/resolved key is used for both reading and
+    writing, typically ray. This avoids creating synthetic ray entries
     when the original data only contains ray.
     """
 
-    qa_alias = get_ray_pcb_alias(
+    qa_alias = get_ray_alias(
         output_data=output_data,
         processing_info=processing_info,
         required_store=required_store,
@@ -1816,12 +1816,12 @@ def get_ray_pcb_io_keys(
         return None, None
 
     store = output_data.get(required_store, {})
-    qa_store = "ray_pcb" if "ray_pcb" in store else qa_alias
+    qa_store = "ray" if "ray" in store else qa_alias
 
     return qa_alias, qa_store
 
 
-def collect_ray_pcb_eta_inputs(
+def collect_ray_eta_inputs(
     output_data: Dict[str, Dict[str, Any]],
     sig: xr.DataArray,
 ) -> Optional[Tuple[List[str], List[str], List[str], xr.DataArray]]:
@@ -2120,7 +2120,7 @@ def compute_mean_calibrated_ratio(
     vertical_scale = output_data[processing_info["caller_info"]["vertical_scale"]]
     averaging_range = processing_info["settings_info"]["pcb"]["rayleigh_region"]
 
-    qa_alias, qa_store = get_ray_pcb_io_keys(
+    qa_alias, qa_store = get_ray_io_keys(
         output_data,
         processing_info,
         required_store="profile_mean",
@@ -2133,7 +2133,7 @@ def compute_mean_calibrated_ratio(
     sig = output_data["profile_mean"][qa_alias]
     sig_err = output_data["profile_error_mean"][qa_alias]
 
-    eta_inputs = collect_ray_pcb_eta_inputs(output_data, sig)
+    eta_inputs = collect_ray_eta_inputs(output_data, sig)
     if eta_inputs is None:
         print_entry("Mean calibrated ratio calculation skipped: no usable pcb/pcb_aux eta pairs found.")
         return output_data
@@ -2177,7 +2177,7 @@ def compute_calibrated_ratio(
 
     output_data = shallow_copy(input_data)
 
-    qa_alias, qa_store = get_ray_pcb_io_keys(
+    qa_alias, qa_store = get_ray_io_keys(
         output_data,
         processing_info,
         required_store="profile",
@@ -2190,7 +2190,7 @@ def compute_calibrated_ratio(
     sig = output_data["profile"][qa_alias]
     sig_err = output_data["profile_error"][qa_alias]
 
-    eta_inputs = collect_ray_pcb_eta_inputs(output_data, sig)
+    eta_inputs = collect_ray_eta_inputs(output_data, sig)
     if eta_inputs is None:
         print_entry("Calibrated ratio calculation skipped: no usable pcb/pcb_aux eta pairs found.")
         return output_data
@@ -2226,7 +2226,7 @@ def compute_mean_vldr(
     vertical_scale = output_data[processing_info["caller_info"]["vertical_scale"]]
     averaging_range = processing_info["settings_info"]["pcb"]["rayleigh_region"]
 
-    qa_alias, qa_store = get_ray_pcb_io_keys(
+    qa_alias, qa_store = get_ray_io_keys(
         output_data,
         processing_info,
         required_store="profile_mean",
@@ -2245,7 +2245,7 @@ def compute_mean_vldr(
     sig = output_data["profile_mean"][qa_alias]
     sig_err = output_data["profile_error_mean"][qa_alias]
 
-    eta_inputs = collect_ray_pcb_eta_inputs(output_data, sig)
+    eta_inputs = collect_ray_eta_inputs(output_data, sig)
     if eta_inputs is None:
         print_entry("Mean VLDR calculation skipped: no usable pcb/pcb_aux eta pairs found.")
         return output_data
@@ -2301,7 +2301,7 @@ def compute_vldr(
 
     output_data = shallow_copy(input_data)
 
-    qa_alias, qa_store = get_ray_pcb_io_keys(
+    qa_alias, qa_store = get_ray_io_keys(
         output_data,
         processing_info,
         required_store="profile",
@@ -2317,7 +2317,7 @@ def compute_vldr(
     sig = output_data["profile"][qa_alias]
     sig_err = output_data["profile_error"][qa_alias]
 
-    eta_inputs = collect_ray_pcb_eta_inputs(output_data, sig)
+    eta_inputs = collect_ray_eta_inputs(output_data, sig)
     if eta_inputs is None:
         print_entry("VLDR calculation skipped: no usable pcb/pcb_aux eta pairs found.")
         return output_data
@@ -2348,9 +2348,9 @@ def compute_mldr(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
     """
-    Compute MLDR for ray_pcb from molecular profiles.
+    Compute MLDR for ray from molecular profiles.
 
-    The MLDR channel combinations are created directly from the base ray_pcb
+    The MLDR channel combinations are created directly from the base ray
     polarization-calibration metadata, instead of depending on existing eta
     entries.  This makes MLDR independent of compute_calibration_factor while
     still producing pair ids that can be linked to VLDR by using the same
@@ -2361,8 +2361,8 @@ def compute_mldr(
     optional selection of opto_parameters="atten_bsc".
 
     The output is saved under:
-        output_data["molecular_ratio"]["ray_pcb"]
-        output_data["molecular_info"]["ray_pcb"]
+        output_data["molecular_ratio"]["ray"]
+        output_data["molecular_info"]["ray"]
 
     No random error is calculated or stored.  The regional mean is stored in
     molecular_info; no sem row is added.
@@ -2374,7 +2374,7 @@ def compute_mldr(
     vertical_scale_name = processing_info["caller_info"]["vertical_scale"]
     vertical_scale = output_data[vertical_scale_name]
 
-    qa_test_alias, qa_store = get_ray_pcb_io_keys(
+    qa_test_alias, qa_store = get_ray_io_keys(
         output_data=output_data,
         processing_info=processing_info,
         required_store="profile",
@@ -2386,10 +2386,10 @@ def compute_mldr(
     pol_cal_info = output_data.get("pol_cal_info", {})
 
     if qa_test_alias not in molec_store:
-        print_entry("MLDR calculation skipped: no ray_pcb molecular profiles found.")
+        print_entry("MLDR calculation skipped: no ray molecular profiles found.")
         return output_data
     if qa_test_alias not in vertical_scale:
-        print_entry("MLDR calculation skipped: no ray_pcb vertical scale found.")
+        print_entry("MLDR calculation skipped: no ray vertical scale found.")
         return output_data
     qa_info_key = qa_store if qa_store in pol_cal_info else qa_test_alias
     if qa_info_key not in pol_cal_info:
@@ -2417,7 +2417,7 @@ def compute_mldr(
     ]
 
     if len(keep) == 0:
-        print_entry("MLDR calculation skipped: no base ray_pcb channel pairs found in molecular profiles.")
+        print_entry("MLDR calculation skipped: no base ray channel pairs found in molecular profiles.")
         return output_data
 
     ch_r = [ch_r[i] for i in keep]
@@ -2445,6 +2445,7 @@ def compute_mldr(
         denominator=molec_t,
         info=mldr_info,
     )
+
 
     # The molecular ratio must be converted with the same ideal analyzer
     # response used for calibrated_ratio before comparing MLDR and VLDR.

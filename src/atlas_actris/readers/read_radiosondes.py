@@ -198,33 +198,6 @@ def export_radiosonde_scc(nc_path, st_name, wmo_id, wban_id,
     
     return()
 
-def export_to_scc(output_folder, meteo, metadata):
-    
-    date = metadata['rsonde_start_date']
-    time = metadata['rsonde_start_time']
-    station_id = metadata['station_id']
-    
-    # Creating the radiosonde ID
-    rsonde_ID = f"{date}{station_id}{time[:4]}"
-    
-    # Creating the paths and folders
-    nc_path = export_path(output_folder = output_folder, meas_ID = rsonde_ID)
-
-    # Making the raw SCC file
-    export_radiosonde_scc(nc_path = nc_path, 
-                          date = metadata['rsonde_start_date'], 
-                          time = metadata['rsonde_start_time'], 
-                          ground = metadata['rsonde_altitude'], 
-                          lat = metadata['rsonde_latitude'], 
-                          lon = metadata['rsonde_longitude'], 
-                          st_name = metadata['rsonde_station_name'], 
-                          wmo_id = metadata['rsonde_wmo_number'], 
-                          wban_id = metadata['rsonde_wban_number'], 
-                          meteo = meteo)
-    
-    print('--Succesfully generated an SCC radiosonde file!')
-    print('')
-    
 def wyoming_filename_checks(bnames):
     
     bad_length = [len(name) < 14 for name in bnames]

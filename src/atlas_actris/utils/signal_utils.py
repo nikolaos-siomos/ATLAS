@@ -12,7 +12,7 @@ import pandas as pd
 from scipy.signal import savgol_coeffs
 from scipy.ndimage import uniform_filter1d
 
-from typing import Tuple
+from typing import Tuple, Optional, Set, Dict, Any
 from utils.error_classes import CustomWarning
 
 def expected_profiles_per_window(freq: str,
@@ -387,3 +387,203 @@ def fast_rolling_mean_range(
 
     return out
     
+def _true_bin_grid(
+    zero_bin: xr.DataArray,
+    n_old_bins: int,
+    resolution: xr.DataArray,
+    zenith_angle_rad: float,
+    max_height_agl: Optional[float] = None,
+    ) -> np.ndarray:
+    """
+    Build common true-bin left-edge grid.
+
+    Convention:
+        true_bin = file_bin + zero_bin[channel]
+
+    The returned grid:
+        - starts at true bin 0
+        - covers the union of all channel-shifted bins
+        - is optionally limited by max_height_agl
+    """
+
+    if "channels" in zero_bin.dims and "channel" not in zero_bin.dims:
+        zero_bin = zero_bin.rename({"channels": "channel"})
+
+    if "channels" in resolution.dims and "channel" not in resolution.dims:
+        resolution = resolution.rename({"channels": "channel"})
+
+    zero_bin = zero_bin.astype("float64")
+    resolution = resolution.astype("float64")
+
+    first_valid = zero_bin
+    last_valid = zero_bin + n_old_bins
+
+    target_min = max(0, int(np.floor(float(first_valid.min().values))))
+    target_max = int(np.ceil(float(last_valid.max().values)) - 1.0)
+
+    if max_height_agl is not None:
+        max_bin = (
+            max_height_agl
+            / (resolution * np.cos(zenith_angle_rad))
+            - 0.5
+        )
+
+        # Use max across channels because each channel has a different resolution.
+        target_max = min(
+            target_max,
+            int(np.floor(float(max_bin.max().values))),
+        )
+
+    if target_max < target_min:
+        raise ValueError(
+            "No valid bins remain after applying zero-bin and height limits."
+        )
+
+    return np.arange(target_min, target_max + 1, dtype="float64")
+
+def _rebin_to_true_bins(
+    da: xr.DataArray,
+    zero_bin: xr.DataArray,
+    target_bins: np.ndarray,
+    output_dtype: str = "float32",
+) -> xr.DataArray:
+    """
+    Lazily rebin a DataArray from file bins to true bins.
+
+    Required dims:
+        channel, bins
+
+    Optional dims:
+        time, or anything else
+
+    Conservative fractional-overlap logic:
+        old bin i: [i + zero_bin, i + zero_bin + 1]
+        new bin j: [j, j + 1]
+
+    Missing shifted signal is set to NaN.
+    """
+
+    if "bins" not in da.dims or "channel" not in da.dims:
+        return da
+
+    if "channels" in zero_bin.dims and "channel" not in zero_bin.dims:
+        zero_bin = zero_bin.rename({"channels": "channel"})
+
+    n_old_bins = da.sizes["bins"]
+    out_channels = []
+
+    for ch in da.channel.values:
+        zb = float(zero_bin.sel(channel=ch).values)
+
+        shift_int = int(np.floor(zb))
+        frac = float(zb - shift_int)
+
+        weight_main = 1.0 - frac
+        weight_prev = frac
+
+        old_i_main = xr.DataArray(
+            target_bins - shift_int,
+            dims=["bins_new"],
+            coords={"bins_new": target_bins},
+        )
+
+        old_i_prev = old_i_main - 1
+
+        valid_main = (
+            (old_i_main >= 0)
+            & (old_i_main < n_old_bins)
+            & (weight_main > 0.0)
+        )
+
+        valid_prev = (
+            (old_i_prev >= 0)
+            & (old_i_prev < n_old_bins)
+            & (weight_prev > 0.0)
+        )
+
+        valid_out = valid_main | valid_prev
+
+        da_ch = da.sel(channel=ch)
+        work = da_ch.rename({"bins": "bins_old"})
+        work = work.assign_coords(
+            bins_old=np.arange(n_old_bins)
+        )
+
+        old_i_main_clip = old_i_main.clip(
+            min=0,
+            max=n_old_bins - 1,
+        ).astype("int64")
+
+        old_i_prev_clip = old_i_prev.clip(
+            min=0,
+            max=n_old_bins - 1,
+        ).astype("int64")
+
+        main = work.isel(bins_old=old_i_main_clip)
+        prev = work.isel(bins_old=old_i_prev_clip)
+
+        if np.issubdtype(da.dtype, np.bool_):
+            out_ch = main.where(valid_main, False) | prev.where(valid_prev, False)
+            out_ch = out_ch.where(valid_out, False)
+        else:
+            out_ch = (
+                main.where(valid_main, 0.0) * weight_main
+                + prev.where(valid_prev, 0.0) * weight_prev
+            )
+
+            # No measured signal exists here.
+            out_ch = out_ch.where(valid_out, np.nan)
+            out_ch = out_ch.astype(output_dtype)
+
+        out_ch = out_ch.rename({"bins_new": "bins"})
+        out_ch = out_ch.assign_coords(bins=target_bins)
+
+        out_channels.append(out_ch)
+
+    out = xr.concat(out_channels, dim=da.channel)
+    out = out.assign_coords(channel=da.channel)
+
+    return out.transpose(*da.dims)
+
+def _rebin_and_trim_all_binned_arrays(
+    output_data: Dict[str, Any],
+    key: str,
+    zero_bin: xr.DataArray,
+    target_bins: np.ndarray,
+    mask_bins: xr.DataArray,
+    skip_stores: set[str] = {"range", "height_agl", "height_asl"},
+) -> None:
+    """
+    Rebin and trim all output_data[store_name][key] arrays that are
+    DataArrays with channel + bins.
+
+    The operation is in-place on output_data.
+    """
+
+    for store_name, store in output_data.items():
+
+        if store_name in skip_stores:
+            continue
+
+        if not isinstance(store, dict):
+            continue
+
+        if key not in store:
+            continue
+
+        arr = store[key]
+
+        if not isinstance(arr, xr.DataArray):
+            continue
+
+        if "channel" not in arr.dims or "bins" not in arr.dims:
+            continue
+
+        arr = _rebin_to_true_bins(
+            da=arr,
+            zero_bin=zero_bin,
+            target_bins=target_bins,
+            output_dtype="float32",
+        )
+
+        store[key] = arr.where(mask_bins, drop=True).reset_coords(drop=True)

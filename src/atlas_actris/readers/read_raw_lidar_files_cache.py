@@ -52,11 +52,11 @@ def measurement_type(meas_key: str) -> str:
     if meas_key.startswith("ray"):
         return "nrm"
 
-    if meas_key in ["trg", "dtm", "nsf"]:
+    if meas_key in ["trg", "dtm"]:
         return "nrm"
 
     if meas_key in ["tlc_north", "tlc_east", "tlc_south", "tlc_west"]:
-        return "tlc_qua"
+        return "tlc"
 
     if meas_key in ["tlc_inner", "tlc_outer"]:
         return "tlc_rin"

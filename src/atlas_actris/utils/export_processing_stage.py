@@ -5,7 +5,7 @@ Utilities to export and import ATLAS processor stages.
 
 The exported layout is:
 
-    caller_info['output_folder']/exported/<stage_name>/
+    output_folder/exported/<stage_name>/
         manifest.pkl
         <qa_test>/<parameter>/data.zarr      # numeric xarray objects
         <qa_test>/<parameter>/data.pkl       # object/mixed metadata or non-xarray objects
@@ -39,23 +39,21 @@ def _safe_name(name: Any) -> str:
     return safe or "unnamed"
 
 
-def _export_root(caller_info: Dict[str, Any]) -> str:
-    """Return caller_info['output_folder']/exported, creating it if needed."""
-
-    output_folder = caller_info.get("output_folder")
+def _export_root(output_folder: str) -> str:
+    """Return output_folder/exported, creating it if needed."""
 
     if output_folder is None:
-        raise ValueError("caller_info['output_folder'] is required for stage export/import")
+        raise ValueError("output_folder is required for stage export/import")
 
     root = os.path.join(output_folder, "exported")
     os.makedirs(root, exist_ok=True)
     return root
 
 
-def _stage_dir(caller_info: Dict[str, Any], stage_name: str) -> str:
+def _stage_dir(output_folder: str, stage_name: str) -> str:
     """Return the export folder of a specific stage."""
 
-    return os.path.join(_export_root(caller_info), _safe_name(stage_name))
+    return os.path.join(_export_root(output_folder), _safe_name(stage_name))
 
 
 def _ask_yes_no(question: str, default: bool = False) -> bool:
@@ -84,6 +82,231 @@ def _ask_yes_no(question: str, default: bool = False) -> bool:
             return False
 
         print("Please answer 'y' or 'n'.")
+
+
+
+def _print_numbered_options(title: str, options: Iterable[str]) -> list[str]:
+    """Print options with ascending 1-based numbers and return them as a list."""
+
+    option_list = [str(option) for option in options]
+
+    if len(option_list) == 0:
+        raise ValueError(f"No options available for selection: {title}")
+
+    print(title)
+    for idx, option in enumerate(option_list, start=1):
+        print(f"  {idx}) {option}")
+
+    return option_list
+
+
+def _parse_number_selection(answer: str, n_options: int, allow_multiple: bool) -> list[int]:
+    """Parse a numbered user selection.
+
+    Accepts values such as ``1``, ``1,3``, ``1 3``, ``1-3`` and ``all``.
+    Returned indices are zero-based and unique while preserving selection order.
+    """
+
+    text = answer.strip().lower()
+
+    if text in ["all", "a", "*"]:
+        if not allow_multiple:
+            raise ValueError("Please select only one number.")
+        return list(range(n_options))
+
+    if text == "":
+        raise ValueError("No selection was provided.")
+
+    tokens = re.split(r"[ ,;]+", text)
+    selected: list[int] = []
+
+    for token in tokens:
+        if token == "":
+            continue
+
+        if "-" in token:
+            if not allow_multiple:
+                raise ValueError("Ranges are only allowed for multiple selection.")
+
+            parts = token.split("-", 1)
+            if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+                raise ValueError(f"Invalid range selection: {token!r}")
+
+            start = int(parts[0])
+            stop = int(parts[1])
+
+            if start > stop:
+                raise ValueError(f"Invalid descending range selection: {token!r}")
+
+            numbers = range(start, stop + 1)
+        else:
+            if not token.isdigit():
+                raise ValueError(f"Invalid selection: {token!r}")
+            numbers = [int(token)]
+
+        for number in numbers:
+            if number < 1 or number > n_options:
+                raise ValueError(
+                    f"Selection {number} is outside the valid range 1-{n_options}"
+                )
+
+            idx = number - 1
+            if idx not in selected:
+                selected.append(idx)
+
+    if len(selected) == 0:
+        raise ValueError("No valid selection was provided.")
+
+    if not allow_multiple and len(selected) != 1:
+        raise ValueError("Please select only one number.")
+
+    return selected
+
+
+def _select_from_options(
+    title: str,
+    options: Iterable[str],
+    allow_multiple: bool = False,
+    prompt: Optional[str] = None,
+) -> Union[str, list[str]]:
+    """Prompt the user to select one or more values from numbered options."""
+
+    option_list = _print_numbered_options(title, options)
+
+    if prompt is None:
+        if allow_multiple:
+            prompt = "Select number(s), for example 1,3 or 1-3 or all: "
+        else:
+            prompt = "Select number: "
+
+    while True:
+        answer = input(prompt)
+
+        try:
+            indices = _parse_number_selection(
+                answer=answer,
+                n_options=len(option_list),
+                allow_multiple=allow_multiple,
+            )
+        except ValueError as exc:
+            print(f"-- {exc}")
+            continue
+
+        selected = [option_list[idx] for idx in indices]
+
+        if allow_multiple:
+            return selected
+
+        return selected[0]
+
+
+def select_exported_stage(output_folder: str) -> str:
+    """Prompt the user to select one available exported stage by number."""
+
+    return str(
+        _select_from_options(
+            title="-- Available exported processing stages:",
+            options=list_exported_stages(output_folder),
+            allow_multiple=False,
+        )
+    )
+
+
+def select_exported_stages(output_folder: str) -> list[str]:
+    """Prompt the user to select one or more available exported stages by number."""
+
+    return list(
+        _select_from_options(
+            title="-- Available exported processing stages:",
+            options=list_exported_stages(output_folder),
+            allow_multiple=True,
+        )
+    )
+
+
+def select_stage_names(stage_names: Iterable[str], allow_multiple: bool = True) -> Union[str, list[str]]:
+    """Prompt the user to select one or more stage names from a provided list."""
+
+    return _select_from_options(
+        title="-- Available processing stages:",
+        options=sorted(str(stage_name) for stage_name in stage_names),
+        allow_multiple=allow_multiple,
+    )
+
+
+def _available_processor_stage_names(processor: Any) -> list[str]:
+    """Best-effort discovery of stage names stored on an ATLAS Processor."""
+
+    candidates: list[str] = []
+
+    for attr_name in [
+        "stages",
+        "processing_stages",
+        "stage_data",
+        "stages_data",
+        "data",
+        "_stages",
+    ]:
+        value = getattr(processor, attr_name, None)
+        if isinstance(value, dict):
+            candidates.extend(str(key) for key in value.keys())
+
+    processing_info = getattr(processor, "processing_info", None)
+    if isinstance(processing_info, dict):
+        for key in ["stages", "processing_stages", "stage_data", "stage_names"]:
+            value = processing_info.get(key)
+            if isinstance(value, dict):
+                candidates.extend(str(name) for name in value.keys())
+            elif isinstance(value, (list, tuple, set)):
+                candidates.extend(str(name) for name in value)
+
+    # Keep order stable but remove duplicates and obvious non-stage placeholders.
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in candidates:
+        if name in seen:
+            continue
+        seen.add(name)
+        out.append(name)
+
+    return sorted(out)
+
+
+def _resolve_processor_stage_name(processor: Any, stage_name: Optional[str]) -> str:
+    """Return a processor stage name, prompting when stage_name is None."""
+
+    if stage_name is not None:
+        return str(stage_name)
+
+    available = _available_processor_stage_names(processor)
+
+    if len(available) == 0:
+        raise ValueError(
+            "stage_name was not provided and available processor stages could "
+            "not be discovered automatically. Please pass stage_name explicitly."
+        )
+
+    return str(select_stage_names(available, allow_multiple=False))
+
+
+def _resolve_processor_stage_names(
+    processor: Any,
+    stage_names: Optional[Iterable[str]],
+) -> list[str]:
+    """Return processor stage names, prompting when stage_names is None."""
+
+    if stage_names is not None:
+        return [str(stage_name) for stage_name in stage_names]
+
+    available = _available_processor_stage_names(processor)
+
+    if len(available) == 0:
+        raise ValueError(
+            "stage_names was not provided and available processor stages could "
+            "not be discovered automatically. Please pass stage_names explicitly."
+        )
+
+    return list(select_stage_names(available, allow_multiple=True))
 
 
 def _has_object_dtype_xarray(obj: Union[xr.DataArray, xr.Dataset]) -> bool:
@@ -318,10 +541,10 @@ def _read_xarray_from_zarr(path: str, kind: str) -> Union[xr.DataArray, xr.Datas
     raise ValueError(f"Unsupported zarr entry kind: {kind}")
 
 
-def _read_export_manifest(caller_info: Dict[str, Any], stage_name: str) -> tuple[str, Dict[str, Any]]:
+def _read_export_manifest(output_folder: str, stage_name: str) -> tuple[str, Dict[str, Any]]:
     """Return exported stage directory and manifest."""
 
-    in_dir = _stage_dir(caller_info, stage_name)
+    in_dir = _stage_dir(output_folder, stage_name)
     manifest_path = os.path.join(in_dir, _MANIFEST_NAME)
 
     if not os.path.isfile(manifest_path):
@@ -356,15 +579,15 @@ def _entry_subdir(stage_dir: str, qa_test: str, parameter: str) -> str:
 
 def export_processing_stage(
     stage_data: Dict[str, Dict[str, Any]],
-    stage_name: str,
-    caller_info: Dict[str, Any],
+    stage_name: Optional[str] = None,
+    output_folder: Optional[str] = None,
     overwrite: bool = False,
     ask: bool = False,
     default_answer: bool = False,
     print_estimated_size: bool = True,
 ) -> Optional[str]:
     """
-    Export a full ATLAS processing stage to caller_info['output_folder']/exported.
+    Export a full ATLAS processing stage to output_folder/exported.
 
     Parameters
     ----------
@@ -374,8 +597,8 @@ def export_processing_stage(
         ``stage_data[qa_test][parameter]``.
     stage_name
         Name of the processing stage, e.g. ``'preprocessing_complete'``.
-    caller_info
-        ATLAS caller_info dictionary. Must contain ``output_folder``.
+    output_folder
+        Base output folder where the ``exported`` directory is stored.
     overwrite
         If False, raise an error when the stage export already exists. If True,
         replace the existing exported stage.
@@ -398,7 +621,21 @@ def export_processing_stage(
     if not isinstance(stage_data, dict):
         raise TypeError("stage_data must be a dictionary")
 
-    out_dir = _stage_dir(caller_info, stage_name)
+    if output_folder is None:
+        raise ValueError("output_folder is required for stage export/import")
+
+    if stage_name is None:
+        existing_stages = list_exported_stages(output_folder)
+        if len(existing_stages) == 0:
+            raise ValueError(
+                "stage_name was not provided and no existing exported stages "
+                "are available to select. Please pass stage_name explicitly."
+            )
+        stage_name = select_exported_stage(output_folder)
+    else:
+        stage_name = str(stage_name)
+
+    out_dir = _stage_dir(output_folder, stage_name)
 
     size_estimate = None
     if print_estimated_size or ask:
@@ -472,8 +709,8 @@ def export_processing_stage(
 
 
 def import_processing_stage(
-    caller_info: Dict[str, Any],
-    stage_name: str,
+    output_folder: str,
+    stage_name: Optional[str] = None,
     qa_tests: Optional[Iterable[str]] = None,
     parameters: Optional[Iterable[str]] = None,
     qa_test: Optional[str] = None,
@@ -487,8 +724,8 @@ def import_processing_stage(
 
     Parameters
     ----------
-    caller_info
-        ATLAS caller_info dictionary. Must contain ``output_folder``.
+    output_folder
+        Base output folder where the ``exported`` directory is stored.
     stage_name
         Name of the exported stage to read.
     qa_tests
@@ -509,7 +746,12 @@ def import_processing_stage(
         Nested dictionary with the same ``qa_test -> parameter -> value`` layout.
     """
 
-    in_dir, manifest = _read_export_manifest(caller_info, stage_name)
+    if stage_name is None:
+        stage_name = select_exported_stage(output_folder)
+    else:
+        stage_name = str(stage_name)
+
+    in_dir, manifest = _read_export_manifest(output_folder, stage_name)
 
     if qa_test is not None:
         if qa_tests is not None:
@@ -542,8 +784,8 @@ def import_processing_stage(
 
 
 def import_processing_entry(
-    caller_info: Dict[str, Any],
-    stage_name: str,
+    output_folder: str,
+    stage_name: Optional[str] = None,
     qa_test: Optional[str] = None,
     parameter: Optional[str] = None,
 ) -> Any:
@@ -555,8 +797,8 @@ def import_processing_entry(
 
     Parameters
     ----------
-    caller_info
-        ATLAS caller_info dictionary. Must contain ``output_folder``.
+    output_folder
+        Base output folder where the ``exported`` directory is stored.
     stage_name
         Name of the exported stage to read.
     qa_test
@@ -574,10 +816,15 @@ def import_processing_entry(
         If neither is provided, returns the full stage via import_processing_stage.
     """
 
-    if qa_test is None and parameter is None:
-        return import_processing_stage(caller_info=caller_info, stage_name=stage_name)
+    if stage_name is None:
+        stage_name = select_exported_stage(output_folder)
+    else:
+        stage_name = str(stage_name)
 
-    in_dir, manifest = _read_export_manifest(caller_info, stage_name)
+    if qa_test is None and parameter is None:
+        return import_processing_stage(output_folder=output_folder, stage_name=stage_name)
+
+    in_dir, manifest = _read_export_manifest(output_folder, stage_name)
     entries = manifest.get("entries", {})
 
     if qa_test is not None:
@@ -627,8 +874,8 @@ def import_processing_entry(
 
 
 def delete_exported_stage(
-    caller_info: Dict[str, Any],
-    stage_name: str,
+    output_folder: str,
+    stage_name: Optional[str] = None,
     ask: bool = False,
     default_answer: bool = False,
     missing_ok: bool = False,
@@ -639,7 +886,12 @@ def delete_exported_stage(
     returns None.
     """
 
-    stage_path = _stage_dir(caller_info, stage_name)
+    if stage_name is None:
+        stage_name = select_exported_stage(output_folder)
+    else:
+        stage_name = str(stage_name)
+
+    stage_path = _stage_dir(output_folder, stage_name)
 
     if not os.path.exists(stage_path):
         if missing_ok:
@@ -665,19 +917,19 @@ def delete_exported_stage(
 
 
 def delete_all_exported_stages(
-    caller_info: Dict[str, Any],
+    output_folder: str,
     ask: bool = True,
     default_answer: bool = False,
     missing_ok: bool = True,
 ) -> Optional[str]:
-    """Delete caller_info['output_folder']/exported and all saved stages.
+    """Delete output_folder/exported and all saved stages.
 
     By default this asks for confirmation because it removes every saved stage.
     Returns the deleted root path. If the folder is missing and missing_ok=True,
     returns None.
     """
 
-    root = os.path.join(caller_info.get("output_folder", ""), "exported")
+    root = _export_root(output_folder)
 
     if not os.path.exists(root):
         if missing_ok:
@@ -686,7 +938,7 @@ def delete_all_exported_stages(
         raise FileNotFoundError(f"Exported stages folder does not exist: {root}")
 
     if ask:
-        stages = list_exported_stages(caller_info)
+        stages = list_exported_stages(output_folder)
         stage_text = ", ".join(stages) if len(stages) else "no manifest-backed stages"
         do_delete = _ask_yes_no(
             question=(
@@ -707,9 +959,234 @@ def delete_all_exported_stages(
     return root
 
 
+
+def estimate_processing_stages_size(
+    stages_data: Dict[str, Dict[str, Dict[str, Any]]],
+) -> Dict[str, Any]:
+    """Estimate the combined exported size of multiple processing stages.
+
+    Parameters
+    ----------
+    stages_data
+        Dictionary with layout ``stages_data[stage_name][qa_test][parameter]``.
+
+    Returns
+    -------
+    dict
+        Combined totals plus a per-stage estimate dictionary.
+    """
+
+    if not isinstance(stages_data, dict):
+        raise TypeError("stages_data must be a dictionary")
+
+    per_stage: Dict[str, Dict[str, Any]] = {}
+    total_bytes = 0
+    zarr_bytes = 0
+    pickle_bytes = 0
+    entries = 0
+    xarray_entries = 0
+    pickle_entries = 0
+
+    for stage_name, stage_data in stages_data.items():
+        estimate = estimate_processing_stage_size(stage_data)
+        per_stage[str(stage_name)] = estimate
+
+        total_bytes += estimate["total_bytes"]
+        zarr_bytes += estimate["zarr_bytes"]
+        pickle_bytes += estimate["pickle_bytes"]
+        entries += estimate["entries"]
+        xarray_entries += estimate["xarray_entries"]
+        pickle_entries += estimate["pickle_entries"]
+
+    return {
+        "total_bytes": int(total_bytes),
+        "zarr_bytes": int(zarr_bytes),
+        "pickle_bytes": int(pickle_bytes),
+        "entries": int(entries),
+        "xarray_entries": int(xarray_entries),
+        "pickle_entries": int(pickle_entries),
+        "total_human": _human_readable_size(total_bytes),
+        "zarr_human": _human_readable_size(zarr_bytes),
+        "pickle_human": _human_readable_size(pickle_bytes),
+        "per_stage": per_stage,
+    }
+
+
+def _print_stages_size_estimate(estimate: Dict[str, Any]) -> None:
+    """Print a compact size estimate for multiple exported stages."""
+
+    per_stage = estimate.get("per_stage", {})
+    print(
+        f"-- Estimated exported size for {len(per_stage)} stage(s): "
+        f"{estimate['total_human']} "
+        f"(zarr arrays: {estimate['zarr_human']}, "
+        f"pickle metadata: {estimate['pickle_human']}, "
+        f"entries: {estimate['entries']})"
+    )
+
+    for stage_name in sorted(per_stage.keys()):
+        stage_estimate = per_stage[stage_name]
+        print(
+            f"   - {stage_name}: {stage_estimate['total_human']} "
+            f"(entries: {stage_estimate['entries']})"
+        )
+
+    print()
+
+
+def _check_stage_export_targets(
+    output_folder: str,
+    stage_names: Iterable[str],
+    overwrite: bool,
+) -> None:
+    """Validate output targets before a batch export writes anything."""
+
+    safe_to_original: Dict[str, str] = {}
+    existing: list[str] = []
+
+    for stage_name in stage_names:
+        stage_key = str(stage_name)
+        safe = _safe_name(stage_key)
+
+        if safe in safe_to_original and safe_to_original[safe] != stage_key:
+            raise ValueError(
+                "Two stage names resolve to the same export folder after "
+                f"filesystem-safe conversion: {safe_to_original[safe]!r} and "
+                f"{stage_key!r} -> {safe!r}"
+            )
+
+        safe_to_original[safe] = stage_key
+        out_dir = _stage_dir(output_folder, stage_key)
+
+        if os.path.exists(out_dir):
+            existing.append(out_dir)
+
+    if existing and not overwrite:
+        raise FileExistsError(
+            "One or more exported stages already exist. Use overwrite=True to "
+            "replace them:\n" + "\n".join(f"  - {path}" for path in existing)
+        )
+
+
+def export_processing_stages(
+    stages_data: Dict[str, Dict[str, Dict[str, Any]]],
+    output_folder: str,
+    stage_names: Optional[Iterable[str]] = None,
+    overwrite: bool = False,
+    ask: bool = False,
+    default_answer: bool = False,
+    print_estimated_size: bool = True,
+) -> Dict[str, str]:
+    """Export multiple ATLAS processing stages with one optional prompt.
+
+    Parameters
+    ----------
+    stages_data
+        Dictionary with layout ``stages_data[stage_name][qa_test][parameter]``.
+    output_folder
+        Base output folder where the ``exported`` directory is stored.
+    overwrite
+        If False, raise an error when any target stage export already exists.
+        If True, replace existing exported stages.
+    ask
+        If True, show one terminal yes/no prompt before exporting any stage.
+    default_answer
+        Default answer used by the prompt when the user presses Enter.
+    print_estimated_size
+        If True, print one combined approximate exported size before writing.
+
+    Returns
+    -------
+    dict
+        Mapping ``stage_name -> exported stage folder``. Returns an empty dict
+        when ask=True and the user chooses not to export.
+    """
+
+    if not isinstance(stages_data, dict):
+        raise TypeError("stages_data must be a dictionary")
+
+    available_stage_names = [str(stage_name) for stage_name in stages_data.keys()]
+
+    if len(available_stage_names) == 0:
+        raise ValueError("stages_data must contain at least one stage")
+
+    if stage_names is None:
+        stage_names = list(select_stage_names(available_stage_names, allow_multiple=True))
+    else:
+        stage_names = [str(stage_name) for stage_name in stage_names]
+
+    missing_stage_names = [
+        stage_name for stage_name in stage_names
+        if stage_name not in stages_data
+    ]
+    if len(missing_stage_names) > 0:
+        raise KeyError(
+            "Selected stage name(s) are not available in stages_data: "
+            + ", ".join(missing_stage_names)
+        )
+
+    _check_stage_export_targets(
+        output_folder=output_folder,
+        stage_names=stage_names,
+        overwrite=overwrite,
+    )
+
+    selected_stages_data = {
+        stage_name: stages_data[stage_name]
+        for stage_name in stage_names
+    }
+
+    size_estimate = None
+    if print_estimated_size or ask:
+        size_estimate = estimate_processing_stages_size(selected_stages_data)
+
+    if print_estimated_size and size_estimate is not None:
+        _print_stages_size_estimate(size_estimate)
+
+    if ask:
+        root = _export_root(output_folder)
+        stage_text = ", ".join(stage_names)
+        size_text = "unknown"
+
+        if size_estimate is not None:
+            size_text = size_estimate["total_human"]
+
+        do_export = _ask_yes_no(
+            question=(
+                f"Export {len(stage_names)} processing stage(s) "
+                f"({stage_text}) to '{root}'? "
+                f"Estimated total size: {size_text}."
+            ),
+            default=default_answer,
+        )
+
+        if not do_export:
+            print("-- Skipping export of processing stages: " + stage_text)
+            return {}
+
+    exported: Dict[str, str] = {}
+
+    for stage_name in stage_names:
+        out_dir = export_processing_stage(
+            stage_data=stages_data[stage_name],
+            stage_name=stage_name,
+            output_folder=output_folder,
+            overwrite=overwrite,
+            ask=False,
+            default_answer=default_answer,
+            print_estimated_size=False,
+        )
+
+        if out_dir is not None:
+            exported[stage_name] = out_dir
+
+    return exported
+
+
 def export_processor_stage(
     processor: Any,
-    stage_name: str,
+    output_folder: 'str',
+    stage_name: Optional[str] = None,
     overwrite: bool = False,
     ask: bool = False,
     default_answer: bool = False,
@@ -721,13 +1198,13 @@ def export_processor_stage(
     Set ask=True to show a terminal yes/no prompt before writing anything.
     """
 
+    stage_name = _resolve_processor_stage_name(processor, stage_name)
     stage_data = processor.export_test_from_stage(stage_name)
-    caller_info = processor.processing_info["caller_info"]
 
     return export_processing_stage(
         stage_data=stage_data,
         stage_name=stage_name,
-        caller_info=caller_info,
+        output_folder=output_folder,
         overwrite=overwrite,
         ask=ask,
         default_answer=default_answer,
@@ -735,10 +1212,66 @@ def export_processor_stage(
     )
 
 
-def list_exported_stages(caller_info: Dict[str, Any]) -> list[str]:
+
+def export_processor_stages(
+    processor: Any,
+    output_folder: str,
+    stage_names: Optional[Iterable[str]] = None,
+    overwrite: bool = False,
+    ask: bool = False,
+    default_answer: bool = False,
+    print_estimated_size: bool = True,
+) -> Dict[str, str]:
+    """Convenience wrapper that exports multiple stages from an ATLAS Processor.
+
+    Set ask=True to show exactly one terminal yes/no prompt before writing any
+    of the requested stages. The printed size estimate is the combined total for
+    all stages.
+    """
+
+    stage_names = _resolve_processor_stage_names(processor, stage_names)
+
+    if len(stage_names) == 0:
+        raise ValueError("stage_names must contain at least one stage")
+
+    stages_data = {
+        stage_name: processor.export_test_from_stage(stage_name)
+        for stage_name in stage_names
+    }
+
+    return export_processing_stages(
+        stages_data=stages_data,
+        output_folder=output_folder,
+        stage_names=stage_names,
+        overwrite=overwrite,
+        ask=ask,
+        default_answer=default_answer,
+        print_estimated_size=print_estimated_size,
+    )
+
+
+def ask_export_processor_stages(
+    processor: Any,
+    stage_names: Optional[Iterable[str]] = None,
+    overwrite: bool = False,
+    default_answer: bool = False,
+    print_estimated_size: bool = True,
+) -> Dict[str, str]:
+    """Prompt once in the terminal before exporting multiple stages."""
+
+    return export_processor_stages(
+        processor=processor,
+        stage_names=stage_names,
+        overwrite=overwrite,
+        ask=True,
+        default_answer=default_answer,
+        print_estimated_size=print_estimated_size,
+    )
+
+def list_exported_stages(output_folder: str) -> list[str]:
     """Return available exported stage folder names."""
 
-    root = _export_root(caller_info)
+    root = _export_root(output_folder)
 
     return sorted(
         name
@@ -750,7 +1283,7 @@ def list_exported_stages(caller_info: Dict[str, Any]) -> list[str]:
 
 def ask_export_processor_stage(
     processor: Any,
-    stage_name: str,
+    stage_name: Optional[str] = None,
     overwrite: bool = False,
     default_answer: bool = False,
     print_estimated_size: bool = True,
@@ -768,7 +1301,7 @@ def ask_export_processor_stage(
 
 
 def inspect_exported_stages(
-    caller_info: Dict[str, Any],
+    output_folder: str,
     stage_name: Optional[str] = None,
     print_tree: bool = True,
     include_kinds: bool = True,
@@ -782,8 +1315,8 @@ def inspect_exported_stages(
 
     Parameters
     ----------
-    caller_info
-        ATLAS caller_info dictionary. Must contain ``output_folder``.
+    output_folder
+        Base output folder where the ``exported`` directory is stored.
     stage_name
         Optional stage name to inspect. If None, all exported stages are
         inspected.
@@ -809,14 +1342,14 @@ def inspect_exported_stages(
     """
 
     if stage_name is None:
-        stage_names = list_exported_stages(caller_info)
+        stage_names = list_exported_stages(output_folder)
     else:
         stage_names = [str(stage_name)]
 
     summary: Dict[str, Dict[str, Dict[str, Dict[str, Any]]]] = {}
 
     for stage in stage_names:
-        _, manifest = _read_export_manifest(caller_info, stage)
+        _, manifest = _read_export_manifest(output_folder, stage)
         stage_entries = manifest.get("entries", {})
         summary[stage] = {}
 
@@ -879,7 +1412,7 @@ def print_exported_stage_tree(
 
 
 def list_exported_stage_contents(
-    caller_info: Dict[str, Any],
+    output_folder: str,
     stage_name: Optional[str] = None,
 ) -> Dict[str, Dict[str, list[str]]]:
     """Return a compact stage -> qa_test -> parameter list summary.
@@ -889,7 +1422,7 @@ def list_exported_stage_contents(
     """
 
     detailed = inspect_exported_stages(
-        caller_info=caller_info,
+        output_folder=output_folder,
         stage_name=stage_name,
         print_tree=False,
     )
@@ -905,9 +1438,13 @@ def list_exported_stage_contents(
 
 # Short aliases, in case you prefer shorter imports.
 export_stage = export_processing_stage
+export_stages = export_processing_stages
+export_processor_stage_list = export_processor_stages
 import_stage = import_processing_stage
 import_entry = import_processing_entry
 delete_stage = delete_exported_stage
 delete_all_stages = delete_all_exported_stages
 inspect_stages = inspect_exported_stages
 list_stage_contents = list_exported_stage_contents
+select_stage = select_exported_stage
+select_stages = select_exported_stages

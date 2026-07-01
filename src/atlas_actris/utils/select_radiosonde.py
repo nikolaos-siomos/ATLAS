@@ -10,32 +10,32 @@ import re
 import os
 import glob
 import numpy as np
-from typing import Union
 from pathlib import Path
 from datetime import datetime
+from typing import Union, Dict, Any
 from utils.error_classes import CustomWarning
 
 WYOMING_RE = re.compile(
     # Supports both legacy Wyoming files and downloaded BUFR text files, e.g.
     #   20240428_1200_wyoming_16716.dat
     #   20240428_1200_wyoming_bufr_16716.txt
-    r"^(?P<date>\d{8})_(?P<time>\d{4})_wyoming(?:_bufr)?_(?P<wmo_id>\d{5})\.(?:dat|txt)$"
+    r"^(?P<date>\d{8})_(?P<time>\d{4})_wyoming(?:_bufr)?_(?P<identifier>\d{5})\.(?:dat|txt)$"
 )
 
 ECMWF_RE = re.compile(
-    r"^(?P<date>\d{8})_(?P<time>\d{4})_ecmwf_(?P<site>[A-Za-z0-9][A-Za-z0-9_-]*)\.nc$"
+    r"^(?P<date>\d{8})_(?P<time>\d{4})_ecmwf_(?P<identifier>[A-Za-z0-9][A-Za-z0-9_-]*)\.nc$"
 )
 
 SCC_RE = re.compile(
-    r"^rs_(?P<date>\d{8})(?P<site>[A-Za-z]+?)(?P<time>\d{2})\.nc$"
+    r"^rs_(?P<date>\d{8})(?P<identifier>[A-Za-z]+?)(?P<time>\d{2})\.nc$"
 )
 
 ASCII_RE = re.compile(
-    r"^(?P<date>\d{8})_(?P<time>\d{4}).*\.txt$"
+    r"^(?P<date>\d{8})_(?P<time>\d{4})_custom_radiosonde_(?P<identifier>[A-Za-z0-9][A-Za-z0-9_-]*)\.(?:dat|txt)$"
 )
 
 
-def parse_radiosonde_filename(filename: Union[str, Path]):
+def parse_radiosonde_filename(filename: Union[str, Path], identifiers: Dict[Any]):
     """
     Parse a supported radiosonde filename.
 
@@ -105,18 +105,8 @@ def infer_manual_radiosonde_format(filename: Union[str, Path]):
 
     if status:
         return parsed["radiosonde_format"]
-
-    suffix = Path(filename).suffix.lower()
-
-    if suffix in [".txt", ".dat", ".csv", ".asc"]:
-        return "ascii"
-
-    if suffix == ".nc":
-        # Unknown NetCDF radiosonde. Keep it explicit rather than pretending it
-        # is SCC or ECMWF. The downstream loader can decide whether to support it.
+    else:
         return "unknown"
-
-    return "unknown"
 
 
 def select_manual_radiosonde_file(
@@ -169,6 +159,7 @@ def select_manual_radiosonde_file(
 def select_radiosonde_filename(
     target: object,
     folder: Union[str, Path],
+    identifiers: Dict[Any],
     time_limit: int = 18,
     priority_time_limit: int = 3,
 ) -> str:
@@ -180,7 +171,7 @@ def select_radiosonde_filename(
       - Wyoming BUFR text: <yyyymmdd>_<hhmm>_wyoming_bufr_<wmo_id>.txt
       - ECMWF:   <yyyymmdd>_<hhmm>_ecmwf_<site>.nc
       - SCC:     rs_<yyyymmdd><site><hh>.nc
-      - ASCII:   <yyyymmdd>_<hhmm>*.txt
+      - ASCII:   <yyyymmdd>_<hhmm>_custom_radiosonde_<site>.txt
 
     Selection rule:
       1. Prefer the closest Wyoming file within +/- `priority_time_limit` hours.
@@ -193,6 +184,9 @@ def select_radiosonde_filename(
         Target time, usually numpy.datetime64.
     folder:
         Folder containing radiosonde files.
+    identifiers:
+        Unique identifiers related to the lidar system to link with radiosondes 
+        which correspond to the same station
     time_limit:
         Fallback time window in hours. Default: 18.
     priority_time_limit:
@@ -221,6 +215,7 @@ def select_radiosonde_filename(
     time_stamps = []
     delta_hours = []
     file_formats = []
+    identifier_list = []
 
     output = {}
 
@@ -228,7 +223,7 @@ def select_radiosonde_filename(
         if not os.path.isfile(filename):
             continue
 
-        parsed, status = parse_radiosonde_filename(filename)
+        parsed, status = parse_radiosonde_filename(filename, identifiers)
 
         if not status:
             continue

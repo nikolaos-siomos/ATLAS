@@ -204,7 +204,7 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
                     metadata = metadata,
                     extra_metadata = {},
                     settings = settings,
-                    qa_test_info = {}
+                    qa_test_info = {'qa_test': key}
                     )
                 
                 

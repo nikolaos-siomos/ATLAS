@@ -53,19 +53,30 @@ def get_max_channel_height(norm_region, norm_region_flag):
     return(max_channel_height)
     
 def generate_rayleigh_fit(data_pack, caller_info, settings_info):
-    
-    process = caller_info['process']
-    
+        
     qa_test_info = defaultdict(dict)
     
-
-    for key in ['ray']:
-        if key in process and key in data_pack:
+    if 'ray' not in caller_info['process']:
+        return
+    
+    for key in ['ray','ray_pcb']:
+        if key in data_pack:
     
             print_header(f'Initializing the Rayleigh fit test ({key})')
             
             # Prepare folders
-            prepare_folder(caller_info, pattern = "_ray_", exclude_pattern = '_qck_ray_')
+            if key == 'ray':
+                prepare_folder(
+                    caller_info, pattern = "_ray_", 
+                    exclude_patterns = ['_qck_ray_', "_ray_pcb_"]
+                    )
+            elif key == 'ray_pcb':
+                prepare_folder(
+                    caller_info, pattern = "_ray_pcb_", 
+                    exclude_pattern = '_qck_ray_pcb_'
+                    )
+            else:
+                return
 
             # Load arrays
             profiles = data_pack[key]['profile_mean']
@@ -258,12 +269,22 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 text_generator = GenerateText(lib = lib)
                 
                 # Make titles
-                qa_test_info[key][ch]['title'] = \
-                    text_generator.make_rayleigh_fit_title()
+                if key == 'ray':
+                    qa_test_info[key][ch]['title'] = \
+                        text_generator.make_rayleigh_fit_title(
+                            'Rayleigh Fit'
+                            )
+                elif key == 'ray_pcb':
+                    qa_test_info[key][ch]['title'] = \
+                        text_generator.make_rayleigh_fit_title(
+                            'Rayleigh Fit (Calib. Mode)'
+                            )
+                else:
+                    return
                 
                 # Make filenames
                 qa_test_info[key][ch]['filename'] = text_generator.make_filename(
-                    qa_test = 'ray'
+                    qa_test = key
                     )
                 
                 # Make ascii file header
@@ -312,10 +333,21 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                 
                 mask_metadata = qa_test_info[key][ch].copy()
                 
-                mask_metadata['title'] = text_generator.make_rayleigh_fit_mask_title()
+                if key == 'ray':
+                    mask_metadata['title'] = \
+                        text_generator.make_rayleigh_fit_mask_title(
+                            'Rayl. Fit Mask'
+                            )
+                elif key == 'ray_pcb':
+                    mask_metadata['title'] = \
+                        text_generator.make_rayleigh_fit_mask_title(
+                            'Rayl. Fit Mask (Calib. Mode)'
+                            )
+                else:
+                    return
                 
                 mask_metadata['filename'] = text_generator.make_filename(
-                    qa_test = 'ray', 
+                    qa_test = key, 
                     extra_type = 'mask'
                     ) 
 

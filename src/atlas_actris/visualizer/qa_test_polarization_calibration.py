@@ -86,11 +86,14 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         QA-test metadata, indexed as qa_test_info["pcb"][eta_id].
     """
 
+    if 'pcb' not in caller_info['process']:
+        return
+    
     qa_test_info = defaultdict(dict)
     
     loading_map = caller_info['loading_map']
 
-    ray_key = "ray_pcb"
+    ray_key = "ray"
     
     if ray_key in loading_map:
         ray_key = loading_map[ray_key]

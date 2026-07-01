@@ -87,17 +87,65 @@ def export_plot(fig, args):
     
     return fpath
 
-def clean_plots(plot_dir, pattern, exclude_pattern=None):
-    
+def _normalize_exclude_patterns(exclude_patterns=None, exclude_pattern=None):
+    """Return exclude patterns as a flat list of strings.
+
+    Parameters
+    ----------
+    exclude_patterns : None, str, or iterable of str
+        Preferred input. A single string is treated as one pattern.
+    exclude_pattern : None, str, or iterable of str
+        Backward-compatible alias for older calls.
+
+    Notes
+    -----
+    If both arguments are provided, their entries are combined. Empty strings
+    and None entries are ignored.
+    """
+
+    def as_list(value):
+        if value is None:
+            return []
+
+        if isinstance(value, str):
+            value = value.strip()
+            return [value] if value else []
+
+        try:
+            values = list(value)
+        except TypeError as exc:
+            raise TypeError(
+                "exclude_patterns must be None, a string, or an iterable of strings"
+            ) from exc
+
+        out = []
+        for item in values:
+            if item is None:
+                continue
+
+            text = str(item).strip()
+            if text:
+                out.append(text)
+
+        return out
+
+    return as_list(exclude_patterns) + as_list(exclude_pattern)
+
+
+def clean_plots(plot_dir, pattern, exclude_patterns=None, exclude_pattern=None):
+    """Remove plots matching pattern, optionally preserving excluded names.
+
+    ``exclude_patterns`` can be None, a single string, or a list/tuple of
+    strings. ``exclude_pattern`` is kept as a backward-compatible alias.
+    """
+
     if not os.path.isdir(plot_dir):
         return
 
-    if exclude_pattern is None:
-        exclude_patterns = []
-    elif isinstance(exclude_pattern, str):
-        exclude_patterns = [exclude_pattern]
-    else:
-        exclude_patterns = list(exclude_pattern)
+    exclude_patterns = _normalize_exclude_patterns(
+        exclude_patterns=exclude_patterns,
+        exclude_pattern=exclude_pattern,
+    )
 
     for filename in os.listdir(plot_dir):
         if pattern not in filename:
@@ -112,7 +160,12 @@ def clean_plots(plot_dir, pattern, exclude_pattern=None):
             os.remove(file_path)
             
 
-def prepare_folder(caller_info, pattern, exclude_pattern=None):
+def prepare_folder(caller_info, pattern, exclude_patterns=None, exclude_pattern=None):
+    """Create the plots folder and clean old plots.
+
+    ``exclude_patterns`` can be None, a single string, or a list/tuple of
+    strings. ``exclude_pattern`` is kept as a backward-compatible alias.
+    """
     
     plot_dir = os.path.join(caller_info["output_folder"], "plots")
             
@@ -121,6 +174,7 @@ def prepare_folder(caller_info, pattern, exclude_pattern=None):
     clean_plots(
         plot_dir=plot_dir,
         pattern=pattern,
+        exclude_patterns=exclude_patterns,
         exclude_pattern=exclude_pattern,
     )
 
@@ -460,3 +514,31 @@ def add_fitting_suptitle(
         renderer = fig.canvas.get_renderer()
 
     return title_obj
+
+def find_time_blocks(da, dim="time", expected_freq=None, gap_factor=1.5):
+    time = pd.DatetimeIndex(da[dim].values).sort_values()
+
+    if len(time) == 0:
+        return [0, 0]
+
+    dt = pd.Series(time[1:] - time[:-1])
+
+    if expected_freq is None:
+        expected_freq = dt.median() if len(dt) else pd.NaT
+    else:
+        expected_freq = pd.Timedelta(expected_freq)
+
+    if len(time) == 1:
+        return [1, round(expected_freq.total_seconds())]
+
+    gap_idx = dt[dt > gap_factor * expected_freq].index
+    starts = [0] + [i + 1 for i in gap_idx]
+    stops = list(gap_idx) + [len(time) - 1]
+
+    durations = []
+    for i0, i1 in zip(starts, stops):
+        t = time[i0:i1 + 1]
+        res = pd.Series(t[1:] - t[:-1]).median() if len(t) > 1 else expected_freq
+        durations.append(len(t) * res.total_seconds())
+
+    return [len(durations), round(sum(durations) / len(durations))]

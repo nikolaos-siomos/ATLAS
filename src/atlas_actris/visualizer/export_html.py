@@ -23,8 +23,8 @@ from pathlib import Path
 
 qck_text_map = {
     'qck_ray': 'Rayleigh measurement', 
-    'qck_ray_pcb': 'Rayleigh measurement for polarization calibration',  
-    'qck_tlc_qua': 'Quadrant telecover', 
+    'qck_ray_pcb': 'Rayleigh measurement in calibration mode',  
+    'qck_tlc': 'Quadrant telecover', 
     'qck_tlc_rin': 'Ring telecover', 
     'qck_pcb': 'Polarization calibration', 
     'qck_drk': 'Long dark',
@@ -189,7 +189,7 @@ def channel_limit_table(f, data, photon_only, export_all):
         meta = _copy_meta_with_triggering(meta0)
               
         minimum_channel_height_qua = (
-            data.get('tlc_qua', {}).get(ch, {}).get('minimum_channel_height', "")
+            data.get('tlc', {}).get(ch, {}).get('minimum_channel_height', "")
         )
         minimum_channel_height_rin = (
             data.get('tlc_rin', {}).get(ch, {}).get('minimum_channel_height', "")
@@ -198,6 +198,18 @@ def channel_limit_table(f, data, photon_only, export_all):
         meta["minimum_channel_height"] = bigger_numeric_string(
             minimum_channel_height_qua, 
             minimum_channel_height_rin
+            )
+        
+        maximum_channel_height_ray = (
+            data.get('ray', {}).get(ch, {}).get('maximum_channel_height', "")
+        )
+        maximum_channel_height_ray_pcb = (
+            data.get('ray_pcb', {}).get(ch, {}).get('maximum_channel_height', "")
+        )
+            
+        meta["maximum_channel_height"] = bigger_numeric_string(
+            maximum_channel_height_ray, 
+            maximum_channel_height_ray_pcb
             )
         
         channel_mode = ch[6] if len(ch) > 6 else ""
@@ -563,7 +575,7 @@ def _collect_report_data(plots_folder: str):
     data = {}
 
     # Quicklooks ray
-    for qa in ['ray', 'ray_pcb', 'tlc_qua', 'tlc_rin', 'pcb', 'drk']:
+    for qa in ['ray', 'ray_pcb', 'tlc', 'tlc_rin', 'pcb', 'drk']:
         qck_images = _select_quicklook_images(plots_folder, qa)
         qck_metas = {}
         for im in qck_images:
@@ -580,7 +592,8 @@ def _collect_report_data(plots_folder: str):
     ray_images = np.sort(glob.glob(os.path.join(plots_folder, '*_ray_*.png')))
     ray_images = [item for item in ray_images if '_qck_' not in item]
     ray_images = [item for item in ray_images if '_mask_' not in item]
-
+    ray_images = [item for item in ray_images if '_ray_pcb_' not in item]
+    
     ray_metas = {}
     for im in ray_images:
         meta = Image.open(im).text
@@ -591,25 +604,42 @@ def _collect_report_data(plots_folder: str):
             'data_uri': _encode_png_as_data_uri(im),
         }
     data["ray"] = ray_metas
+    
+    # Rayleigh-Fit Calib. Mode plots
+    ray_pcb_images = np.sort(glob.glob(os.path.join(plots_folder, '*_ray_pcb_*.png')))
+    ray_pcb_images = [item for item in ray_pcb_images if '_qck_' not in item]
+    ray_pcb_images = [item for item in ray_pcb_images if '_mask_' not in item]
+    
+    ray_pcb_metas = {}
+    for im in ray_pcb_images:
+        meta = Image.open(im).text
+        atlas_channel_id = meta['atlas_channel_id']
+        ray_pcb_metas[atlas_channel_id] = {
+            **meta,
+            'path':im,
+            'data_uri': _encode_png_as_data_uri(im),
+        }
+    data["ray_pcb"] = ray_pcb_metas
 
     # Telecover plots
-    tlc_qua_images = np.sort(glob.glob(os.path.join(plots_folder, '*_tlc_qua_*.png')))
-    tlc_qua_images = [item for item in tlc_qua_images if '_qck_' not in item]
+    tlc_images = np.sort(glob.glob(os.path.join(plots_folder, '*_tlc_*.png')))
+    tlc_images = [item for item in tlc_images if '_qck_' not in item]
+    tlc_images = [item for item in tlc_images if '_qck_rin_' not in item]
 
     tlc_rin_images = np.sort(glob.glob(os.path.join(plots_folder, '*_tlc_rin_*.png')))
     tlc_rin_images = [item for item in tlc_rin_images if '_qck_' not in item]
 
-    tlc_qua_metas = {}
-    for im in tlc_qua_images:
+    tlc_metas = {}
+    for im in tlc_images:
         meta = Image.open(im).text
         atlas_channel_id = meta['atlas_channel_id']
-        tlc_qua_metas[atlas_channel_id] = {
+        tlc_metas[atlas_channel_id] = {
             **meta,
             'path':im,
             'data_uri': _encode_png_as_data_uri(im),
         }
         
-    data["tlc_qua"] = tlc_qua_metas
+    data["tlc"] = tlc_metas
 
     tlc_rin_metas = {}
     for im in tlc_rin_images:
@@ -735,7 +765,7 @@ def QA_report(
         if data:
             f.write('<h1>Quicklooks</h1>')
             f.write('\n')
-            qck_list = ['qck_ray', 'qck_ray_pcb', 'qck_tlc_qua', 'qck_tlc_rin', 'qck_pcb', 'qck_drk']
+            qck_list = ['qck_ray', 'qck_ray_pcb', 'qck_tlc', 'qck_tlc_rin', 'qck_pcb', 'qck_drk']
             for ch in _quicklook_channel_keys(data, qck_list):
                 f.write(f'<h2>{ch}</h2>')
                 for key in qck_list:
@@ -754,27 +784,44 @@ def QA_report(
                 channel_entry(f, meta, plot_width)
             
         # Rayleigh-Fit plots
-        if data["ray"]:
+        # if data["ray"]:
+        #     f.write('<h1>Rayleigh Fit</h1>')
+        #     f.write('\n')
+        #     for ch in _select_preferred_channel_keys(data["ray"].keys(), preferred_mode="p", export_all=export_all):
+        #         meta = data["ray"][ch]
+        #         f.write(f'<h2>{ch}</h2>')
+        #         channel_entry(f, meta, plot_width)
+                    
+        #     write_page_break(f)
+    
+        # Rayleigh-Fit plots
+        if data["ray"] or data["ray_pcb"]:
             f.write('<h1>Rayleigh Fit</h1>')
             f.write('\n')
-            for ch in _select_preferred_channel_keys(data["ray"].keys(), preferred_mode="p", export_all=export_all):
-                meta = data["ray"][ch]
+
+            rayfit_channels = data["ray"].keys() | data["ray_pcb"].keys()
+            for ch in _select_preferred_channel_keys(rayfit_channels, preferred_mode="p", export_all=export_all):
                 f.write(f'<h2>{ch}</h2>')
-                channel_entry(f, meta, plot_width)
-                    
-            write_page_break(f)
+                if ch in data["ray"]:
+                    channel_entry(f, data["ray"][ch], plot_width)                    
+                if ch in data["ray"] and ch in data["ray_pcb"]:
+                    f.write('<br>\n')
+                if ch in data["ray_pcb"]:
+                    channel_entry(f, data["ray_pcb"][ch], plot_width)
     
-        if data["tlc_qua"] or data["tlc_rin"]:
+            write_page_break(f)
+            
+        if data["tlc"] or data["tlc_rin"]:
             # Telecover Plots
             f.write('<h1>Telecover</h1>')
             f.write('\n')
 
-            telecover_channels = data["tlc_qua"].keys() | data["tlc_rin"].keys()
+            telecover_channels = data["tlc"].keys() | data["tlc_rin"].keys()
             for ch in _select_preferred_channel_keys(telecover_channels, preferred_mode="a", export_all=export_all):
                 f.write(f'<h2>{ch}</h2>')
-                if ch in data["tlc_qua"]:
-                    channel_entry(f, data["tlc_qua"][ch], plot_width)                    
-                if ch in data["tlc_qua"] and ch in data["tlc_rin"]:
+                if ch in data["tlc"]:
+                    channel_entry(f, data["tlc"][ch], plot_width)                    
+                if ch in data["tlc"] and ch in data["tlc_rin"]:
                     f.write('<br>\n')
                 if ch in data["tlc_rin"]:
                     channel_entry(f, data["tlc_rin"][ch], plot_width)
@@ -1135,12 +1182,12 @@ def _summary_table_metas(data):
     selected_tests = [
         'qck_ray',
         'qck_ray_pcb',
-        'qck_tlc_qua',
+        'qck_tlc',
         'qck_tlc_rin',
         'qck_pcb',
         'qck_drk',
         'ray',
-        'tlc_qua',
+        'tlc',
         'tlc_rin',
     ]
 
@@ -1171,9 +1218,13 @@ def _limit_table_rows(data, photon_only, export_all):
     for ch, meta0 in _summary_table_metas(data).items():
         meta = _copy_meta_with_triggering(meta0)
 
-        minimum_channel_height_qua = data.get('tlc_qua', {}).get(ch, {}).get('minimum_channel_height', "")
+        minimum_channel_height_qua = data.get('tlc', {}).get(ch, {}).get('minimum_channel_height', "")
         minimum_channel_height_rin = data.get('tlc_rin', {}).get(ch, {}).get('minimum_channel_height', "")
         meta["minimum_channel_height"] = bigger_numeric_string(minimum_channel_height_qua, minimum_channel_height_rin)
+
+        maximum_channel_height_ray = data.get('ray', {}).get(ch, {}).get('maximum_channel_height', "")
+        maximum_channel_height_ray_pcb = data.get('ray_pcb', {}).get(ch, {}).get('maximum_channel_height', "")
+        meta["maximum_channel_height"] = bigger_numeric_string(maximum_channel_height_ray, maximum_channel_height_ray_pcb)
 
         channel_mode = ch[6] if len(ch) > 6 else ""
         try:
@@ -1429,7 +1480,7 @@ def convert_report_data_to_docx(
 
     if data:
         document.add_heading("Quicklooks", level=1)
-        qck_list = ['qck_ray', 'qck_ray_pcb', 'qck_tlc_qua', 'qck_tlc_rin', 'qck_pcb', 'qck_drk']
+        qck_list = ['qck_ray', 'qck_ray_pcb', 'qck_tlc', 'qck_tlc_rin', 'qck_pcb', 'qck_drk']
         for ch in _quicklook_channel_keys(data, qck_list):
             document.add_heading(ch, level=2)
             for key in qck_list:
@@ -1446,19 +1497,28 @@ def convert_report_data_to_docx(
 
     if data.get("ray"):
         document.add_heading("Rayleigh Fit", level=1)
-        for ch in _select_preferred_channel_keys(data["ray"].keys(), preferred_mode="p", export_all=export_all):
-            meta = data["ray"][ch]
-            document.add_heading(ch, level=2)
-            _add_docx_picture(document, meta.get('path'))
-        document.add_page_break()
+        # for ch in _select_preferred_channel_keys(data["ray"].keys(), preferred_mode="p", export_all=export_all):
+        #     meta = data["ray"][ch]
+        #     document.add_heading(ch, level=2)
+        #     _add_docx_picture(document, meta.get('path'))
+        # document.add_page_break()
+    
+    rayfit_channels = data.get("ray", {}).keys() | data.get("ray_pcb", {}).keys()
+    for ch in _select_preferred_channel_keys(rayfit_channels, preferred_mode="p", export_all=export_all):
+        document.add_heading(ch, level=2)
+        if ch in data.get("ray", {}):
+            _add_docx_picture(document, data["ray"][ch].get('path'))
+        if ch in data.get("ray_pcb", {}):
+            _add_docx_picture(document, data["ray_pcb"][ch].get('path'))
+    document.add_page_break()
 
-    if data.get("tlc_qua") or data.get("tlc_rin"):
+    if data.get("tlc") or data.get("tlc_rin"):
         document.add_heading("Telecover", level=1)
-        telecover_channels = data.get("tlc_qua", {}).keys() | data.get("tlc_rin", {}).keys()
+        telecover_channels = data.get("tlc", {}).keys() | data.get("tlc_rin", {}).keys()
         for ch in _select_preferred_channel_keys(telecover_channels, preferred_mode="a", export_all=export_all):
             document.add_heading(ch, level=2)
-            if ch in data.get("tlc_qua", {}):
-                _add_docx_picture(document, data["tlc_qua"][ch].get('path'))
+            if ch in data.get("tlc", {}):
+                _add_docx_picture(document, data["tlc"][ch].get('path'))
             if ch in data.get("tlc_rin", {}):
                 _add_docx_picture(document, data["tlc_rin"][ch].get('path'))
         document.add_page_break()

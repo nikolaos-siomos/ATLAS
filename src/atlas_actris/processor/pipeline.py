@@ -410,6 +410,24 @@ class Processor():
         # Save output entries
         self.save_output(output_data, output_map)
         
+    def package_from_stage(self, input_id):
+
+        print_header(f"Packaging stage directly: {input_id}")
+
+        input_data = self.export_stage(input_id)
+
+        exported_data = combine_QA_pack(input_data)
+
+        exported_data_swapped = defaultdict(dict)
+        
+        for k1, inner in exported_data.items():
+            for k2, value in inner.items():
+                exported_data_swapped[k2][k1] = value
+        
+        exported_data_swapped = dict(exported_data_swapped)
+        
+        return exported_data_swapped
+        
     def checkout(self, output_id, input_id):
     
         # Print process header

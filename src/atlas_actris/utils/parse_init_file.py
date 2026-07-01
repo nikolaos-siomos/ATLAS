@@ -7,17 +7,23 @@ Created on Thu Aug 14 15:16:34 2025
 """
 
 from __future__ import annotations
-import configparser
-from typing import Any, Dict, List, Optional, Union, Mapping, Iterable, Sequence
-from pathlib import Path
-import numpy as np
-import os, sys
-from utils.caller_utils import autodetect_paths
-from utils.printouts import print_header, endpoint
-from pprint import pprint
-from utils.error_classes import ConfigError, CustomWarning
-from datetime import datetime
+
 import re
+import os
+import numpy as np
+import configparser
+from pathlib import Path
+from pprint import pprint
+from datetime import datetime
+from utils.printouts import print_header, endpoint
+from utils.error_classes import ConfigError, CustomWarning
+from typing import Any, Dict, List, Optional, Union, Mapping, Iterable, Sequence
+from utils.cookbook import (
+    screening_recipe, 
+    preprocessing_recipe, 
+    pol_cal_recipe,
+    checkout_stages,
+    )
 
 Number = Union[int, float]
 
@@ -36,12 +42,11 @@ Number = Union[int, float]
 qa_tests = [
     "ray",
     "pcb",
-    "tlc_qua",
+    "tlc",
     "tlc_rin",
     "drk",
     "trg",
     "dtm",
-    "nsf",
     "ray_pcb",
     "pcb_aux",
     "cam",
@@ -50,11 +55,12 @@ qa_tests = [
 quicklooks = [
     "ray",
     "pcb",
-    "tlc_qua",
+    "tlc",
     "tlc_rin",
     "drk",
     "ray_pcb",
     "pcb_aux",
+    "vldr",
 ]
 
 qa_measurement_folders = [
@@ -69,26 +75,64 @@ qa_measurement_folders = [
     "tlc_outer",
     "trg",
     "dtm",
-    "nsf",
     "ray_pcb",
     "pcb_aux_p45",
     "pcb_aux_m45",
     "drk",
     "drk_ray",
     "drk_pcb",
-    "drk_tlc_qua",
+    "drk_tlc",
     "drk_tlc_rin",
     "drk_trg",
     "drk_dtm",
-    "drk_nsf",
     "drk_ray_pcb",
     "drk_pcb_aux",
 ]
+
+# User-facing bundle aliases accepted only by slice_measurement and
+# exclude_measurement. These aliases are expanded to concrete measurement keys
+# before the final caller_info dictionary is returned.
+#
+# Keep qa_tests, quicklooks, and qa_measurement_folders unchanged: external code
+# may import or rely on those names and values.
+slice_exclude_bundles = {
+    "tlc": ["tlc_north", "tlc_east", "tlc_south", "tlc_west"],
+    "tlc_rin": ["tlc_inner", "tlc_outer"],
+    "pcb": ["pcb_p45", "pcb_m45"],
+    "pcb_aux": ["pcb_aux_p45", "pcb_aux_m45"],
+}
+
+version_warning_nrm = (
+    "\nSince update 1.0.0 the ray suffix has replaced the nrm suffix "
+    "for Rayleigh measurements. Any folders with the nrm suffix "
+    "will be renamed using the ray suffix\n"
+)
+
+version_warning_pcb = (
+    "\nSince update 1.0.0 the p45 and m45 folders have replaced the "
+    "+45 and -45 folders for pol. cal measurements. Any folder named "
+    "+45 (-45) will be automatically renamed to p45 (m45), respectively\n"
+)
+
+slice_exclude_allowed_keys = sorted(
+    set(qa_measurement_folders) | set(slice_exclude_bundles.keys())
+)
 
 height_units = ["m_asl", "m_agl", "km_asl", "km_agl"]
 pressure_units = ["Pa", "hPa", "atm"]
 temperature_units = ["K", "C", "Cx10"]
 humidity_units = ["percent", "fraction"]
+
+default_export_stage = ['pol_cal_complete']
+default_mean_signal_stages = ['averaged', 'background_corrected', 'preprocessing_complete']
+default_signal_stages = ['averaged']
+
+allowed_stages = [recipe[0] for recipe in screening_recipe] +\
+    [recipe[0] for recipe in preprocessing_recipe] + \
+        [recipe[0] for recipe in pol_cal_recipe] + \
+            [v for k,v in checkout_stages.items()]
+        
+allowed_vertical_scales = ["range", "height_agl", "height_asl"]
 
 SCHEMA: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
@@ -102,59 +146,55 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "radiosonde_folder":         {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "dir"},
     "radiosonde_file":           {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "file"},
 
-    "process":             {"dtype": str,  "default": qa_tests,   "is_list": True,  "category": "optional", "allowed": qa_tests + ["off"]},
-    "process_qck":         {"dtype": str,  "default": quicklooks, "is_list": True,  "category": "optional", "allowed": qa_tests + ["off"]},
-    "vertical_scale":      {"dtype": str,  "default": "range",    "is_list": False, "category": "optional", "allowed": ["range", "height_agl", "height_asl"]},
-    "dpi":                 {"dtype": int,  "default": 300,        "is_list": False, "category": "optional"},
-    "color_reduction":     {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
-    "output_folder":       {"dtype": str,  "default": None,       "is_list": False, "category": "optional"},
-    "overwrite_output":    {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
-    "expert_analyst":      {"dtype": str,  "default": None,       "is_list": False, "category": "optional"},
-    "debug_signals":       {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
-    "export_netcdf":       {"dtype": bool, "default": True,       "is_list": False, "category": "optional"},
-    "export_all":          {"dtype": bool, "default": False,      "is_list": False, "category": "optional"},
+    "process":                 {"dtype": str,  "default": qa_tests,                   "is_list": True,  "category": "optional", "allowed": qa_tests + ["off"]},
+    "process_qck":             {"dtype": str,  "default": quicklooks,                 "is_list": True,  "category": "optional", "allowed": quicklooks + ["off"]},
+    "vertical_scale":          {"dtype": str,  "default": "range",                    "is_list": False, "category": "optional", "allowed": allowed_vertical_scales},
+    "view_mean_signal_stages": {"dtype": str,  "default": default_mean_signal_stages, "is_list": True,  "category": "optional", "allowed": allowed_stages},
+    "view_signal_stages":      {"dtype": str,  "default": default_signal_stages,      "is_list": True,  "category": "optional", "allowed": allowed_stages},
+    "dpi":                     {"dtype": int,  "default": 300,                        "is_list": False, "category": "optional"},
+    "color_reduction":         {"dtype": bool, "default": False,                      "is_list": False, "category": "optional"},
+    "output_folder":           {"dtype": str,  "default": None,                       "is_list": False, "category": "optional"},
+    "overwrite_output":        {"dtype": bool, "default": False,                      "is_list": False, "category": "optional"},
+    "expert_analyst":          {"dtype": str,  "default": None,                       "is_list": False, "category": "optional"},
+    "export_stages":           {"dtype": str,  "default": default_export_stage,       "is_list": True,  "category": "optional", "allowed": allowed_stages},
+    "export_all":              {"dtype": bool, "default": False,                      "is_list": False, "category": "optional"},
 
-    "exclude_channels":         {"dtype": str, "default": [], "is_list": True, "category": "optional"},
+    "select_channels":          {"dtype": str, "default": [], "is_list": True, "category": "optional"},
+    "exclude_wavelength":       {"dtype": str, "default": [], "is_list": True, "category": "optional"},
     "exclude_telescope_type":   {"dtype": str, "default": [], "is_list": True, "category": "optional", "allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str, "default": [], "is_list": True, "category": "optional", "allowed": ["p", "c", "t", "v", "r", "a", "f"]},
     "exclude_acquisition_mode": {"dtype": str, "default": [], "is_list": True, "category": "optional", "allowed": ["a", "p", "g"]},
     "exclude_channel_subtype":  {"dtype": str, "default": [], "is_list": True, "category": "optional", "allowed": ["r", "t", "n", "o", "w", "c", "h", "l", "a", "m", "b", "s", "x"]},
 
-    "max_height_agl":               {"dtype": float, "default": 40.,  "is_list": False, "category": "optional"},
-    "low_shot_threshold":           {"dtype": float, "default": 0.9,  "is_list": False, "category": "optional", "min": 0., "max": 0.999},
-    "trim_overflows":               {"dtype": int,   "default": 0,    "is_list": False, "category": "optional", "allowed": [0, 1, 2, 3]},
-    "ray_averaging_rate":           {"dtype": str,   "default": None, "is_list": False, "category": "optional"},
-    "ray_averaging_threshold":      {"dtype": float, "default": 0.5,  "is_list": False, "category": "optional", "min": 0., "max": 1.},
-    "ray_qck_averaging_rate":       {"dtype": str,   "default": None, "is_list": False, "category": "optional"},
-    "ray_qck_averaging_threshold":  {"dtype": float, "default": 0.5,  "is_list": False, "category": "optional", "min": 0., "max": 1.},
-    "max_adjacent_overflows":       {"dtype": int,   "default": 5,    "is_list": False, "category": "optional", "min": 0},
-    "slice_measurement":            {"dtype": str,   "default": [],   "is_list": True,  "category": "optional"},
-    "exclude_measurement":          {"dtype": str,   "default": [],   "is_list": True,  "category": "optional"},
+    "max_height_agl":               {"dtype": float, "default": 40.,     "is_list": False, "category": "optional"},
+    "low_shot_threshold":           {"dtype": float, "default": 0.9,     "is_list": False, "category": "optional", "min": 0., "max": 0.999},
+    "trim_overflows":               {"dtype": int,   "default": 0,       "is_list": False, "category": "optional", "allowed": [0, 1, 2, 3]},
+    "low_res_averaging_rate":       {"dtype": str,   "default": None,    "is_list": False, "category": "optional"},
+    "low_res_averaging_threshold":  {"dtype": float, "default": 0.5,     "is_list": False, "category": "optional", "min": 0., "max": 1.},
+    "high_res_averaging_rate":      {"dtype": str,   "default": None,    "is_list": False, "category": "optional"},
+    "high_res_averaging_threshold": {"dtype": float, "default": 0.5,     "is_list": False, "category": "optional", "min": 0., "max": 1.},
+    "max_adjacent_overflows":       {"dtype": int,   "default": 5,       "is_list": False, "category": "optional", "min": 0},
+    "slice_measurement":            {"dtype": str,   "default": [],      "is_list": True,  "category": "optional"},
+    "exclude_measurement":          {"dtype": str,   "default": [],      "is_list": True,  "category": "optional"},
 
     "ray":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
-    "nrm":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "pcb":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "tlc":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "tlc_rin":      {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "drk":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "trg":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "dtm":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
-    "nsf":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "ray_pcb":      {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
-    "nrm_pcb":      {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "pcb_aux":      {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "cam":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
 
-    "files_per_sector":         {"dtype": int,   "default": None,     "is_list": False, "category": "optional", "min": 0},
+    "files_per_quadrant":         {"dtype": int,   "default": None,     "is_list": False, "category": "optional", "min": 0},
     "files_per_ring":           {"dtype": int,   "default": None,     "is_list": False, "category": "optional", "min": 0},
-    "files_per_set":            {"dtype": int,   "default": None,     "is_list": False, "category": "optional", "min": 0},
     "rsonde_skip_header":       {"dtype": int,   "default": 1,        "is_list": False, "category": "optional", "min": 0},
     "rsonde_skip_footer":       {"dtype": int,   "default": 0,        "is_list": False, "category": "optional", "min": 0},
     "rsonde_delimiter":         {"dtype": str,   "default": "S",      "is_list": False, "category": "optional", "allowed": ["S", "C"]},
     "rsonde_column_index":      {"dtype": int,   "default": [2, 1, 3, 5], "is_list": True, "category": "optional", "min": 0, "size": [3, 4]},
     "rsonde_column_units":      {"dtype": str,   "default": ["m_asl", "hPa", "C", "percent"], "is_list": True, "category": "optional", "size": [3, 4], "allowed": height_units + pressure_units + temperature_units + humidity_units},
-    "rsonde_station_latitude":  {"dtype": float, "default": None,     "is_list": False, "category": "optional", "min": -90,  "max": 90},
-    "rsonde_station_longitude": {"dtype": float, "default": None,     "is_list": False, "category": "optional", "min": -180, "max": 180},
     "rsonde_station_altitude":  {"dtype": float, "default": None,     "is_list": False, "category": "optional", "min": 0,    "max": 5000},
     "cloudnet_station_name":    {"dtype": str,   "default": None,     "is_list": False, "category": "optional"},
     "rsonde_station_name":      {"dtype": str,   "default": None,     "is_list": False, "category": "optional"},
@@ -189,16 +229,18 @@ INIT_FILE_SECTIONS: Dict[str, List[str]] = {
         "process",
         "process_qck",
         "vertical_scale",
+        "view_mean_signal_stages",
+        "view_signal_stages",
         "dpi",
         "color_reduction",
         "overwrite_output",
         "expert_analyst",
-        "debug_signals",
-        "export_netcdf",
+        "export_stages",
         "export_all",
     ],
     "filter_channels": [
-        "exclude_channels",
+        "select_channels",
+        "exclude_wavelength",
         "exclude_telescope_type",
         "exclude_channel_type",
         "exclude_acquisition_mode",
@@ -208,40 +250,34 @@ INIT_FILE_SECTIONS: Dict[str, List[str]] = {
         "max_height_agl",
         "low_shot_threshold",
         "trim_overflows",
-        "ray_averaging_rate",
-        "ray_averaging_threshold",
-        "ray_qck_averaging_rate",
-        "ray_qck_averaging_threshold",
+        "low_res_averaging_rate",
+        "low_res_averaging_threshold",
+        "high_res_averaging_rate",
+        "high_res_averaging_threshold",
         "max_adjacent_overflows",
         "slice_measurement",
         "exclude_measurement",
     ],
     "explicit_folders": [
         "ray",
-        "nrm",
         "pcb",
         "tlc",
         "tlc_rin",
         "drk",
         "trg",
         "dtm",
-        "nsf",
         "ray_pcb",
-        "nrm_pcb",
         "pcb_aux",
         "cam",
     ],
     "parsing_options": [
-        "files_per_sector",
+        "files_per_quadrant",
         "files_per_ring",
-        "files_per_set",
         "rsonde_skip_header",
         "rsonde_skip_footer",
         "rsonde_delimiter",
         "rsonde_column_index",
         "rsonde_column_units",
-        "rsonde_station_latitude",
-        "rsonde_station_longitude",
         "rsonde_station_altitude",
         "cloudnet_station_name",
         "rsonde_station_name",
@@ -385,7 +421,7 @@ def _raise_init_section_and_parameter_errors(config: configparser.ConfigParser) 
         raise ConfigError("\n\n".join(messages))
 
 
-tlc_qua_subfolders = ["north", "east", "south", "west"]
+tlc_subfolders = ["north", "east", "south", "west"]
 tlc_rin_subfolders = ["inner", "outer"]
 pcb_subfolders = ["p45", "m45", "+45", "-45"]
 
@@ -610,6 +646,57 @@ def _fill_with_defaults(parser_args: Dict[str, Any]) -> Dict[str, Any]:
     return parser_args
 
 
+def _expand_slice_exclude_bundles(values: Any) -> Any:
+    """Expand slice/exclude bundle aliases to concrete measurement keys.
+
+    Explicit concrete keys always win over bundle aliases within the same
+    parameter. For example:
+
+        tlc_inner, 2300, 0100, tlc_rin, 0100, 0200
+
+    becomes:
+
+        tlc_inner, 2300, 0100, tlc_outer, 0100, 0200
+
+    because tlc_inner was explicitly provided, so tlc_rin expands only to the
+    remaining ring member.
+    """
+
+    if values is None or len(values) == 0:
+        return values
+
+    # Let the existing detailed validation raise the triplet-format error.
+    if len(values) % 3 != 0:
+        return values
+
+    explicit_keys = {
+        str(values[i]).strip()
+        for i in range(0, len(values), 3)
+        if str(values[i]).strip() not in slice_exclude_bundles
+    }
+
+    expanded: List[Any] = []
+
+    for i in range(0, len(values), 3):
+        key = str(values[i]).strip()
+        start_time = values[i + 1]
+        stop_time = values[i + 2]
+
+        if key in slice_exclude_bundles:
+            keys = [
+                member
+                for member in slice_exclude_bundles[key]
+                if member not in explicit_keys
+            ]
+        else:
+            keys = [key]
+
+        for expanded_key in keys:
+            expanded.extend([expanded_key, start_time, stop_time])
+
+    return expanded
+
+
 def _compute_emitted_wavelength_if_missing(parser_args: Dict[str, Any]) -> Dict[str, Any]:
 
     det = parser_args.get("detected_wavelength")
@@ -690,106 +777,122 @@ def _special_checks(parser_args: Dict[str, Any]) -> None:
             f"{rsonde_column_units} Allowed values: {humidity_units}"
         )
 
+    # Expand user-facing bundle aliases before validation so downstream code
+    # receives only concrete measurement keys.
+    parser_args["slice_measurement"] = _expand_slice_exclude_bundles(
+        parser_args.get("slice_measurement")
+    )
+    parser_args["exclude_measurement"] = _expand_slice_exclude_bundles(
+        parser_args.get("exclude_measurement")
+    )
+
     slice_measurement = parser_args.get("slice_measurement")
     exclude_measurement = parser_args.get("exclude_measurement")
 
-    def wrong_format(name: str, identifier: str, value: str):
-        wrong_format_text = (
-            f"The format of the provided {name} {identifier} {value} is wrong. "
-            "Please use the hhmm format where hh ranges from 00 to 23 and mm "
-            "ranges from 00 to 59."
-        )
-        return wrong_format_text
-
-    example_text = (
-        "Only sets of 3 strings are acceptable where the first one is the test "
-        "identifier (e.g. 'ray'), the second is the start time in hhmm format "
-        "(e.g. 2330) and the third is the stop time in hhmm format (e.g. 0100)"
+    accepted_time_formats = (
+        "HHMM, yyyymmdd, yyyymmdd_HH, yyyymmdd_HHMM, "
+        "or yyyymmdd_HHMMSS"
     )
 
-    if len(slice_measurement) > 0:
-        if len(slice_measurement) % 3 != 0:
+    def wrong_format(name: str, identifier: str, value: str) -> str:
+        return (
+            f"The format of the provided {name} {identifier} {value!r} is wrong. "
+            f"Accepted time formats are: {accepted_time_formats}."
+        )
+
+    def _valid_time_parts(hour: str, minute: str = "00", second: str = "00") -> bool:
+        try:
+            h = int(hour)
+            m = int(minute)
+            s = int(second)
+        except Exception:
+            return False
+
+        return 0 <= h <= 23 and 0 <= m <= 59 and 0 <= s <= 59
+
+    def _is_valid_slice_time(value: Any) -> bool:
+        """Validate slice/exclude time strings.
+
+        Accepted formats:
+        - HHMM
+        - yyyymmdd
+        - yyyymmdd_HH
+        - yyyymmdd_HHMM
+        - yyyymmdd_HHMMSS
+        """
+
+        if value is None:
+            return False
+
+        text = str(value).strip()
+
+        # Legacy HHMM format. The measurement date is assigned later in
+        # compute_slice_and_exclude().
+        if re.fullmatch(r"\d{4}", text):
+            return _valid_time_parts(text[:2], text[2:4])
+
+        # Absolute date only: yyyymmdd -> midnight.
+        match = re.fullmatch(r"(\d{8})", text)
+        if match:
+            try:
+                datetime.strptime(match.group(1), "%Y%m%d")
+                return True
+            except ValueError:
+                return False
+
+        # Absolute date/time: yyyymmdd_HH[MM[SS]].
+        match = re.fullmatch(r"(\d{8})_(\d{2}|\d{4}|\d{6})", text)
+        if not match:
+            return False
+
+        date_part, time_part = match.groups()
+
+        try:
+            datetime.strptime(date_part, "%Y%m%d")
+        except ValueError:
+            return False
+
+        hour = time_part[:2]
+        minute = time_part[2:4] if len(time_part) >= 4 else "00"
+        second = time_part[4:6] if len(time_part) == 6 else "00"
+
+        return _valid_time_parts(hour, minute, second)
+
+    example_text = (
+        "Only sets of 3 strings are acceptable: test identifier, start time, "
+        "and stop time. Accepted time formats are: "
+        f"{accepted_time_formats}. Examples: ray, 2330, 0100 or "
+        "ray, 20251203_2330, 20251204_0100."
+    )
+
+    def _check_slice_exclude_parameter(name: str, values: Any) -> None:
+        if values is None or len(values) == 0:
+            return
+
+        if len(values) % 3 != 0:
             raise ConfigError(
-                f"The provided slice_measurement parameter is wrong "
-                f"{slice_measurement}\n{example_text}"
+                f"The provided {name} parameter is wrong {values}\n{example_text}"
             )
 
-        for i in range(0, len(slice_measurement), 3):
-            if slice_measurement[i] not in qa_measurement_folders:
+        for i in range(0, len(values), 3):
+            qa_key = values[i]
+            start_time = values[i + 1]
+            stop_time = values[i + 2]
+
+            if qa_key not in qa_measurement_folders:
                 raise ConfigError(
-                    f"slice_measurement: unrecognized qa_test ID provided: "
-                    f"{slice_measurement[i]}\nRecognised IDs: {qa_measurement_folders}"
+                    f"{name}: unrecognized qa_test ID provided: "
+                    f"{qa_key}\nRecognised IDs: {qa_measurement_folders}"
                 )
 
-        for i in range(1, len(slice_measurement), 3):
-            if len(slice_measurement[i]) != 4:
-                raise ConfigError(
-                    wrong_format("slice_measurement", "start time", slice_measurement[i])
-                )
-            elif slice_measurement[i][:2] not in [str(x).zfill(2) for x in np.arange(0, 24, 1)]:
-                raise ConfigError(
-                    wrong_format("slice_measurement", "start time", slice_measurement[i])
-                )
-            elif slice_measurement[i][2:] not in [str(x).zfill(2) for x in np.arange(0, 59, 1)]:
-                raise ConfigError(
-                    wrong_format("slice_measurement", "start time", slice_measurement[i])
-                )
+            if not _is_valid_slice_time(start_time):
+                raise ConfigError(wrong_format(name, "start time", start_time))
 
-        for i in range(2, len(slice_measurement), 3):
-            if len(slice_measurement[i]) != 4:
-                raise ConfigError(
-                    wrong_format("slice_measurement", "stop time", slice_measurement[i])
-                )
-            elif slice_measurement[i][:2] not in [str(x).zfill(2) for x in np.arange(0, 24, 1)]:
-                raise ConfigError(
-                    wrong_format("slice_measurement", "stop time", slice_measurement[i])
-                )
-            elif slice_measurement[i][2:] not in [str(x).zfill(2) for x in np.arange(0, 59, 1)]:
-                raise ConfigError(
-                    wrong_format("slice_measurement", "stop time", slice_measurement[i])
-                )
+            if not _is_valid_slice_time(stop_time):
+                raise ConfigError(wrong_format(name, "stop time", stop_time))
 
-    if exclude_measurement is not None:
-        if len(exclude_measurement) % 3 != 0:
-            raise ConfigError(
-                f"The provided exclude_measurement parameter is wrong "
-                f"{exclude_measurement}\n{example_text}"
-            )
-
-        for i in range(0, len(exclude_measurement), 3):
-            if exclude_measurement[i] not in qa_measurement_folders:
-                raise ConfigError(
-                    f"slice_measurement: unrecognized qa_test ID provided: "
-                    f"{exclude_measurement[i]}\nRecognised IDs: {qa_measurement_folders}"
-                )
-
-        for i in range(1, len(exclude_measurement), 3):
-            if len(exclude_measurement[i]) != 4:
-                raise ConfigError(
-                    wrong_format("exclude_measurement", "start time", exclude_measurement[i])
-                )
-            elif exclude_measurement[i][:2] not in [str(x).zfill(2) for x in np.arange(0, 24, 1)]:
-                raise ConfigError(
-                    wrong_format("exclude_measurement", "start time", exclude_measurement[i])
-                )
-            elif exclude_measurement[i][2:] not in [str(x).zfill(2) for x in np.arange(0, 59, 1)]:
-                raise ConfigError(
-                    wrong_format("exclude_measurement", "start time", exclude_measurement[i])
-                )
-
-        for i in range(2, len(exclude_measurement), 3):
-            if len(exclude_measurement[i]) != 4:
-                raise ConfigError(
-                    wrong_format("exclude_measurement", "stop time", exclude_measurement[i])
-                )
-            elif exclude_measurement[i][:2] not in [str(x).zfill(2) for x in np.arange(0, 24, 1)]:
-                raise ConfigError(
-                    wrong_format("exclude_measurement", "stop time", exclude_measurement[i])
-                )
-            elif exclude_measurement[i][2:] not in [str(x).zfill(2) for x in np.arange(0, 59, 1)]:
-                raise ConfigError(
-                    wrong_format("exclude_measurement", "stop time", exclude_measurement[i])
-                )
+    _check_slice_exclude_parameter("slice_measurement", slice_measurement)
+    _check_slice_exclude_parameter("exclude_measurement", exclude_measurement)
 
     CustomWarning(
         "Please note that since update 0.6.0 the more generic slice_measurement "
@@ -1053,28 +1156,17 @@ def _relative_paths_exist_check(parser_args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _handle_telecover_path_aliases(parser_args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle telecover path aliases without deleting active tlc paths.
+
+    Since the internal telecover quadrants were renamed from ``tlc_qua`` to
+    ``tlc``, the active base keys are now ``abs_tlc`` and ``abs_drk_tlc``.
+    They must be preserved so that ``_special_path_handling`` can expand them
+    into ``abs_tlc_north/east/south/west``.
+
+    The old implementation mapped ``abs_tlc`` to ``abs_tlc_qua`` and then
+    removed ``abs_tlc``.  That was correct only while ``tlc_qua`` was the
+    internal quadrant key.
     """
-    Handle legacy / physical telecover folder names.
-
-    Physical folders:
-        tlc      -> internal key abs_tlc_qua
-        tlc_rin  -> internal key abs_tlc_rin
-
-    This allows keeping folders named 'tlc' and 'tlc_rin' on disk while using
-    the internal QA keys 'tlc_qua' and 'tlc_rin' in the code.
-    """
-
-    if parser_args.get("abs_tlc_qua") is None and parser_args.get("abs_tlc") is not None:
-        parser_args["abs_tlc_qua"] = parser_args["abs_tlc"]
-
-    if (
-        parser_args.get("abs_drk_tlc_qua") is None
-        and parser_args.get("abs_drk_tlc") is not None
-    ):
-        parser_args["abs_drk_tlc_qua"] = parser_args["abs_drk_tlc"]
-
-    parser_args.pop("abs_tlc", None)
-    parser_args.pop("abs_drk_tlc", None)
 
     return parser_args
 
@@ -1109,18 +1201,6 @@ def _rename_folder(
 
 
 def _special_path_handling(parser_args: Dict[str, Any]) -> Dict[str, Any]:
-
-    version_warning_nrm = (
-        "\nSince update 0.6.0 the ray suffix was introduced as a replacement "
-        "for nrm for Rayleigh measurements. Any folders with the nrm suffix "
-        "will be renamed using the ray suffix\n"
-    )
-
-    version_warning_pcb = (
-        "\nSince update 0.6.0 the p45 and m45 folders have been introduced "
-        "as replacements to the +45 and -45 folders. Any subfolders named "
-        "+45 (-45) will be automatically renamed to p45 (m45), respectively\n"
-    )
 
     # Rename any existing folders with the nrm suffix to ray.
     parser_args = _rename_folder(
@@ -1219,12 +1299,12 @@ def _special_path_handling(parser_args: Dict[str, Any]) -> Dict[str, Any]:
     os.makedirs(parser_args["plot_folder"], exist_ok=True)
     os.makedirs(parser_args["ascii_folder"], exist_ok=True)
 
-    # Create the tlc_qua, tlc_rin, pcb, and pcb_aux related subfolders.
-    # Note: abs_tlc_qua may point to a physical folder named 'tlc'.
+    # Create the tlc, tlc_rin, pcb, and pcb_aux related subfolders.
+    # Note: abs_tlc may point to a physical folder named 'tlc'.
     _expand_subfolders(
         parser_args,
-        base_key="abs_tlc_qua",
-        subfolders=tlc_qua_subfolders,
+        base_key="abs_tlc",
+        subfolders=tlc_subfolders,
     )
     _expand_subfolders(
         parser_args,
@@ -1296,24 +1376,17 @@ def _canonicalize_telecover_sector_keys(parser_args: Dict[str, Any]) -> Dict[str
         abs_tlc_inner
 
     This prevents mixed data_pack keys such as:
-        tlc_qua_south
+        tlc_south
         tlc_rin_inner
     """
 
     replacements = [
-        ("abs_tlc_qua_north", "abs_tlc_north"),
-        ("abs_tlc_qua_east",  "abs_tlc_east"),
-        ("abs_tlc_qua_south", "abs_tlc_south"),
-        ("abs_tlc_qua_west",  "abs_tlc_west"),
+        # Quadrant telecover keys are already loader-friendly after the
+        # tlc_qua -> tlc rename, so they must not be self-renamed/popped.
 
         # Order intentionally outer before inner.
         ("abs_tlc_rin_outer", "abs_tlc_outer"),
         ("abs_tlc_rin_inner", "abs_tlc_inner"),
-
-        ("abs_drk_tlc_qua_north", "abs_drk_tlc_north"),
-        ("abs_drk_tlc_qua_east",  "abs_drk_tlc_east"),
-        ("abs_drk_tlc_qua_south", "abs_drk_tlc_south"),
-        ("abs_drk_tlc_qua_west",  "abs_drk_tlc_west"),
 
         # Order intentionally outer before inner.
         ("abs_drk_tlc_rin_outer", "abs_drk_tlc_outer"),
@@ -1322,6 +1395,11 @@ def _canonicalize_telecover_sector_keys(parser_args: Dict[str, Any]) -> Dict[str
 
     for old_key, new_key in replacements:
         if old_key not in parser_args:
+            continue
+
+        # Protect against accidental self-renames.  Popping in that case would
+        # delete a valid key such as abs_tlc_north.
+        if old_key == new_key:
             continue
 
         old_val = parser_args.get(old_key)
@@ -1401,24 +1479,24 @@ def _distribute_files_into_sectors(
 ) -> None:
     """
     If cfg[files_per_key] is not None, distribute files from cfg[base_key] into subfolders
-    named <sector> (e.g., north/east/south/west) in sequential blocks of size files_per_sector.
+    named <sector> (e.g., north/east/south/west) in sequential blocks of size files_per_quadrant.
     Enforces:
-      - base folder must exist when files_per_sector is not None
-      - base folder must not be empty when files_per_sector is not None
-      - total files must be divisible by files_per_sector * len(sectors)
+      - base folder must exist when files_per_quadrant is not None
+      - base folder must not be empty when files_per_quadrant is not None
+      - total files must be divisible by files_per_quadrant * len(sectors)
     Moves files in the order of sorted names to keep behavior deterministic.
     """
 
-    files_per_sector = cfg.get(files_per_key, None)
+    files_per_quadrant = cfg.get(files_per_key, None)
 
-    if files_per_sector is None:
+    if files_per_quadrant is None:
         return
 
     base_val = cfg.get(base_key, None)
 
     if base_val is None:
         raise DistributionError(
-            f"{base_key} is None but {files_per_key} is set to {files_per_sector}."
+            f"{base_key} is None but {files_per_key} is set to {files_per_quadrant}."
         )
 
     base = Path(base_val)
@@ -1426,22 +1504,23 @@ def _distribute_files_into_sectors(
     if not base.exists() or not base.is_dir():
         raise DistributionError(f"{base_key} points to a non-existent directory: {base}")
 
-    files = sorted([p for p in base.glob(pattern) if p.is_file() and p.parent == base])
+    files = sorted([p for p in base.glob(pattern) if p.is_file() and p.parent == base and 'temp' not in p.name])
 
     if not files:
-        raise DistributionError(
+        CustomWarning(
             f"No files detected in {base} (pattern='{pattern}') while "
-            f"{files_per_key}={files_per_sector}."
+            f"{files_per_key}={files_per_quadrant}."
         )
+        return
 
     k = len(sectors)
-    group = files_per_sector * k
+    group = files_per_quadrant * k
 
     if len(files) % group != 0:
         raise DistributionError(
             f"The {files_per_key} was provided but the file count {len(files)} "
             f"in {base} is not divisible by {files_per_key} * folders "
-            f"({files_per_sector} * {k} = {group})."
+            f"({files_per_quadrant} * {k} = {group})."
         )
 
     dest_dirs = []
@@ -1452,7 +1531,7 @@ def _distribute_files_into_sectors(
         dest_dirs.append(d)
 
     for i, f in enumerate(files):
-        sector_idx = (i // files_per_sector) % k
+        sector_idx = (i // files_per_quadrant) % k
         dest_dir = dest_dirs[sector_idx]
         target = dest_dir / f.name
 
@@ -1537,7 +1616,7 @@ def _get_mtype(d: Dict[str, Any]) -> Dict[str, Any]:
 
     to_add = {}
 
-    tlc_qua_parts = ["north", "east", "south", "west"]
+    tlc_parts = ["north", "east", "south", "west"]
     tlc_rin_parts = ["outer", "inner"]
 
     for key in d.keys():
@@ -1552,8 +1631,8 @@ def _get_mtype(d: Dict[str, Any]) -> Dict[str, Any]:
         elif key.startswith("abs_tlc_"):
             suffix = name.removeprefix("tlc_")
 
-            if suffix in tlc_qua_parts:
-                to_add[f"mtype_{name}"] = "tlc_qua"
+            if suffix in tlc_parts:
+                to_add[f"mtype_{name}"] = "tlc"
             elif suffix in tlc_rin_parts:
                 to_add[f"mtype_{name}"] = "tlc_rin"
 
@@ -1591,11 +1670,11 @@ def measurement_type(meas_key: str) -> str:
     if meas_key.startswith("ray"):
         return "nrm"
 
-    if meas_key in ["trg", "dtm", "nsf"]:
+    if meas_key in ["trg", "dtm"]:
         return "nrm"
 
     if meas_key in ["tlc_north", "tlc_east", "tlc_south", "tlc_west"]:
-        return "tlc_qua"
+        return "tlc"
 
     if meas_key in ["tlc_inner", "tlc_outer"]:
         return "tlc_rin"
@@ -1634,7 +1713,7 @@ def _build_path_registry(parser_args: Dict[str, Any]) -> Dict[str, Any]:
     Examples:
         loading_map["ray_pcb"] = "ray"
         loading_map["drk_ray"] = "drk"
-        loading_map["drk_tlc_qua"] = "drk"
+        loading_map["drk_tlc"] = "drk"
     """
 
     path_by_key: Dict[str, str] = {}
@@ -1761,15 +1840,15 @@ def parse_call_atlas_ini(filepath: str, debug: bool = False) -> Dict[str, Any]:
     # 8) Check if the relative QA test folder paths exist and add corresponding absolute paths
     parser_args = _relative_paths_exist_check(parser_args)
 
-    # 8b) Map physical folder/alias 'tlc' to internal key 'tlc_qua'
+    # 8b) Map physical folder/alias 'tlc' to internal key 'tlc'
     parser_args = _handle_telecover_path_aliases(parser_args)
 
     # 9) Distribute tlc files in the correct sector/ring if requested
     _distribute_files_into_sectors(
         parser_args,
-        base_key="abs_tlc_qua",
-        files_per_key="files_per_sector",
-        sectors=tlc_qua_subfolders,
+        base_key="abs_tlc",
+        files_per_key="files_per_quadrant",
+        sectors=tlc_subfolders,
     )
 
     _distribute_files_into_sectors(
@@ -1783,7 +1862,7 @@ def parse_call_atlas_ini(filepath: str, debug: bool = False) -> Dict[str, Any]:
     parser_args = _special_path_handling(parser_args)
     
     # 10b) Rename expanded telecover keys to loader-friendly names.
-    # This prevents mixed keys like tlc_qua_north and tlc_north.
+    # This prevents mixed keys like tlc_north and tlc_north.
     parser_args = _canonicalize_telecover_sector_keys(parser_args)
 
     # 11) Collapse temporary abs_* keys into caller_info["paths"] and

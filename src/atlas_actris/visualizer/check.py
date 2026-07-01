@@ -7,11 +7,12 @@ Created on Wed Sep 21 17:27:01 2022
 """
 
 import numpy as np
+import xarray as xr
 from utils.error_classes import CustomWarning
 
 def check_channels(all_channels, settings):
 
-    sel_channels = settings["include_channels"]
+    sel_channels = settings["select_channels"]
     exclude_wavelength = settings["exclude_wavelength"]
     exclude_telescope_type = settings["exclude_telescope_type"]
     exclude_channel_type = settings["exclude_channel_type"]
@@ -34,10 +35,11 @@ def check_channels(all_channels, settings):
 
     if missing_channels:
         CustomWarning(
-            "Channels provided in include_channels do not exist: "
+            "Channels provided in select_channels do not exist: "
             f"{missing_channels}\nPlease select one of: "
             f"{all_channels.tolist()}"
         )
+        print()
 
     mask = np.array([
         ch[:4] not in exclude_wavelength and
@@ -53,8 +55,10 @@ def check_channels(all_channels, settings):
             "The provided channel filtering arguments are too strict "
             "and exclude all channels. Please revise the following arguments: "
             "exclude_wavelength, exclude_telescope_type, exclude_channel_type, "
-            "exclude_acquisition_mode, exclude_channel_subtype, include_channels"
+            "exclude_acquisition_mode, exclude_channel_subtype, select_channels"
         )
+        print()
+
 
     channels = channels[mask]
 
@@ -319,3 +323,75 @@ def find_rt_channels(ch_r, ch_t, channels):
         channels_t = ch_t
         
     return(channels_r, channels_t)
+
+def _valid_channel_value(value):
+    if value is None:
+        return False
+
+    try:
+        if bool(np.isnan(value)):
+            return False
+    except Exception:
+        pass
+
+    value = str(value).strip()
+
+    return value.lower() not in ["", "nan", "none"]
+
+
+def check_pairs(pol_cal_info, caller_info):
+    """Filter pol_cal_info pairs using the ch_r/ch_t source channels."""
+
+    if not isinstance(pol_cal_info, xr.DataArray):
+        return pol_cal_info
+
+    if "pair" not in pol_cal_info.dims or "parameters" not in pol_cal_info.dims:
+        return pol_cal_info
+
+    if "ch_r" not in pol_cal_info.parameters.values:
+        return pol_cal_info
+
+    channel_values = []
+
+    for parameter in ["ch_r", "ch_t"]:
+        if parameter not in pol_cal_info.parameters.values:
+            continue
+
+        values = np.asarray(
+            pol_cal_info.sel(parameters=parameter).values,
+            dtype=object,
+        ).ravel()
+
+        channel_values.extend(
+            str(value).strip()
+            for value in values
+            if _valid_channel_value(value)
+        )
+
+    if len(channel_values) == 0:
+        return pol_cal_info
+
+    allowed_channels = set(check_channels(channel_values, caller_info))
+    keep_pairs = []
+
+    for pair in pol_cal_info.pair.values:
+        pair_channels = []
+
+        for parameter in ["ch_r", "ch_t"]:
+            if parameter not in pol_cal_info.parameters.values:
+                continue
+
+            value = pol_cal_info.sel(parameters=parameter, pair=pair).values
+            value = np.asarray(value).item()
+
+            if _valid_channel_value(value):
+                pair_channels.append(str(value).strip())
+
+        if len(pair_channels) > 0 and all(
+            channel in allowed_channels for channel in pair_channels
+        ):
+            keep_pairs.append(pair)
+
+    pol_cal_info = pol_cal_info.sel({"pair": keep_pairs})
+
+    return pol_cal_info

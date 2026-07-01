@@ -22,7 +22,8 @@ def find_radiosonde(caller_info, metadata):
     
     radiosonde_file = caller_info.get('radiosonde_file')
     radiosonde_folder = caller_info.get('radiosonde_folder')
-    rsonde_wmo_number = caller_info['rsonde_station_wmo_id']
+    rsonde_station_wmo_id = caller_info['rsonde_station_wmo_id']
+    rsonde_station_name = caller_info['rsonde_station_name']
     cloudnet_station_name = caller_info['cloudnet_station_name']
     
     qa_tests = metadata['time_info'].keys()
@@ -34,6 +35,9 @@ def find_radiosonde(caller_info, metadata):
     for key in qa_tests:
         
         if key in allowed_tests:
+            
+            station_id = metadata['system_info'][key].sel({'parameters':'station_id'})
+            
             print_entry(key)
             print()
             
@@ -87,12 +91,12 @@ def find_radiosonde(caller_info, metadata):
             print("Downloading will be attempted")
             print()
             
-            if rsonde_wmo_number:
+            if rsonde_station_wmo_id:
                 dl_status = None
                 
                 try:
                     dl_status = _download_wyoming(
-                        wmo_id = rsonde_wmo_number,
+                        wmo_id = rsonde_station_wmo_id,
                         date = mid_date,
                         time_utc = mid_time,
                         save_dir = radiosonde_folder,
@@ -142,9 +146,16 @@ def find_radiosonde(caller_info, metadata):
                         )
                         print()
             
+            identifiers = {
+                'wyoming' : rsonde_station_wmo_id,
+                'ecmwf': cloudnet_station_name,
+                'scc': station_id,
+                'ascii': rsonde_station_name
+                }
             radiosonde_info, status = select_radiosonde_filename(
                 mid_time_dt64, 
-                folder = radiosonde_folder
+                folder = radiosonde_folder,
+                identifiers = identifiers
                 )
             
             if status == 0:

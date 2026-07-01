@@ -17,29 +17,32 @@ project helpers.
 """
 
 import warnings
-from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 
 from version import __version__
-from visualizer import export_ascii, plot_quadrant_telecover
+from collections import defaultdict
 from utils.printouts import print_header
 from visualizer.check import check_channels
 from processor.packaging import collect_metadata
 from visualizer.make_text import GenerateText, Libraries
+from visualizer import export_ascii, plot_quadrant_telecover
 from visualizer.telecover_sector_processor import TelecoverSectorProcessor
+
 from visualizer.plot_utils import (
     prepare_folder,
     collect_dict,
     convert_m_to_km,
     perform_color_reduction,
     add_plot_metadata,
+    find_time_blocks,
 )
 
 warnings.filterwarnings("ignore")
 
 
-QA_KEY = "tlc_qua"
+QA_KEY = "tlc"
 
 SECTOR_KEYS = {
     "N": "tlc_north",
@@ -66,29 +69,6 @@ def _available_sector_keys(data_pack):
     }
 
 
-def _get_time_dim(da, sector_id):
-    """Return the time dimension name of a sector DataArray."""
-
-    candidates = [
-        "time",
-        f"time_{sector_id.lower()}",
-        f"time_{SECTOR_NAMES[sector_id]}",
-    ]
-
-    for dim in candidates:
-        if dim in da.dims:
-            return dim
-
-    for dim in da.dims:
-        if dim not in ["channel", "bins"]:
-            return dim
-
-    raise ValueError(
-        f"Could not identify a time dimension for sector {sector_id}. "
-        f"Available dims: {da.dims}"
-    )
-
-
 def _common_channels(sector_profiles):
     """Return channels common to all available sector profiles."""
 
@@ -100,93 +80,7 @@ def _common_channels(sector_profiles):
 
     return np.array(sorted(channels))
 
-def _sector_iters(sector_profiles_ch):
-    """Return the common number of profiles among available sectors."""
 
-    return min(
-        da.sizes[_get_time_dim(da, sector_id)]
-        for sector_id, da in sector_profiles_ch.items()
-    )
-
-
-def _sampling_times_per_sector(sector_profiles_ch, ref_sector):
-    """Return total and per-iteration sampling time per sector in seconds.
-
-    The estimate is based on the native sampling interval of the files in the
-    reference sector, not on the time span between the first and last profile.
-    This avoids counting the time spent measuring the other telecover sectors.
-
-    Returns
-    -------
-    tuple
-        (sampling_time_per_sector, sampling_time_per_sector_per_iteration,
-         inferred_iterations)
-    """
-
-    if ref_sector not in sector_profiles_ch:
-        return np.nan, np.nan, np.nan
-
-    da = sector_profiles_ch[ref_sector]
-    time_dim = _get_time_dim(da, ref_sector)
-
-    if time_dim not in da.coords:
-        return np.nan, np.nan, np.nan
-
-    time_vals = da[time_dim].values
-
-    if len(time_vals) == 0:
-        return np.nan, np.nan, np.nan
-
-    if len(time_vals) == 1:
-        return np.nan, np.nan, 1
-
-    try:
-        time_vals = np.asarray(time_vals, dtype="datetime64[ns]")
-        time_vals = np.sort(time_vals)
-        diffs_s = np.diff(time_vals) / np.timedelta64(1, "s")
-        diffs_s = np.asarray(diffs_s, dtype=float)
-    except Exception:
-        return np.nan, np.nan, np.nan
-
-    diffs_s = diffs_s[np.isfinite(diffs_s) & (diffs_s > 0.0)]
-
-    if diffs_s.size == 0:
-        return np.nan, np.nan, np.nan
-
-    # The smallest positive differences correspond to consecutive files within
-    # the same sector/iteration. Larger differences include the time spent on
-    # the other sectors and must not be counted as sampling time.
-    min_dt = np.nanmin(diffs_s)
-    sample_diffs = diffs_s[diffs_s <= 1.5 * min_dt]
-
-    if sample_diffs.size == 0:
-        sample_dt = min_dt
-    else:
-        sample_dt = np.nanmedian(sample_diffs)
-
-    if not np.isfinite(sample_dt) or sample_dt <= 0.0:
-        return np.nan, np.nan, np.nan
-
-    # Split the same-sector time series into iterations. Gaps larger than the
-    # native sampling interval are assumed to separate different iterations.
-    iteration_breaks = np.where(diffs_s > 1.5 * sample_dt)[0]
-    group_sizes = np.diff(
-        np.concatenate(([-1], iteration_breaks, [len(time_vals) - 1]))
-    )
-    group_sizes = group_sizes[group_sizes > 0]
-
-    if group_sizes.size == 0:
-        return np.nan, np.nan, np.nan
-
-    inferred_iterations = int(group_sizes.size)
-    sampling_time_per_sector_per_iteration = float(np.nanmedian(group_sizes) * sample_dt)
-    sampling_time_per_sector = float(np.sum(group_sizes) * sample_dt)
-
-    return (
-        sampling_time_per_sector,
-        sampling_time_per_sector_per_iteration,
-        inferred_iterations,
-    )
 def generate_quadrant_telecover(data_pack, caller_info, settings_info):
     """
     Generate telecover quadrant QA outputs.
@@ -212,6 +106,9 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
         qa_test_info['tlc'][channel].
     """
 
+    if 'tlc' not in caller_info['process']:
+        return
+    
     qa_test_info = defaultdict(dict)
 
     available_sectors = _available_sector_keys(data_pack)
@@ -222,7 +119,7 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
     print_header("Initializing the quadrant Telecover test")
 
     # Telecover is one QA test, not a loop over multiple QA keys.
-    prepare_folder(caller_info, pattern = "_tlc_qua_", exclude_pattern = '_qck_tlc_qua_')
+    prepare_folder(caller_info, pattern = "_tlc_", exclude_pattern = ['_qck_tlc_','_tlc_rin_'])
 
     settings = settings_info.copy()
     
@@ -288,16 +185,22 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
         # Keep channel-specific modifications local.
         channel_settings = settings.copy()
         channel_settings["available_sectors"] = list(sector_profiles_ch.keys())
+                
+        sector_iters = [
+            find_time_blocks(da)[0]
+            for sector_id, da in sector_profiles.items()
+        ]
         
-        iters = _sector_iters(sector_profiles_ch)
-        (
-            sampling_time_per_sector,
-            sampling_time_per_sector_per_iteration,
-            inferred_iterations,
-        ) = _sampling_times_per_sector(
-            sector_profiles_ch=sector_profiles_ch,
-            ref_sector=ref_sector,
-        )
+        sector_sampling = [
+            find_time_blocks(da)[1]
+            for sector_id, da in sector_profiles.items()
+        ]
+        
+        
+        iters = np.min(sector_iters)
+        sampling_per_sector_per_iter = np.round(np.mean(sector_sampling))
+        sampling_per_sector = sampling_per_sector_per_iter * iters
+        
 
         sector_processor = TelecoverSectorProcessor(
             settings=channel_settings,
@@ -320,9 +223,8 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
         qa_test_info[QA_KEY][ch] = collect_dict(
             data_list=[
                 iters,
-                sampling_time_per_sector,
-                sampling_time_per_sector_per_iteration,
-                inferred_iterations,
+                sampling_per_sector,
+                sampling_per_sector_per_iter,
                 list(processed.keys()),
                 extra_sec,
                 channel_settings["normalization_region"],
@@ -331,33 +233,11 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
                 "iters",
                 "sampling_time_per_sector",
                 "sampling_time_per_sector_per_iteration",
-                "inferred_iterations",
                 "available_sectors",
                 "extra_sec",
                 "norm_region",
             ],
         )
-
-        # # Metadata added to the PNG file.
-        # plot_metadata = collect_dict(
-        #     data_list=[
-        #         iters,
-        #         list(processed.keys()),
-        #         extra_sec,
-        #         channel_settings["normalization_region"],
-        #         __version__,
-        #         QA_KEY,
-        #     ],
-        #     data_keys=[
-        #         "iters",
-        #         "available_sectors",
-        #         "extra_sec",
-        #         "norm_region",
-        #         "ATLAS_version",
-        #         "QA_test_ID",
-        #     ],
-        #     add_dicts=[channel_settings, metadata],
-        # )
 
 #------------------------------------------------------------------------------
 # Text
@@ -371,7 +251,7 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
 
         text_generator = GenerateText(lib=lib)
 
-        qa_test_info[QA_KEY][ch]["title"] = text_generator.make_telecover_title()
+        qa_test_info[QA_KEY][ch]["title"] = text_generator.make_telecover_title("Quadrant")
         qa_test_info[QA_KEY][ch]["filename"] = text_generator.make_filename(
             qa_test=QA_KEY,
         )
@@ -380,7 +260,7 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
 
 #------------------------------------------------------------------------------
 # Plot
-        qa_test_info[QA_KEY][ch]["tlc_qua_plot_path"], dofl_x = \
+        qa_test_info[QA_KEY][ch]["tlc_plot_path"], dofl_x = \
             plot_quadrant_telecover.generate_quadrant_telecover(
                 X=x_vals,
                 sectors=processed,
@@ -403,9 +283,9 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
                 "atlas_channel_id": ch,
                 "ATLAS_version": __version__,
                 "QA_test_ID": QA_KEY,
-                "sampling_time_per_sector": sampling_time_per_sector,
-                "sampling_time_per_sector_per_iteration": sampling_time_per_sector_per_iteration,
-                "inferred_iterations": inferred_iterations,
+                "sampling_time_per_sector": sampling_per_sector,
+                "sampling_time_per_sector_per_iteration": sampling_per_sector_per_iter,
+                "iterations": iters,
                 "minimum_channel_height": minimum_channel_height
             }
         )
@@ -414,11 +294,11 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
 
         perform_color_reduction(
             color_reduction=caller_info["color_reduction"],
-            plot_path=qa_test_info[QA_KEY][ch]["tlc_qua_plot_path"],
+            plot_path=qa_test_info[QA_KEY][ch]["tlc_plot_path"],
         )
 
         add_plot_metadata(
-            plot_path=qa_test_info[QA_KEY][ch]["tlc_qua_plot_path"],
+            plot_path=qa_test_info[QA_KEY][ch]["tlc_plot_path"],
             plot_metadata=plot_metadata,
         )
 

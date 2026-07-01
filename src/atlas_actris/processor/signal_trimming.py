@@ -7,6 +7,7 @@ Created on Wed Apr  1 17:55:19 2026
 """
 import numpy as np
 import copy
+import re
 import xarray as xr
 import pandas as pd
 
@@ -24,20 +25,106 @@ from processor.definitions import (
     )
 
 def hhmm_to_datetime(hhmm: str, base: pd.Timestamp) -> pd.Timestamp:
-    """Convert hhmm string to datetime on the date of base timestamp."""
-    return pd.Timestamp(year=base.year,
-                        month=base.month,
-                        day=base.day,
-                        hour=int(hhmm[:2]),
-                        minute=int(hhmm[2:]))
+    """Convert HHMM string to datetime on the date of base timestamp."""
+
+    value = str(hhmm).strip()
+
+    if not value.isdigit() or len(value) != 4:
+        raise ValueError(
+            "HHMM times must contain exactly 4 digits, for example '2130'. "
+            f"Got {hhmm!r}."
+        )
+
+    return pd.Timestamp(
+        year=base.year,
+        month=base.month,
+        day=base.day,
+        hour=int(value[:2]),
+        minute=int(value[2:]),
+    )
+
+
+def _parse_slice_time(value: str, base: pd.Timestamp) -> tuple[pd.Timestamp, bool]:
+    """Parse a slice/exclude time string.
+
+    Accepted formats are:
+    - HHMM              -> time on the date of ``base``
+    - YYYYMMDD          -> absolute date at 00:00:00
+    - YYYYMMDD_HH       -> absolute date and hour
+    - YYYYMMDD_HHMM     -> absolute date, hour, and minute
+    - YYYYMMDD_HHMMSS   -> absolute date, hour, minute, and second
+
+    Returns
+    -------
+    timestamp, is_relative_hhmm
+        ``is_relative_hhmm`` is True only for the legacy HHMM format.
+        It is used by ``make_interval`` to preserve the old overnight behavior.
+    """
+
+    text = str(value).strip()
+
+    if text.isdigit() and len(text) == 4:
+        return hhmm_to_datetime(text, base), True
+
+    match = re.fullmatch(r"(\d{8})(?:_(\d{2}|\d{4}|\d{6}))?", text)
+
+    if match is None:
+        raise ValueError(
+            "Invalid slice/exclude time format. Accepted formats are: "
+            "HHMM, YYYYMMDD, YYYYMMDD_HH, YYYYMMDD_HHMM, "
+            f"YYYYMMDD_HHMMSS. Got {value!r}."
+        )
+
+    date_part, time_part = match.groups()
+    year = int(date_part[:4])
+    month = int(date_part[4:6])
+    day = int(date_part[6:8])
+
+    hour = 0
+    minute = 0
+    second = 0
+
+    if time_part is not None:
+        hour = int(time_part[:2])
+
+        if len(time_part) >= 4:
+            minute = int(time_part[2:4])
+
+        if len(time_part) == 6:
+            second = int(time_part[4:6])
+
+    return pd.Timestamp(
+        year=year,
+        month=month,
+        day=day,
+        hour=hour,
+        minute=minute,
+        second=second,
+    ), False
+
 
 def make_interval(start_str: str, stop_str: str, base: pd.Timestamp):
-    start_dt = hhmm_to_datetime(start_str, base)
-    stop_dt = hhmm_to_datetime(stop_str, base)
+    """Create a start/stop interval from supported slice/exclude strings.
 
-    # If stop is "before" start → assume it's the next day
+    The legacy HHMM format keeps the old behavior: if the stop time is not
+    after the start time, the stop time is assumed to be on the next day.
+    Absolute YYYYMMDD-based formats are not auto-shifted; use the next date
+    explicitly when the interval crosses midnight.
+    """
+
+    start_dt, start_is_hhmm = _parse_slice_time(start_str, base)
+    stop_dt, stop_is_hhmm = _parse_slice_time(stop_str, base)
+
     if stop_dt <= start_dt:
-        stop_dt += pd.Timedelta(days=1)
+        if start_is_hhmm and stop_is_hhmm:
+            stop_dt += pd.Timedelta(days=1)
+        else:
+            raise ValueError(
+                "The slice/exclude stop time must be after the start time "
+                "for YYYYMMDD-based formats. For overnight absolute "
+                "intervals, write the stop time with the next date. "
+                f"Got start={start_str!r}, stop={stop_str!r}."
+            )
 
     return start_dt, stop_dt
 

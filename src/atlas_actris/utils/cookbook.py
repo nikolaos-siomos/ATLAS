@@ -21,13 +21,13 @@ preprocessing_recipe = [
     ("averaged_high_res", "averaging_by_time_high_res"),
     ("mean_computed", "computing_mean"),
     ("photon_units_converted", "photon_units_conversion"),
+    ("dark_smoothed", "smoothing_dark"),
+    ("dark_corrected", "dark_correction"),
     ("background_raw_calculated", "background_calculation"),
     ("dead_time_corrected", "dead_time_correction"),
     ("background_calculated", "background_calculation"),
     ("background_corrected", "background_correction"),
     ("range_corrected", "range_correction"),
-    ("dark_smoothed", "smoothing_dark"),
-    ("dark_corrected", "dark_correction"),
     ("vert_trimmed", "trim_vertically"),
     ("gluing_region_found", "gluing_region"),
     ("glued", "gluing"),
@@ -36,10 +36,27 @@ preprocessing_recipe = [
     ("noise_calculated", "signal_noise_calculation"),
 ]
 
-# pol_cal_hr_recipe = [
-#     ("calibrated_ratio_hr_generated", "calibrated_ratio"),
-#     ("vldr_hr_generated", "vldr"),
-#     ]
+dark_rc_recipe = [
+    ("averaged", "averaging_by_time"),
+    ("averaged_low_res", "averaging_by_time_low_res"),
+    ("averaged_high_res", "averaging_by_time_high_res"),
+    ("mean_computed", "computing_mean"),
+    ("photon_units_converted", "photon_units_conversion"),
+    ("dark_smoothed", "smoothing_dark"),
+    ("dark_corrected", "dark_correction"),
+    ("background_raw_calculated", "background_calculation"),
+    ("dead_time_corrected", "dead_time_correction"),
+    ("background_calculated", "background_calculation"),
+    ("background_corrected", "background_correction"),
+    ("range_corrected", "range_correction"),
+    ("vert_trimmed", "trim_vertically"),
+    ("gluing_region_found", "gluing_region"),
+    ("glued", "gluing"),
+    ("molecular_calculated", "molecular_calculations"),
+    ("mldr_generated", "mldr"),
+    ("noise_calculated", "signal_noise_calculation"),
+]
+
 
 pol_cal_recipe = [
     ("gain_ratio_generated", "gain_ratio"),
@@ -49,6 +66,13 @@ pol_cal_recipe = [
     ("calibrated_ratio_generated", "calibrated_ratio"),
     ("vldr_generated", "vldr"),
     ]
+
+checkout_stages = {
+    "init": "init",
+    "screening": "screening_complete",
+    "preprocessing": "preprocessing_complete",
+    "pol_cal": "pol_cal_complete",
+    }
 
 def run_linear_recipe(
     processor,

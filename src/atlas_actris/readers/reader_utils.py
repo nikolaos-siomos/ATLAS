@@ -155,7 +155,7 @@ def special_path_rules(caller_info):
             "drk_ray_pcb": "ray_pcb",
             "drk_pcb": "pcb_p45",
             "drk_pcb_aux": "pcb_p45_aux",
-            "drk_tlc_qua": "tlc_qua_north",
+            "drk_tlc": "tlc_north",
             "drk_tlc_rin": "tlc_rin_outer",
             "drk_dtm": "dtm_fo",
             "drk_trg": "trg",

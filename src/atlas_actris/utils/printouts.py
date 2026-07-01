@@ -14,6 +14,7 @@ termination_ids = {
     3: "Slicing and excluding measurement parts removed all measurements. No signals to process.",
     4: "Screening low shots removed all measurements. No signals to process.",
     5: "Handing overflows removed all measurements. No signals to process.",
+    6: "Filtering options removed all channels. No signals to process.",
     }
 
 def print_header(text: str) -> None:

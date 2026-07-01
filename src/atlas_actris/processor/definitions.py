@@ -47,10 +47,10 @@ assign_drk = {
     "pcb_aux_p45": "drk_pcb_aux",
     "pcb_aux_m45": "drk_pcb_aux",
 
-    "tlc_north": "drk_tlc_qua",
-    "tlc_east": "drk_tlc_qua",
-    "tlc_south": "drk_tlc_qua",
-    "tlc_west": "drk_tlc_qua",
+    "tlc_north": "drk_tlc",
+    "tlc_east": "drk_tlc",
+    "tlc_south": "drk_tlc",
+    "tlc_west": "drk_tlc",
 
     "tlc_inner": "drk_tlc_rin",
     "tlc_outer": "drk_tlc_rin",
@@ -59,6 +59,5 @@ assign_drk = {
     "dtm_fi": "drk_dtm",
     "dtm_fo": "drk_dtm",
     "dtm": "drk_dtm",
-    "nsf": "drk_nsf",
     "cam": "drk_cam",
     }

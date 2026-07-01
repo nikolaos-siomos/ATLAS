@@ -34,6 +34,7 @@ from visualizer.plot_utils import (
     convert_m_to_km,
     perform_color_reduction,
     add_plot_metadata,
+    find_time_blocks,
 )
 
 warnings.filterwarnings("ignore")
@@ -208,6 +209,9 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
         qa_test_info['tlc_rin'][channel].
     """
 
+    if 'tlc_rin' not in caller_info['process']:
+        return
+
     qa_test_info = defaultdict(dict)
 
     available_sectors = _available_sector_keys(data_pack)
@@ -285,16 +289,21 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
         channel_settings = settings.copy()
         channel_settings["available_sectors"] = list(sector_profiles_ch.keys())
         
-        iters = _sector_iters(sector_profiles_ch)
-        (
-            sampling_time_per_sector,
-            sampling_time_per_sector_per_iteration,
-            inferred_iterations,
-        ) = _sampling_times_per_sector(
-            sector_profiles_ch=sector_profiles_ch,
-            ref_sector=ref_sector,
-        )
-
+        sector_iters = [
+            find_time_blocks(da)[0]
+            for sector_id, da in sector_profiles.items()
+        ]
+        
+        sector_sampling = [
+            find_time_blocks(da)[1]
+            for sector_id, da in sector_profiles.items()
+        ]
+        
+        
+        iters = np.min(sector_iters)
+        sampling_per_sector_per_iter = np.round(np.mean(sector_sampling))
+        sampling_per_sector = sampling_per_sector_per_iter * iters
+        
         sector_processor = TelecoverSectorProcessor(
             settings=channel_settings,
         )
@@ -316,9 +325,8 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
         qa_test_info[QA_KEY][ch] = collect_dict(
             data_list=[
                 iters,
-                sampling_time_per_sector,
-                sampling_time_per_sector_per_iteration,
-                inferred_iterations,
+                sampling_per_sector,
+                sampling_per_sector_per_iter,
                 list(processed.keys()),
                 extra_sec,
                 channel_settings["normalization_region"],
@@ -327,7 +335,6 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
                 "iters",
                 "sampling_time_per_sector",
                 "sampling_time_per_sector_per_iteration",
-                "inferred_iterations",
                 "available_sectors",
                 "extra_sec",
                 "norm_region",
@@ -367,7 +374,7 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
 
         text_generator = GenerateText(lib=lib)
 
-        qa_test_info[QA_KEY][ch]["title"] = text_generator.make_telecover_title()
+        qa_test_info[QA_KEY][ch]["title"] = text_generator.make_telecover_title("Ring")
         qa_test_info[QA_KEY][ch]["filename"] = text_generator.make_filename(
             qa_test=QA_KEY,
         )
@@ -399,9 +406,9 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
                 "atlas_channel_id": ch,
                 "ATLAS_version": __version__,
                 "QA_test_ID": QA_KEY,
-                "sampling_time_per_sector": sampling_time_per_sector,
-                "sampling_time_per_sector_per_iteration": sampling_time_per_sector_per_iteration,
-                "inferred_iterations": inferred_iterations,
+                "sampling_time_per_sector": sampling_per_sector,
+                "sampling_time_per_sector_per_iteration": sampling_per_sector_per_iter,
+                "iterations": iters,
                 "minimum_channel_height": minimum_channel_height
             }
         )

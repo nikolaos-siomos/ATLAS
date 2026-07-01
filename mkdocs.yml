@@ -15,6 +15,10 @@ nav:
   - Extra tools:
       - Get config files from SCC HOI: get_config_files_from_scc_hoi/README.md
       - Get T/P profiles from Cloudnet: get_T_P_profiles_from_cloudnet/README_Cloudnet_Profile_Library_v11.txt
+  - INI file guide:
+      - Initialization file: generated/initialization_reference.md
+      - Configuration file: generated/configuration_reference.md
+      - Settings file: generated/settings_reference.md
 
 markdown_extensions:
   - admonition

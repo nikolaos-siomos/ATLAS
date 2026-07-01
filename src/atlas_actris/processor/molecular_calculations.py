@@ -305,9 +305,9 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
                     mldr = rrb.mldr(mldr_type = 'full')
 
                     if ch[5] == 'p':
-                        c_bsc[i] = 1. / (1. + mldr) * c_bsc[i]
+                        c_bsc[i] = 2. / (1. + mldr) * c_bsc[i]
                     elif ch[5] == 'c':
-                        c_bsc[i] = mldr / (1. + mldr) * c_bsc[i]
+                        c_bsc[i] = 2. * mldr / (1. + mldr) * c_bsc[i]
 
                 elif ch[5] in ['v']:
                     rrb = arc(

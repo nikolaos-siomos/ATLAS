@@ -24,3 +24,19 @@ def ask_clean_cache(caller_info):
     else:
         print(f"-- Kept cache folder: {cache_path}")
         print()
+
+def ask_clean_viewer(caller_info):
+    signal_viewer_path = os.path.join(caller_info["output_folder"], "signal_viewer")
+
+    if not os.path.exists(signal_viewer_path):
+        return
+
+    answer = input(f"\nDelete signal_viewer folder?\n{signal_viewer_path}\n[y/N]: ").strip().lower()
+
+    if answer in ["y", "yes"]:
+        shutil.rmtree(signal_viewer_path)
+        print(f"-- Deleted signal_viewer folder: {signal_viewer_path}")
+        print()
+    else:
+        print(f"-- Kept signal_viewer folder: {signal_viewer_path}")
+        print()

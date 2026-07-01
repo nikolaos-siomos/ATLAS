@@ -104,6 +104,7 @@ def get_source_map(io_id):
         'time_mask': {'db': 'time_mask_db', 'item_id': io_id},
         'channel_mask': {'db': 'channel_mask_db', 'item_id': io_id},
         
+        'bins': {'db': 'bins_db', 'item_id': io_id},
         'range': {'db': 'range_db', 'item_id': io_id},
         'height_agl': {'db': 'height_agl_db', 'item_id': io_id},
         'height_asl': {'db': 'height_asl_db', 'item_id': io_id},

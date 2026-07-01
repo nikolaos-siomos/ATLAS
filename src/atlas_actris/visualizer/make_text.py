@@ -157,6 +157,53 @@ class GenerateText:
         
         return filename
     
+    def make_filename_viewer(self, qa_test, extra_type = '', extra_metadata = {}):
+               
+        start_date = self.metadata['start_timestamp'].strftime("%Y%m%d")
+        start_time = self.metadata['start_timestamp'].strftime("%H%M%S")
+        
+        common_parts = [
+            self.metadata['station_id'], 
+            self.metadata['configuration_id'], 
+            start_date, 
+            start_time, 
+            qa_test, 
+            self.metadata['atlas_channel_id'], 
+            self.metadata['scc_channel_id']
+            ]
+        
+        stage_parts = [
+            self.qa_test_info['stage'],
+            self.qa_test_info['db']
+            ]
+        
+        final_parts = [
+            extra_type, 
+            'ATLAS', 
+            __version__
+            ]
+        
+        if extra_metadata:
+            extra_channel = extra_metadata['atlas_channel_id']
+            extra_scc_channel = extra_metadata['scc_channel_id']
+
+            extra_parts = [
+                extra_channel,
+                extra_scc_channel
+                ]
+                
+        else:
+            extra_parts = []
+        
+        parts = common_parts + extra_parts + stage_parts + final_parts
+        
+        filename = "_".join(
+            str(part) for part in parts
+            if part is not None and str(part) != ""
+            )   
+        
+        return filename
+    
     def make_filename_pair(self, qa_test, extra_type = '', extra_metadata = {}):
                
         start_date = self.metadata['start_timestamp'].strftime("%Y%m%d")
@@ -197,7 +244,8 @@ class GenerateText:
             )   
         
         return filename
-                
+       
+         
     def make_quicklook_title(self):
 
         sm_part = sm_text(
@@ -207,11 +255,14 @@ class GenerateText:
             sm_expo = self.settings['smoothing_exponential']
             )
         
+        qck_text = quicklook_text(self.qa_test_info['qa_test'])
+        
         title = self.system_part + ' ' + self.channel_part + '\n'+\
             self.config_part  + ' - ' + sm_part + '\n'+\
-                self.dateloc_part
+                qck_text + ' - ' + self.dateloc_part
                             
         return title 
+    
     
     def make_vldr_title(self):
 
@@ -227,11 +278,12 @@ class GenerateText:
         
         title = self.system_part + ' ' + pair_part + ' - ' + channel_part + '\n'+\
             self.config_part  + ' - ' + sm_part + '\n'+\
-                self.dateloc_part
+                'Quicklook VLDR - ' + self.dateloc_part
                             
         return title 
     
-    def make_rayleigh_fit_title(self):
+    
+    def make_rayleigh_fit_title(self, ray_type = 'Rayleigh Fit'):
                
         radiosonde_timestamp = pd.Timestamp(self.metadata['radiosonde_time'])
          
@@ -257,11 +309,12 @@ class GenerateText:
             )
         
         title = self.system_part + ' ' + self.channel_part + ' - ' + self.dateloc_part + ' - ' + sm_part + '\n'+\
-                    self.config_part + ' - ' + mol_part + ' - ' + if_part 
+                    ray_type + ' - ' + self.config_part + ' - ' + mol_part + ' - ' + if_part 
 
         return title 
 
-    def make_rayleigh_fit_mask_title(self):
+
+    def make_rayleigh_fit_mask_title(self, ray_type = 'Rayleigh Fit Mask'):
         
         radiosonde_timestamp = pd.Timestamp(self.metadata['radiosonde_time'])
          
@@ -288,11 +341,12 @@ class GenerateText:
         
         title = self.system_part + ' ' + self.channel_part + ' - ' + sm_part + '\n'+\
                     self.config_part + ' - ' + self.dateloc_part + '\n'+\
-                        mol_part+ ' - ' + if_part
+                        ray_type + ' - ' + mol_part + ' - ' + if_part
 
         return title 
     
-    def make_telecover_title(self):
+    
+    def make_telecover_title(self, tlc_type = 'Qaudrant Telecover'):
         
         sm_part = sm_text_tlc(
             smooth = self.settings['smooth'], 
@@ -312,14 +366,16 @@ class GenerateText:
             )
         
         title = (
-            self.system_part + ' ' + self.channel_part + ' - ' + sm_part + '\n'
-            + iter_part + ' - ' + if_part + '\n'
-            + self.config_part + ' - ' + self.dateloc_part
+            self.system_part + ' ' + self.channel_part + ' - ' + sm_part + '\n' +\
+                iter_part + ' - ' + if_part + '\n' +\
+                    tlc_type + ' - ' + self.config_part + ' - ' + self.dateloc_part
         )
                          
         return title 
     
-    def make_polarization_calibration_title(self, metadata_r, metadata_t):
+    
+    def make_polarization_calibration_title(self, metadata_r, metadata_t, 
+                                            pcb_type = 'Pol. Calibration'):
         
         radiosonde_timestamp = pd.Timestamp(self.metadata['radiosonde_time'])
          
@@ -363,10 +419,29 @@ class GenerateText:
         
         title = self.system_part + ' - ' + sm_part + '\n'+\
             f"Rayleigh: {self.dateloc_part}" + ' - ' + f"Calibration: {self.dateloc_part_extra}" + '\n'+\
-                    self.config_part + ' - ' + mol_part + '\n'+\
+                    pcb_type + ' - ' + self.config_part + ' - ' + mol_part + '\n'+\
                         'Ch R: ' + ch_r_text + ', ' + if_part_r + ' - ' +'Ch T: ' + ch_t_text + ', ' + if_part_t
 
         return title 
+    
+    
+    def make_sig_mlines_title(self):
+        
+        stage_part = stage_text(self.qa_test_info['stage'])
+
+        if self.qa_test_info['db'] == 'profile':
+            sig_type = 'Signal'
+        else:
+            sig_type = 'Mean Signal'
+            
+        signal_part = sig_type + ' - ' + self.qa_test_info['qa_test']
+        
+        title = self.system_part + ' ' + self.channel_part + '\n'+\
+            self.config_part + ' - ' + stage_part + '\n'+\
+                signal_part + ' - ' + self.dateloc_part
+                            
+        return title 
+    
     
     def make_header_rayleigh_fit(self):
                 
@@ -672,6 +747,23 @@ def channel_text(atlas_channel_id, scc_channel_id=""):
         channel_part = f"{channel_part} ({scc_channel_id})"
 
     return channel_part
+
+def quicklook_text(qa_test):
+    
+    qa_test_map = {
+        'drk': 'Long Dark',
+        'ray': 'Rayleigh',
+        'ray_pcb': 'Rayleigh Pol. Cal. Mode',
+        'tlc': 'Quadrant Telecover',
+        'tlc_rin': 'Ring Telecover',
+        'pcb': 'Pol. Calibration',
+        }
+
+    return f'Quicklook {qa_test_map[qa_test]}'
+
+def stage_text(stage):
+    
+    return f'Stage: {stage}'
 
 def system_text(lidar_name, station_name):
     

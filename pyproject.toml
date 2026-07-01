@@ -82,7 +82,9 @@ Issues = "https://github.com/nikolaos-siomos/ATLAS/issues"
 # ----------------------------------------------------------
 [project.scripts]
 atlas = "atlas_actris.cli:main"
+signal_viewer = "atlas_actris.cli_viewer:main"
 atlas-smoke-test = "atlas_actris.testing.smoke_test:main"
+atlas-generate-templates = "atlas_actris.templates.generator:main"
 
 # ----------------------------------------------------------
 # Setuptools configuration for src/atlas_actris layout

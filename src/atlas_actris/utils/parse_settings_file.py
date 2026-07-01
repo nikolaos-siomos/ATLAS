@@ -42,7 +42,7 @@ SCHEMA_QCK: Dict[str, Dict[str, Any]] = {
     "smoothing_exponential":    {"dtype": bool,  "default": False,       "is_list": False},
 
 
-    "include_channels":         {"dtype": str,"default": [], "is_list": True},
+    "select_channels":          {"dtype": str,"default": [], "is_list": True},
     "exclude_wavelength":       {"dtype": str,"default": [], "is_list": True},
     "exclude_telescope_type":   {"dtype": str,"default": [], "is_list": True,"allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str,"default": [], "is_list": True,"allowed": ["p", "c", "t", "v", "r", "a", "f"]},
@@ -101,7 +101,7 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "smoothing_range":             {"dtype": float, "default": [0.05, 35.], "is_list": True,  "min": 0.,   "max": 100., "size": 2},
     "smoothing_window":            {"dtype": float, "default": 0.5,         "is_list": False, "min": 0.05, "max": 10.},
 
-    "include_channels":         {"dtype": str,"default": [],         "is_list": True},
+    "select_channels":          {"dtype": str,"default": [],         "is_list": True},
     "exclude_wavelength":       {"dtype": str,"default": [],         "is_list": True},
     "exclude_telescope_type":   {"dtype": str,"default": [],         "is_list": True, "allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str,"default": ["a","f"],  "is_list": True, "allowed": ["p", "c", "t", "v", "r", "a", "f"]},
@@ -109,7 +109,7 @@ SCHEMA_RAY: Dict[str, Dict[str, Any]] = {
     "exclude_channel_subtype":  {"dtype": str,"default": ["w", "c"], "is_list": True, "allowed": ["r", "t", "n", "o", "w", "c", "h", "l", "a", "m", "b", "s", "x"]},
 }
 
-SCHEMA_TLC_QUA: Dict[str, Dict[str, Any]] = {
+SCHEMA_TLC: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
     "plot_raw_signals":         {"dtype": bool,    "default": False,      "is_list": False},
     "use_last_sector":          {"dtype": bool,    "default": False,      "is_list": False},
@@ -120,7 +120,7 @@ SCHEMA_TLC_QUA: Dict[str, Dict[str, Any]] = {
     "smooth":                   {"dtype": bool,    "default": True,       "is_list": False},
     "smoothing_window":         {"dtype": float,   "default": 0.1,        "is_list": False, "min": 0.05,  "max": 10.},
 
-    "include_channels":         {"dtype": str,"default": [], "is_list": True},
+    "select_channels":          {"dtype": str,"default": [], "is_list": True},
     "exclude_wavelength":       {"dtype": str,"default": [], "is_list": True},
     "exclude_telescope_type":   {"dtype": str,"default": [], "is_list": True,"allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str,"default": [], "is_list": True,"allowed": ["p", "c", "t", "v", "r", "a", "f"]},
@@ -140,7 +140,7 @@ SCHEMA_TLC_RIN: Dict[str, Dict[str, Any]] = {
     "smooth":                   {"dtype": bool,    "default": True,       "is_list": False},
     "smoothing_window":         {"dtype": float,   "default": 0.1,        "is_list": False, "min": 0.05,  "max": 10.},
 
-    "include_channels":         {"dtype": str,"default": [], "is_list": True},
+    "select_channels":          {"dtype": str,"default": [], "is_list": True},
     "exclude_wavelength":       {"dtype": str,"default": [], "is_list": True},
     "exclude_telescope_type":   {"dtype": str,"default": [], "is_list": True,"allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
     "exclude_channel_type":     {"dtype": str,"default": [], "is_list": True,"allowed": ["p", "c", "t", "v", "r", "a", "f"]},
@@ -177,14 +177,14 @@ SCHEMA_PCB: Dict[str, Dict[str, Any]] = {
 SCHEMA = {'qck': SCHEMA_QCK,
           'qck_vldr': SCHEMA_QCK_VLDR,
           'ray': SCHEMA_RAY,
-          'tlc_qua': SCHEMA_TLC_QUA,
+          'tlc': SCHEMA_TLC,
           'tlc_rin': SCHEMA_TLC_RIN,
           'pcb': SCHEMA_PCB}
 
 recognized_sections = {'qck': "quicklooks",
                        'qck_vldr': "quicklooks_vldr",
                        'ray': "rayleigh_fit",
-                       'tlc_qua': "quadrant_telecover",
+                       'tlc': "quadrant_telecover",
                        'tlc_rin': "ring_telecover",
                        'pcb': "polarization_calibration"}
 

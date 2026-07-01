@@ -45,6 +45,8 @@ from utils.signal_utils import (
     fast_rolling_mean_range,
     fast_rolling_noise,
     fast_rolling_mean,
+    _rebin_and_trim_all_binned_arrays,
+    _true_bin_grid,
     )
 
 from utils.error_classes import CustomWarning
@@ -96,17 +98,20 @@ def compute_height_and_range_calculation(
         station_altitude = system_info[key].loc["station_altitude"].values
         
         bins = profiles[key].bins
-
+        
         zenith_angle_rad = np.pi * zenith_angle / 180.0
+
+        corrected_bins = (bins + 0.5 + zero_bin)
         
         ranges = (
-            resolution * (bins + 0.5 + zero_bin)
+            resolution * corrected_bins
         ).reset_coords(drop=True)
-
+        
         height_agl = (
             ranges * np.cos(zenith_angle_rad)
         ).reset_coords(drop=True)
 
+        output_data["bins"][key] = corrected_bins
         output_data["range"][key] = ranges
         output_data["height_agl"][key] = height_agl
         
@@ -325,8 +330,8 @@ def compute_averaging_by_time_low_res(
 
     allowed_qa_tests = ['ray', 'drk']
 
-    ray_averaging_rate = processing_info['caller_info']["ray_averaging_rate"]
-    ray_averaging_threshold = processing_info['caller_info']["ray_averaging_threshold"]
+    low_res_averaging_rate = processing_info['caller_info']["low_res_averaging_rate"]
+    low_res_averaging_threshold = processing_info['caller_info']["low_res_averaging_threshold"]
     
     output_data = shallow_copy(input_data)
 
@@ -350,11 +355,11 @@ def compute_averaging_by_time_low_res(
             sig = profile[key]
                                 
             # Averaging the measurement
-            if ray_averaging_rate:       
+            if low_res_averaging_rate:       
                 sig_avg, sig_avg_mask = temporal_averaging(
                     sig = sig, 
-                    averaging_rate = ray_averaging_rate, 
-                    averaging_threshold = ray_averaging_threshold
+                    averaging_rate = low_res_averaging_rate, 
+                    averaging_threshold = low_res_averaging_threshold
                     )
 
                 output_data['profile_low_res'][key] = sig_avg
@@ -364,8 +369,8 @@ def compute_averaging_by_time_low_res(
 
                     bgd_avg, bgd_avg_mask = temporal_averaging(
                         sig = bgd, 
-                        averaging_rate = ray_averaging_rate, 
-                        averaging_threshold = ray_averaging_threshold
+                        averaging_rate = low_res_averaging_rate, 
+                        averaging_threshold = low_res_averaging_threshold
                         )
                     
                     output_data['background_low_res'][key] = bgd_avg
@@ -375,8 +380,8 @@ def compute_averaging_by_time_low_res(
 
                     sig_avg_err, _ = temporal_averaging_error(
                         sig_err = sig_err, 
-                        averaging_rate = ray_averaging_rate, 
-                        averaging_threshold = ray_averaging_threshold
+                        averaging_rate = low_res_averaging_rate, 
+                        averaging_threshold = low_res_averaging_threshold
                         )
 
                     output_data['profile_error_low_res'][key] = sig_avg_err
@@ -386,8 +391,8 @@ def compute_averaging_by_time_low_res(
 
                     bgd_avg_err, _ = temporal_averaging_error(
                         sig_err = bgd_err, 
-                        averaging_rate = ray_averaging_rate, 
-                        averaging_threshold = ray_averaging_threshold
+                        averaging_rate = low_res_averaging_rate, 
+                        averaging_threshold = low_res_averaging_threshold
                         )
            
             
@@ -410,8 +415,8 @@ def compute_averaging_by_time_high_res(
     
     allowed_qa_tests = ['ray', 'drk']
 
-    ray_qck_averaging_rate = processing_info['caller_info']["ray_qck_averaging_rate"]
-    ray_qck_averaging_threshold = processing_info['caller_info']["ray_qck_averaging_threshold"]
+    high_res_averaging_rate = processing_info['caller_info']["high_res_averaging_rate"]
+    high_res_averaging_threshold = processing_info['caller_info']["high_res_averaging_threshold"]
     
     output_data = shallow_copy(input_data)
 
@@ -435,11 +440,11 @@ def compute_averaging_by_time_high_res(
             sig = profile[key]
                                 
             # Averaging the measurement
-            if ray_qck_averaging_rate:       
+            if high_res_averaging_rate:       
                 sig_avg, sig_avg_mask = temporal_averaging(
                     sig = sig, 
-                    averaging_rate = ray_qck_averaging_rate, 
-                    averaging_threshold = ray_qck_averaging_threshold
+                    averaging_rate = high_res_averaging_rate, 
+                    averaging_threshold = high_res_averaging_threshold
                     )
 
                 output_data['profile_high_res'][key] = sig_avg
@@ -450,8 +455,8 @@ def compute_averaging_by_time_high_res(
                     if bgd:
                         bgd_avg, bgd_avg_mask = temporal_averaging(
                             sig = bgd, 
-                            averaging_rate = ray_qck_averaging_rate, 
-                            averaging_threshold = ray_qck_averaging_threshold
+                            averaging_rate = high_res_averaging_rate, 
+                            averaging_threshold = high_res_averaging_threshold
                             )
                         
                         output_data['background_high_res'][key] = bgd_avg
@@ -462,8 +467,8 @@ def compute_averaging_by_time_high_res(
                     if sig_err:
                         sig_avg_err, _ = temporal_averaging_error(
                             sig_err = sig_err, 
-                            averaging_rate = ray_qck_averaging_rate, 
-                            averaging_threshold = ray_qck_averaging_threshold
+                            averaging_rate = high_res_averaging_rate, 
+                            averaging_threshold = high_res_averaging_threshold
                             )
 
                         output_data['profile_error_high_res'][key] = sig_avg_err
@@ -475,8 +480,8 @@ def compute_averaging_by_time_high_res(
                     if bgd_err:
                         bgd_avg_err, _ = temporal_averaging_error(
                             sig_err = bgd_err, 
-                            averaging_rate = ray_qck_averaging_rate, 
-                            averaging_threshold = ray_qck_averaging_threshold
+                            averaging_rate = high_res_averaging_rate, 
+                            averaging_threshold = high_res_averaging_threshold
                             )
                
                 
@@ -492,7 +497,7 @@ def compute_averaging_by_time_high_res(
 
     return output_data
 
-def compute_trim_vertically(
+def compute_trim_vertically_old(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
@@ -567,6 +572,153 @@ def compute_trim_vertically(
 
     return output_data
       
+def compute_trim_vertically(
+    processing_info: Dict[str, Any],
+    input_data: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+
+    max_height_agl = 1.0e3 * processing_info["caller_info"]["max_height_agl"]
+
+    output_data = shallow_copy(input_data)
+
+    ranges = output_data["range"]
+    channel_info = output_data["channel_info"]
+    system_info = output_data["system_info"]
+
+    if not ranges:
+        print_entry(
+            "Vertical trimming could not be performed! "
+            "Range data not found in input stage"
+        )
+        return output_data
+
+    qa_tests = list(ranges.keys())
+
+    for key in qa_tests:
+
+        if key not in channel_info:
+            continue
+
+        if key not in system_info:
+            continue
+
+        ci = channel_info[key]
+
+        zero_bin = (
+            ci
+            .sel(parameters="zero_bin")
+            .astype("float32")
+            .reset_coords(drop=True)
+        )
+
+        resolution = (
+            ci
+            .sel(parameters="range_resolution")
+            .astype("float32")
+            .reset_coords(drop=True)
+        )
+
+        if "channels" in zero_bin.dims and "channel" not in zero_bin.dims:
+            zero_bin = zero_bin.rename({"channels": "channel"})
+
+        if "channels" in resolution.dims and "channel" not in resolution.dims:
+            resolution = resolution.rename({"channels": "channel"})
+
+        zenith_angle = float(system_info[key].loc["zenith_angle"].values)
+        zenith_angle_rad = np.pi * zenith_angle / 180.0
+
+        station_altitude = system_info[key].loc["station_altitude"].values
+
+        # Find a representative array to get the original number of bins.
+        reference = None
+
+        for store in output_data.values():
+            if not isinstance(store, dict):
+                continue
+
+            if key not in store:
+                continue
+
+            arr = store[key]
+
+            if not isinstance(arr, xr.DataArray):
+                continue
+
+            if "channel" in arr.dims and "bins" in arr.dims:
+                reference = arr
+                break
+
+        if reference is None:
+            continue
+
+        n_old_bins = reference.sizes["bins"]
+
+        target_bins = _true_bin_grid(
+            zero_bin=zero_bin,
+            n_old_bins=n_old_bins,
+            resolution=resolution,
+            zenith_angle_rad=zenith_angle_rad,
+            max_height_agl=max_height_agl,
+        )
+
+        bins = xr.DataArray(
+            target_bins,
+            dims=["bins"],
+            coords={"bins": target_bins},
+        )
+
+        # After rebinning, bins are true-bin left edges.
+        based_bins = bins + 0.5
+
+        z_rng = (
+            resolution * based_bins
+        ).reset_coords(drop=True)
+
+        z_agl = (
+            z_rng * np.cos(zenith_angle_rad)
+        ).reset_coords(drop=True)
+
+        if station_altitude is not None:
+            z_asl = (
+                z_agl + float(station_altitude)
+            ).reset_coords(drop=True)
+        else:
+            z_asl = None
+
+        # Bins below zero were already removed by target_bins.
+        mask_bins = z_agl <= max_height_agl
+
+        _rebin_and_trim_all_binned_arrays(
+            output_data=output_data,
+            key=key,
+            zero_bin=zero_bin,
+            target_bins=target_bins,
+            mask_bins=mask_bins,
+        )
+
+        output_data["range"][key] = (
+            z_rng
+            .where(mask_bins, drop=True)
+            .reset_coords(drop=True)
+        )
+
+        output_data["height_agl"][key] = (
+            z_agl
+            .where(mask_bins, drop=True)
+            .reset_coords(drop=True)
+        )
+
+        if z_asl is not None:
+            output_data["height_asl"][key] = (
+                z_asl
+                .where(mask_bins, drop=True)
+                .reset_coords(drop=True)
+            )
+
+    print_entry("Vertical trimming succesfully performed!")
+
+    return output_data
+
 def compute_background_correction(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
@@ -700,6 +852,7 @@ def compute_dark_correction(
                 else:
                     continue
             
+                print(key)
                 drk = dark_profiles[drk_key]                   
                 
                 acquisition_mode = channel_info[key].sel(parameters="acquisition_mode")

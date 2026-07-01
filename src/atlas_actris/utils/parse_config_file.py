@@ -39,7 +39,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "configuration_id":   {"dtype": int,   "default": None, "is_list": False, "category": "optional"},
     "station_altitude":   {"dtype": float, "default": None, "is_list": False, "category": "optional", "min": 0,    "max": 5000},
     "station_latitude":   {"dtype": float, "default": None, "is_list": False, "category": "optional", "min": -90,  "max": 90},
-    "station_longitude":          {"dtype": float, "default": None, "is_list": False, "category": "optional", "min": -180, "max": 180},
+    "station_longitude":  {"dtype": float, "default": None, "is_list": False, "category": "optional", "min": -180, "max": 180},
     "zenith_angle":       {"dtype": float, "default": None, "is_list": False, "category": "optional", "min": 0,    "max": 85},
     "azimuth_angle":      {"dtype": float, "default": None, "is_list": False, "category": "optional", "min": 0,    "max": 360},
 
