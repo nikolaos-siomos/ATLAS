@@ -49,6 +49,7 @@ import shutil
 import tempfile
 import urllib.request
 import urllib.error
+from dataclasses import dataclass
 from datetime import datetime, date as _date, time as _time
 from typing import List, Tuple, Optional
 
@@ -59,10 +60,63 @@ import xarray as xr
 import argparse
 import csv
 
+try:
+    import certifi
+except ImportError:
+    certifi = None
+
+
+CLOUDNET_DEBUG = False
+CLOUDNET_USER_AGENT = "atlas-actris-cloudnet-ecmwf-downloader/1.0"
+
+
+@dataclass
+class DownloadStatus:
+    ok: bool
+    path: Optional[str] = None
+    message: str = ""
+    url: Optional[str] = None
+
 
 __all__ = ["read_ecmwf_profile", "lv_get_profile"]
 
 # ---------------- Utilities ----------------
+# ----------- _debug ----------
+def _debug(message: str) -> None:
+    """Print a debug message only when CLOUDNET_DEBUG is enabled."""
+    if CLOUDNET_DEBUG:
+        print(f"[DEBUG] {message}")
+# -----------------------------
+
+
+# ----------- _ssl_context ----------
+def _ssl_context(allow_insecure_ssl: bool = False) -> ssl.SSLContext:
+    """Return the SSL context used for Cloudnet HTTPS requests."""
+    if allow_insecure_ssl:
+        _debug("Using insecure SSL context. Certificate verification is disabled.")
+        return ssl._create_unverified_context()
+
+    if certifi is not None:
+        cafile = certifi.where()
+        _debug(f"Using certifi CA bundle: {cafile}")
+        return ssl.create_default_context(cafile=cafile)
+
+    _debug("certifi is not installed. Using Python default SSL context.")
+    return ssl.create_default_context()
+# -----------------------------
+
+
+# ----------- _urlopen ----------
+def _urlopen(url: str, context: ssl.SSLContext, timeout: int):
+    """Open a URL with a consistent User-Agent and SSL context."""
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": CLOUDNET_USER_AGENT},
+    )
+    return urllib.request.urlopen(request, context=context, timeout=timeout)
+# -----------------------------
+
+
 def _closest_time_index(time_coord, target_dt: datetime) -> tuple[int, pd.Timestamp]:
     """Return the index of the closest time and the matched pandas Timestamp."""
     if hasattr(time_coord, "values"):
@@ -151,10 +205,16 @@ def _download_from_cloudnet(
         src_path=None,
         nc_path=None,
         try_download=True,
+        allow_insecure_ssl=False,
     )
 
 # ---------------- Cloudnet downloader ----------------
-def _download_cloudnet_ecmwf(station: str, date_obj: _date, out_path: str) -> str:
+def _download_cloudnet_ecmwf(
+    station: str,
+    date_obj: _date,
+    out_path: str,
+    allow_insecure_ssl: bool = False,
+) -> str:
     """
     Download the daily ECMWF model file from the Cloudnet API.
 
@@ -186,9 +246,10 @@ def _download_cloudnet_ecmwf(station: str, date_obj: _date, out_path: str) -> st
     date_iso = date_obj.strftime("%Y-%m-%d")
     api_url = f"https://cloudnet.fmi.fi/api/model-files?site={site}&date={date_iso}&model=ecmwf"
 
-    ctx = ssl.create_default_context()
+    ctx = _ssl_context(allow_insecure_ssl=allow_insecure_ssl)
+    _debug(f"Cloudnet API URL: {api_url}")
     try:
-        with urllib.request.urlopen(api_url, context=ctx, timeout=60) as resp:
+        with _urlopen(api_url, context=ctx, timeout=60) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Cloudnet API HTTP error {e.code} for {api_url}") from e
@@ -210,7 +271,8 @@ def _download_cloudnet_ecmwf(station: str, date_obj: _date, out_path: str) -> st
     tmpfd, tmpname = tempfile.mkstemp(prefix="cn_ecmwf_", suffix=".nc")
     os.close(tmpfd)
     try:
-        with urllib.request.urlopen(chosen, context=ctx, timeout=300) as r, open(tmpname, "wb") as f:
+        _debug(f"Cloudnet download URL: {chosen}")
+        with _urlopen(chosen, context=ctx, timeout=300) as r, open(tmpname, "wb") as f:
             while True:
                 chunk = r.read(8192)
                 if not chunk:
@@ -237,6 +299,7 @@ def _ensure_nc_saved(
     src_path: Optional[str] = None,
     nc_path: Optional[str] = None,
     try_download: bool = True,
+    allow_insecure_ssl: bool = False,
 ) -> str:
     """
     Ensure the expected NetCDF is present in the cache, else seed or download it.
@@ -267,7 +330,12 @@ def _ensure_nc_saved(
             return expected
 
     if try_download:
-        return _download_cloudnet_ecmwf(station, date_obj, expected)
+        return _download_cloudnet_ecmwf(
+            station=station,
+            date_obj=date_obj,
+            out_path=expected,
+            allow_insecure_ssl=allow_insecure_ssl,
+        )
 
     raise FileNotFoundError(
         f"Model file missing in cache and download disabled.\nExpected: {expected}"
@@ -312,6 +380,7 @@ def read_ecmwf_profile(
     save_dir: str,
     src_path: Optional[str] = None,
     nc_path: Optional[str] = None,
+    allow_insecure_ssl: bool = False,
 ) -> Tuple[List[float], List[float], List[float], str, str]:
     """
     Read ECMWF profile for a Cloudnet site at the closest model time.
@@ -369,6 +438,7 @@ def read_ecmwf_profile(
         src_path=src_path,
         nc_path=nc_path,
         try_download=True,
+        allow_insecure_ssl=allow_insecure_ssl,
     )
 
     target_dt = datetime.combine(req_date, req_time)
@@ -398,66 +468,129 @@ def lv_get_profile(
         save_dir=save_dir,
         src_path=src_path or None,
         nc_path=nc_path or None,
+        allow_insecure_ssl=False,
     )
 
+# ----------- export_to_csv ----------
 def export_to_csv(outcsv, model_time_iso, station, alt_m, temp_C, press_hPa):
-    # Exported csv filename
+    """Export one ECMWF profile to a CSV-like text file."""
     dt = datetime.strptime(model_time_iso, "%Y-%m-%dT%H:%M:%S")
     filename_part = dt.strftime("%Y%m%d_%H%M")
     default_csv = f"{filename_part}_{station}.txt"
 
     csv_path = os.path.abspath(os.path.join(outcsv, default_csv))
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
 
     with open(csv_path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["altitude_m", "temperature_C", "pressure_hPa"])
         for z, T, P in zip(alt_m, temp_C, press_hPa):
             w.writerow([z, T, P])
-    print("Saved CSV:",csv_path)
 
-# ---------------- CLI for quick tests ----------------
-def _cli():
+    return csv_path
+# -----------------------------
 
-    ap = argparse.ArgumentParser(description="Extract ECMWF profile for a Cloudnet site. Downloads if missing.")
-    ap.add_argument("station", help='e.g. "Bucharest"')
-    ap.add_argument("date", help='date "dd.mm.yyyy"')
-    ap.add_argument("time", help='time "hh:mm:ss" UTC')
-    ap.add_argument("--save-dir", required = True, help="cache directory for .nc files")
-    ap.add_argument("--src", default=None, help="optional seed .nc to copy if cache empty")
-    ap.add_argument("--nc", default=None, help="optional seed .nc to copy if cache empty")
-    ap.add_argument("--outcsv-dir", default=None, help="CSV export folder path (defaults to the save-dir folder)")
-    args = ap.parse_args()
 
-    # Create directories inside the script parent folder if save-dir or outcsv are not provided
-        
-    if args.outcsv_dir is None:
-        default_dir = args.save_dir        
-        args.outcsv_dir = os.path.join(default_dir)
+# ----------- _main ----------
+def _main() -> int:
+    """Command line interface for testing the Cloudnet ECMWF downloader."""
+    global CLOUDNET_DEBUG
 
-    os.makedirs(args.outcsv_dir, exist_ok=True)
-
-    alt_m, temp_C, press_hPa, model_time_iso, nc_used = read_ecmwf_profile(
-        args.station, args.date, args.time, args.save_dir, src_path=args.src, nc_path=args.nc
+    parser = argparse.ArgumentParser(
+        description="Debug and test the ATLAS Cloudnet ECMWF profile downloader."
     )
-    
-    print()
 
-    print("Model time:", model_time_iso)
-    print(f"Levels: {len(alt_m)}")
-    print()
-    print("Saved netcdf:", nc_used)
-    
-    export_to_csv(
-        outcsv = args.outcsv_dir, 
-        model_time_iso = model_time_iso, 
-        station = args.station,
-        alt_m = alt_m, 
-        temp_C = temp_C,
-        press_hPa = press_hPa
+    parser.add_argument("station", help='Cloudnet site name, e.g. "bucharest" or "Bucharest"')
+    parser.add_argument("date", help='Date, e.g. "27.05.2026"')
+    parser.add_argument("time", help='UTC time, e.g. "08:30:00"')
+    parser.add_argument("--outdir", required=True, help="Output folder for downloaded Cloudnet ECMWF files")
+    parser.add_argument("--outcsv-dir", default=None, help="CSV export folder path. Defaults to --outdir")
+    parser.add_argument("--src", default=None, help="Optional seed .nc file copied if cache is empty")
+    parser.add_argument("--nc", default=None, help="Optional seed .nc file copied if cache is empty")
+    parser.add_argument("--download-only", action="store_true", help="Only download or reuse the NetCDF file. Do not extract profiles")
+    parser.add_argument("--no-csv", action="store_true", help="Do not export the extracted profile to txt/csv")
+    parser.add_argument("--debug", action="store_true", help="Print each workflow step in the CMD window")
+    parser.add_argument(
+        "--allow-insecure-ssl",
+        action="store_true",
+        help="Disable SSL certificate verification only for local debugging behind a proxy",
+    )
+
+    args = parser.parse_args()
+    CLOUDNET_DEBUG = bool(args.debug)
+
+    print("[CMD] Cloudnet ECMWF downloader test started")
+    print(f"[CMD] Station : {args.station}")
+    print(f"[CMD] Date    : {args.date}")
+    print(f"[CMD] Time UTC: {args.time}")
+    print(f"[CMD] Outdir  : {os.path.abspath(args.outdir)}")
+    print(f"[CMD] Debug   : {CLOUDNET_DEBUG}")
+    print(f"[CMD] Insecure SSL: {bool(args.allow_insecure_ssl)}")
+
+    os.makedirs(args.outdir, exist_ok=True)
+
+    if args.outcsv_dir is None:
+        args.outcsv_dir = args.outdir
+
+    try:
+        if args.download_only:
+            nc_used = _ensure_nc_saved(
+                date_obj=datetime.strptime(args.date, "%d.%m.%Y").date(),
+                time_obj=datetime.strptime(args.time, "%H:%M:%S").time(),
+                station=args.station,
+                save_dir=args.outdir,
+                src_path=args.src,
+                nc_path=args.nc,
+                try_download=True,
+                allow_insecure_ssl=args.allow_insecure_ssl,
+            )
+
+            print("[CMD] Cloudnet ECMWF downloader test finished")
+            print("OK      :", True)
+            print("PATH    :", os.path.abspath(nc_used))
+            print("MESSAGE :", "Downloaded or reused Cloudnet ECMWF NetCDF file")
+            print("URL     :", "https://cloudnet.fmi.fi/api/model-files")
+            return 0
+
+        alt_m, temp_C, press_hPa, model_time_iso, nc_used = read_ecmwf_profile(
+            station=args.station,
+            date_ddmmyyyy=args.date,
+            time_hhmmss=args.time,
+            save_dir=args.outdir,
+            src_path=args.src,
+            nc_path=args.nc,
+            allow_insecure_ssl=args.allow_insecure_ssl,
         )
-    print()
 
+        csv_path = None
+        if not args.no_csv:
+            csv_path = export_to_csv(
+                outcsv=args.outcsv_dir,
+                model_time_iso=model_time_iso,
+                station=args.station,
+                alt_m=alt_m,
+                temp_C=temp_C,
+                press_hPa=press_hPa,
+            )
+
+        print("[CMD] Cloudnet ECMWF downloader test finished")
+        print("OK      :", True)
+        print("PATH    :", os.path.abspath(nc_used))
+        print("MESSAGE :", f"Extracted {len(alt_m)} levels. Model time={model_time_iso}")
+        print("URL     :", "https://cloudnet.fmi.fi/api/model-files")
+        if csv_path is not None:
+            print("CSV     :", csv_path)
+        return 0
+
+    except Exception as exc:
+        print("[CMD] Cloudnet ECMWF downloader test finished")
+        print("OK      :", False)
+        print("PATH    :", None)
+        print("MESSAGE :", str(exc))
+        print("URL     :", "https://cloudnet.fmi.fi/api/model-files")
+        return 1
+# -----------------------------
 
 
 if __name__ == "__main__":
-    _cli()
+    raise SystemExit(_main())

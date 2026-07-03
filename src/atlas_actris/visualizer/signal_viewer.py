@@ -11,6 +11,7 @@ import gc
 import warnings
 import numpy as np
 import panel as pn
+import hvplot.xarray
 import holoviews as hv
 from bokeh.models import (
     LinearColorMapper, ColorBar, FixedTicker,

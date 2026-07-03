@@ -56,7 +56,7 @@ from atlas_actris.templates.template_profiles import (
     BEGINNER_SETTINGS_TEMPLATE_KEYS,
 )
 
-AUTO_SELECTION = "auto_selection"
+AUTO_SELECTION = "empty parameter --> ignored or automatic selection"
 ALLOWED_TARGETS = ("all", "ini", "docs")
 ALLOWED_PROFILES = ("all", "full", "bare", "beginner")
 ALLOWED_LEGACY_STATUS = {"", "new", "unchanged", "renamed", "moved"}
@@ -579,6 +579,212 @@ def _markdown_header(title: str, template_name: str, flavor_file: str) -> str:
     )
 
 
+def _section_title(section: str) -> str:
+    """Return a readable title for an INI section name."""
+
+    return section.replace("_", " ").title()
+
+
+def _section_anchor(section: str) -> str:
+    """Return the MkDocs/Markdown anchor generated from a section heading."""
+
+    return section.replace("_", "-").lower()
+
+
+def _section_intro(section: str) -> str:
+    """Return short narrative text for initialization reference sections."""
+
+    intros = {
+        "configuration": (
+            "Controls how ATLAS obtains or uses the system configuration, "
+            "including optional SCC HOI export behaviour."
+        ),
+        "explicit_paths": (
+            "Defines the main input, configuration, settings, radiosonde, and "
+            "output paths. Relative paths are interpreted with respect to the "
+            "folder containing the initialization file."
+        ),
+        "general_options": (
+            "Selects which QA tests and quicklooks are produced and controls "
+            "general output and plotting behaviour."
+        ),
+        "filter_channels": (
+            "Restricts the channels that are processed, either by selecting "
+            "explicit ATLAS channel IDs or excluding groups of channels based "
+            "on parts of the channel ID."
+        ),
+        "trimming_options": (
+            "Controls signal trimming, overflow handling, temporal averaging "
+            "options, and optional time slicing/exclusion of measurements."
+        ),
+        "explicit_folders": (
+            "Overrides the default measurement folder names inside "
+            "parent_folder. Leave these empty when the standard ATLAS folder "
+            "structure is used."
+        ),
+        "parsing_options": (
+            "Controls automatic telecover file distribution and custom "
+            "radiosonde parsing metadata."
+        ),
+    }
+
+    return intros.get(section, "Initialization parameters for this section.")
+
+
+def _schema_summary_lines(meta: Mapping[str, Any]) -> list[str]:
+    """Return compact Markdown bullet lines for schema metadata."""
+
+    lines = [
+        f"- **Type:** `{_escape_md(_type_display(meta))}`",
+        f"- **Category:** `{_escape_md(_category_display(meta))}`",
+        f"- **Default:** `{_escape_md(_format_value(meta.get('default')))}`",
+    ]
+
+    allowed_range = _allowed_range_display(meta)
+    if allowed_range:
+        lines.append(f"- **Limits / allowed values:** {_escape_md(allowed_range)}")
+
+    return lines
+
+
+def _render_parameter_details(
+    key: str,
+    meta: Mapping[str, Any],
+    flavor_entry: Mapping[str, Any],
+) -> str:
+    """Render one parameter as a MkDocs details block."""
+
+    description = _escape_md(flavor_entry.get("description", ""))
+    example = str(flavor_entry.get("example", "") or "").strip()
+    legacy_text = _escape_md(
+        _legacy_sentence(flavor_entry.get("legacy", {}), for_docs=True)
+    )
+
+    lines = [
+        f'<a id="{_escape_md(key).replace("_", "-")}"></a>',
+        f'??? info "`{_escape_md(key)}`"',
+        "",
+    ]
+
+    if description:
+        lines.append(f"    {description}")
+        lines.append("")
+
+    for item in _schema_summary_lines(meta):
+        lines.append(f"    {item}")
+
+    if example:
+        lines.append(f"    - **Example:** `{_escape_md(example)}`")
+
+    lines.append(f"    - **Version history:** {legacy_text}")
+    lines.append("")
+    lines.append("    ```ini")
+    lines.append(f"    {key} =")
+    lines.append("    ```")
+
+    return "\n".join(lines)
+
+
+def _render_section_summary_table(
+    schema: Mapping[str, Mapping[str, Any]],
+    flavor: Mapping[str, Mapping[str, Any]],
+) -> str:
+    """Render a compact section summary table for quick scanning."""
+
+    lines = [
+        "| Parameter | Type | Default | Allowed / limits |",
+        "| --- | --- | --- | --- |",
+    ]
+
+    for key, meta in schema.items():
+        allowed_range = _allowed_range_display(meta)
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    f"[`{_escape_md(key)}`](#{_escape_md(key).replace('_', '-')})",
+                    f"`{_escape_md(_type_display(meta))}`",
+                    f"`{_escape_md(_format_value(meta.get('default')))}`",
+                    _escape_md(allowed_range),
+                ]
+            )
+            + " |"
+        )
+
+    return "\n".join(lines)
+
+
+def _render_initialization_markdown() -> str:
+    """Render the generated MkDocs page for the initialization INI reference.
+
+    This page is intentionally written to ``initialization_reference.md`` so
+    that ``initialization.md`` can remain a hand-written overview page.
+    """
+
+    lines = [
+        _markdown_header(
+            "ATLAS initialization file reference",
+            "call_atlas.ini",
+            "src/atlas_actris/templates/init_template_flavor.py",
+        ),
+        "## Purpose",
+        "",
+        "The initialization file tells ATLAS where the input data and metadata "
+        "files are located, which QA tests and quicklooks should be produced, "
+        "and which optional filtering, trimming, export, and radiosonde parsing "
+        "settings should be applied for one processing run.",
+        "",
+        "This page is generated automatically from the initialization parser "
+        "schema and the user-facing template flavor text. Edit "
+        "`src/atlas_actris/templates/init_template_flavor.py` to change "
+        "descriptions, examples, or version notes. Edit "
+        "`src/atlas_actris/utils/parse_init_file.py` only when the technical "
+        "schema itself changes.",
+        "",
+        "## How values are interpreted",
+        "",
+        "- Empty values mean that ATLAS will use the schema default or automatic "
+        "selection when available.",
+        "- List values can be separated with commas or semicolons.",
+        "- Boolean values must be written as `True` or `False`.",
+        "- Relative explicit paths are resolved relative to the folder containing "
+        "the initialization file.",
+        "- Measurement folder aliases in `explicit_folders` are resolved relative "
+        "to `parent_folder`.",
+        "",
+        "## Sections",
+        "",
+    ]
+
+    for section, keys in INIT_TEMPLATE_SECTIONS.items():
+        lines.append(
+            f"- [`{section}`](#{_section_anchor(section)}): "
+            f"{_section_intro(section)} ({len(list(keys))} parameters)."
+        )
+
+    lines.append("")
+    lines.append("## Parameter reference")
+    lines.append("")
+
+    for section, keys in INIT_TEMPLATE_SECTIONS.items():
+        section_schema = {key: INIT_SCHEMA[key] for key in keys}
+        section_flavor = {key: INIT_FLAVOR[key] for key in keys}
+
+        lines.append(f'<a id="{_section_anchor(section)}"></a>')
+        lines.append(f"### `{section}`")
+        lines.append("")
+        lines.append(_section_intro(section))
+        lines.append("")
+        lines.append(_render_section_summary_table(section_schema, section_flavor))
+        lines.append("")
+
+        for key in keys:
+            lines.append(_render_parameter_details(key, INIT_SCHEMA[key], INIT_FLAVOR[key]))
+            lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def _render_md_table(schema: Mapping[str, Mapping[str, Any]], flavor: Mapping[str, Mapping[str, Any]]) -> str:
     lines = [
         "| Parameter | Description | Type | Category | Default | Limits / allowed values | Example | Version history |",
@@ -745,14 +951,7 @@ def build_outputs(
             )
 
     if target in ("all", "docs"):
-        outputs[docs_dir / "initialization_reference.md"] = _render_flat_markdown(
-            title="ATLAS initialization file reference",
-            template_name="call_atlas.ini",
-            flavor_file="src/atlas_actris/templates/init_template_flavor.py",
-            schema=INIT_SCHEMA,
-            sections=INIT_TEMPLATE_SECTIONS,
-            flavor=INIT_FLAVOR,
-        )
+        outputs[docs_dir / "initialization_reference.md"] = _render_initialization_markdown()
         outputs[docs_dir / "configuration_reference.md"] = _render_flat_markdown(
             title="ATLAS configuration file reference",
             template_name="config_file.ini",

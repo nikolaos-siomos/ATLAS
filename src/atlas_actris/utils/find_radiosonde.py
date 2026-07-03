@@ -56,9 +56,13 @@ def find_radiosonde(caller_info, metadata):
                     )
                     print()
 
+                station_altitude = metadata['system_info'][key].sel({'parameters': 'station_altitude'})
+
                 radiosonde_info, status = select_manual_radiosonde_file(
                     target=mid_time_dt64,
                     radiosonde_file=radiosonde_file,
+                    caller_info=caller_info,
+                    station_altitude=station_altitude,
                 )
 
                 if status == 0:
@@ -150,7 +154,7 @@ def find_radiosonde(caller_info, metadata):
                 'wyoming' : rsonde_station_wmo_id,
                 'ecmwf': cloudnet_station_name,
                 'scc': station_id,
-                'ascii': rsonde_station_name
+                'custom_ascii': rsonde_station_name
                 }
             radiosonde_info, status = select_radiosonde_filename(
                 mid_time_dt64, 

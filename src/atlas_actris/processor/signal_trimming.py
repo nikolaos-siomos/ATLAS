@@ -267,6 +267,52 @@ def _start_time_array_from_time_info(time_info_key: xr.DataArray) -> xr.DataArra
     )
 
 
+def _resolve_loading_map_key(
+    key: str,
+    available_keys,
+    loading_map,
+    context: str | None = None,
+    warn: bool = True,
+) -> str | None:
+    """Resolve a QA-test key or loading-map alias to an available data key.
+
+    Examples
+    --------
+    If ``key`` is ``"drk_ray"`` and ``loading_map["drk_ray"] == "drk"``,
+    this returns ``"drk"`` when ``"drk"`` exists in ``available_keys``.
+    Existing data keys are returned unchanged. Unresolvable keys return None.
+    """
+
+    if key in available_keys:
+        return key
+
+    if loading_map is None:
+        loading_map = {}
+
+    context_prefix = f"{context}: " if context else ""
+
+    if key not in loading_map:
+        if warn:
+            CustomWarning(
+                f"{context_prefix}key {key!r} was not found in available "
+                "measurements or loading-map aliases. Entry skipped."
+            )
+        return None
+
+    mapped_key = loading_map[key]
+
+    if mapped_key in available_keys:
+        return mapped_key
+
+    if warn:
+        CustomWarning(
+            f"{context_prefix}key {key!r} maps to {mapped_key!r}, but the "
+            "mapped key is not available. Entry skipped."
+        )
+
+    return None
+
+
 def compute_slice_and_exclude(
         processing_info: Dict[str, Any],
         input_data: Dict[str, Dict[str, Any]],
@@ -278,6 +324,7 @@ def compute_slice_and_exclude(
     time_info = output_data["time_info"]
 
     qa_tests = list(time_info.keys())
+    loading_map = processing_info["caller_info"].get("loading_map", {})
 
     # Start with full-True masks for all measurements.
     # The mask is based on the time dimension/coordinate of time_info.
@@ -294,18 +341,30 @@ def compute_slice_and_exclude(
         slice_stop_time = [slicer[i] for i in range(2, len(slicer), 3)]
 
         # If slicing is specified, start from all-False for mentioned keys.
+        # Mentioned keys may be direct output_data keys or loading-map aliases.
         for key in slice_meas:
-            if key in qa_tests:
-                mask_time[key] = xr.zeros_like(time_info[key]["time"], dtype=bool)
+            resolved_key = _resolve_loading_map_key(
+                key, qa_tests, loading_map, context="slice_measurement"
+            )
+
+            if resolved_key is not None:
+                mask_time[resolved_key] = xr.zeros_like(
+                    time_info[resolved_key]["time"],
+                    dtype=bool,
+                )
 
         for i, key in enumerate(slice_meas):
-            if key not in qa_tests:
+            resolved_key = _resolve_loading_map_key(
+                key, qa_tests, loading_map, context="slice_measurement"
+            )
+
+            if resolved_key is None:
                 continue
 
-            time = time_info[key]["time"]
+            time = time_info[resolved_key]["time"]
 
             start_times = iso_to_datetimes(
-                time_info[key].sel({"parameters": "start_time"}).values
+                time_info[resolved_key].sel({"parameters": "start_time"}).values
             )
 
             start_dt, stop_dt = make_interval(
@@ -316,7 +375,7 @@ def compute_slice_and_exclude(
 
             mask_interval = (time >= start_dt) & (time <= stop_dt)
 
-            mask_time[key] = mask_time[key] | mask_interval
+            mask_time[resolved_key] = mask_time[resolved_key] | mask_interval
 
     slicer = processing_info["caller_info"]["exclude_measurement"]
 
@@ -326,13 +385,17 @@ def compute_slice_and_exclude(
         slice_stop_time = [slicer[i] for i in range(2, len(slicer), 3)]
 
         for i, key in enumerate(slice_meas):
-            if key not in qa_tests:
+            resolved_key = _resolve_loading_map_key(
+                key, qa_tests, loading_map, context="exclude_measurement"
+            )
+
+            if resolved_key is None:
                 continue
 
-            time = time_info[key]["time"]
+            time = time_info[resolved_key]["time"]
 
             start_times = iso_to_datetimes(
-                time_info[key].sel({"parameters": "start_time"}).values
+                time_info[resolved_key].sel({"parameters": "start_time"}).values
             )
 
             start_dt, stop_dt = make_interval(
@@ -343,7 +406,7 @@ def compute_slice_and_exclude(
 
             mask_interval = (time < start_dt) | (time > stop_dt)
 
-            mask_time[key] = mask_time[key] & mask_interval
+            mask_time[resolved_key] = mask_time[resolved_key] & mask_interval
 
     output_data = select_by_time_mask(qa_tests, mask_time, output_data)
 

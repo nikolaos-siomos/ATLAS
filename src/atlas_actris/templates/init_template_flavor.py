@@ -27,6 +27,7 @@ from utils.parse_init_file import (
     slice_exclude_allowed_keys, 
     version_warning_nrm,
     version_warning_pcb,
+    INIT_FILE_SECTIONS,
     )
 
 try:
@@ -45,60 +46,61 @@ locations = {
     'settings_file': 'settings_file'
     }
 
-INIT_TEMPLATE_SECTIONS = {'configuration': ['scc_compatible_format', 'export_hoi_cfg', 'scc_configuration_id'],
- 'explicit_paths': ['parent_folder',
-                    'atlas_configuration_file',
-                    'atlas_settings_file',
-                    'radiosonde_folder',
-                    'radiosonde_file',
-                    'output_folder'],
- 'general_options': ['process',
-                     'process_qck',
-                     'vertical_scale',
-                     'view_mean_signal_stage',
-                     'view_signal_stage',
-                     'dpi',
-                     'color_reduction',
-                     'overwrite_output',
-                     'expert_analyst',
-                     'export_stages',
-                     'export_all'],
- 'filter_channels': ['exclude_channels',
-                     'exclude_telescope_type',
-                     'exclude_channel_type',
-                     'exclude_acquisition_mode',
-                     'exclude_channel_subtype'],
- 'trimming_options': ['max_height_agl',
-                      'low_shot_threshold',
-                      'trim_overflows',
-                      'low_res_averaging_rate',
-                      'low_res_averaging_threshold',
-                      'high_res_averaging_rate',
-                      'high_res_averaging_threshold',
-                      'max_adjacent_overflows',
-                      'slice_measurement',
-                      'exclude_measurement'],
- 'explicit_folders': ['ray',
-                      'pcb',
-                      'tlc',
-                      'tlc_rin',
-                      'drk',
-                      'trg',
-                      'dtm',
-                      'ray_pcb',
-                      'pcb_aux',
-                      'cam'],
- 'parsing_options': ['files_per_quadrant',
-                     'files_per_ring',
-                     'rsonde_skip_header',
-                     'rsonde_skip_footer',
-                     'rsonde_delimiter',
-                     'rsonde_column_index',
-                     'rsonde_column_units',
-                     'rsonde_station_altitude',
-                     'cloudnet_station_name',
-                     'rsonde_station_name',
-                     'rsonde_station_wmo_id']}
+INIT_TEMPLATE_SECTIONS = INIT_FILE_SECTIONS
+# INIT_TEMPLATE_SECTIONS = {'configuration': ['scc_compatible_format', 'export_hoi_cfg', 'scc_configuration_id'],
+#  'explicit_paths': ['parent_folder',
+#                     'atlas_configuration_file',
+#                     'atlas_settings_file',
+#                     'radiosonde_folder',
+#                     'radiosonde_file',
+#                     'output_folder'],
+#  'general_options': ['process',
+#                      'process_qck',
+#                      'vertical_scale',
+#                      'view_mean_signal_stages',
+#                      'view_signal_stages',
+#                      'dpi',
+#                      'color_reduction',
+#                      'overwrite_output',
+#                      'expert_analyst',
+#                      'export_stages',
+#                      'export_all'],
+#  'filter_channels': ['select_channels',
+#                      'exclude_telescope_type',
+#                      'exclude_channel_type',
+#                      'exclude_acquisition_mode',
+#                      'exclude_channel_subtype'],
+#  'trimming_options': ['max_height_agl',
+#                       'low_shot_threshold',
+#                       'trim_overflows',
+#                       'low_res_averaging_rate',
+#                       'low_res_averaging_threshold',
+#                       'high_res_averaging_rate',
+#                       'high_res_averaging_threshold',
+#                       'max_adjacent_overflows',
+#                       'slice_measurement',
+#                       'exclude_measurement'],
+#  'explicit_folders': ['ray',
+#                       'pcb',
+#                       'tlc',
+#                       'tlc_rin',
+#                       'drk',
+#                       'trg',
+#                       'dtm',
+#                       'ray_pcb',
+#                       'pcb_aux',
+#                       'cam'],
+#  'parsing_options': ['files_per_quadrant',
+#                      'files_per_ring',
+#                      'rsonde_skip_header',
+#                      'rsonde_skip_footer',
+#                      'rsonde_delimiter',
+#                      'rsonde_column_index',
+#                      'rsonde_column_units',
+#                      'rsonde_station_altitude',
+#                      'cloudnet_station_name',
+#                      'rsonde_station_name',
+#                      'rsonde_station_wmo_id']}
 
 rel_path_note = 'Relative paths are provided with respect'
 'to the root folder of the initialization file used to run ATLAS.'
@@ -489,7 +491,7 @@ INIT_FLAVOR = {
              }
          },
         
-    'exclude_wavelengths': {
+    'exclude_wavelength': {
         'description': 
             'Provide the wavelegth part of the ATLAS channel ID '
             '(first 4 characters) of the channels to be excluded '
@@ -611,10 +613,10 @@ INIT_FLAVOR = {
             'This options determines how overflow values in the raw input '
             'files will be treated if detected. Choose among: '
             '0: the algorithm will stop and provide a diagnostic error, '
-            'if overflows arefound, '
+            'if overflows are found, '
             '1: the files containing at least one overflow value will be '
             'screened out, '
-            '2: overflows will be interpolated from neibouring bins.'
+            '2: overflows will be interpolated from neighboring bins.'
             '3: overflows will not be masked out.',
          'example': '2',
          'legacy': {

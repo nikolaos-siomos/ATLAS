@@ -30,7 +30,7 @@ Radiosonde behavior is controlled from the initialization file through `caller_i
 | `radiosonde_folder` | Folder used for automatic downloads and automatic radiosonde file selection. Ignored when `radiosonde_file` is provided. |
 | `rsonde_station_wmo_id` | Optional WMO station identifier used to download a radiosonde from Wyoming. |
 | `cloudnet_station_name` | Optional Cloudnet station name used to download ECMWF/Cloudnet meteorological profiles. |
-| `rsonde_*` ASCII settings | Column, delimiter, header, footer, and unit settings used later when loading manual or generic ASCII radiosondes. |
+| `rsonde_*` ASCII settings | Column, delimiter, header, footer, and unit settings used later when loading manually provided custom ASCII radiosondes. |
 
 ## Manual radiosonde mode
 
@@ -44,7 +44,7 @@ Manual mode does the following:
 4. Skips Cloudnet download.
 5. Skips folder-based radiosonde selection.
 6. Stores `radiosonde_source = "manual"` in the radiosonde metadata.
-7. Infers the loadable `radiosonde_format` when possible.
+7. Detects the loadable `radiosonde_format` by trying the available radiosonde readers.
 
 If both `radiosonde_file` and `radiosonde_folder` are provided, `radiosonde_file` takes precedence. ATLAS prints a warning that `radiosonde_folder` will be ignored.
 
@@ -65,6 +65,17 @@ Manual mode is useful when:
 
 Manual mode does **not** reject the file based on a time-window test. If the filename contains a supported timestamp pattern, that time is stored as `radiosonde_time`. If the timestamp cannot be parsed, ATLAS stores the lidar measurement midpoint as a metadata placeholder and prints a warning.
 
+Manual format detection is content-based. ATLAS creates a temporary `radiosonde_info` object, sets one candidate `radiosonde_format` at a time, and calls the corresponding reader. The first reader that successfully returns a valid meteorological profile determines the stored `radiosonde_format`. The temporary profile is discarded; the selected file is read again later by `load_radiosonde()`, so the rest of the processing chain keeps the usual behavior.
+
+Typical probing order is:
+
+```text
+text-like files: custom_ascii -> wyoming -> ecmwf -> scc
+NetCDF files:    ecmwf -> scc -> wyoming -> custom_ascii
+```
+
+If the filename clearly matches one of the standard ATLAS patterns, that format is tried first.
+
 ## Automatic radiosonde mode
 
 If `radiosonde_file` is not provided, ATLAS uses automatic mode. Automatic mode works per supported QA test. Currently, radiosonde selection is applied to:
@@ -80,9 +91,10 @@ Automatic mode follows this sequence:
 2. Try to download a Wyoming radiosonde if `rsonde_station_wmo_id` is provided.
 3. Try to download a Cloudnet/ECMWF profile if `cloudnet_station_name` is provided.
 4. Search `radiosonde_folder` for supported radiosonde files.
-5. Prefer the closest Wyoming file within the priority time window.
-6. Otherwise select the closest supported file within the fallback time window.
-7. Store the selected file and metadata in `metadata["radiosonde_info"]`.
+5. Reject supported-looking filenames whose station identifier does not match the expected identifier for that format.
+6. Prefer the closest Wyoming file within the priority time window.
+7. Otherwise select the closest supported file within the fallback time window.
+8. Store the selected file and metadata in `metadata["radiosonde_info"]`.
 
 ## Download sources
 
@@ -151,7 +163,7 @@ radiosonde_source = "auto"
 
 Cloudnet/ECMWF files are also cached locally. If the expected NetCDF file already exists in `radiosonde_folder`, ATLAS reuses it. Otherwise, the downloader tries to obtain the daily ECMWF model file from Cloudnet and saves it under the expected local filename. To force a Cloudnet/ECMWF file to be downloaded again, delete the corresponding local `.nc` file from `radiosonde_folder`.
 
-Downloads do not automatically guarantee selection. Downloaded files are still evaluated by the timestamp and priority rules below.
+Downloads do not automatically guarantee selection. Downloaded files are still evaluated by the filename, identifier, timestamp, and priority rules below.
 
 ## Supported filename patterns
 
@@ -163,9 +175,24 @@ Automatic selection only considers files whose names match a supported pattern. 
 | Wyoming BUFR text | `YYYYMMDD_HHMM_wyoming_bufr_<wmo_id>.txt` | `20240428_1200_wyoming_bufr_16716.txt` |
 | ECMWF / Cloudnet | `YYYYMMDD_HHMM_ecmwf_<site>.nc` | `20240428_0300_ecmwf_antikythera.nc` |
 | SCC | `rs_YYYYMMDD<site>HH.nc` | `rs_20240428aky12.nc` |
-| Generic ASCII | `YYYYMMDD_HHMM*.txt` | `20240428_1200_custom_profile.txt` |
+| Custom ASCII | `YYYYMMDD_HHMM_custom_ascii_<identifier>.<txt|dat|csv|asc>` | `20240428_1200_custom_ascii_athens.txt` |
 
 The timestamp encoded in the filename is used to compare each radiosonde file against the measurement midpoint.
+
+### Identifier matching in automatic mode
+
+Automatic selection also checks the station identifier encoded in the filename. The expected identifiers are collected per format, using the same keys as `radiosonde_format`:
+
+```python
+identifiers = {
+    "wyoming": rsonde_station_wmo_id,
+    "ecmwf": cloudnet_station_name,
+    "scc": station_id,
+    "custom_ascii": rsonde_station_name,
+}
+```
+
+A filename can match the regular expression and still be rejected if its parsed identifier does not match the expected identifier for that format. Identifier comparison is normalized before comparison, including case normalization, so a downloaded file such as `20251203_1159_ecmwf_barcelona.nc` can match a configuration value such as `Barcelona`. If the expected identifier for a format is missing or empty, files of that format are not selected automatically.
 
 
 ## Parsing selected radiosonde files
@@ -175,7 +202,7 @@ After selection, ATLAS reads the selected file with the reader that corresponds 
 | `radiosonde_format` | Reader behavior |
 | --- | --- |
 | `wyoming` | Reads the ATLAS-downloaded Wyoming CSV text file using the fixed Wyoming column layout. |
-| `ascii` | Reads a generic user-provided ASCII file using the `rsonde_*` options from the initialization file. |
+| `custom_ascii` | Reads a manually provided or automatically selected custom ASCII file using the `rsonde_*` options from the initialization file. |
 | `ecmwf` | Reads a Cloudnet/ECMWF NetCDF file. This follows the Cloudnet model-file structure and is normally produced by the Cloudnet downloader. |
 | `scc` | Reads an SCC-style radiosonde NetCDF file using the standard SCC variable names. |
 
@@ -205,9 +232,9 @@ The reader converts these internally to the units required by the molecular calc
 
 This fixed layout is used only for files classified as `radiosonde_format = "wyoming"`.
 
-### Generic ASCII format
+### Custom ASCII format
 
-Generic ASCII files are used when `radiosonde_format = "ascii"`. Their parsing is controlled by the initialization-file parameters below.
+Custom ASCII files are used when `radiosonde_format = "custom_ascii"`. Their parsing is controlled by the initialization-file parameters below.
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
@@ -225,7 +252,7 @@ height, pressure, temperature
 
 The fourth selected column is optional and represents relative humidity. If only three columns are provided, relative humidity is filled with missing values.
 
-The default ASCII interpretation is therefore:
+The default custom ASCII interpretation is therefore:
 
 ```text
 height      -> column 2, m_asl
@@ -260,7 +287,7 @@ percent, fraction
 
 If the height unit is `m_agl` or `km_agl`, `rsonde_station_altitude` must also be provided so ATLAS can convert the profile to altitude above sea level.
 
-Example generic ASCII configuration:
+Example custom ASCII configuration:
 
 ```ini
 [System]
@@ -359,7 +386,7 @@ Typical manual-mode metadata:
 
 ```text
 radiosonde_file     = /path/to/manual_profile.txt
-radiosonde_format   = ascii
+radiosonde_format   = custom_ascii
 radiosonde_source   = manual
 radiosonde_time     = <parsed file time or measurement midpoint>
 measurement_time    = <measurement midpoint>
@@ -377,15 +404,26 @@ The `radiosonde_format` value should remain a loadable format. The fact that the
 | `2` | No supported radiosonde file was found, or a manually provided file path was invalid. |
 | `-1` | Radiosonde handling is not required for this QA test. |
 
-If no radiosonde can be selected, processing steps that require molecular profiles are skipped or cannot be performed.
+If no radiosonde can be selected, processing steps that require molecular profiles are skipped or cannot be performed. The Rayleigh-fit and polarization-calibration quicklook generators also skip their molecular-dependent plots and print a warning instead of failing when molecular products are unavailable.
 
 ## Recommended usage
 
 Use `radiosonde_file` when reproducibility is more important than automatic selection, or when the correct radiosonde file is known beforehand.
 
-Use `radiosonde_folder` with `rsonde_station_wmo_id` and/or `cloudnet_station_name` when ATLAS should download and select the best available profile automatically.
+Use `radiosonde_folder` with `rsonde_station_wmo_id` and/or `cloudnet_station_name` when ATLAS should download and select the best available profile automatically. Make sure the configured station identifiers match the identifiers used in supported filenames.
 
-Avoid mixing unrelated campaigns, stations, or dates in the same `radiosonde_folder`. The selector ignores unsupported names, but all supported filenames in the folder are candidates for automatic selection.
+Avoid mixing unrelated campaigns, stations, or dates in the same `radiosonde_folder`. The selector ignores unsupported names and supported-looking names with mismatching identifiers, but all supported filenames with matching identifiers are candidates for automatic selection.
+
+## Behavior when molecular products are missing
+
+If no usable radiosonde is selected, `load_radiosonde()` cannot create meteorological profiles and molecular calculations are skipped. In that case, downstream molecular products such as attenuated molecular backscatter, molecular depolarization ratio, and molecular metadata are unavailable.
+
+The molecular-dependent quicklooks are protected against this situation:
+
+- Rayleigh fit quicklooks are skipped for a QA test if `molecular` is missing.
+- Polarization calibration quicklooks are skipped if `molecular_ratio` or `molecular_info` is missing.
+
+ATLAS prints a warning explaining that no molecular products were found and that this usually means no usable radiosonde was selected. This prevents errors from title generation, molecular overlays, or Rayleigh-fit normalization when radiosonde-dependent data do not exist.
 
 ## Troubleshooting
 
@@ -396,6 +434,7 @@ A download can succeed but still fail selection. Common reasons are:
 - the downloaded file timestamp is outside the selection window;
 - a Wyoming file inside the priority window was preferred;
 - the filename does not match a supported pattern;
+- the identifier part of the filename does not match the expected identifier for that format;
 - the selected QA test midpoint is different from the expected time.
 
 ### Wyoming is slow on the first run
@@ -404,7 +443,7 @@ This is expected when ATLAS has to contact the Wyoming server and test candidate
 
 Delete `.wyoming_download_failures.json` from `radiosonde_folder` when you want ATLAS to retry requests that were previously marked as unavailable or failed.
 
-### A file is treated as ASCII instead of Wyoming
+### A file is treated as custom ASCII instead of Wyoming
 
 Wyoming BUFR text files should use the pattern:
 
@@ -418,9 +457,24 @@ For example:
 20240428_1200_wyoming_bufr_16716.txt
 ```
 
-This is classified as `wyoming`, not generic `ascii`.
+This is classified as `wyoming`, not `custom_ascii`.
 
 ### Manual file timestamp warning
 
-If a manual file does not contain a timestamp in a supported filename pattern, ATLAS cannot infer `radiosonde_time` from the name. The file can still be used, but the measurement midpoint is stored as the radiosonde time metadata placeholder.
+If a manual file does not contain a timestamp in a supported filename pattern, ATLAS cannot infer `radiosonde_time` from the name. The file can still be used if one of the readers can parse it, but the measurement midpoint is stored as the radiosonde time metadata placeholder.
+
+### Manual file cannot be parsed by any reader
+
+Manual mode no longer relies only on the filename extension. It tries the available radiosonde readers and accepts the file only if one reader returns a valid meteorological profile. If all readers fail, the manual file is rejected and `radiosonde_status = 2`.
+
+Check that:
+
+- the file path is correct;
+- the file content matches one of the supported reader formats;
+- for `custom_ascii`, the `rsonde_*` column, delimiter, header, footer, and unit options match the file content;
+- for `custom_ascii` heights in `m_agl` or `km_agl`, `rsonde_station_altitude` is provided.
+
+### Cloudnet file downloaded but not selected
+
+If a Cloudnet/ECMWF file is downloaded but then rejected, check the identifier in the filename and the configured `cloudnet_station_name`. For example, `20251203_1159_ecmwf_barcelona.nc` has identifier `barcelona`. Identifier comparison is case-normalized, so `Barcelona` should match, but a genuinely different station name will not.
 

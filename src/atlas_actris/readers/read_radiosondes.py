@@ -518,8 +518,8 @@ def load_radiosonde(caller_info, metadata):
                 print_entry("Parsing downloaded Wyoming radiosonde")
                 da = read_radiosonde_wyoming(radiosonde_info[key])
                 
-            elif radiosonde_format == 'ascii':
-                print_entry("Parsing manually provided ASCII radiosonde")
+            elif radiosonde_format == 'custom_ascii':
+                print_entry("Parsing manually provided custom ASCII radiosonde")
                 da = read_radiosonde_ascii(caller_info, radiosonde_info[key])
                 
             elif radiosonde_format == 'scc':

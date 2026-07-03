@@ -8,45 +8,45 @@
 
 | Parameter | Description | Type | Category | Default | Limits / allowed values | Example | Version history |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `t_lims` | Time limits used in the plot. | `list[str]` | optional | `auto_selection` |  | `2300, 0100` | Unchanged from previous ATLAS versions. |
-| `t_tick` | Tick spacing for the time axis. | `int` | optional | `auto_selection` | Minimum: 5 | `30` | Unchanged from previous ATLAS versions. |
+| `t_lims` | Time limits used in the plot. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `2300, 0100` | Unchanged from previous ATLAS versions. |
+| `t_tick` | Tick spacing for the time axis. | `int` | optional | `empty parameter --&gt; ignored or automatic selection` | Minimum: 5 | `30` | Unchanged from previous ATLAS versions. |
 | `x_lims` | Horizontal-axis limits used in the plot. | `list[float]` | optional | `0.0, 14.0` | Range: 0.0 to 100.0; Required list size: 2 | `0, 14` | Unchanged from previous ATLAS versions. |
 | `x_tick` | Horizontal-axis tick spacing. | `float` | optional | `1.0` | Range: 0.0 to 10 | `1` | Unchanged from previous ATLAS versions. |
-| `y_lims` | Vertical-axis limits used in the plot. | `list[float]` | optional | `auto_selection` | Required list size: 2 | `0, 1` | Unchanged from previous ATLAS versions. |
+| `y_lims` | Vertical-axis limits used in the plot. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` | Required list size: 2 | `0, 1` | Unchanged from previous ATLAS versions. |
 | `y_max_zone` | Zone used to define or display the maximum signal range. | `list[float]` | optional | `0.2, 1.0` | Range: 0.0 to 30.0; Required list size: 2 | `0.2, 1.0` | Unchanged from previous ATLAS versions. |
 | `use_log_y_scale` | Use a logarithmic vertical axis. | `bool` | optional | `False` |  | `False` | Unchanged from previous ATLAS versions. |
 | `smooth` | Apply smoothing before plotting or fitting. | `bool` | optional | `False` |  | `True` | Unchanged from previous ATLAS versions. |
 | `smoothing_range` | Height/range interval over which smoothing is applied. | `list[float]` | optional | `0.05, 15.0` | Range: 0.0 to 100.0; Required list size: 2 | `0.05, 15` | Unchanged from previous ATLAS versions. |
 | `smoothing_window` | Smoothing window size. | `list[float]` | optional | `0.05, 0.5` | Range: 0.05 to 10.0; Required list size: 2 | `0.5` | Unchanged from previous ATLAS versions. |
 | `smoothing_exponential` | Use exponential smoothing window behaviour. | `bool` | optional | `False` |  | `False` | Unchanged from previous ATLAS versions. |
-| `include_channels` | Channel IDs to include explicitly. | `list[str]` | optional | `auto_selection` |  | `0532xcpr, 1064xtax` | Unchanged from previous ATLAS versions. |
-| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `auto_selection` |  | `1064` | Unchanged from previous ATLAS versions. |
-| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
-| `exclude_channel_type` | Channel types to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: p, c, t, v, r, a, f | `a, f` | Unchanged from previous ATLAS versions. |
-| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
-| `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
+| `select_channels` | Channel IDs to include explicitly. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0532xcpr, 1064xtax` | Unchanged from previous ATLAS versions. |
+| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `1064` | Unchanged from previous ATLAS versions. |
+| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
+| `exclude_channel_type` | Channel types to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: p, c, t, v, r, a, f | `a, f` | Unchanged from previous ATLAS versions. |
+| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
+| `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
 
 ## `quicklooks_vldr`
 
 | Parameter | Description | Type | Category | Default | Limits / allowed values | Example | Version history |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `t_lims` | Time limits used in the plot. | `list[str]` | optional | `auto_selection` |  | `2300, 0100` | Unchanged from previous ATLAS versions. |
-| `t_tick` | Tick spacing for the time axis. | `int` | optional | `auto_selection` | Minimum: 5 | `30` | Unchanged from previous ATLAS versions. |
+| `t_lims` | Time limits used in the plot. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `2300, 0100` | Unchanged from previous ATLAS versions. |
+| `t_tick` | Tick spacing for the time axis. | `int` | optional | `empty parameter --&gt; ignored or automatic selection` | Minimum: 5 | `30` | Unchanged from previous ATLAS versions. |
 | `x_lims` | Horizontal-axis limits used in the plot. | `list[float]` | optional | `0.0, 14.0` | Range: 0.0 to 100.0; Required list size: 2 | `0, 14` | Unchanged from previous ATLAS versions. |
 | `x_tick` | Horizontal-axis tick spacing. | `float` | optional | `1.0` | Range: 0.0 to 10 | `1` | Unchanged from previous ATLAS versions. |
-| `y_lims` | Vertical-axis limits used in the plot. | `list[float]` | optional | `auto_selection` | Required list size: 2 | `0, 1` | Unchanged from previous ATLAS versions. |
+| `y_lims` | Vertical-axis limits used in the plot. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` | Required list size: 2 | `0, 1` | Unchanged from previous ATLAS versions. |
 | `y_max_zone` | Zone used to define or display the maximum signal range. | `list[float]` | optional | `0.2, 1.0` | Range: 0.0 to 30.0; Required list size: 2 | `0.2, 1.0` | Unchanged from previous ATLAS versions. |
 | `use_log_y_scale` | Use a logarithmic vertical axis. | `bool` | optional | `False` |  | `False` | Unchanged from previous ATLAS versions. |
 | `smooth` | Apply smoothing before plotting or fitting. | `bool` | optional | `False` |  | `True` | Unchanged from previous ATLAS versions. |
 | `smoothing_range` | Height/range interval over which smoothing is applied. | `list[float]` | optional | `0.05, 15.0` | Range: 0.0 to 100.0; Required list size: 2 | `0.05, 15` | Unchanged from previous ATLAS versions. |
 | `smoothing_window` | Smoothing window size. | `list[float]` | optional | `0.05, 0.5` | Range: 0.05 to 10.0; Required list size: 2 | `0.5` | Unchanged from previous ATLAS versions. |
 | `smoothing_exponential` | Use exponential smoothing window behaviour. | `bool` | optional | `False` |  | `False` | Unchanged from previous ATLAS versions. |
-| `include_pairs` | Channel/pair IDs to include explicitly. | `list[str]` | optional | `auto_selection` |  | `0532xvax, 0532xvpx` | Unchanged from previous ATLAS versions. |
-| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `auto_selection` |  | `1064` | Unchanged from previous ATLAS versions. |
-| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
-| `exclude_pair_type` | Pair/channel types to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: p, c, t, v, r, a, f | `a, f` | Unchanged from previous ATLAS versions. |
-| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
-| `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
+| `include_pairs` | Channel/pair IDs to include explicitly. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0532xvax, 0532xvpx` | Unchanged from previous ATLAS versions. |
+| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `1064` | Unchanged from previous ATLAS versions. |
+| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
+| `exclude_pair_type` | Pair/channel types to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: p, c, t, v, r, a, f | `a, f` | Unchanged from previous ATLAS versions. |
+| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
+| `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
 
 ## `rayleigh_fit`
 
@@ -54,7 +54,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `x_lims` | Horizontal-axis limits used in the plot. | `list[float]` | optional | `0.0, 34.0` | Range: 0.0 to 100.0 | `0, 14` | Unchanged from previous ATLAS versions. |
 | `x_tick` | Horizontal-axis tick spacing. | `float` | optional | `2.0` | Range: 0.1 to 10.0 | `1` | Unchanged from previous ATLAS versions. |
-| `y_lims` | Vertical-axis limits used in the plot. | `list[float]` | optional | `auto_selection` |  | `0, 1` | Unchanged from previous ATLAS versions. |
+| `y_lims` | Vertical-axis limits used in the plot. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0, 1` | Unchanged from previous ATLAS versions. |
 | `use_lin_y_scale` | Force a linear vertical axis. | `bool` | optional | `False` |  | `False` | Unchanged from previous ATLAS versions. |
 | `normalization_region` | Height/range interval used for signal normalization. | `list[float]` | optional | `6.0, 8.0` | Range: 0.0 to 50.0 | `6, 8` | Unchanged from previous ATLAS versions. |
 | `molecular_mask_region` | Height/range interval searched for molecular-mask candidates. | `list[float]` | optional | `2.0, 34.0` | Range: 0.0 to 150.0 | `2, 34` | Unchanged from previous ATLAS versions. |
@@ -72,11 +72,11 @@
 | `smooth` | Apply smoothing before plotting or fitting. | `bool` | optional | `True` |  | `True` | Unchanged from previous ATLAS versions. |
 | `smoothing_range` | Height/range interval over which smoothing is applied. | `list[float]` | optional | `0.05, 35.0` | Range: 0.0 to 100.0; Required list size: 2 | `0.05, 15` | Unchanged from previous ATLAS versions. |
 | `smoothing_window` | Smoothing window size. | `float` | optional | `0.5` | Range: 0.05 to 10.0 | `0.5` | Unchanged from previous ATLAS versions. |
-| `include_channels` | Channel IDs to include explicitly. | `list[str]` | optional | `auto_selection` |  | `0532xcpr, 1064xtax` | Unchanged from previous ATLAS versions. |
-| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `auto_selection` |  | `1064` | Unchanged from previous ATLAS versions. |
-| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
+| `select_channels` | Channel IDs to include explicitly. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0532xcpr, 1064xtax` | Unchanged from previous ATLAS versions. |
+| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `1064` | Unchanged from previous ATLAS versions. |
+| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
 | `exclude_channel_type` | Channel types to exclude. | `list[str]` | optional | `a, f` | Allowed values: p, c, t, v, r, a, f | `a, f` | Unchanged from previous ATLAS versions. |
-| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
+| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
 | `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `w, c` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
 
 ## `quadrant_telecover`
@@ -90,12 +90,12 @@
 | `near_range_upper_limit` | Upper limit of the near-range interval. | `float` | optional | `2.5` | Range: 0.05 to 10.0 | `2.5` | Unchanged from previous ATLAS versions. |
 | `smooth` | Apply smoothing before plotting or fitting. | `bool` | optional | `True` |  | `True` | Unchanged from previous ATLAS versions. |
 | `smoothing_window` | Smoothing window size. | `float` | optional | `0.1` | Range: 0.05 to 10.0 | `0.5` | Unchanged from previous ATLAS versions. |
-| `include_channels` | Channel IDs to include explicitly. | `list[str]` | optional | `auto_selection` |  | `0532xcpr, 1064xtax` | Unchanged from previous ATLAS versions. |
-| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `auto_selection` |  | `1064` | Unchanged from previous ATLAS versions. |
-| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
-| `exclude_channel_type` | Channel types to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: p, c, t, v, r, a, f | `a, f` | Unchanged from previous ATLAS versions. |
-| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
-| `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
+| `select_channels` | Channel IDs to include explicitly. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0532xcpr, 1064xtax` | Unchanged from previous ATLAS versions. |
+| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `1064` | Unchanged from previous ATLAS versions. |
+| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
+| `exclude_channel_type` | Channel types to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: p, c, t, v, r, a, f | `a, f` | Unchanged from previous ATLAS versions. |
+| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
+| `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
 
 ## `ring_telecover`
 
@@ -108,12 +108,12 @@
 | `near_range_upper_limit` | Upper limit of the near-range interval. | `float` | optional | `2.5` | Range: 0.05 to 10.0 | `2.5` | Unchanged from previous ATLAS versions. |
 | `smooth` | Apply smoothing before plotting or fitting. | `bool` | optional | `True` |  | `True` | Unchanged from previous ATLAS versions. |
 | `smoothing_window` | Smoothing window size. | `float` | optional | `0.1` | Range: 0.05 to 10.0 | `0.5` | Unchanged from previous ATLAS versions. |
-| `include_channels` | Channel IDs to include explicitly. | `list[str]` | optional | `auto_selection` |  | `0532xcpr, 1064xtax` | Unchanged from previous ATLAS versions. |
-| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `auto_selection` |  | `1064` | Unchanged from previous ATLAS versions. |
-| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
-| `exclude_channel_type` | Channel types to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: p, c, t, v, r, a, f | `a, f` | Unchanged from previous ATLAS versions. |
-| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
-| `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `auto_selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
+| `select_channels` | Channel IDs to include explicitly. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0532xcpr, 1064xtax` | Unchanged from previous ATLAS versions. |
+| `exclude_wavelength` | Wavelengths to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `1064` | Unchanged from previous ATLAS versions. |
+| `exclude_telescope_type` | Telescope types to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | Unchanged from previous ATLAS versions. |
+| `exclude_channel_type` | Channel types to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: p, c, t, v, r, a, f | `a, f` | Unchanged from previous ATLAS versions. |
+| `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
+| `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
 
 ## `polarization_calibration`
 
@@ -121,13 +121,13 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `x_lims_signals` | Horizontal-axis limits for polarization-calibration signal plots. | `list[float]` | optional | `0.0, 8.0` | Range: 0.0 to 50.0 | `0, 8` | Unchanged from previous ATLAS versions. |
 | `x_tick_signals` | Horizontal-axis tick spacing for signal plots. | `float` | optional | `1.0` | Range: 0.1 to 10.0 | `1` | Unchanged from previous ATLAS versions. |
-| `y_lims_signals` | Vertical-axis limits for signal plots. | `list[float]` | optional | `auto_selection` |  | `0, 1` | Unchanged from previous ATLAS versions. |
+| `y_lims_signals` | Vertical-axis limits for signal plots. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0, 1` | Unchanged from previous ATLAS versions. |
 | `x_lims_calibration` | Horizontal-axis limits for calibration plots. | `list[float]` | optional | `0.0, 8.0` | Range: 0.0 to 50.0 | `0, 8` | Unchanged from previous ATLAS versions. |
 | `x_tick_calibration` | Horizontal-axis tick spacing for calibration plots. | `float` | optional | `1.0` | Range: 0.1 to 10.0 | `1` | Unchanged from previous ATLAS versions. |
-| `y_lims_calibration` | Vertical-axis limits for calibration plots. | `list[float]` | optional | `auto_selection` |  | `0, 1` | Unchanged from previous ATLAS versions. |
+| `y_lims_calibration` | Vertical-axis limits for calibration plots. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0, 1` | Unchanged from previous ATLAS versions. |
 | `x_lims_rayleigh` | Horizontal-axis limits for Rayleigh comparison plots. | `list[float]` | optional | `0.0, 20.0` | Range: 0.0 to 50.0 | `0, 20` | Unchanged from previous ATLAS versions. |
 | `x_tick_rayleigh` | Horizontal-axis tick spacing for Rayleigh comparison plots. | `float` | optional | `2.0` | Range: 0.1 to 10.0 | `2` | Unchanged from previous ATLAS versions. |
-| `y_lims_rayleigh` | Vertical-axis limits for Rayleigh comparison plots. | `list[float]` | optional | `auto_selection` |  | `0, 1` | Unchanged from previous ATLAS versions. |
+| `y_lims_rayleigh` | Vertical-axis limits for Rayleigh comparison plots. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0, 1` | Unchanged from previous ATLAS versions. |
 | `calibration_region` | Height/range interval used for polarization calibration. | `list[float]` | optional | `2.0, 4.0` | Range: 0.0 to 50.0; Required list size: 2 | `2, 4` | Unchanged from previous ATLAS versions. |
 | `rayleigh_region` | Height/range interval used for Rayleigh reference comparison. | `list[float]` | optional | `6.0, 8.0` | Required list size: 2 | `6, 8` | Unchanged from previous ATLAS versions. |
 | `pldr_error_threshold` | Allowed PLDR uncertainty threshold. | `float` | optional | `0.025` | Range: 0.0 to 0.5 | `0.025` | Unchanged from previous ATLAS versions. |

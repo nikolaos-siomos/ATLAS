@@ -13,6 +13,7 @@ from visualizer import curve_fit
 from visualizer import export_ascii
 from collections import defaultdict
 from utils.printouts import print_header
+from utils.error_classes import CustomWarning
 from visualizer.check import check_channels
 from processor.packaging import collect_metadata
 from visualizer.make_text import GenerateText, Libraries
@@ -80,6 +81,17 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
 
             # Load arrays
             profiles = data_pack[key]['profile_mean']
+
+            if 'molecular' not in data_pack[key] or data_pack[key]['molecular'] is None:
+                CustomWarning(
+                    f"Rayleigh fit quicklook skipped for {key}: no molecular products were "
+                    "found. This usually means that no usable radiosonde was selected, so "
+                    "molecular parameters and attenuated molecular backscatter could not be "
+                    "calculated."
+                )
+                print()
+                continue
+
             atten_bsc = data_pack[key]['molecular'].sel({'opto_parameters':'atten_bsc'}).compute()
             vertical_scale = data_pack[key][caller_info['vertical_scale']]
             system_info = data_pack[key]["system_info"]

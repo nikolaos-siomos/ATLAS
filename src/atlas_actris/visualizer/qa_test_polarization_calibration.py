@@ -35,6 +35,7 @@ import numpy as np
 
 from version import __version__
 from utils.printouts import print_header
+from utils.error_classes import CustomWarning
 from processor.packaging import collect_metadata
 from visualizer.make_text import GenerateText, Libraries
 from visualizer.plot_utils import (
@@ -124,10 +125,22 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
 
     ray_ratio = ray_pack["pol_cal_ratio_mean"]
     ray_info = ray_pack["pol_cal_info"]
-
-    molecular_ratio = ray_pack.get("molecular_ratio", None).compute()
-    molecular_info = ray_pack.get("molecular_info", None)
     
+    molecular_ratio = ray_pack.get("molecular_ratio", None)
+    molecular_info = ray_pack.get("molecular_info", None)
+
+    if molecular_ratio is None or molecular_info is None:
+        CustomWarning(
+            "Polarization calibration quicklook skipped: no molecular products were "
+            "found. This usually means that no usable radiosonde was selected, so "
+            "molecular parameters and molecular depolarization ratio could not be "
+            "calculated."
+        )
+        print()
+        return qa_test_info
+
+    molecular_ratio = molecular_ratio.compute()
+
     channel_info = pcb_p45_pack["channel_info"]
 
     # data_pack["pcb"] has only combined products, so use a source

@@ -425,6 +425,17 @@ tlc_subfolders = ["north", "east", "south", "west"]
 tlc_rin_subfolders = ["inner", "outer"]
 pcb_subfolders = ["p45", "m45", "+45", "-45"]
 
+# Legacy physical folder aliases. These are deliberately not SCHEMA entries and
+# are not measurement-type identifiers. They only allow existing folders named
+# with old suffixes to be detected and renamed to the current physical names
+# before the final path registry is built.
+legacy_folder_aliases = {
+    "abs_nrm": "nrm",
+    "abs_drk_nrm": "drk_nrm",
+    "abs_nrm_pcb": "nrm_pcb",
+    "abs_drk_nrm_pcb": "drk_nrm_pcb",
+}
+
 
 # -------------------------------------------------------------------
 # Utilities
@@ -1171,6 +1182,38 @@ def _handle_telecover_path_aliases(parser_args: Dict[str, Any]) -> Dict[str, Any
     return parser_args
 
 
+def _detect_legacy_folder_aliases(parser_args: Dict[str, Any]) -> Dict[str, Any]:
+    """Detect old physical folder names without making them parser keys.
+
+    The INI schema intentionally exposes only the current logical folder names
+    (for example ``ray``).  This helper only looks on disk for old folder names
+    such as ``nrm`` so that ``_rename_folder`` can rename them to the current
+    names before downstream path handling starts.
+    """
+
+    parent_folder = parser_args.get("parent_folder")
+
+    if parent_folder is None:
+        return parser_args
+
+    parent = Path(parent_folder)
+
+    for abs_key, folder_name in legacy_folder_aliases.items():
+        parser_args.setdefault(abs_key, None)
+        candidate = parent / folder_name
+
+        if candidate.exists():
+            if not candidate.is_dir():
+                raise ConfigError(
+                    f"Legacy folder alias {folder_name!r} exists but is not a directory: "
+                    f"{candidate}"
+                )
+
+            parser_args[abs_key] = os.path.normpath(str(candidate))
+
+    return parser_args
+
+
 def _rename_folder(
     parser_args: Dict[str, Any],
     old_key: str,
@@ -1179,28 +1222,33 @@ def _rename_folder(
     version_warning: str = "",
 ) -> Dict[str, Any]:
 
-    if parser_args[old_key] is not None and parser_args[new_key] is not None:
+    old_value = parser_args.get(old_key)
+    new_value = parser_args.get(new_key)
+
+    if old_value is not None and new_value is not None:
         raise ConfigError(
             f"{old_key} and {new_key} folders cannot be present at the same time. "
             f"{version_warning}"
         )
 
-    elif parser_args[old_key] is not None and parser_args[new_key] is None:
+    elif old_value is not None and new_value is None:
         CustomWarning(f"folder with the {old_key} suffix was detected. {version_warning}")
 
-        old = Path(parser_args[old_key])
+        old = Path(old_value)
         new = old.parent / new_name
 
         old.rename(new)
 
-        parser_args[new_key] = new
+        parser_args[new_key] = os.path.normpath(str(new))
 
-    del parser_args[old_key]
+    parser_args.pop(old_key, None)
 
     return parser_args
 
 
 def _special_path_handling(parser_args: Dict[str, Any]) -> Dict[str, Any]:
+
+    parser_args = _detect_legacy_folder_aliases(parser_args)
 
     # Rename any existing folders with the nrm suffix to ray.
     parser_args = _rename_folder(
