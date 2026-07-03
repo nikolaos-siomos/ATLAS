@@ -1,26 +1,59 @@
 site_name: ATLAS ACTRIS
 site_description: Documentation for the ATLAS ACTRIS processing package
+site_url: https://nikolaos-siomos.github.io/ATLAS/
 repo_url: https://github.com/nikolaos-siomos/ATLAS
+repo_name: nikolaos-siomos/ATLAS
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+strict: false
+
+copyright: Copyright &copy; ATLAS ACTRIS contributors
 
 theme:
   name: material
+  language: en
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
 
 nav:
   - Home: index.md
-  - Installation: installation.md
-  - Initialization: initialization.md
-  - Configuration: configuration.md
-  - Settings: settings.md
-  - CLI Documentation: atlas_actris_cli_documentation.md
-  - Extra tools:
-      - Get config files from SCC HOI: get_config_files_from_scc_hoi/README.md
-      - Get T/P profiles from Cloudnet: get_T_P_profiles_from_cloudnet/README_Cloudnet_Profile_Library_v11.txt
-  - INI file guide:
+  - Getting started:
+      - Installation: installation.md
+      - Command line interface: atlas_actris_cli_documentation.md
+  - User guide:
+      - Exported processing stages: exported_processing_stages.md
+      - Radiosonde selection and downloading: radiosonde_selection.md
+  - INI file reference:
       - Initialization file: generated/initialization_reference.md
       - Configuration file: generated/configuration_reference.md
       - Settings file: generated/settings_reference.md
+  - Extra tools:
+      - Get config files from SCC HOI: get_config_files_from_scc_hoi/README.md
+      - Get T/P profiles from Cloudnet: get_T_P_profiles_from_cloudnet/README_Cloudnet_Profile_Library_v11.txt
+
+plugins:
+  - search
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
   - toc:
       permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
