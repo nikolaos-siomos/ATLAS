@@ -263,7 +263,7 @@ def detect_manual_radiosonde_format(
     downstream code still reads the selected file through `load_radiosonde`.
     """
 
-    from utils.read_radiosondes import (
+    from readers.read_radiosondes import (
         read_radiosonde_ecmwf,
         read_radiosonde_wyoming,
         read_radiosonde_scc,
