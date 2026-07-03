@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue)](pyproject.toml)
-[![Tests](https://github.com/nikolaos-siomos/atlas_dev/actions/workflows/tests.yml/badge.svg)](https://github.comnikolaos-siomos/atlas_dev/actions/workflows/tests.yml)
+[![Tests](https://github.com/nikolaos-siomos/atlas_dev/actions/workflows/tests.yml/badge.svg)](https://github.com/nikolaos-siomos/atlas_dev/actions/workflows/tests.yml)
 [![License](https://img.shields.io/badge/license-see%20LICENSE-lightgrey)](LICENSE)
 
 Automated Lidar Analysis Software (ATLAS) for lidar data processing, visualization, and quality-assurance workflows.
@@ -168,31 +168,110 @@ The workflow installs ATLAS, checks dependencies with `pip check`, and runs the 
 
 ## Local documentation
 
-The full documentation is built with MkDocs and is kept in the `docs/` folder.
+The documentation can be checked completely locally. This is currently the recommended way to view the documentation while the repository is private and GitHub Pages is not enabled.
 
-Install the documentation dependencies if you have not already done so:
+The documentation source files are in:
+
+```text
+docs/
+```
+
+The automatically generated reference pages are in:
+
+```text
+docs/generated/
+```
+
+These generated pages document the initialization, configuration, and settings INI files. They are generated from the parser schemas and template flavor files, so they should not be edited manually.
+
+### Simple local documentation check
+
+From a fresh clone or extracted copy of the repository, create and activate an environment:
+
+```bash
+conda create -n atlas_box python=3.13 pip
+conda activate atlas_box
+```
+
+Enter the repository root, meaning the folder that contains `mkdocs.yml`:
+
+```bash
+cd atlas_dev
+```
+
+Install ATLAS with the documentation dependencies:
 
 ```bash
 python -m pip install -e ".[docs]"
 ```
 
-Start the local documentation server from the repository root:
+Start the local documentation server:
 
 ```bash
 mkdocs serve
 ```
 
-Then open the local URL printed in the terminal, usually:
+Open the local URL printed in the terminal. Usually it is:
 
 ```text
 http://127.0.0.1:8000/
 ```
 
-To build the static documentation site locally:
+Keep the terminal open while reading the documentation. When you edit a documentation file, MkDocs usually rebuilds the page automatically and the browser can be refreshed.
 
-```bash
-mkdocs build
+Stop the documentation server with:
+
+```text
+Ctrl+C
 ```
 
-The generated site will be written to the `site/` folder, which should not be committed to Git.
+### Strict documentation check
+
+Before sharing documentation changes, run:
+
+```bash
+mkdocs build --strict
+```
+
+This checks that the documentation can be built as a static website. The `--strict` option treats warnings as errors, so broken links and missing pages are easier to catch.
+
+A successful build ends with a message similar to:
+
+```text
+Documentation built in ... seconds
+```
+
+The generated static website is written to:
+
+```text
+site/
+```
+
+The `site/` folder is only a local build output and should not be committed to Git.
+
+### Regenerate the automatic reference pages
+
+If the parser schemas or template flavor files change, regenerate the INI reference pages before checking the documentation:
+
+```bash
+atlas-generate-templates --target docs
+```
+
+Then run:
+
+```bash
+mkdocs build --strict
+```
+
+The generated files that should be committed are:
+
+```text
+docs/generated/initialization_reference.md
+docs/generated/configuration_reference.md
+docs/generated/settings_reference.md
+```
+
+### GitHub Pages note
+
+GitHub Pages deployment is optional for local testing. If the repository is private and GitHub Pages is not available for the current plan/settings, colleagues can still use `mkdocs serve` to view the full documentation locally.
 
