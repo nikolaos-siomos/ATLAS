@@ -15,7 +15,12 @@ def ask_clean_cache(caller_info):
     if not os.path.exists(cache_path):
         return
 
-    answer = input(f"\nDelete temporary cache folder?\n{cache_path}\n[y/N]: ").strip().lower()
+    answer = os.environ.get("ATLAS_CLEAN_CACHE_ANSWER")
+
+    if answer is None:
+        answer = input(f"\nDelete temporary cache folder?\n{cache_path}\n[y/N]: ")
+
+    answer = answer.strip().lower()
 
     if answer in ["y", "yes"]:
         shutil.rmtree(cache_path)
@@ -31,7 +36,12 @@ def ask_clean_viewer(caller_info):
     if not os.path.exists(signal_viewer_path):
         return
 
-    answer = input(f"\nDelete signal_viewer folder?\n{signal_viewer_path}\n[y/N]: ").strip().lower()
+    answer = os.environ.get("ATLAS_CLEAN_VIEWER_ANSWER")
+
+    if answer is None:
+        answer = input(f"\nDelete signal_viewer folder?\n{signal_viewer_path}\n[y/N]: ")
+
+    answer = answer.strip().lower()
 
     if answer in ["y", "yes"]:
         shutil.rmtree(signal_viewer_path)

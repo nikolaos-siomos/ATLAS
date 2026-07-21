@@ -8,11 +8,7 @@ The package is currently intended to be installed from the local repository with
 python -m pip install -e .
 ```
 
-After installation, the main command is:
-
-```bash
-atlas
-```
+After installation, the main workflow is available through `atlas`. Additional installed commands provide the signal viewer and smoke tests, as documented below.
 
 The main command expects an initialization file path:
 
@@ -136,6 +132,153 @@ or:
 
 ```bash
 atlas --help
+```
+
+
+## Additional installed commands
+
+The package also exposes commands for the signal viewer and for automated smoke testing:
+
+```toml
+[project.scripts]
+atlas = "atlas_actris.cli:main"
+atlas-signal-viewer = "atlas_actris.cli_viewer:main"
+atlas-smoke-test = "atlas_actris.testing.smoke_test:main"
+atlas-signal-viewer-smoke-test = "atlas_actris.testing.signal_viewer_smoke_test:main"
+```
+
+After changing `[project.scripts]`, reinstall the package in editable mode so the new commands are created in the active environment:
+
+```bash
+python -m pip install -e .
+```
+
+## Command: `atlas-signal-viewer`
+
+Runs the ATLAS signal-viewer workflow using the same initialization-file interface as the main ATLAS command.
+
+### Usage
+
+```bash
+atlas-signal-viewer -i /path/to/call_atlas.ini
+```
+
+Equivalent long-option form:
+
+```bash
+atlas-signal-viewer --ini_file /path/to/call_atlas.ini
+```
+
+The signal viewer reads and processes the configured test data, generates the requested interactive viewer outputs, and stores them under the case output folder in:
+
+```text
+analysis/<case-name>/signal_viewer/
+```
+
+The command is interactive during normal use. At the end it may ask whether temporary cache files and generated signal-viewer files should be deleted.
+
+## Command: `atlas-smoke-test`
+
+Runs the packaged ATLAS smoke-test dataset through the main `atlas` CLI and validates that the expected plots, reports, and ASCII products are created.
+
+### Usage
+
+From the repository root:
+
+```bash
+atlas-smoke-test
+```
+
+The command can also be run from another directory, provided the package is installed in the active environment. The test first looks for `./testing_pack`; if that folder is not present, it falls back to the repository-level `testing_pack` associated with the editable installation.
+
+An explicit testing-pack path can also be supplied:
+
+```bash
+atlas-smoke-test /path/to/testing_pack
+```
+
+Useful options include:
+
+```text
+--ini FILE
+--case-name NAME
+--timeout SECONDS
+--keep-output
+```
+
+By default, the smoke test removes generated analysis files when it finishes. This keeps repeated local and CI test runs from accumulating large output folders. Cleanup also occurs after a failed run where possible.
+
+### Keeping generated outputs
+
+Use `--keep-output` when debugging or manually inspecting the generated files:
+
+```bash
+atlas-smoke-test --keep-output
+```
+
+With this option, existing outputs are not removed before the test and newly generated outputs are retained afterwards. This is useful when checking plots, reports, cache contents, or a failing intermediate result. Because these files can be large, omit `--keep-output` during routine testing and continuous integration.
+
+## Command: `atlas-signal-viewer-smoke-test`
+
+Runs the signal-viewer workflow through the installed `atlas-signal-viewer` CLI and verifies that signal-viewer output files are created.
+
+### Usage
+
+```bash
+atlas-signal-viewer-smoke-test
+```
+
+An explicit testing-pack path can be supplied in the same way:
+
+```bash
+atlas-signal-viewer-smoke-test /path/to/testing_pack
+```
+
+Useful options include:
+
+```text
+--ini FILE
+--case-name NAME
+--timeout SECONDS
+--keep-output
+```
+
+By default, the signal-viewer smoke test deletes the generated `signal_viewer` and temporary `cache` folders after validation. Other ATLAS analysis products are left untouched.
+
+To retain the generated viewer files for manual inspection, use:
+
+```bash
+atlas-signal-viewer-smoke-test --keep-output
+```
+
+This is particularly useful when checking generated HTML files, interactive plots, or viewer-specific failures. As with the main smoke test, retained outputs may consume significant disk space.
+
+## Smoke-test examples
+
+Run both smoke tests with automatic cleanup:
+
+```bash
+atlas-smoke-test
+atlas-signal-viewer-smoke-test
+```
+
+Retain outputs from the main test:
+
+```bash
+atlas-smoke-test --keep-output
+```
+
+Retain signal-viewer outputs:
+
+```bash
+atlas-signal-viewer-smoke-test --keep-output
+```
+
+Use a longer timeout on a slower machine or CI runner:
+
+```bash
+atlas-smoke-test --timeout 3600
+atlas-signal-viewer-smoke-test --timeout 3600
 ```
 
 ## Developer execution from Python

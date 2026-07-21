@@ -11,7 +11,7 @@ import re
 import xarray as xr
 import pandas as pd
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from utils.printouts import endpoint
 from utils.error_classes import CustomWarning
 from utils.dataarray_utils import shallow_copy
@@ -271,9 +271,9 @@ def _resolve_loading_map_key(
     key: str,
     available_keys,
     loading_map,
-    context: str | None = None,
+    context: Optional[str] = None,
     warn: bool = True,
-) -> str | None:
+):
     """Resolve a QA-test key or loading-map alias to an available data key.
 
     Examples

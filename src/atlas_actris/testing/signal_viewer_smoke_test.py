@@ -15,7 +15,10 @@ DEFAULT_INI_NAME = "call_atlas_the_179_199_665_20231221.ini"
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run the ATLAS smoke-test dataset and check that outputs are created."
+        description=(
+            "Run the ATLAS signal-viewer smoke-test dataset and check that "
+            "viewer outputs are created."
+        )
     )
 
     parser.add_argument(
@@ -43,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--keep-output",
         action="store_true",
-        help="Do not delete existing analysis/cache outputs before running.",
+        help="Do not delete existing signal_viewer/cache outputs before running.",
     )
 
     parser.add_argument(
@@ -53,30 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Timeout in seconds. Default: 1800.",
     )
 
-    parser.add_argument(
-        "--yes-clean-cache",
-        default="y",
-        choices=["y", "Y", "n", "N"],
-        help="Answer to the first ATLAS prompt. Default: y.",
-    )
-
-    parser.add_argument(
-        "--yes-export-stage",
-        default="N",
-        choices=["y", "Y", "n", "N"],
-        help="Answer to the second ATLAS prompt. Default: N.",
-    )
-
     return parser
 
 
 def resolve_testing_pack(testing_pack: Union[str, Path]) -> Path:
-    """Resolve the testing-pack directory.
-
-    Relative paths are first resolved from the current working directory.
-    When the default ``testing_pack`` path is not found there, fall back to
-    the repository-level testing_pack directory located from this module.
-    """
+    """Resolve the testing-pack directory."""
     requested_path = Path(testing_pack).expanduser()
     cwd_path = requested_path.resolve()
 
@@ -100,8 +84,6 @@ def run_smoke_test(
     case_name: str = DEFAULT_CASE_NAME,
     keep_output: bool = False,
     timeout: int = 1800,
-    yes_clean_cache: str = "y",
-    yes_export_stage: str = "N",
 ) -> int:
     pack_dir = resolve_testing_pack(testing_pack)
     ini_path = pack_dir / ini
@@ -114,33 +96,32 @@ def run_smoke_test(
         print(f"ERROR: Missing INI file: {ini_path}", file=sys.stderr)
         return 1
 
-    analysis_dir = pack_dir / "analysis"
-
-    if analysis_dir.exists() and not keep_output:
-        print(f"Removing old analysis folder: {analysis_dir}")
-        shutil.rmtree(analysis_dir)
+    output_root = pack_dir / "analysis" / case_name
+    viewer_dir = output_root / "signal_viewer"
+    cache_dir = output_root / "cache"
 
     if not keep_output:
-        for cache_dir in pack_dir.rglob("cache"):
-            if cache_dir.is_dir():
-                print(f"Removing old cache folder: {cache_dir}")
-                shutil.rmtree(cache_dir)
+        if viewer_dir.exists():
+            print(f"Removing old signal_viewer folder: {viewer_dir}")
+            shutil.rmtree(viewer_dir)
+
+        if cache_dir.exists():
+            print(f"Removing old cache folder: {cache_dir}")
+            shutil.rmtree(cache_dir)
 
     env = os.environ.copy()
     env.setdefault("MPLBACKEND", "Agg")
     env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
+    env["ATLAS_CLEAN_CACHE_ANSWER"] = "y"
+    env["ATLAS_CLEAN_VIEWER_ANSWER"] = "N"
 
-    print("Running ATLAS smoke test")
+    print("Running ATLAS signal-viewer smoke test")
     print(f"Testing pack: {pack_dir}")
     print(f"INI file:     {ini_path}")
 
-    env["ATLAS_CLEAN_CACHE_ANSWER"] = yes_clean_cache
-    env["ATLAS_DELETE_EXPORTED_ANSWER"] = "N"
-    env["ATLAS_EXPORT_STAGE_ANSWER"] = yes_export_stage
-
     try:
         result = subprocess.run(
-            ["atlas", "-i", str(ini_path)],
+            ["atlas-signal-viewer", "-i", str(ini_path)],
             cwd=pack_dir,
             text=True,
             env=env,
@@ -148,44 +129,39 @@ def run_smoke_test(
         )
 
         if result.returncode != 0:
-            print(f"ERROR: ATLAS failed with return code {result.returncode}", file=sys.stderr)
+            print(
+                f"ERROR: ATLAS signal viewer failed with return code {result.returncode}",
+                file=sys.stderr,
+            )
             return result.returncode
 
-        output_root = analysis_dir / case_name
+        if not viewer_dir.is_dir():
+            print(
+                f"ERROR: Signal-viewer output folder was not created: {viewer_dir}",
+                file=sys.stderr,
+            )
+            return 1
 
-        plots = list((output_root / "plots").glob("*.png"))
-        html_reports = list((output_root / "reports").glob("*.html"))
-        docx_reports = list((output_root / "reports").glob("*.docx"))
-        ascii_files = list((output_root / "ascii").rglob("*.txt"))
+        output_files = [path for path in viewer_dir.rglob("*") if path.is_file()]
 
         print("\nOutput summary:")
-        print(f"  Plots:        {len(plots)}")
-        print(f"  HTML reports: {len(html_reports)}")
-        print(f"  DOCX reports: {len(docx_reports)}")
-        print(f"  ASCII files:  {len(ascii_files)}")
+        print(f"  Signal-viewer files: {len(output_files)}")
 
-        if len(plots) < 10:
-            print("ERROR: Too few plots were created.", file=sys.stderr)
+        if len(output_files) == 0:
+            print("ERROR: No signal-viewer output files were created.", file=sys.stderr)
             return 1
 
-        if len(html_reports) < 1:
-            print("ERROR: No HTML report was created.", file=sys.stderr)
-            return 1
-
-        if len(docx_reports) < 1:
-            print("ERROR: No DOCX report was created.", file=sys.stderr)
-            return 1
-
-        if len(ascii_files) < 5:
-            print("ERROR: Too few ASCII files were created.", file=sys.stderr)
-            return 1
-
-        print("\nATLAS smoke test completed successfully.")
+        print("\nATLAS signal-viewer smoke test completed successfully.")
         return 0
     finally:
-        if not keep_output and analysis_dir.exists():
-            print(f"Removing generated analysis folder: {analysis_dir}")
-            shutil.rmtree(analysis_dir)
+        if not keep_output:
+            if viewer_dir.exists():
+                print(f"Removing generated signal_viewer folder: {viewer_dir}")
+                shutil.rmtree(viewer_dir)
+
+            if cache_dir.exists():
+                print(f"Removing generated cache folder: {cache_dir}")
+                shutil.rmtree(cache_dir)
 
 
 def main(argv: Union[list[str], None] = None) -> int:
@@ -197,8 +173,6 @@ def main(argv: Union[list[str], None] = None) -> int:
         case_name=args.case_name,
         keep_output=args.keep_output,
         timeout=args.timeout,
-        yes_clean_cache=args.yes_clean_cache,
-        yes_export_stage=args.yes_export_stage,
     )
 
 

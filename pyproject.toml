@@ -94,6 +94,7 @@ Issues = "https://github.com/nikolaos-siomos/ATLAS/issues"
 atlas = "atlas_actris.cli:main"
 atlas-signal-viewer = "atlas_actris.cli_viewer:main"
 atlas-smoke-test = "atlas_actris.testing.smoke_test:main"
+atlas-signal-viewer-smoke-test = "atlas_actris.testing.signal_viewer_smoke_test:main"
 atlas-generate-templates = "atlas_actris.templates.generator:main"
 
 # ----------------------------------------------------------

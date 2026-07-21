@@ -7,6 +7,7 @@ Created on Tue Sep 19 17:43:26 2023
 """
 
 # from __master__ import main as atlas_master
+import os
 from utils.cleaners import ask_clean_cache
 from utils.filtering import filter_channels
 from utils.caller_utils import export_report
@@ -203,17 +204,42 @@ export_report(caller_info)
 ask_clean_cache(caller_info)
 
 # Delete all exported stages
-delete_all_exported_stages(
-    output_folder=caller_info['output_folder'],
-)
+delete_exported_answer = os.environ.get("ATLAS_DELETE_EXPORTED_ANSWER")
+
+if delete_exported_answer is None:
+    delete_all_exported_stages(
+        output_folder=caller_info['output_folder'],
+    )
+elif delete_exported_answer.strip().lower() in ["y", "yes"]:
+    delete_all_exported_stages(
+        output_folder=caller_info['output_folder'],
+        ask=False,
+    )
+else:
+    print("-- Skipping deletion of all exported processing stages")
 
 # Export latest stage
-export_processor_stages(
-    processor=processor,
-    stage_names = caller_info['export_stages'],
-    output_folder = caller_info['output_folder'],
-    overwrite=True,
-    ask=True,
-    default_answer=False,
-    print_estimated_size=True,
-)
+export_stage_answer = os.environ.get("ATLAS_EXPORT_STAGE_ANSWER")
+
+if export_stage_answer is None:
+    export_processor_stages(
+        processor=processor,
+        stage_names = caller_info['export_stages'],
+        output_folder = caller_info['output_folder'],
+        overwrite=True,
+        ask=True,
+        default_answer=False,
+        print_estimated_size=True,
+    )
+elif export_stage_answer.strip().lower() in ["y", "yes"]:
+    export_processor_stages(
+        processor=processor,
+        stage_names = caller_info['export_stages'],
+        output_folder = caller_info['output_folder'],
+        overwrite=True,
+        ask=False,
+        default_answer=False,
+        print_estimated_size=True,
+    )
+else:
+    print("-- Skipping export of processing stages")
