@@ -136,15 +136,6 @@ processor.package(
     input_id = 'preprocessing_complete'
     )
 
-dark__metadata = generate_dark(
-    # data_pack = processor.export_test_from_stage("background_calculated"),
-    data_pack = processor.export_test_from_stage("dark_preprocessing_complete"),
-    # data_pack_rc = processor.export_test_from_stage("preprocessing_complete"),
-    caller_info = processor.processing_info["caller_info"],
-    settings_info = settings_info['drk'],
-)
-raise Exception
-
 pol_cal__metadata = generate_polarization_calibration(
     data_pack = processor.export_test_from_stage("pol_cal_complete"),
     caller_info = processor.processing_info["caller_info"],
@@ -171,6 +162,16 @@ ring_telecover__metadata = generate_ring_telecover(
     caller_info = processor.processing_info['caller_info'],
     settings_info = settings_info['tlc_rin']
     )
+
+
+#Dark test
+dark__metadata = generate_dark(
+    # data_pack = processor.export_test_from_stage("background_calculated"),
+    data_pack = processor.export_test_from_stage("dark_preprocessing_complete"),
+    # data_pack_rc = processor.export_test_from_stage("preprocessing_complete"),
+    caller_info = processor.processing_info["caller_info"],
+    settings_info = settings_info['drk'],
+)
 
 # Quicklooks
 generate_quicklooks(

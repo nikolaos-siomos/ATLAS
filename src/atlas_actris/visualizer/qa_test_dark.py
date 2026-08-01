@@ -15,6 +15,7 @@ from collections import defaultdict
 from utils.printouts import print_header
 from visualizer.check import check_channels
 from scipy.stats import linregress, shapiro
+from utils.error_classes import CustomWarning
 from processor.packaging import collect_metadata
 from visualizer.make_text import GenerateText, Libraries
 from visualizer.molecular_signal_simulator import get_molecular_profile
@@ -71,28 +72,32 @@ def extract_arrays(ch_d, key, data_pack_bc,
     # RC signal is currently unused.
     # vertical_scale_rc = data_pack_rc[key][caller_info["vertical_scale"]].sel(ch_d)
 
-    if settings["averaging_rate"] == "raw" or key != "drk":
-        # profiles = data_pack[key]["profile"].sel(ch_d)
+    averaging_rate = settings["averaging_rate"]
+
+    if averaging_rate == "raw" or key != "drk":
         profiles_bc = data_pack_bc[key]["profile"].sel(ch_d)
-        # profiles_rc = data_pack_rc[key]["profile"].sel(ch_d)
         background = data_pack_bc[key]["background"].sel(ch_d)
 
-    elif settings["averaging_rate"] == "low_res" and key == "drk":
-        # profiles = data_pack[key]["profile_low_res"].sel(ch_d)
-        profiles_bc = data_pack_bc[key]["profile_low_res"].sel(ch_d)
-        # profiles_rc = data_pack_rc[key]["profile_low_res"].sel(ch_d)
-        background = data_pack_bc[key]["background_low_res"].sel(ch_d)
+    elif averaging_rate in ("low_res", "high_res") and key == "drk":
+        profiles_bc = data_pack_bc[key][f"profile_{averaging_rate}"].sel(ch_d)
+        background = data_pack_bc[key][f"background_{averaging_rate}"].sel(ch_d)
 
-    elif settings["averaging_rate"] == "high_res" and key == "drk":
-        # profiles = data_pack[key]["profile_high_res"].sel(ch_d)
-        profiles_bc = data_pack_bc[key]["profile_high_res"].sel(ch_d)
-        # profiles_rc = data_pack_rc[key]["profile_high_res"].sel(ch_d)
-        background = data_pack_bc[key]["background_high_res"].sel(ch_d)
+        profiles_all_nan = not np.isfinite(_to_numpy(profiles_bc)).any()
+        background_all_nan = not np.isfinite(_to_numpy(background)).any()
 
+        if profiles_all_nan or background_all_nan:
+            print()
+            CustomWarning(
+                f"{averaging_rate} dark data are unavailable for "
+                f"channel {ch_d['channel']}; raw data will be used instead."
+            )
+            print()
+            profiles_bc = data_pack_bc[key]["profile"].sel(ch_d)
+            background = data_pack_bc[key]["background"].sel(ch_d)
 
     else:
         raise ValueError(
-            f"Unsupported averaging_rate {settings['averaging_rate']!r} for key {key!r}."
+            f"Unsupported averaging_rate {averaging_rate!r} for key {key!r}."
         )
 
     # Mean raw profile at the original raw temporal resolution.

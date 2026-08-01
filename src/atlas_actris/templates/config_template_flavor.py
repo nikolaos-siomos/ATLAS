@@ -66,10 +66,9 @@ CONFIG_TEMPLATE_SECTIONS = {'System': ['station_id',
               'range_resolution',
               'laser_repetition_rate',
               'analog_noise_per_bin',
-              'analog_noise_scaling_factor',
-              'ch_n',
-              'ch_f'],
+              'analog_noise_scaling_factor'],
  'polarization_calibration': ['ch_r', 'ch_t', 'K', 'R_to_T_transmission_ratio', 'eta'],
+ 'gluing': ['ch_n', 'ch_f'],
  'water_vapour': ['ch_w', 'ch_v', 'wv_calibration_factor'],
  'temperature': ['ch_h', 'ch_l', 'alpha_prime', 'beta_prime', 'gamma_prime']}
 

@@ -265,7 +265,7 @@ def generate_vldr_quicklooks(data_pack, caller_info, settings_info):
                 "atlas_channel_id_t": ch_t,
                 "vldr_id": pair,
                 "ATLAS_version": __version__,
-                "QA_test_ID": f"qck_{ray_key}",
+                "QA_test_ID": f"qck_vldr",
             }
         )
         

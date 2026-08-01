@@ -23,11 +23,10 @@ from readers.read_radiosondes import load_radiosonde
 from readers.read_raw_lidar_files_cache import infer_format, flexible_reader
 
 from utils.cookbook import (
-    run_linear_recipe,
-    screening_recipe, 
-    preprocessing_recipe, 
-    pol_cal_recipe,
+    recipes,
+    checkin_stages, 
     checkout_stages,
+    run_linear_recipe
     )
 
 from processor.modify import (
@@ -110,28 +109,13 @@ ctx = Context(
 # Initialize the Processor class
 processor = Processor(ctx)
 
-# Apply screening recipe
-run_linear_recipe(
-    processor, 
-    recipe = screening_recipe, 
-    initial_input = checkout_stages['init'],
-    checkout_id = checkout_stages['screening'],
-    )
-
-# Apply preprocessing recipe
-run_linear_recipe(
-    processor, 
-    recipe = preprocessing_recipe, 
-    initial_input = checkout_stages['screening'],
-    checkout_id = checkout_stages['preprocessing'],
-    )
-
-run_linear_recipe(
-    processor, 
-    recipe = pol_cal_recipe, 
-    initial_input = checkout_stages['preprocessing'],
-    checkout_id = checkout_stages["pol_cal"],
-    )
+for key, recipe in recipes.items():
+    run_linear_recipe(
+        processor, 
+        recipe = recipe, 
+        initial_input = checkin_stages[key],
+        checkout_id = checkout_stages[key],
+        )
 
 for view_stage in caller_info['view_mean_signal_stages']:
     generate_line_plots(processor, stage = view_stage, db = 'profile_mean')

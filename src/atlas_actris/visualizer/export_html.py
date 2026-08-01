@@ -20,6 +20,7 @@ import zipfile
 import tempfile
 import re
 from pathlib import Path
+from utils.parse_init_file import qa_tests, quicklooks
 
 qck_text_map = {
     'qck_ray': 'Rayleigh measurement', 
@@ -565,127 +566,248 @@ def _encode_png_as_data_uri(path_png: str) -> str:
         encoded = base64.b64encode(image_file.read()).decode("utf-8")
     return f"data:image/png;base64,{encoded}"
 
+DRK_QA_TOKENS = tuple(
+    f"_drk_{qa}_"
+    for qa in qa_tests
+    if qa != "drk"
+)
+
+
+def _is_dark_prefixed_plot(path_png: str) -> bool:
+    """Return True for any non-quicklook plot carrying a ``drk`` prefix."""
+    name = os.path.basename(path_png)
+    return "_qck_" not in name and "_drk_" in name
+
+
+def _is_analysis_plot_for_qa(path_png: str, qa: str) -> bool:
+    """Return True only for a non-quicklook, non-dark plot of one QA type.
+
+    The QA token must be followed directly by a four-digit wavelength. This
+    prevents broader glob patterns from mixing related names such as
+    ``pcb``/``pcb_aux`` or ``ray``/``ray_pcb``.
+    """
+    name = os.path.basename(path_png)
+
+    if "_qck_" in name or "_drk_" in name:
+        return False
+
+    return re.search(
+        rf"_{re.escape(qa)}_\d{{4}}[A-Za-z0-9]+(?:_|\.png$)",
+        name,
+    ) is not None
+
+def _is_pure_dark_plot(path_png: str) -> bool:
+    """Return True only for a pure dark-test analysis plot.
+
+    Quicklooks are rejected through the dedicated ``_qck_`` token. Dark
+    variants belonging to another QA test are derived from the shared
+    ``qa_tests`` list in ``utils.parse_init_file``. Adding a new QA test there
+    therefore automatically protects this collector from ``_drk_<qa>_`` plots.
+    """
+    name = os.path.basename(path_png)
+
+    if "_qck_" in name or "_drk_" not in name:
+        return False
+
+    return not any(token in name for token in DRK_QA_TOKENS)
+
+
+
+def _index_plot_metadata(plots_folder: str):
+    """Index PNG paths and metadata by the exact ``QA_test_ID`` value.
+
+    Accepted IDs are derived from the initialization parser:
+
+    - normal QA analyses: ``<qa>``
+    - dark variants: ``drk_<qa>``
+    - quicklooks: ``qck_<qa>``
+
+    Pure dark plots use ``drk`` and VLDR quicklooks use ``qck_vldr``.
+    Files with a missing or unrecognized ``QA_test_ID`` are ignored.
+    """
+    valid_ids = set(qa_tests)
+    valid_ids.update(
+        f"drk_{qa}" for qa in qa_tests if qa != "drk"
+    )
+    valid_ids.update(f"qck_{qa}" for qa in quicklooks)
+
+    indexed = {qa_id: [] for qa_id in valid_ids}
+
+    for path_png in sorted(glob.glob(os.path.join(plots_folder, "*.png"))):
+        try:
+            with Image.open(path_png) as image:
+                meta = dict(image.text)
+        except Exception:
+            continue
+
+        qa_test_id = str(meta.get("QA_test_ID", "")).strip()
+        if qa_test_id not in valid_ids:
+            continue
+
+        indexed.setdefault(qa_test_id, []).append((path_png, meta))
+
+    return indexed
+
+
+def _select_quicklook_entries(entries):
+    """Select preferred quicklooks per telescope type and wavelength."""
+    standard_wavelengths = ["0355", "0532", "1064"]
+    candidates = []
+
+    for path_png, meta in entries:
+        atlas_channel_id = str(meta.get("atlas_channel_id", ""))
+        if not atlas_channel_id:
+            continue
+
+        telescope_type = (
+            atlas_channel_id[4] if len(atlas_channel_id) > 4 else ""
+        )
+        candidates.append((telescope_type, atlas_channel_id, path_png, meta))
+
+    grouped = {}
+    for telescope_type, channel, path_png, meta in candidates:
+        grouped.setdefault(telescope_type, []).append(
+            (channel, path_png, meta)
+        )
+
+    selected = []
+    selected_paths = set()
+
+    for telescope_type in sorted(grouped):
+        items = sorted(
+            grouped[telescope_type],
+            key=lambda item: _quicklook_channel_preference_key(
+                (item[0], item[1])
+            ),
+        )
+        found_standard = False
+
+        for wavelength in standard_wavelengths:
+            matches = [
+                item for item in items
+                if str(item[0]).startswith(wavelength)
+            ]
+            if matches:
+                channel, path_png, meta = matches[0]
+                if path_png not in selected_paths:
+                    selected.append((path_png, meta))
+                    selected_paths.add(path_png)
+                found_standard = True
+
+        if not found_standard and items:
+            channel, path_png, meta = items[0]
+            if path_png not in selected_paths:
+                selected.append((path_png, meta))
+                selected_paths.add(path_png)
+
+    return selected
+
+
+def _select_vldr_entries(entries):
+    """Select one preferred VLDR quicklook for each standard wavelength."""
+    selected = []
+
+    for wavelength in ["0355", "0532", "1064"]:
+        matches = []
+        for path_png, meta in entries:
+            channel = str(meta.get("atlas_channel_id", ""))
+            if channel.startswith(wavelength):
+                matches.append((channel, path_png, meta))
+
+        if not matches:
+            continue
+
+        matches.sort(
+            key=lambda item: (
+                0 if len(item[0]) > 6 and item[0][6] == "a" else 1,
+                _channel_sort_key(item[0]),
+                item[1],
+            )
+        )
+        _, path_png, meta = matches[0]
+        selected.append((path_png, meta))
+
+    return selected
+
+
+def _metadata_entries(entries, key_name):
+    """Build one report dictionary from indexed ``(path, metadata)`` entries."""
+    out = {}
+
+    for path_png, meta in entries:
+        key = str(meta.get(key_name, "")).strip()
+        if not key:
+            continue
+
+        out[key] = {
+            **meta,
+            "path": path_png,
+            "data_uri": _encode_png_as_data_uri(path_png),
+        }
+
+    return out
+
+
 def _collect_report_data(plots_folder: str):
-    """
-    Collect all file paths and image metadata needed to write the report.
-
-    This keeps data collection separate from HTML writing (so that summary tables can
-    be written at the beginning of the HTML file).
-    """
+    """Collect report data using the exact embedded ``QA_test_ID`` metadata."""
     data = {}
+    indexed = _index_plot_metadata(plots_folder)
 
-    # Quicklooks ray
-    for qa in ['ray', 'ray_pcb', 'tlc', 'tlc_rin', 'pcb', 'drk']:
-        qck_images = _select_quicklook_images(plots_folder, qa)
-        qck_metas = {}
-        for im in qck_images:
-            meta = Image.open(im).text
-            atlas_channel_id = meta['atlas_channel_id']
-            qck_metas[atlas_channel_id] = {
-                **meta,
-                'path':im,
-                'data_uri': _encode_png_as_data_uri(im),
-            }
-        data[f"qck_{qa}"] = qck_metas
+    # Quicklooks are categorized exclusively through qck_<qa> IDs.
+    for qa in ["ray", "ray_pcb", "tlc", "tlc_rin", "pcb", "drk"]:
+        entries = _select_quicklook_entries(
+            indexed.get(f"qck_{qa}", [])
+        )
+        data[f"qck_{qa}"] = _metadata_entries(
+            entries,
+            "atlas_channel_id",
+        )
 
-    # Rayleigh-Fit plots
-    ray_images = np.sort(glob.glob(os.path.join(plots_folder, '*_ray_*.png')))
-    ray_images = [item for item in ray_images if '_qck_' not in item]
-    ray_images = [item for item in ray_images if '_mask_' not in item]
-    ray_images = [item for item in ray_images if '_ray_pcb_' not in item]
-    
-    ray_metas = {}
-    for im in ray_images:
-        meta = Image.open(im).text
-        atlas_channel_id = meta['atlas_channel_id']
-        ray_metas[atlas_channel_id] = {
-            **meta,
-            'path':im,
-            'data_uri': _encode_png_as_data_uri(im),
-        }
-    data["ray"] = ray_metas
-    
-    # Rayleigh-Fit Calib. Mode plots
-    ray_pcb_images = np.sort(glob.glob(os.path.join(plots_folder, '*_ray_pcb_*.png')))
-    ray_pcb_images = [item for item in ray_pcb_images if '_qck_' not in item]
-    ray_pcb_images = [item for item in ray_pcb_images if '_mask_' not in item]
-    
-    ray_pcb_metas = {}
-    for im in ray_pcb_images:
-        meta = Image.open(im).text
-        atlas_channel_id = meta['atlas_channel_id']
-        ray_pcb_metas[atlas_channel_id] = {
-            **meta,
-            'path':im,
-            'data_uri': _encode_png_as_data_uri(im),
-        }
-    data["ray_pcb"] = ray_pcb_metas
+    # Normal QA analyses. Dark-prefixed variants such as drk_ray or drk_pcb
+    # have different IDs and therefore cannot enter these collections.
+    data["ray"] = _metadata_entries(
+        indexed.get("ray", []),
+        "atlas_channel_id",
+    )
+    data["ray_pcb"] = _metadata_entries(
+        indexed.get("ray_pcb", []),
+        "atlas_channel_id",
+    )
+    data["tlc"] = _metadata_entries(
+        indexed.get("tlc", []),
+        "atlas_channel_id",
+    )
+    data["tlc_rin"] = _metadata_entries(
+        indexed.get("tlc_rin", []),
+        "atlas_channel_id",
+    )
+    data["pcb"] = _metadata_entries(
+        indexed.get("pcb", []),
+        "vldr_id",
+    )
+    data["pcb_aux"] = _metadata_entries(
+        indexed.get("pcb_aux", []),
+        "vldr_id",
+    )
 
-    # Telecover plots
-    tlc_images = np.sort(glob.glob(os.path.join(plots_folder, '*_tlc_*.png')))
-    tlc_images = [item for item in tlc_images if '_qck_' not in item]
-    tlc_images = [item for item in tlc_images if '_qck_rin_' not in item]
+    # Only the exact QA_test_ID='drk' is included in the Dark Test section.
+    # IDs such as drk_ray, drk_pcb_aux, and drk_tlc are kept separate and are
+    # currently not displayed in another report section.
+    data["drk"] = _metadata_entries(
+        indexed.get("drk", []),
+        "atlas_channel_id",
+    )
 
-    tlc_rin_images = np.sort(glob.glob(os.path.join(plots_folder, '*_tlc_rin_*.png')))
-    tlc_rin_images = [item for item in tlc_rin_images if '_qck_' not in item]
+    # VLDR quicklooks are identified by the exact qck_vldr ID. Keep every
+    # available channel pair; vldr_id is the pair identifier stored in the
+    # plot metadata. No wavelength-based preselection is applied here.
+    data["vldr"] = _metadata_entries(
+        indexed.get("qck_vldr", []),
+        "vldr_id",
+    )
 
-    tlc_metas = {}
-    for im in tlc_images:
-        meta = Image.open(im).text
-        atlas_channel_id = meta['atlas_channel_id']
-        tlc_metas[atlas_channel_id] = {
-            **meta,
-            'path':im,
-            'data_uri': _encode_png_as_data_uri(im),
-        }
-        
-    data["tlc"] = tlc_metas
-
-    tlc_rin_metas = {}
-    for im in tlc_rin_images:
-        meta = Image.open(im).text
-        atlas_channel_id = meta['atlas_channel_id']
-        tlc_rin_metas[atlas_channel_id] = {
-            **meta,
-            'path':im,
-            'data_uri': _encode_png_as_data_uri(im),
-        }
-        
-    data["tlc_rin"] = tlc_rin_metas
-
-    # Polarization Calibration plots
-    pcb_images = np.sort(glob.glob(os.path.join(plots_folder, '*_pcb_*.png')))
-    pcb_images = [item for item in pcb_images if '_qck_' not in item and '_ray_' not in item]
-
-    pcb_metas = {}
-    for im in pcb_images:
-        meta = Image.open(im).text
-        atlas_vldr_id = meta['vldr_id']
-        pcb_metas[atlas_vldr_id] = {
-            **meta,
-            'path':im,
-            'data_uri': _encode_png_as_data_uri(im),
-        }
-        
-    data["pcb"] = pcb_metas
-
-    # VLDR plots
-    vldr_images = _select_vldr_images(plots_folder)
-
-    vldr_metas = {}
-    for im in vldr_images:
-        meta = Image.open(im).text
-        atlas_vldr_id = meta['vldr_id']
-        vldr_metas[atlas_vldr_id] = {
-            **meta,
-            'path':im,
-            'data_uri': _encode_png_as_data_uri(im),
-        }
-        
-    data["vldr"] = vldr_metas
-    
     return data
- 
+
 def channel_entry(f, meta, plot_width):
     """Write an embedded image tag.
 
@@ -773,6 +895,16 @@ def QA_report(
                         f.write(f'<h3>{qck_text_map[key]}</h3>')
                         f.write('<br>\n')
                         channel_entry(f, data[key][ch], plot_width)
+
+        # Pure dark-test analysis plots
+        if data.get("drk"):
+            f.write('<h1>Dark Test</h1>')
+            f.write('\n')
+            for ch in sorted(data["drk"].keys(), key=_channel_sort_key):
+                f.write(f'<h2>{ch}</h2>')
+                channel_entry(f, data["drk"][ch], plot_width)
+
+            write_page_break(f)
                     
         # Quicklooks VLDR
         if data["vldr"]:
@@ -828,17 +960,30 @@ def QA_report(
     
             write_page_break(f)
 
-        if data["pcb"]:
+        if data["pcb"] or data["pcb_aux"]:
             # Polarization Calibration Plots
             f.write('<h1>Polarization Calibration</h1>')
             f.write('\n')
-    
-            for ch in _select_preferred_pcb_keys(data["pcb"], preferred_mode="p", export_all=export_all):
-                meta = data["pcb"][ch]
+
+            pcb_entries = dict(data.get("pcb_aux", {}))
+            pcb_entries.update(data.get("pcb", {}))
+
+            for ch in _select_preferred_pcb_keys(
+                pcb_entries, preferred_mode="p", export_all=export_all
+            ):
+                meta = pcb_entries[ch]
                 ch_r = meta['atlas_channel_id_r']
                 ch_t = meta['atlas_channel_id_t']
                 f.write(f'<h2>{ch_r} to {ch_t}</h2>')
-                channel_entry(f, meta, plot_width)
+
+                if ch in data["pcb"]:
+                    channel_entry(f, data["pcb"][ch], plot_width)
+
+                if ch in data["pcb"] and ch in data["pcb_aux"]:
+                    f.write('<br>\n')
+
+                if ch in data["pcb_aux"]:
+                    channel_entry(f, data["pcb_aux"][ch], plot_width)
 
     # Optional editable document export. Conversion must never break HTML report creation.
     if export_docx:
@@ -1488,6 +1633,13 @@ def convert_report_data_to_docx(
                     document.add_heading(qck_text_map[key], level=3)
                     _add_docx_picture(document, data[key][ch].get('path'))
 
+    if data.get("drk"):
+        document.add_heading("Dark Test", level=1)
+        for ch in sorted(data["drk"].keys(), key=_channel_sort_key):
+            document.add_heading(ch, level=2)
+            _add_docx_picture(document, data["drk"][ch].get('path'))
+        document.add_page_break()
+
     if data.get("vldr"):
         document.add_heading("VLDR Quicklooks", level=1)
         for ch in sorted(data["vldr"].keys(), key=_channel_sort_key):
@@ -1523,14 +1675,26 @@ def convert_report_data_to_docx(
                 _add_docx_picture(document, data["tlc_rin"][ch].get('path'))
         document.add_page_break()
 
-    if data.get("pcb"):
+    if data.get("pcb") or data.get("pcb_aux"):
         document.add_heading("Polarization Calibration", level=1)
-        for ch in _select_preferred_pcb_keys(data["pcb"], preferred_mode="p", export_all=export_all):
-            meta = data["pcb"][ch]
+
+        pcb_data = data.get("pcb", {})
+        pcb_aux_data = data.get("pcb_aux", {})
+        pcb_entries = dict(pcb_aux_data)
+        pcb_entries.update(pcb_data)
+
+        for ch in _select_preferred_pcb_keys(
+            pcb_entries, preferred_mode="p", export_all=export_all
+        ):
+            meta = pcb_entries[ch]
             ch_r = meta.get('atlas_channel_id_r', '')
             ch_t = meta.get('atlas_channel_id_t', '')
             document.add_heading(f"{ch_r} to {ch_t}", level=2)
-            _add_docx_picture(document, meta.get('path'))
+
+            if ch in pcb_data:
+                _add_docx_picture(document, pcb_data[ch].get('path'))
+            if ch in pcb_aux_data:
+                _add_docx_picture(document, pcb_aux_data[ch].get('path'))
 
     document.save(docx_filepath)
 

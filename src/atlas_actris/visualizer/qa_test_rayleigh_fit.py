@@ -234,7 +234,7 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                         **settings,
                         "atlas_channel_id": ch,
                         "ATLAS_version": __version__,
-                        "QA_test_ID": "ray",
+                        "QA_test_ID": key,
                         'maximum_channel_height':maximum_channel_height, 
                         'normalization_region':norm_region, 
                         'normalization_flag':norm_region_flag,

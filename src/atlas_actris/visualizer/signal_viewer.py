@@ -16,7 +16,9 @@ import holoviews as hv
 from bokeh.models import (
     LinearColorMapper, ColorBar, FixedTicker,
     LinearAxis, BoxAnnotation, Span,
+    Button, CustomJS, TextInput,
 )
+from bokeh.layouts import row
 from matplotlib import colors as mpl_colors
 from utils.error_classes import CustomWarning
 
@@ -620,14 +622,117 @@ def _cleanup_plotting_state():
     gc.collect()
 
 
-def _save_hvplot_html(plot, output_folder, filename):
-    """Save an hvPlot/HoloViews object as a left-aligned HTML file.
+def _make_axis_limit_controls(fig):
+    """Create browser-side controls for setting exact x/y plot limits.
 
-    Wrapping the HoloViews object in a Panel Column gives better control over
-    the exported page layout than saving the HoloViews object directly.  The
-    plot itself is configured as responsive, while the Panel container is
-    left-aligned and stretches to the available browser width.
+    The exported viewer is a standalone HTML file, so the controls use Bokeh
+    CustomJS callbacks rather than Python callbacks.  Empty fields leave the
+    corresponding range endpoint unchanged.
     """
+
+    x_min = TextInput(title="x min", placeholder="auto/current", width=135)
+    x_max = TextInput(title="x max", placeholder="auto/current", width=135)
+    y_min = TextInput(title="y min", placeholder="auto/current", width=135)
+    y_max = TextInput(title="y max", placeholder="auto/current", width=135)
+
+    apply_button = Button(label="Apply limits", button_type="primary", width=125)
+    reset_button = Button(label="Reset limits", width=125)
+
+    # Store the ranges that existed when the page was created.  The dedicated
+    # reset button returns exactly to these values, independently of later zooms.
+    initial_x_start = fig.x_range.start
+    initial_x_end = fig.x_range.end
+    initial_y_start = fig.y_range.start
+    initial_y_end = fig.y_range.end
+
+    apply_button.js_on_click(CustomJS(
+        args=dict(
+            x_range=fig.x_range,
+            y_range=fig.y_range,
+            x_min=x_min,
+            x_max=x_max,
+            y_min=y_min,
+            y_max=y_max,
+        ),
+        code="""
+            function parseLimit(widget) {
+                const text = widget.value.trim();
+                if (text === "") return null;
+                const value = Number(text);
+                return Number.isFinite(value) ? value : NaN;
+            }
+
+            const xmin = parseLimit(x_min);
+            const xmax = parseLimit(x_max);
+            const ymin = parseLimit(y_min);
+            const ymax = parseLimit(y_max);
+
+            const values = [xmin, xmax, ymin, ymax];
+            if (values.some((value) => Number.isNaN(value))) {
+                window.alert("Axis limits must be valid numbers.");
+                return;
+            }
+            if (xmin !== null && xmax !== null && xmin >= xmax) {
+                window.alert("x min must be smaller than x max.");
+                return;
+            }
+            if (ymin !== null && ymax !== null && ymin >= ymax) {
+                window.alert("y min must be smaller than y max.");
+                return;
+            }
+
+            if (xmin !== null) x_range.start = xmin;
+            if (xmax !== null) x_range.end = xmax;
+            if (ymin !== null) y_range.start = ymin;
+            if (ymax !== null) y_range.end = ymax;
+
+            x_range.change.emit();
+            y_range.change.emit();
+        """,
+    ))
+
+    reset_button.js_on_click(CustomJS(
+        args=dict(
+            x_range=fig.x_range,
+            y_range=fig.y_range,
+            x_min=x_min,
+            x_max=x_max,
+            y_min=y_min,
+            y_max=y_max,
+            initial_x_start=initial_x_start,
+            initial_x_end=initial_x_end,
+            initial_y_start=initial_y_start,
+            initial_y_end=initial_y_end,
+        ),
+        code="""
+            x_range.start = initial_x_start;
+            x_range.end = initial_x_end;
+            y_range.start = initial_y_start;
+            y_range.end = initial_y_end;
+
+            x_min.value = "";
+            x_max.value = "";
+            y_min.value = "";
+            y_max.value = "";
+
+            x_range.change.emit();
+            y_range.change.emit();
+        """,
+    ))
+
+    return row(
+        x_min,
+        x_max,
+        y_min,
+        y_max,
+        apply_button,
+        reset_button,
+        sizing_mode="stretch_width",
+    )
+
+
+def _save_hvplot_html(plot, output_folder, filename):
+    """Save an interactive hvPlot with standalone axis-limit controls."""
 
     os.makedirs(output_folder, exist_ok=True)
 
@@ -636,8 +741,14 @@ def _save_hvplot_html(plot, output_folder, filename):
 
     _ensure_panel_css()
 
+    # Render once so the controls can directly target the Bokeh x/y ranges.
+    # The resulting JavaScript callbacks continue to work in standalone HTML.
+    bokeh_plot = hv.render(plot, backend="bokeh")
+    controls = _make_axis_limit_controls(bokeh_plot)
+
     page = pn.Column(
-        plot,
+        controls,
+        bokeh_plot,
         sizing_mode="stretch_width",
         align="start",
         margin=(0, 0, 0, 0),
@@ -653,6 +764,8 @@ def _save_hvplot_html(plot, output_folder, filename):
         # Drop Panel/Bokeh references immediately after each file is saved.
         page.clear()
         del page
+        del controls
+        del bokeh_plot
         _cleanup_plotting_state()
 
     return fpath

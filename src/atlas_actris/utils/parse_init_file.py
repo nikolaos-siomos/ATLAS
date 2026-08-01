@@ -119,8 +119,12 @@ temperature_units = ["K", "C", "Cx10"]
 humidity_units = ["percent", "fraction"]
 
 default_export_stage = ['pol_cal_complete']
-default_mean_signal_stages = ['averaged', 'background_corrected', 'preprocessing_complete']
-default_signal_stages = ['averaged']
+default_mean_signal_stages = [
+    'common_preprocessing_complete', 
+    'preprocessing_complete', 
+    'dark_preprocessing_complete'
+    ]
+default_signal_stages = ['screening_complete']
 
 allowed_stages = collect_stages()
         

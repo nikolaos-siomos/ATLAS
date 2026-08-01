@@ -86,6 +86,10 @@ BEGINNER_CONFIG_TEMPLATE_SECTIONS = {
         "R_to_T_transmission_ratio",
         "eta",
     ],
+    "gluing": [
+        "ch_n",
+        "ch_f",
+    ],
     "water_vapour": [
         "ch_w",
         "ch_v",

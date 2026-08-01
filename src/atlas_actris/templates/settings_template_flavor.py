@@ -908,3 +908,89 @@ SETTINGS_FLAVOR = {'qck': {'t_lims': {'description': 'Time limits used in the pl
                                               'old_names_removed_in': '',
                                               'note': ''}}}}
 
+
+# Dark-test settings added with the corresponding parser schema. Existing
+# flavor entries above are intentionally left unchanged.
+SETTINGS_TEMPLATE_SECTIONS["drk"] = "dark"
+SETTINGS_FLAVOR["drk"] = {
+    "stats_range": {
+        "description": "Height/range interval used to calculate dark-signal statistics.",
+        "example": "5, 15",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "far_range_region": {
+        "description": "Far-range interval used for the dark-signal quality check.",
+        "example": "25, _",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "averaging_rate": {
+        "description": "Select the signal averaging level used by the dark test.",
+        "example": "high_res",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "relative_molecular_deviation": {
+        "description": "Maximum relative molecular-signal deviation accepted by the dark test.",
+        "example": "0.01",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "smooth": {
+        "description": "Apply smoothing to the dark signal before plotting or evaluation.",
+        "example": "True",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "smoothing_range": {
+        "description": "Height/range interval over which dark-signal smoothing is applied.",
+        "example": "5, 15",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "smoothing_window": {
+        "description": "Smoothing window size used for the dark signal.",
+        "example": "0.5",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "smooth_rc": {
+        "description": "Apply smoothing to the range-corrected dark signal.",
+        "example": "True",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "smoothing_range_rc": {
+        "description": "Height/range interval over which range-corrected dark-signal smoothing is applied.",
+        "example": "0.05, 35",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "smoothing_window_rc": {
+        "description": "Smoothing window size used for the range-corrected dark signal.",
+        "example": "2",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "select_channels": {
+        "description": "Channel IDs to include explicitly in the dark test.",
+        "example": "0532xcpr, 1064xtax",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "exclude_wavelength": {
+        "description": "Wavelengths to exclude from the dark test.",
+        "example": "1064",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "exclude_telescope_type": {
+        "description": "Telescope types to exclude from the dark test.",
+        "example": "n, f",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "exclude_channel_type": {
+        "description": "Channel types to exclude from the dark test.",
+        "example": "a, f",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "exclude_acquisition_mode": {
+        "description": "Acquisition modes to exclude from the dark test.",
+        "example": "a",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+    "exclude_channel_subtype": {
+        "description": "Channel subtypes to exclude from the dark test.",
+        "example": "w, c",
+        "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
+    },
+}

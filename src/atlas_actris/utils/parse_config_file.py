@@ -164,7 +164,7 @@ TEMP_KEYS = {
     }
 
 recognized_sections = [
-    "System", "Channels", "polarization_calibration", "water_vapour", "temperature"
+    "System", "Channels", "polarization_calibration", "gluing", "water_vapour", "temperature"
     ]
 
 blank_tokens = ["_"]
