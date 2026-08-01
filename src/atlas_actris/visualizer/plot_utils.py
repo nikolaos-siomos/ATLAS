@@ -197,15 +197,18 @@ def pass_to_args(args, data_list, data_keys):
         
     return(args)
     
-def smoothing(args, x_vals, y_vals, err_type = "std"):
+def smoothing(args, x_vals, y_vals, err_type = "std",
+              range_alias = "smoothing_range",
+              window_alias = "smoothing_window", smooth_alias = "smooth",
+              expo_alias = "smooth_exponential"):
     
-    if args['smooth'] and args['smoothing_window']:
+    if args[smooth_alias] and args[window_alias]:
 
         y_vals_sm, y_errs = \
             smooth_1D(y_vals = y_vals, 
                       x_vals = x_vals,
-                      x_sm_lims = args['smoothing_range'],
-                      x_sm_win = 1E3 * args['smoothing_window'],
+                      x_sm_lims = args[range_alias],
+                      x_sm_win = args[window_alias],
                       expo = False,
                       err_type = err_type)
     
@@ -215,25 +218,38 @@ def smoothing(args, x_vals, y_vals, err_type = "std"):
         
     return(y_vals_sm, y_errs)
 
-def smoothing_2D(args, x_vals, y_vals, err_type = "std"):
+def smoothing_2D(args, x_vals, y_vals, 
+                 err_type = "std", range_alias = "smoothing_range",
+                 window_alias = "smoothing_window", smooth_alias = "smooth",
+                 expo_alias = "smooth_exponential"):
     
-    if args['smooth'] and args['smoothing_window']:
+    if args[smooth_alias] and args[window_alias]:
         
-        if isinstance(args['smoothing_window'],list):
+        if isinstance(args[window_alias],list):
             smooth_2D = sliding_average_2D
         else:
             smooth_2D = sliding_average_2D_fast
 
+        if expo_alias in args:
+            expo = args[expo_alias]
+        else:
+            expo = False
+            
         y_vals_sm, y_errs = smooth_2D(
             z_vals = y_vals, 
             y_vals = x_vals,
-            y_sm_lims = args['smoothing_range'],
-            y_sm_win = args['smoothing_window'],
-            expo = args['smooth_exponential']
+            y_sm_lims = args[range_alias],
+            y_sm_win = args[window_alias],
+            expo = expo
             )
+
     else:
-        y_vals_sm = y_vals
-        y_errs = np.nan * np.zeros_like(y_vals)
+        y_vals_sm = y_vals.copy()
+        if isinstance(y_vals, DataArray):
+            y_errs = y_vals.copy(deep=True)
+            y_errs.data = np.full(y_vals.shape, np.nan, dtype=float)
+        else:
+            y_errs = np.full(np.asarray(y_vals).shape, np.nan, dtype=float)
         
     return(y_vals_sm, y_errs)
 

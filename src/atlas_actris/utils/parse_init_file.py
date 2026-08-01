@@ -18,12 +18,7 @@ from datetime import datetime
 from utils.printouts import print_header, endpoint
 from utils.error_classes import ConfigError, CustomWarning
 from typing import Any, Dict, List, Optional, Union, Mapping, Iterable, Sequence
-from utils.cookbook import (
-    screening_recipe, 
-    preprocessing_recipe, 
-    pol_cal_recipe,
-    checkout_stages,
-    )
+from utils.cookbook import collect_stages
 
 Number = Union[int, float]
 
@@ -127,10 +122,7 @@ default_export_stage = ['pol_cal_complete']
 default_mean_signal_stages = ['averaged', 'background_corrected', 'preprocessing_complete']
 default_signal_stages = ['averaged']
 
-allowed_stages = [recipe[0] for recipe in screening_recipe] +\
-    [recipe[0] for recipe in preprocessing_recipe] + \
-        [recipe[0] for recipe in pol_cal_recipe] + \
-            [v for k,v in checkout_stages.items()]
+allowed_stages = collect_stages()
         
 allowed_vertical_scales = ["range", "height_agl", "height_asl"]
 
@@ -151,7 +143,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "vertical_scale":          {"dtype": str,  "default": "range",                    "is_list": False, "category": "optional", "allowed": allowed_vertical_scales},
     "view_mean_signal_stages": {"dtype": str,  "default": default_mean_signal_stages, "is_list": True,  "category": "optional", "allowed": allowed_stages},
     "view_signal_stages":      {"dtype": str,  "default": default_signal_stages,      "is_list": True,  "category": "optional", "allowed": allowed_stages},
-    "dpi":                     {"dtype": int,  "default": 300,                        "is_list": False, "category": "optional"},
+    "dpi":                     {"dtype": int,  "default": 150,                        "is_list": False, "category": "optional"},
     "color_reduction":         {"dtype": bool, "default": False,                      "is_list": False, "category": "optional"},
     "output_folder":           {"dtype": str,  "default": None,                       "is_list": False, "category": "optional"},
     "overwrite_output":        {"dtype": bool, "default": False,                      "is_list": False, "category": "optional"},
@@ -169,9 +161,9 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "max_height_agl":               {"dtype": float, "default": 40.,     "is_list": False, "category": "optional"},
     "low_shot_threshold":           {"dtype": float, "default": 0.9,     "is_list": False, "category": "optional", "min": 0., "max": 0.999},
     "trim_overflows":               {"dtype": int,   "default": 0,       "is_list": False, "category": "optional", "allowed": [0, 1, 2, 3]},
-    "low_res_averaging_rate":       {"dtype": str,   "default": None,    "is_list": False, "category": "optional"},
+    "low_res_averaging_rate":       {"dtype": str,   "default": '1H',    "is_list": False, "category": "optional"},
     "low_res_averaging_threshold":  {"dtype": float, "default": 0.5,     "is_list": False, "category": "optional", "min": 0., "max": 1.},
-    "high_res_averaging_rate":      {"dtype": str,   "default": None,    "is_list": False, "category": "optional"},
+    "high_res_averaging_rate":      {"dtype": str,   "default": '10min', "is_list": False, "category": "optional"},
     "high_res_averaging_threshold": {"dtype": float, "default": 0.5,     "is_list": False, "category": "optional", "min": 0., "max": 1.},
     "max_adjacent_overflows":       {"dtype": int,   "default": 5,       "is_list": False, "category": "optional", "min": 0},
     "slice_measurement":            {"dtype": str,   "default": [],      "is_list": True,  "category": "optional"},
@@ -188,7 +180,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "pcb_aux":      {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
     "cam":          {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "relative"},
 
-    "files_per_quadrant":         {"dtype": int,   "default": None,     "is_list": False, "category": "optional", "min": 0},
+    "files_per_quadrant":       {"dtype": int,   "default": None,     "is_list": False, "category": "optional", "min": 0},
     "files_per_ring":           {"dtype": int,   "default": None,     "is_list": False, "category": "optional", "min": 0},
     "rsonde_skip_header":       {"dtype": int,   "default": 1,        "is_list": False, "category": "optional", "min": 0},
     "rsonde_skip_footer":       {"dtype": int,   "default": 0,        "is_list": False, "category": "optional", "min": 0},

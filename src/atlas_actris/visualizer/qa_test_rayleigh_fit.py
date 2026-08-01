@@ -13,8 +13,8 @@ from visualizer import curve_fit
 from visualizer import export_ascii
 from collections import defaultdict
 from utils.printouts import print_header
-from utils.error_classes import CustomWarning
 from visualizer.check import check_channels
+from utils.error_classes import CustomWarning
 from processor.packaging import collect_metadata
 from visualizer.make_text import GenerateText, Libraries
 from visualizer.plot_utils import (
@@ -226,25 +226,6 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                         'norm_flag',
                         ]
                     )
-                
-                # # Collect metadata to be added in the plot files
-                # plot_metadata = collect_dict(
-                #     data_list = [
-                #         maximum_channel_height, 
-                #         norm_region, 
-                #         norm_region_flag,
-                #         __version__,
-                #         'ray'
-                #         ],
-                #     data_keys = [
-                #         'maximum_channel_height', 
-                #         'norm_region', 
-                #         'norm_flag',
-                #         'ATLAS_version',
-                #         'QA_test_ID'
-                #         ],
-                #     add_dicts = [channel_settings, metadata]
-                #     )
                 
                 plot_metadata = (
                     {

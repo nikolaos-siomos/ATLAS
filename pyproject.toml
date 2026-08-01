@@ -1,6 +1,6 @@
 [project]
 name = "atlas_actris"
-version = "1.0.0"
+version = "1.0.1"
 
 authors = [
     { name = "Nikolaos Siomos", email = "nikolaos.siomos@lmu.de" },

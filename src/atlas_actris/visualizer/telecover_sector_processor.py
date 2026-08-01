@@ -226,7 +226,7 @@ class TelecoverSectorProcessor:
             y_vals=y_m,
             x_vals=x,
             x_sm_lims=[0.,nr_ulim],
-            x_sm_win=1E3*x_sm_win,
+            x_sm_win=x_sm_win,
             expo=False,
         )
 
@@ -234,7 +234,7 @@ class TelecoverSectorProcessor:
             z_vals=y,
             y_vals=x,
             y_sm_lims=[0.,nr_ulim],
-            y_sm_win=1E3*x_sm_win,
+            y_sm_win=x_sm_win,
             expo=False,
         )
 
@@ -244,7 +244,7 @@ class TelecoverSectorProcessor:
             y_vals=y_m,
             x_vals=x,
             x_sm_lims=[nr_ulim, 20.0],
-            x_sm_win=500.0,
+            x_sm_win=0.5,
             expo=False,
         )
 
@@ -252,7 +252,7 @@ class TelecoverSectorProcessor:
             z_vals=y,
             y_vals=x,
             y_sm_lims=[nr_ulim, 20.0],
-            y_sm_win=500.0,
+            y_sm_win=0.5,
             expo=False,
         )
 

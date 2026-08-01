@@ -8,355 +8,569 @@ Created on Thu Sep  1 12:02:25 2022
 
 import warnings
 import numpy as np
-import pandas as pd
 import xarray as xr
-from .readers.parse_drk_args import call_parser, check_parser
-from .readers.check import check_channels
-from .readers.read_prepro import unpack
-from .readers.read_raw import unpack_raw
-from .plotting import make_title, plot_utils, plot_dark, plot_dark_mask
-from ..visualizer.tools.smoothing import sliding_average_2D_fast
-from .tools.smoothing import sliding_average_1D_fast as smooth_1D
-from .writters import make_header, export_ascii
-from .tools import curve_fit
+from version import __version__
+from visualizer import plot_dark
+from collections import defaultdict
+from utils.printouts import print_header
+from visualizer.check import check_channels
 from scipy.stats import linregress, shapiro
-from bokeh.palettes import Category10, turbo
-from .tools import curve_fit
-from matplotlib import pyplot as plt
-from utils.toolbox import round_it
-
-# from .processor.lidar_processing.signal import dark_correction
+from processor.packaging import collect_metadata
+from visualizer.make_text import GenerateText, Libraries
+from visualizer.molecular_signal_simulator import get_molecular_profile
+from visualizer.plot_utils import (
+    prepare_folder, 
+    smoothing,
+    smoothing_2D,
+    collect_dict,
+    convert_m_to_km, 
+    slice_by_vertical_scale,
+    perform_color_reduction, 
+    add_plot_metadata,
+    )
 
 # Ignores all warnings --> they are not printed in terminal
 warnings.filterwarnings('ignore')
 
-def main(args, __version__):
-    # Check the command line argument information
-    args = check_parser(args)
+key_translation = {
+    "molecular_mask_window": "fit_mask_window",
+    "molecular_mask_window_step": "fit_mask_window_step",
+    "molecular_mask_region": "fit_mask_region",
+    "rsem_threshold": "rsem_threshold",
+    "first_derivative_threshold": "first_derivative_threshold",
+    "second_derivative_threshold": "second_derivative_threshold",
+    "shapiro_wilk_threshold": "shapiro_wilk_threshold",
+    "cross_criterion_threshold": "cross_criterion_threshold",
+    "durbin_watson_threshold": "durbin_watson_threshold",
+}
 
-    print('-----------------------------------------')
-    print('Initializing the Dark test...')
-    print('-----------------------------------------')
-    
-    profiles, metadata = unpack(args['input_file'])
+def _dark_title_key(key):
+    """Return the base QA-test category used only for title generation.
 
-    if 'ray_file' in args.keys():
-        profiles_ray, metadata_ray = unpack(args['ray_file'])
+    Dark-test variants keep their complete key everywhere else, including the
+    returned metadata dictionary, PNG metadata, filenames, and ASCII output.
+    """
+
+    if key == "drk" or key.startswith("drk_"):
+        return "drk"
+
+    raise ValueError(f"Expected a dark-test key, received {key!r}.")
+
+# def extract_arrays(ch_d, key, data_pack, data_pack_bc, data_pack_rc,
+def extract_arrays(ch_d, key, data_pack_bc,
+                   caller_info, settings):
+    """Extract raw, background-corrected, smoothed, and raw-mean signals.
+
+    The range-corrected signal is intentionally not used by the dark-test
+    plots anymore. The corresponding extraction code is retained below as
+    comments for reference.
+    """
+    # vertical_scale = data_pack[key][caller_info["vertical_scale"]].sel(ch_d)
+    vertical_scale_bc = data_pack_bc[key][caller_info["vertical_scale"]].sel(ch_d)
+
+    # RC signal is currently unused.
+    # vertical_scale_rc = data_pack_rc[key][caller_info["vertical_scale"]].sel(ch_d)
+
+    if settings["averaging_rate"] == "raw" or key != "drk":
+        # profiles = data_pack[key]["profile"].sel(ch_d)
+        profiles_bc = data_pack_bc[key]["profile"].sel(ch_d)
+        # profiles_rc = data_pack_rc[key]["profile"].sel(ch_d)
+        background = data_pack_bc[key]["background"].sel(ch_d)
+
+    elif settings["averaging_rate"] == "low_res" and key == "drk":
+        # profiles = data_pack[key]["profile_low_res"].sel(ch_d)
+        profiles_bc = data_pack_bc[key]["profile_low_res"].sel(ch_d)
+        # profiles_rc = data_pack_rc[key]["profile_low_res"].sel(ch_d)
+        background = data_pack_bc[key]["background_low_res"].sel(ch_d)
+
+    elif settings["averaging_rate"] == "high_res" and key == "drk":
+        # profiles = data_pack[key]["profile_high_res"].sel(ch_d)
+        profiles_bc = data_pack_bc[key]["profile_high_res"].sel(ch_d)
+        # profiles_rc = data_pack_rc[key]["profile_high_res"].sel(ch_d)
+        background = data_pack_bc[key]["background_high_res"].sel(ch_d)
+
+
     else:
-        profiles_ray = None
-        metadata_ray = None
+        raise ValueError(
+            f"Unsupported averaging_rate {settings['averaging_rate']!r} for key {key!r}."
+        )
+
+    # Mean raw profile at the original raw temporal resolution.
+    profiles_ra = data_pack_bc[key]["profile_mean"].sel(ch_d).squeeze(drop=True)
+
+    y_dict = {
+        "av": profiles_bc + background,
+        "bc": profiles_bc,
+        "sm": profiles_bc,
+        "ra": profiles_ra,
+        # "rc": profiles_rc,
+    }
+
+    x_dict = {
+        "av": vertical_scale_bc,
+        "bc": vertical_scale_bc,
+        "sm": vertical_scale_bc,
+        "ra": vertical_scale_bc,
+        # "rc": vertical_scale_rc,
+    }
+
+    bins_dict = {
+        "av": vertical_scale_bc.bins,
+        "bc": vertical_scale_bc.bins,
+        "sm": vertical_scale_bc.bins,
+        "ra": vertical_scale_bc.bins,
+        # "rc": vertical_scale_rc.bins,
+    }
+
+    return y_dict, x_dict, bins_dict
+
+def insert_mol_sig(ch, ch_info, height, background, x_dict):
+    """Create molecular reference profiles aligned with the signal grids."""
+
+    emitted_wavelength = float(
+        ch_info.sel(parameters="emitted_wavelength").item()
+    )
+
+    if ch[6] == "a":
+        max_signal_ch = float(
+            ch_info.sel(parameters="data_acquisition_range").item()
+        )
+    else:
+        max_signal_ch = np.nan
+
+    height_vals = _to_numpy(height).astype(float).squeeze()
+    if height_vals.ndim != 1:
+        raise ValueError(
+            f"Expected one-dimensional height_agl, got shape {height_vals.shape}."
+        )
+
+    background_value = float(_to_numpy(background).squeeze())
+
+    _, sig_mol, _ = get_molecular_profile(
+        wavelength=emitted_wavelength,
+        sig_nr=max_signal_ch * 0.4,
+        sig_d=background_value,
+        channel_type=ch[5],
+        channel_subtype=ch[7],
+        altitude_agl=height_vals,
+    )
+
+    sm_template = x_dict["sm"]
+    if sig_mol.size != sm_template.size:
+        raise ValueError(
+            "Molecular-profile/smoothed-grid mismatch: "
+            f"{sig_mol.size} molecular points versus {sm_template.size} signal bins."
+        )
+
+    if isinstance(sm_template, xr.DataArray):
+        sig_mol = xr.DataArray(
+            sig_mol,
+            coords=sm_template.coords,
+            dims=sm_template.dims,
+            name="molecular_signal",
+        )
+
+    return {
+        "av": xr.full_like(x_dict["av"], np.nan),
+        "bc": sig_mol,
+        "sm": sig_mol,
+        "ra": xr.full_like(x_dict["ra"], np.nan),
+        # "rc": xr.full_like(x_dict["rc"], np.nan),
+    }
+
+def _scale_range_km_to_m(region):
+    """Convert a two-element range from kilometers to meters."""
+    if region is None or len(region) == 0:
+        return []
+    return [None if value is None else 1e3 * value for value in region]
+
+
+def smooth_arrays(x_dict, y_dict, settings):
+    """Smooth the background-corrected signal while retaining xarray metadata."""
+
+    y_dict["sm"], _ = smoothing_2D(
+        args=settings,
+        x_vals=x_dict["sm"],
+        y_vals=y_dict["sm"],
+        err_type="std",
+    )
+
+    # RC smoothing is intentionally disabled because RC is no longer used by
+    # the dark-test plots.
+    # y_dict["rc"], _ = smoothing_2D(
+    #     args=settings,
+    #     x_vals=x_dict["rc"],
+    #     y_vals=y_dict["rc"],
+    #     err_type="std",
+    #     smooth_alias="smooth_rc",
+    #     range_alias="smoothing_range_rc",
+    #     window_alias="smoothing_window_rc",
+    # )
+
+    if not isinstance(y_dict["sm"], xr.DataArray):
+        raise TypeError(
+            f"smoothing_2D returned {type(y_dict['sm']).__name__} for "
+            "y_dict['sm']. Install/use the xarray-aware versions of "
+            "visualizer.smoothing and visualizer.plot_utils."
+        )
+
+    return y_dict
+
+def convert_x_dict_to_km(x_dict):
+    """Return a copy of the vertical-coordinate dictionary in kilometers."""
+    return {name: convert_m_to_km(values) for name, values in x_dict.items()}
+
+
+def generate_dark(
+        # data_pack, data_pack_bc, data_pack_rc, caller_info, settings_info
+        data_pack, caller_info, settings_info
+        ):
+
+    qa_test_info = defaultdict(dict)
     
+    if 'drk' not in caller_info['process']:
+        return
     
-    args['input_raw_file']
+    for key in data_pack:
+        
+        if key.startswith('drk'):
+            
+            print_header(f'Initializing the Dark test ({key})')
+            
+            # Prepare folders
+            prepare_folder(
+                caller_info, pattern = key, 
+                exclude_patterns = [f'_qck_{key}_']
+                )
     
-
-    system_info, channel_info, time_info,\
-           sig_t, ranges_t, shots = unpack_raw(args['input_raw_file'])
-           
-    # Check if the parsed channels exist
-    channels = \
-        check_channels(sel_channels = args['channels'], 
-                       all_channels = metadata['atlas_channel_id'],
-                       exclude_telescope_type = args['exclude_telescope_type'], 
-                       exclude_channel_type = args['exclude_channel_type'], 
-                       exclude_acquisition_mode = args['exclude_acquisition_mode'], 
-                       exclude_channel_subtype = args['exclude_channel_subtype'])
-
-    meas_duration = int(time_info.loc[:,'Raw_Data_Start_Time'].iloc[-1] / 60.)
-    
-    print()
-    # iterate over the channels
-    for ch in channels:
-        print(f"-- channel: {ch}")
-
-        args_ch = args.copy()
-
-        ch_d = dict(channel = ch)
+            # Load settings
+            settings = settings_info.copy()
+            
+            # Load arrays
+            system_info = data_pack[key]["system_info"]
+            channel_info = data_pack[key]["channel_info"]
+            
+            shots = data_pack[key]["shots"]
+            background = data_pack[key]["background_mean"]
         
-        ranges_ch, sig_ch, sig_ray_ch = \
-            extract_xy_arrays(profiles, profiles_ray, ch_d)
-        
-        sig_t_ch = sig_t.loc[ch_d]
-        ranges_t_ch = ranges_t.loc[ch_d]
-        bins_t_ch = sig_t_ch.bins
-
-        # sig_t_up_ch = sig_t_ch.max(dim='time')
-        # sig_t_dn_ch = sig_t_ch.min(dim='time')
-        
-        args_ch['shots'] = shots.loc[ch_d].mean().values
-        
-        sig_t_av_ch, args_ch['block_samples'] = block_mean_by_duration(
-            sig_t_ch, 
-            duration = args_ch['averaging_rate']
+            profiles = data_pack[key]['profile']
+            
+            system_info_d = dict(
+                zip(
+                    system_info.parameters.values,
+                    system_info.values,
+                )
             )
-        
-        sig_av_ch = sig_t_ch.mean('time')
-                        
-        if ch[6] == 'a':
             
-            set_background_range(
-                args = args_ch, 
-                channel_info = channel_info.loc[ch,:]
+            # Check if the parsed channels exist and apply exclusion options
+            channels = check_channels(
+                all_channels = profiles.channel.values,
+                settings = settings
                 )
-            
-            sig_t_bc_ch, bgr_t_ch = background_correction(
-                sig = sig_t_av_ch, 
-                background_range = args_ch["background_range"],
-                )
-            
-            # er_per_bin_ch = error_per_bin(sig_t_ch, args_ch, channel_info)
-            
-            sig_t_sm_ch, sig_t_er_ch = smoothing_2D(
-                sig = sig_t_bc_ch, 
-                ranges = ranges_t_ch,
-                args = args_ch,
-                channel_info = channel_info.loc[ch,:],
-                mode = 'bin'
-                )
-            
-            sig_t_sm_raw_ch, sig_t_raw_er_ch = smoothing_2D(
-                sig = sig_t_ch, 
-                ranges = ranges_t_ch,
-                args = args_ch,
-                channel_info = channel_info.loc[ch,:],
-                mode = 'bin'
-                )
-            
-            # sig_t_rc_ch = range_correction(sig_t_sm_ch, ranges_t_ch)
-            
-            sig_sm_ch, sig_er_ch = smoothing_1D(
-                sig = sig_ch,
-                ranges = ranges_ch,
-                args = args_ch
-                )
-            
-            sig_ray_sm_ch, sig_ray_er_ch = smoothing_1D(
-                sig = sig_ray_ch,
-                ranges = ranges_ch,
-                args = args_ch
-                )
-        
-            last_index = np.where(sig_av_ch == sig_av_ch)[0][-1]
-            max_bin = ranges_t_ch.bins.values[last_index] - 1
-            
-            if args_ch['fit_mask_region'] is None:
-                # args['fit_mask_region'] = [
-                #     np.ceil(args['fit_mask_window'][0]/2.),
-                #     max_bin - np.ceil(args['fit_mask_window'][0]/2.)]
-                args_ch['fit_mask_region'] = [0, max_bin]
+                    
+            # iterate over the channels
+            for ch in channels:
+                print(f"-- channel: {ch}")
                 
-            # Check for a background correction range
-            stats, masks = \
-                curve_fit.statistics(
-                    y1 = sig_av_ch.values,
-                    y2 = np.ones_like(sig_av_ch), 
-                    x  = ranges_t_ch.bins.values,
-                    sm_win =  1,
-                    keyw_args = args_ch,
-                    cancel_stats = ['pos', 'ccr', 'ext', 'psn']
+                ch_d = dict(channel = ch)
+
+                qa_test_info.setdefault(key, {})
+                qa_test_info[key].setdefault(ch, {})
+
+                ch_info = channel_info.sel(ch_d)  
+                ch_info_d = dict(zip(ch_info.parameters.values, ch_info.values))
+                
+                channel_settings = settings.copy()
+
+                shots_ch = shots.sel(ch_d)
+                all_shots_ch = float(
+                    _to_scalar(shots_ch.sum(dim="time", skipna=True))
+                )
+                n_raw_profiles = int(shots_ch.sizes.get("time", 0))
+                
+                y_dict, x_dict, bins_dict = \
+                    extract_arrays(
+                        ch_d = ch_d, 
+                        key = key, 
+                        # data_pack = data_pack, 
+                        data_pack_bc = data_pack, 
+                        # data_pack_rc = data_pack_rc, 
+                        caller_info = caller_info, 
+                        settings = channel_settings
+                        )
+                
+                # The extended molecular analysis is reserved for the long
+                # dark measurement only: exact key ``drk`` and analog mode.
+                # Photon-counting channels and all auxiliary ``drk_*``
+                # measurements use the compact three-panel layout.
+                extended_dark_analysis = key == "drk" and ch[6] == "a"
+
+                if extended_dark_analysis:
+                    m_dict = insert_mol_sig(
+                        ch=ch,
+                        ch_info=ch_info,
+                        height=data_pack[key]["height_agl"].sel(ch_d),
+                        background=background.sel(ch_d),
+                        x_dict=x_dict,
+                    )
+                else:
+                    m_dict = None
+
+                
+                # All downstream statistics, limits, exports, and plots use km.
+                x_dict = convert_x_dict_to_km(x_dict)
+
+                y_dict = smooth_arrays(
+                    x_dict=x_dict,
+                    y_dict=y_dict,
+                    settings=channel_settings,
                     )
                 
-            zero_bin = get_zero_bin(channel_info.loc[ch])
+                zero_bin = get_zero_bin(ch_info)
             
-            middle_point = masks['total'].middle_point
-            pretrig_middle_points = np.where(middle_point <= zero_bin)[0]
-            
-            if len(pretrig_middle_points) > 0 and zero_bin > 200:
-                masks['pretrig'] = masks['total'][:,:pretrig_middle_points[-1]]
-            
-            if args_ch['far_range'][1] is None:
-                args_ch['far_range'][1] = ranges_t_ch[-1].values
-            
-            if args_ch['far_range'][1] - args_ch['far_range'][0] > 2.:
-                far_range_llim = np.where(ranges_t_ch >= 1E3 * args_ch['far_range'][0])[0][0]
-                far_range_ulim = np.where(ranges_t_ch <= 1E3 * args_ch['far_range'][1])[0][-1]
+                if channel_settings['far_range_region'][1] is None:
+                    channel_settings['far_range_region'][1] = float(x_dict['av'][-1].values)
+                
+                # Slice the reconstructed averaged signal over the statistics
+                # region. Its regional mean is used as the baseline offset,
+                # because the added background may have been estimated over a
+                # different range interval.
+                av_region, _, _ = slice_by_vertical_scale(
+                    da=y_dict["av"],
+                    vertical_scale=x_dict["av"],
+                    x_lims=channel_settings["stats_range"],
+                )
+
+                # Slice the mean raw profile over the statistics region for
+                # noise, vertical-trend, and Gaussian-noise statistics.
+                ra_region, x_region, _ = slice_by_vertical_scale(
+                    da=y_dict["ra"],
+                    vertical_scale=x_dict["ra"],
+                    x_lims=channel_settings["stats_range"],
+                )
+
+                # Use the time-resolved background-corrected signal over the
+                # same region for the temporal-trend calculation.
+                bc_region, _, _ = slice_by_vertical_scale(
+                    da=y_dict["bc"],
+                    vertical_scale=x_dict["bc"],
+                    x_lims=channel_settings["stats_range"],
+                )
+
+                qa_test_info[key][ch] = calculate_statistics(
+                    av=av_region,
+                    ra=ra_region,
+                    bc=bc_region,
+                    ranges=x_region,
+                    all_shots_ch=all_shots_ch,
+                    n_raw_profiles=n_raw_profiles,
+                    stats=qa_test_info[key][ch],
+                )
+
+                # Gather the metadata that are common for all QA tests in a dictonary
+                metadata = collect_metadata(data_pack[key], atlas_channel_id = ch)
+                            
+                plot_metadata = (
+                    {
+                        **system_info_d,
+                        **ch_info_d,
+                        **settings,
+                        "atlas_channel_id": ch,
+                        "ATLAS_version": __version__,
+                        "QA_test_ID": key,
+                        "QA_test_type": "drk",
+                    }
+                )
+                
+                plot_metadata = dict(sorted(plot_metadata.items()))
+
+#------------------------------------------------------------------------------
+# Dark
+#------------------------------------------------------------------------------  
+        
+#------------------------------------------------------------------------------  
+# Text
+                # Load libraris
+                lib = Libraries(
+                    caller_info = caller_info,
+                    metadata = metadata,
+                    extra_metadata = {},
+                    settings = settings,
+                    qa_test_info = {
+                        "qa_test": _dark_title_key(key),
+                        "qa_test_id": key,
+                    }
+                    )
+                
+                # Call GenerateText class
+                text_generator = GenerateText(lib = lib)
+                
+                # Make titles
+                qa_test_info[key][ch]['title'] = \
+                    text_generator.make_dark_title()
+                
+                # Make filenames
+                qa_test_info[key][ch]['filename'] = text_generator.make_filename(
+                    qa_test = key
+                    )
     
-                masks['far_range'] = masks['total'].loc[:,far_range_llim:far_range_ulim]
+                # Ascii header            
+                # ascii_header = text_generator.make_header_dark()
+    
             
-            # Slice range to perform statistics
-            sig_t_sl_ch, ranges_t_sl_ch = slice_signal_by_range(
-                sig = sig_t_bc_ch,
-                ranges = ranges_t_ch * 1E-3,
-                region = args['stats_range']
-                )
-            
-            args_ch = calculate_statistics(
-                sig_t_sl_ch, 
-                ranges = ranges_t_sl_ch,
-                stats = args_ch
-                )
-        
-            # Make title
-            title = make_title.dark(
-                channel = ch, 
-                metadata = metadata, 
-                metadata_r = metadata_ray, 
-                args = args_ch
-                )
-            
-            # Make plot filename
-            fname = plot_utils.make_filename(
-                metadata = metadata, 
-                channel = ch, 
-                meas_type = 'drk', 
-                version = __version__
-                )
-            
-            # Raw signal plot x and y axis limits
-            xlims_av, xlims_range_av, ylims_av = \
-                raw_lims(
-                    sig_t_av_ch, 
-                    bins = bins_t_ch,
-                    ranges = ranges_t_ch,
-                    region = args_ch['background_range']
-                    )     
+                background_range = [ch_info_d['background_low_bin'], ch_info_d['background_high_bin']]
+
+                # Raw signal plot x and y axis limits
+                xlims_av, xlims_range_av, ylims_av = \
+                    raw_lims(
+                        y_dict['av'], 
+                        bins = bins_dict['av'],
+                        ranges = x_dict['av'],
+                        region = background_range
+                        )     
+                    
+                # Far-range zoom. The configured limits are expressed in
+                # the same units as x_dict (km), and the corresponding bin
+                # limits are derived from the selected x_dict interval.
+                xlims_bc, xlims_range_bc, ylims_bc = \
+                    pretrig_lims(
+                        y_dict['bc'],
+                        bins=bins_dict['bc'],
+                        ranges=x_dict['bc'],
+                        zero_bin=zero_bin,
+                        region=channel_settings['far_range_region'],
+                    )
+                    
+                # Zero bin zoomed
+                xlims_zb, xlims_range_zb, ylims_zb = \
+                    zero_bin_lims(
+                        y_dict['bc'], 
+                        bins = bins_dict['bc'],
+                        ranges = x_dict['bc'],
+                        zero_bin = zero_bin,
+                        )    
+                    
+                if extended_dark_analysis:
+                    # The smoothed and molecular-normalized panels are used
+                    # only for the long analog ``drk`` measurement.
+                    xlims_sm, xlims_range_sm, ylims_sm = \
+                        smoothed_lims(
+                            y_dict['sm'],
+                            bins=bins_dict['sm'],
+                            ranges=x_dict['sm'],
+                            zero_bin=zero_bin,
+                            region=channel_settings['far_range_region'],
+                        )
+
+                    # Time-resolved smoothed-BC deviation normalized by the
+                    # corresponding molecular reference profile.
+                    xlims_rc, ylims_rc, max_channel_vertical_scale = \
+                        normalized_sm_deviation_lims(
+                            sig=y_dict["sm"],
+                            molecular=m_dict["sm"],
+                            ranges=x_dict["sm"],
+                            relative_limit=channel_settings[
+                                "relative_molecular_deviation"
+                            ],
+                        )
+                    qa_test_info[key][ch][
+                        "max_channel_vertical_scale"
+                    ] = max_channel_vertical_scale
+                    qa_test_info[key][ch]["vertical_scale_alias"] = (
+                        caller_info.get(
+                            "vertical_scale_alias",
+                            caller_info.get("vertical_scale", "range"),
+                        )
+                    )
+                else:
+                    # These panels are omitted entirely for photon-counting
+                    # channels. Keep placeholders so the shared args assembly
+                    # and plotting call remain backward compatible.
+                    xlims_sm = None
+                    xlims_range_sm = None
+                    ylims_sm = None
+                    xlims_rc = None
+                    ylims_rc = None
+                    qa_test_info[key][ch]["max_channel_vertical_scale"] = np.nan
+                    qa_test_info[key][ch]["vertical_scale_alias"] = (
+                        caller_info.get(
+                            "vertical_scale_alias",
+                            caller_info.get("vertical_scale", "range"),
+                        )
+                    )
+    
+                # Pass all generated scalar or list parameters relevant to the plots to the args dictionary
+                qa_test_info[key][ch] = pass_to_args(
+                    args = qa_test_info[key][ch], 
+                    data_list = [
+                        xlims_av,
+                        xlims_range_av,
+                        ylims_av,
+                        xlims_bc,
+                        xlims_range_bc,
+                        ylims_bc,
+                        xlims_zb,
+                        xlims_range_zb,
+                        ylims_zb,
+                        xlims_sm,
+                        xlims_range_sm,
+                        ylims_sm,
+                        xlims_rc,
+                        ylims_rc,
+                        ch[6],
+                        extended_dark_analysis,
+                        ],
+                    data_keys = [
+                        'xlims_av',
+                        'xlims_range_av',
+                        'ylims_av',
+                        'xlims_bc',
+                        'xlims_range_bc',
+                        'ylims_bc',
+                        'xlims_zb',
+                        'xlims_range_zb',
+                        'ylims_zb',
+                        'xlims_sm',
+                        'xlims_range_sm',
+                        'ylims_sm',
+                        'xlims_rc',
+                        'ylims_rc',
+                        'channel_mode',
+                        'extended_dark_analysis',
+                        ]
+                    )
                 
-            # Pretrig zoomed
-            xlims_bc, xlims_range_bc, ylims_bc = \
-                pretrig_lims(
-                    sig_t_bc_ch, 
-                    bins = bins_t_ch,
-                    ranges = ranges_t_ch,
-                    zero_bin = zero_bin,
-                    region = args_ch['background_range']
-                    )    
-                
-            # Zero bin zoomed
-            xlims_zb, xlims_range_zb, ylims_zb = \
-                zero_bin_lims(
-                    sig_t_bc_ch, 
-                    bins = bins_t_ch,
-                    ranges = ranges_t_ch,
-                    zero_bin = zero_bin,
-                    )    
-                
-            # Smoothed zoomed
-            xlims_sm, xlims_range_sm, ylims_sm = \
-                smoothed_lims(
-                    sig_t_sm_ch, 
-                    bins = bins_t_ch,
-                    ranges = ranges_t_ch,
-                    zero_bin = zero_bin,
+                # Make the plot
+                qa_test_info[key][ch]['drk_plot_path'] = plot_dark.generate_plot(
+                    bins_dict = bins_dict,
+                    x_dict=x_dict,
+                    y_dict=y_dict,
+                    m_dict=m_dict,
+                    args=channel_settings | qa_test_info[key][ch] | caller_info,
                     )  
+            
+                # Perform color reduction        
+                perform_color_reduction(
+                    color_reduction = True, 
+                    plot_path = qa_test_info[key][ch]['drk_plot_path']
+                    )
+    
+                # Add the metadata to the plot 
+                add_plot_metadata(
+                    plot_path = qa_test_info[key][ch]['drk_plot_path'], 
+                    plot_metadata = plot_metadata
+                    )
+    
+                # # Export to ascii (Volker's format)        
+                # export_dark_ascii_blocks(
+                #     dir_out=caller_info['ascii_folder'],
+                #     fname=f"{qa_test_info[key][ch]['filename']}.txt",
+                #     x_dict=x_dict,
+                #     y_dict=y_dict,
+                #     header=ascii_header,
+                #     )
 
-            # RC smoothed
-            xlims_rc, ylims_rc = \
-                rc_smoothed_lims(
-                    sig = sig_sm_ch, 
-                    sig_er = sig_er_ch, 
-                    sig_ray = sig_ray_sm_ch, 
-                    sig_ray_er = sig_ray_er_ch, 
-                    ranges = ranges_ch,
-                    )  
-
-            # Pass all generated scalar or list parameters relevant to the plots to the args dictionary
-            args_ch = pass_to_args(
-                args = args_ch, 
-                data_list = [
-                    title,
-                    fname,
-                    xlims_av,
-                    xlims_range_av,
-                    ylims_av,
-                    xlims_bc,
-                    xlims_range_bc,
-                    ylims_bc,
-                    xlims_zb,
-                    xlims_range_zb,
-                    ylims_zb,
-                    xlims_sm,
-                    xlims_range_sm,
-                    ylims_sm,
-                    xlims_rc,
-                    ylims_rc,
-                    meas_duration,
-                    ch[6],
-                    ],
-                data_keys = [
-                    'title',
-                    'fname',
-                    'xlims_av',
-                    'xlims_range_av',
-                    'ylims_av',
-                    'xlims_bc',
-                    'xlims_range_bc',
-                    'ylims_bc',
-                    'xlims_zb',
-                    'xlims_range_zb',
-                    'ylims_zb',
-                    'xlims_sm',
-                    'xlims_range_sm',
-                    'ylims_sm',
-                    'xlims_rc',
-                    'ylims_rc',
-                    'meas_duration',
-                    'channel_mode',
-                    ]
-                )
-            
-            data_pack = {
-                "av" : sig_t_av_ch,
-                "bc" : sig_t_bc_ch,
-                "sm" : sig_t_sm_ch,
-                "rc" : sig_sm_ch,
-                "rc_er" : sig_er_ch,
-                "rc_ray" : sig_ray_sm_ch,
-                "rc_ray_er" : sig_ray_er_ch,
-                "ranges" : ranges_t_ch,
-                "ranges_rc" : ranges_ch,
-                "bins" : bins_t_ch,
-                }
-            
-            drk_plot_path = \
-                plot_dark.generate_plot(
-                    profiles = data_pack,
-                    args = args_ch)
-                
-            # Make mask plot filename
-            fname_mask = plot_utils.make_filename(metadata = metadata, 
-                                                  channel = ch, 
-                                                  meas_type = 'drk', 
-                                                  extra_type = 'mask',
-                                                  version = __version__)
-        
-            # Make title
-            title_mask = make_title.dark(
-                channel = ch, 
-                metadata = metadata, 
-                metadata_r = metadata_ray, 
-                args = args_ch,
-                is_mask = True
-                )
-            
-            # Pass all additional scalar or list parameters relevant to the mask plots to the args dictionary
-            args_mask_ch = args_ch.copy()
-            
-            args_mask_ch = pass_to_args(
-                args = args_mask_ch,
-                data_list = [
-                    title_mask,
-                    fname_mask
-                    ],
-                data_keys = [
-                    'title',
-                    'fname'
-                    ]
-                )
-            
-            # Generate the molecular mask plot
-            drk_mask_plot_path = \
-                plot_dark_mask.generate_plot(masks = masks,
-                                             args = args_mask_ch)
-
-            # Perform color reduction        
-            plot_utils.perform_color_reduction(color_reduction = args_ch['color_reduction'], 
-                                               plot_path = drk_plot_path)
-            
-            # Perform color reduction        
-            plot_utils.perform_color_reduction(color_reduction = args_ch['color_reduction'], 
-                                               plot_path = drk_mask_plot_path)
-            
-
+    return qa_test_info
                         
 
 def slice_signal_by_range(sig, ranges, region):
@@ -387,63 +601,286 @@ def slice_signal_by_range(sig, ranges, region):
 
     return sig_slice, ranges_slice
 
-def calculate_statistics(sig, ranges, stats= None):
-    
-    time = (sig.copy().time - sig.copy().time[0]).dt.seconds.values + \
-        1e-6 * (sig.copy().time - sig.copy().time[0]).dt.microseconds
-        
+def _to_numpy(value):
+    """Return an in-memory NumPy representation of an xarray/NumPy object."""
+
+    if hasattr(value, "compute"):
+        value = value.compute()
+
+    if hasattr(value, "values"):
+        value = value.values
+
+    return np.asarray(value)
+
+
+def _to_scalar(value):
+    """Convert a scalar-like xarray/NumPy value to a Python scalar."""
+
+    array = _to_numpy(value)
+
+    if array.size != 1:
+        raise ValueError(
+            f"Expected a scalar value, received shape {array.shape}."
+        )
+
+    return array.item()
+
+
+def _as_1d_numpy(value, name):
+    """Return a one-dimensional NumPy array."""
+
+    array = _to_numpy(value).astype(float).squeeze()
+
+    if array.ndim != 1:
+        raise ValueError(
+            f"Expected '{name}' to be one-dimensional, got shape {array.shape}."
+        )
+
+    return array
+
+
+def _profile_mean_numpy(value, name):
+    """Return a one-dimensional mean profile from 1-D or 2-D input."""
+
+    array = _to_numpy(value).astype(float)
+
+    if array.ndim == 1:
+        return array
+
+    if array.ndim == 2:
+        return np.nanmean(array, axis=0)
+
+    raise ValueError(
+        f"Expected '{name}' to be one- or two-dimensional, got shape {array.shape}."
+    )
+
+
+def export_dark_ascii_blocks(dir_out, fname, header, x_dict, y_dict, y_err_dict):
+    """Export dark-test data on their independent vertical grids.
+
+    Raw/background/smoothed profiles and range-corrected profiles may have
+    different bin counts. They are written as two sections in the same file
+    instead of being forced into one rectangular array.
+    """
+
+    import os
+
+    os.makedirs(dir_out, exist_ok=True)
+    path = os.path.join(dir_out, fname)
+
+    raw_columns = [
+        _as_1d_numpy(x_dict["av"], "x_av"),
+        _profile_mean_numpy(y_dict["av"], "y_av"),
+        _as_1d_numpy(x_dict["bc"], "x_bc"),
+        _profile_mean_numpy(y_dict["bc"], "y_bc"),
+        _as_1d_numpy(x_dict["sm"], "x_sm"),
+        _profile_mean_numpy(y_dict["sm"], "y_sm"),
+    ]
+
+    raw_lengths = {column.size for column in raw_columns}
+    if len(raw_lengths) != 1:
+        raise ValueError(
+            "Raw, background-corrected, and smoothed ASCII columns must "
+            f"share one grid. Received lengths: {sorted(raw_lengths)}"
+        )
+
+    # Range-corrected export is intentionally disabled because RC signals are
+    # no longer collected by this dark-test implementation.
+    # rc_columns = [...]
+    # rc_body = np.column_stack(rc_columns)
+
+    raw_body = np.column_stack(raw_columns)
+    header_text = "" if header is None else str(header).rstrip()
+
+    with open(path, "w", encoding="utf-8") as stream:
+        if header_text:
+            stream.write(header_text)
+            stream.write("\n")
+
+        stream.write("# RAW_BACKGROUND_SMOOTHED\n")
+        stream.write(
+            "# range_av_km mean_av range_bc_km mean_bc "
+            "range_sm_km mean_sm\n"
+        )
+        np.savetxt(stream, raw_body, fmt="%.8e")
+
+    return path
+
+
+def _align_signal_with_vertical_scale(sig, vertical_scale):
+    """Align a signal using its own coordinates and validate its vertical scale.
+
+    The signal must be an xarray DataArray containing a ``time`` dimension and
+    exactly one non-time dimension. Its own ``time`` coordinate is the source
+    of truth; no separate time container is required.
+    """
+
+    if not isinstance(sig, xr.DataArray):
+        raise TypeError(
+            "Signal alignment requires an xarray.DataArray so dimension "
+            f"names and coordinates can be used safely. Received {type(sig).__name__}."
+        )
+
+    if "time" not in sig.dims:
+        raise ValueError(
+            "Statistics signal does not contain a 'time' dimension. "
+            f"Found dimensions: {sig.dims}."
+        )
+
+    if "time" not in sig.coords:
+        raise ValueError("Statistics signal has no coordinate values for 'time'.")
+
+    vertical_dims = [dim for dim in sig.dims if dim != "time"]
+
+    if len(vertical_dims) != 1:
+        raise ValueError(
+            "Expected exactly one vertical dimension in addition to 'time'. "
+            f"Found dimensions: {sig.dims}."
+        )
+
+    vertical_dim = vertical_dims[0]
+    sig_aligned = sig.transpose("time", vertical_dim)
+    n_vertical = int(vertical_scale.size)
+
+    if sig_aligned.sizes[vertical_dim] != n_vertical:
+        raise ValueError(
+            "Signal/vertical-scale mismatch for the selected data entry: "
+            f"signal has {sig_aligned.sizes[vertical_dim]} vertical bins, "
+            f"but its x_dict entry has {n_vertical} values."
+        )
+
+    return sig_aligned
+
+def calculate_statistics(
+    av,
+    ra,
+    bc,
+    ranges,
+    all_shots_ch,
+    n_raw_profiles,
+    stats=None,
+):
+    """Calculate dark statistics in the configured statistics region.
+
+    ``av`` is the reconstructed averaged signal (background-corrected signal
+    plus the previously calculated background). Its mean within the statistics
+    region defines the baseline offset, independently of the range used for the
+    original background calculation.
+
+    ``ra`` is the mean raw signal (``profile_mean``) restricted to the
+    configured statistics region. Noise is converted to a single-shot
+    equivalent by multiplying the standard deviation of this averaged profile
+    by ``sqrt(all_shots_ch)``.
+    The temporal trend is calculated independently from the time-resolved
+    background-corrected signal ``bc`` over the same region.
+    """
     if stats is None:
-       stats = {}
-           
-    if ranges.size > 5:
-                
-        sig_m_t = sig.mean(dim = 'bins')
-        sig_m_b = sig.mean(dim = 'time')
-        sig_m = sig.mean()
-        sig_m_b_c = sig_m_b - sig_m
-        
-        vert_fit = linregress(x = ranges.values, 
-                              y = sig_m_b.values)        
-        temp_fit = linregress(x = time.values, y = sig_m_t.values)
-        
-        stats['profiles'] = time.size
-        stats['bins'] = ranges.size
-        stats['sample'] = sig.size
-        
-        stats['baseline_offset'] = sig_m.values
-        stats['baseline_offset_sdev'] = sig.std().values
-        stats['baseline_offset_sem'] = stats['baseline_offset_sdev'] / np.sqrt(stats['sample'])
+        stats = {}
 
-        stats['noise_per_bin'] = stats['baseline_offset_sdev'] * np.sqrt(stats['shots'] * stats['block_samples'])
+    av_vals = _to_numpy(av).astype(float)
+    ra_vals = _to_numpy(ra).astype(float).squeeze()
+    ranges_vals = _to_numpy(ranges).astype(float).squeeze()
 
-        stats['vert_slope'] = vert_fit[0]
-        stats['vert_slope_sign'] = vert_fit[3] <= 0.05
-        stats['temp_slope'] = temp_fit[0]
-        stats['temp_slope_sign'] = temp_fit[3] <= 0.05
-        stats['gaussian_noise'] = shapiro(sig_m_b_c)[1] > 0.05
-        
-        if stats['gaussian_noise']: stats['gaussian_noise_flag'] = 'Yes'
-        else: stats['gaussian_noise_flag'] = 'No'
-        
-        if stats['vert_slope_sign']: stats['vert_slope_flag'] = 'Significant'
-        else: stats['vert_slope_flag'] = 'Insignificant'
+    if av_vals.ndim not in (1, 2):
+        raise ValueError(
+            "Expected the averaged signal in the statistics region to be "
+            f"one- or two-dimensional, got {av_vals.shape}."
+        )
+    if not np.any(np.isfinite(av_vals)):
+        raise ValueError(
+            "The averaged signal contains no finite values in the statistics region."
+        )
 
-        if stats['temp_slope_sign']: stats['temp_slope_flag'] = 'Significant'
-        else: stats['temp_slope_flag'] = 'Insignificant'
-    
+    if ra_vals.ndim != 1:
+        raise ValueError(
+            f"Expected the mean raw profile to be one-dimensional, got {ra_vals.shape}."
+        )
+    if ranges_vals.ndim != 1 or ranges_vals.size != ra_vals.size:
+        raise ValueError(
+            "Mean raw profile/range mismatch in statistics region: "
+            f"signal shape {ra_vals.shape}, range shape {ranges_vals.shape}."
+        )
+
+    valid = np.isfinite(ra_vals) & np.isfinite(ranges_vals)
+    ra_vals = ra_vals[valid]
+    ranges_vals = ranges_vals[valid]
+
+    if ra_vals.size <= 5:
+        print(
+            "--Warning: Insufficient number of points for the dark test "
+            "statistics. Please check the provided stats_range parameter."
+        )
+        return stats
+
+    if not np.isfinite(all_shots_ch) or all_shots_ch <= 0.0:
+        raise ValueError(
+            f"all_shots_ch must be finite and positive, got {all_shots_ch!r}."
+        )
+
+    av_mean = float(np.nanmean(av_vals))
+    ra_mean = float(np.nanmean(ra_vals))
+    ra_centered = ra_vals - ra_mean
+    ra_std = float(np.nanstd(ra_vals))
+
+    vert_fit = linregress(x=ranges_vals, y=ra_vals)
+
+    stats["bins"] = int(ra_vals.size)
+    stats["profiles"] = int(n_raw_profiles)
+    stats["all_shots"] = float(all_shots_ch)
+    stats["shots"] = float(all_shots_ch)  # Backward-compatible alias.
+    stats["sample"] = float(all_shots_ch)  # Older table/export alias.
+
+    stats["baseline_offset"] = av_mean
+    stats["noise_per_bin_per_shot"] = float(
+        ra_std * np.sqrt(all_shots_ch)
+    )
+    stats["noise_per_bin"] = stats["noise_per_bin_per_shot"]
+
+    stats["vert_slope"] = float(vert_fit.slope)
+    stats["vert_slope_sign"] = bool(vert_fit.pvalue <= 0.05)
+    stats["gaussian_noise"] = bool(shapiro(ra_centered).pvalue > 0.05)
+
+    stats["gaussian_noise_flag"] = (
+        "Yes" if stats["gaussian_noise"] else "No"
+    )
+    stats["vert_slope_flag"] = (
+        "Significant" if stats["vert_slope_sign"] else "Insignificant"
+    )
+
+    # Temporal trend from the time-resolved background-corrected signal.
+    bc = _align_signal_with_vertical_scale(bc, ranges)
+    bc_vals = _to_numpy(bc).astype(float)
+    time_values = _to_numpy(bc.coords["time"]).astype("datetime64[ns]")
+    time_seconds = np.asarray(
+        (time_values - time_values[0]) / np.timedelta64(1, "s"),
+        dtype=float,
+    )
+    bc_mean_time = np.nanmean(bc_vals, axis=1)
+    valid_time = np.isfinite(time_seconds) & np.isfinite(bc_mean_time)
+
+    if np.count_nonzero(valid_time) > 2 and np.ptp(time_seconds[valid_time]) > 0.0:
+        temp_fit = linregress(
+            x=time_seconds[valid_time],
+            y=bc_mean_time[valid_time],
+        )
+        stats["temp_slope"] = float(temp_fit.slope)
+        stats["temp_slope_sign"] = bool(temp_fit.pvalue <= 0.05)
+        stats["temp_slope_flag"] = (
+            "Significant" if stats["temp_slope_sign"] else "Insignificant"
+        )
     else:
-        print(f"--Warning: Insufficient number of points for the dark test statistics. Please check the provided stats_range parameter: {args['stats_range']}")
-                    
-    return(stats)
+        stats["temp_slope"] = np.nan
+        stats["temp_slope_sign"] = False
+        stats["temp_slope_flag"] = "Too few valid profiles"
+
+    return stats
 
 def get_zero_bin(channel_info):
-    
-    if channel_info.loc['DAQ_Trigger_Offset'] <= 0:
-        zero_bin = -channel_info.loc['DAQ_Trigger_Offset']
-    else:
-        zero_bin = 0
-        
-    return zero_bin
+    """Return the canonical zero-bin value as a native Python integer."""
+
+    zero_bin = channel_info.sel(parameters="zero_bin").item()
+
+    return int(zero_bin)
 
 def find_region_ind(arr, llim = None, ulim = None):
     
@@ -495,8 +932,8 @@ def raw_lims(sig, bins, ranges, region):
     xlims_bins = [first_bin - bin_edge, last_bin + bin_edge]
     
     xlims_range = [
-        1E-3 * (first_range - range_edge), 
-        1E-3 * (last_range + range_edge)
+        first_range - range_edge,
+        last_range + range_edge
         ]
     
     min_y, max_y, mean_y, y_edge = \
@@ -509,628 +946,273 @@ def raw_lims(sig, bins, ranges, region):
     ylims = [mean_y - 3.3 * y_edge, mean_y + 3.3 * y_edge]
     
     return(xlims_bins, xlims_range, ylims)
+
+def _coordinate_window_indices(coordinate, lower, upper, name):
+    """Return inclusive indices for an explicitly requested coordinate window."""
+
+    values = _to_numpy(coordinate).astype(float).squeeze()
+    if values.ndim != 1 or values.size == 0:
+        raise ValueError(
+            f"Expected a non-empty one-dimensional {name} coordinate, got {values.shape}."
+        )
+
+    lower = float(values[0]) if lower is None else float(lower)
+    upper = float(values[-1]) if upper is None else float(upper)
+    if lower >= upper:
+        raise ValueError(
+            f"Invalid {name} limits [{lower}, {upper}]: lower must be below upper."
+        )
+
+    mask = np.isfinite(values) & (values >= lower) & (values <= upper)
+    indices = np.flatnonzero(mask)
+    if indices.size < 2:
+        raise ValueError(
+            f"The requested {name} window [{lower}, {upper}] contains fewer than "
+            f"two points. Available extent is [{values[0]}, {values[-1]}]."
+        )
+
+    return int(indices[0]), int(indices[-1])
+
 
 def pretrig_lims(sig, bins, ranges, zero_bin, region):
-    
-    if region[0] > zero_bin:
-        
-        last_range = ranges.values[-1]
-        
-        lind, uind = find_region_ind(ranges.values, llim = last_range - 4000.)
-        
-        first_bin, last_bin, bin_span, bin_edge = \
-            get_span(bins.values, lind, uind)
-        
-        first_range, last_range, range_span, range_edge = \
-            get_span(ranges.values, lind, uind)
-        
-    else:
-        
-        lind, uind = find_region_ind(bins.values, llim = 0, ulim = zero_bin)
-        
-        first_bin, last_bin, bin_span, bin_edge = \
-            get_span(bins.values, lind, uind)
-        
-        first_range, last_range, range_span, range_edge = \
-            get_span(ranges.values, lind, uind)
-        
-    xlims_bins = [first_bin - bin_edge, last_bin + bin_edge]
-    
-    xlims_range = [
-        1E-3 * (first_range - range_edge), 
-        1E-3 * (last_range + range_edge)
-        ]
-    
-    min_y, max_y, mean_y, y_edge = \
-        region_extrema(
-            sig = sig,
-            bins = bins,
-            region = region
-            )
-    
-    ylims = [- 3.3 * y_edge, 3.3 * y_edge]
-    
-    return(xlims_bins, xlims_range, ylims)
+    """Return limits for the far-range background-corrected panel.
 
-def zero_bin_lims(sig, bins, ranges, zero_bin):
-    
-    r_buffer = 300
-    l_buffer = 100
-    
-    if zero_bin < 200:
-        l_buffer = 0
-        
-    lind, uind = find_region_ind(
-        bins.values, 
-        llim = zero_bin - l_buffer, 
-        ulim = zero_bin + r_buffer
+    ``region`` is interpreted directly on ``ranges`` (x_dict, in km). The
+    matching bin-axis limits are obtained from the same selected indices.
+    """
+
+    lind, uind = _coordinate_window_indices(
+        ranges, region[0], region[1], name="far-range"
+    )
+
+    bins_vals = _to_numpy(bins).astype(float).squeeze()
+    ranges_vals = _to_numpy(ranges).astype(float).squeeze()
+
+    xlims_bins = [float(bins_vals[lind]), float(bins_vals[uind])]
+    xlims_range = [float(ranges_vals[lind]), float(ranges_vals[uind])]
+
+    min_y, max_y, mean_y, y_edge = region_extrema(
+        sig=sig,
+        bins=ranges,
+        region=xlims_range,
+    )
+    if not np.isfinite(y_edge) or y_edge == 0.0:
+        y_edge = np.finfo(float).eps
+
+    ylims = [-3.3 * y_edge, 3.3 * y_edge]
+    return xlims_bins, xlims_range, ylims
+
+
+def zero_bin_lims(sig, bins, ranges, zero_bin, left_bins=100, right_bins=300):
+    """Return an asymmetric acquisition window around the laser-pulse position.
+
+    ``zero_bin`` is a signed acquisition offset. A negative value means that
+    recording started before the laser pulse, so the pulse occurs at stored
+    bin ``-zero_bin``. A non-negative value means that recording started at or
+    after the pulse; no pre-trigger samples exist and the window starts at the
+    first available bin.
+    """
+
+    bins_vals = _to_numpy(bins).astype(float).squeeze()
+    ranges_vals = _to_numpy(ranges).astype(float).squeeze()
+    if (
+        bins_vals.ndim != 1
+        or ranges_vals.ndim != 1
+        or bins_vals.size != ranges_vals.size
+    ):
+        raise ValueError(
+            "Zero-bin plot requires one-dimensional bin and range coordinates "
+            "with matching lengths."
         )
-    
-    first_bin, last_bin, bin_span, bin_edge = \
-        get_span(bins.values, lind, uind)
-    
-    first_range, last_range, range_span, range_edge = \
-        get_span(ranges.values, lind, uind)
-    
-    xlims_bins = [first_bin - bin_edge, last_bin + bin_edge]
-    
-    xlims_range = [
-        1E-3 * (first_range - range_edge), 
-        1E-3 * (last_range + range_edge)
-        ]
-    
-    min_y, max_y, mean_y, y_edge = \
-        region_extrema(
-            sig = sig,
-            bins = bins,
-            region = xlims_bins
-            )
-    
-    ylims = [- 1.1 * y_edge, 1.1 * y_edge]
-            
-    return(xlims_bins, xlims_range, ylims)
 
-def smoothed_lims(sig, bins, ranges, zero_bin):
-    
-    first_bin, last_bin, bin_span, bin_edge = \
-        get_span(bins.values)
-    
-    first_range, last_range, range_span, range_edge = \
-        get_span(ranges.values)
-        
+    finite_bins = bins_vals[np.isfinite(bins_vals)]
+    if finite_bins.size == 0:
+        raise ValueError("Zero-bin plot contains no finite bin coordinates.")
+
+    bin_min = float(np.nanmin(finite_bins))
+    bin_max = float(np.nanmax(finite_bins))
+
+    if float(zero_bin) < 0.0:
+        pulse_bin = -float(zero_bin)
+        lower_bin = max(bin_min, pulse_bin - float(left_bins))
+        upper_bin = min(bin_max, pulse_bin + float(right_bins))
+    else:
+        lower_bin = bin_min
+        upper_bin = min(bin_max, bin_min + float(right_bins))
+
+    lind, uind = _coordinate_window_indices(
+        bins_vals, lower_bin, upper_bin, name="zero-bin"
+    )
+
+    # Keep the linked bin and vertical-scale axes aligned through the same
+    # selected array indices.
+    xlims_bins = [float(bins_vals[lind]), float(bins_vals[uind])]
+    xlims_range = [float(ranges_vals[lind]), float(ranges_vals[uind])]
+
+    min_y, max_y, mean_y, y_edge = region_extrema(
+        sig=sig,
+        bins=bins,
+        region=[lower_bin, upper_bin],
+    )
+    if not np.isfinite(y_edge) or y_edge == 0.0:
+        y_edge = np.finfo(float).eps
+
+    ylims = [-1.1 * y_edge, 1.1 * y_edge]
+    return xlims_bins, xlims_range, ylims
+
+def smoothed_lims(sig, bins, ranges, zero_bin, region):
+    """Return full-profile x limits and tightly fitted smoothed-signal y limits."""
+
+    first_bin, last_bin, _, bin_edge = get_span(_to_numpy(bins).astype(float))
+    first_range, last_range, _, range_edge = get_span(
+        _to_numpy(ranges).astype(float)
+    )
+
     xlims_bins = [first_bin - bin_edge, last_bin + bin_edge]
-    
-    xlims_range = [
-        1E-3 * (first_range - range_edge), 
-        1E-3 * (last_range + range_edge)
-        ]
-    
-    min_y, max_y, mean_y, y_edge = \
-        region_extrema(
-            sig = sig,
-            bins = bins,
-            region = [zero_bin + 500, last_bin]
-            )
-    
+    xlims_range = [first_range - range_edge, last_range + range_edge]
+
+    # Use the same mean-centred extrema approach as the raw panel, but evaluate
+    # it in the explicitly configured far-range interval on x_dict.
+    min_y, max_y, mean_y, y_edge = region_extrema(
+        sig=sig,
+        bins=ranges,
+        region=region,
+    )
+    if not np.isfinite(y_edge) or y_edge == 0.0:
+        y_edge = np.finfo(float).eps
+
     ylims = [mean_y - 3.3 * y_edge, mean_y + 3.3 * y_edge]
-    
-    return(xlims_bins, xlims_range, ylims)
+    return xlims_bins, xlims_range, ylims
 
-def rc_smoothed_lims(sig, sig_er, sig_ray, sig_ray_er, ranges):
-    
-    mask = (sig == sig)
-    
-    first_range, last_range, range_span, range_edge = \
-        get_span(ranges.copy().where(mask, drop=True).values)
-            
-    xlims_range = [
-        1E-3 * (first_range - range_edge), 
-        1E-3 * (last_range + range_edge)
-        ]
-    
-    sig_sl = slice_signal_by_range(sig, ranges, region = [5000., ranges[-1].values])
-    sig_ray_sl = slice_signal_by_range(sig_ray, ranges, region = [5000., ranges[-1].values])
-    
-    max_val = np.nanmax([np.nanmax(sig_sl), np.nanmax(sig_ray_sl)])
-    ylims = [-3. * max_val, 3. * max_val]
-    
-    return(xlims_range, ylims)
-    
+def normalized_sm_deviation_lims(
+    sig, molecular, ranges, relative_limit, padding=0.10
+):
+    """Return plot limits and the first threshold-exceedance range."""
+
+    sig = _align_signal_with_vertical_scale(sig, ranges)
+    vertical_dim = next(dim for dim in sig.dims if dim != "time")
+
+    if not isinstance(molecular, xr.DataArray):
+        molecular = xr.DataArray(
+            _to_numpy(molecular).astype(float).squeeze(),
+            dims=(vertical_dim,),
+            coords={vertical_dim: sig[vertical_dim]},
+        )
+    else:
+        molecular = molecular.squeeze(drop=True)
+        if molecular.ndim != 1:
+            raise ValueError(
+                "Expected a one-dimensional molecular profile, "
+                f"got dimensions {molecular.dims}."
+            )
+        molecular = molecular.rename({molecular.dims[0]: vertical_dim})
+        molecular = molecular.assign_coords({vertical_dim: sig[vertical_dim]})
+
+    if molecular.sizes[vertical_dim] != sig.sizes[vertical_dim]:
+        raise ValueError(
+            "Molecular-profile/signal mismatch while calculating limits: "
+            f"{molecular.sizes[vertical_dim]} molecular points versus "
+            f"{sig.sizes[vertical_dim]} signal bins."
+        )
+
+    deviation = sig - sig.mean(dim="time", skipna=True)
+    valid_molecular = np.isfinite(molecular) & (molecular != 0.0)
+    normalized = (deviation / molecular).where(valid_molecular)
+
+    ranges_vals = _to_numpy(ranges).astype(float).squeeze()
+    normalized_vals = _to_numpy(normalized).astype(float)
+    molecular_vals = _to_numpy(molecular).astype(float).squeeze()
+
+    valid_columns = (
+        np.isfinite(ranges_vals)
+        & np.isfinite(molecular_vals)
+        & (molecular_vals != 0.0)
+        & np.any(np.isfinite(normalized_vals), axis=0)
+    )
+    if not np.any(valid_columns):
+        raise ValueError(
+            "No finite normalized smoothed-BC deviations are available. "
+            "Check the molecular reference profile and signal grid."
+        )
+
+    valid_ranges = ranges_vals[valid_columns]
+    first_range, last_range, _, range_edge = get_span(valid_ranges)
+    xlims_range = [first_range - range_edge, last_range + range_edge]
+
+    relative_limit = float(relative_limit)
+    if not np.isfinite(relative_limit) or relative_limit <= 0.0:
+        raise ValueError(
+            "relative_limit must be a finite positive float, "
+            f"got {relative_limit!r}."
+        )
+
+    exceeds_by_column = np.any(
+        np.isfinite(normalized_vals)
+        & (np.abs(normalized_vals) > relative_limit),
+        axis=0,
+    )
+    crossing_indices = np.flatnonzero(valid_columns & exceeds_by_column)
+
+    if crossing_indices.size:
+        # "First" follows the stored x-axis order used by the plot.
+        max_channel_vertical_scale = float(
+            ranges_vals[int(crossing_indices[0])]
+        )
+    else:
+        max_channel_vertical_scale = np.nan
+
+    finite_values = normalized_vals[:, valid_columns]
+    finite_values = finite_values[np.isfinite(finite_values)]
+    max_abs = float(np.nanmax(np.abs(finite_values)))
+    if max_abs == 0.0:
+        max_abs = np.finfo(float).eps
+
+    limit = (1.0 + float(padding)) * max_abs
+    return xlims_range, [-limit, limit], max_channel_vertical_scale
+
 def region_extrema(sig, bins, region):
-        
-    mask_bins = (bins >= region[0]) &\
-        (bins <= region[1])
-        
-    min_y = sig.min('time').where(mask_bins).min().values
-    max_y = sig.max('time').where(mask_bins).max().values
-    mean_y = sig.where(mask_bins).mean().values
-    
-    edge = np.max([mean_y - min_y, max_y - mean_y])
 
-    return(min_y, max_y, mean_y, edge)
-    
-    
-def _default_processor(y_tw, x_w, t):
-    """
-    Default stats processor for one (channel, bin_center) window.
+    bins_vals = np.asarray(
+        bins.values if hasattr(bins, "values") else bins,
+        dtype=float,
+    )
 
-    Parameters
-    ----------
-    y_tw : np.ndarray, shape (time, window)
-        Signal values for this rolling window.
-    x_w : np.ndarray, shape (window,)
-        Range values (for this channel) corresponding to the same window bins.
-    t : np.ndarray, shape (time,)
-        Time axis in seconds since start.
+    sig_vals = np.asarray(
+        sig.values if hasattr(sig, "values") else sig,
+        dtype=float,
+    )
 
-    Returns
-    -------
-    tuple of scalars (mean, sdev, sem, vert_slope, temp_slope, gaussian_noise,
-                      profiles, bins, points)
-    """
-    # If rolling window not fully available, xarray will feed NaNs -> return NaNs
-    if np.isnan(y_tw).any() or np.isnan(x_w).any():
-        return (np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
-                np.nan, np.nan, np.nan)
+    if sig_vals.ndim == 1:
+        sig_vals = sig_vals[np.newaxis, :]
 
-    profiles = float(t.size)
-    bins = float(x_w.size)
-    points = float(np.isfinite(y_tw).sum())
+    mask_bins = (
+        (bins_vals >= region[0])
+        & (bins_vals <= region[1])
+    )
 
-    mean = float(np.nanmean(y_tw))
-    sdev = float(np.nanstd(y_tw, ddof=0))
-    sem = float(sdev / np.sqrt(points)) if points > 0 else np.nan
+    if not np.any(mask_bins):
+        raise ValueError(
+            f"No bins found inside region {region}. "
+            f"Available bin range is {bins_vals[0]} to {bins_vals[-1]}."
+        )
 
-    # Vertical trend: mean over time -> profile over window bins
-    y_profile = np.nanmean(y_tw, axis=0)  # (window,)
-    vert_p = linregress(x=x_w, y=y_profile).pvalue
-    vert_slope = float(vert_p <= 0.05)
+    sig_region = sig_vals[:, mask_bins]
 
-    # Temporal trend: mean over bins -> time series over time
-    y_time = np.nanmean(y_tw, axis=1)  # (time,)
-    temp_p = linregress(x=t, y=y_time).pvalue
-    temp_slope = float(temp_p <= 0.05)
+    min_y = np.nanmin(sig_region)
+    max_y = np.nanmax(sig_region)
+    mean_y = np.nanmean(sig_region)
 
-    # Gaussian noise test on demeaned profile residuals (matches your idea)
-    # Shapiro requires at least 3 samples
-    if y_profile.size >= 3:
-        gaussian_noise = float(shapiro(y_profile - np.mean(y_profile)).pvalue > 0.05)
-    else:
-        gaussian_noise = np.nan
+    edge = max(mean_y - min_y, max_y - mean_y)
 
-    return (mean, sdev, sem, vert_slope, temp_slope, gaussian_noise,
-            profiles, bins, points)
-
-
-def calculate_statistics_rolling(sig, ranges, window, region=None, processor=None, center=True):
-    """
-    Rolling-bin statistics with an easy-to-modify processor hook.
-
-    Parameters
-    ----------
-    sig : xr.DataArray
-        dims: (time, channel, bins)
-    ranges : xr.DataArray
-        dims: (channel, bins)
-    window : int
-        Rolling window size in *bins*.
-    region : None or [lower_bin, upper_bin]
-        Bin boundaries (inclusive) where rolling stats are computed.
-        Outside region -> NaNs.
-    processor : callable or None
-        Function(y_tw, x_w, t) -> tuple of scalar stats.
-        If None, uses _default_processor above.
-    center : bool
-        Center the rolling window on each bin (recommended).
-
-    Returns
-    -------
-    xr.Dataset
-        dims: (channel, bins)
-        vars: mean, sdev, sem, vert_slope, temp_slope, gaussian_noise,
-              profiles, bins_in_window, points
-    """
-    if processor is None:
-        processor = _default_processor
-
-    # time in seconds since start (same intent as your current code)
-    dt = sig["time"] - sig["time"].isel(time=0)
-    t = (dt.dt.seconds + 1e-6 * dt.dt.microseconds).astype(float).values  # (time,)
-
-    # Select region in bin-index space (inclusive)
-    n_bins = sig.sizes["bins"]
-    if region is None:
-        lo, hi = 0, n_bins - 1
-    else:
-        lo, hi = int(region[0]), int(region[1])
-        lo = max(lo, 0)
-        hi = min(hi, n_bins - 1)
-        if hi < lo:
-            raise ValueError("region must satisfy upper_bin >= lower_bin")
-
-    sig_reg = sig.isel(bins=slice(lo, hi + 1))
-    ranges_reg = ranges.isel(bins=slice(lo, hi + 1))
-
-    # Build rolling windows (NaN edges when not fully covered)
-    sig_win = (
-        sig_reg.rolling(bins=window, center=center, min_periods=window)
-        .construct("window")
-    )  # dims: (time, channel, bins, window)
-
-    ranges_win = (
-        ranges_reg.rolling(bins=window, center=center, min_periods=window)
-        .construct("window")
-    )  # dims: (channel, bins, window)
-
-def range_correction(sig, ranges):
-    
-    sig_rc = sig * np.power(ranges, 2)
-    
-    mask = (ranges > 0.).broadcast_like(sig_rc)
-
-    sig_rc = sig_rc.where(mask,sig)
-    
-    return(sig_rc)
+    return min_y, max_y, mean_y, edge
     
     
-def smoothing_1D(sig, ranges, args):
-
-    sig_sm = sig.copy()
-    sig_er = np.nan * sig.copy()
-    ranges_sm = 1E-3 * ranges.copy()
-       
-    window = args['smoothing_window_rc']
-    half_window = np.ceil(window / 2)
-    
-    if args['smoothing_range_rc'] is None:
-        args['smoothing_range_rc'] = [0.5, ranges_sm[-1].values]
-            
-    if args['smooth_rc']:
-
-        sig_sm.values, sig_er.values = \
-            smooth_1D(y_vals = sig_sm.values, 
-                      x_vals = ranges_sm.values,
-                      x_sm_lims = args['smoothing_range_rc'],
-                      x_sm_win = args['smoothing_window_rc'],
-                      expo = False,
-                      err_type = 'std',
-                      mode = 'range')
-            
-        range_mask = (ranges <= ranges[-1].values - half_window) 
-        
-        sig_sm = sig_sm.where(range_mask)
-        sig_er = sig_er.where(range_mask)
-    
-    return(sig_sm, sig_er)
-
-def smoothing_2D(sig, ranges, args, channel_info, mode):
-    
-    zero_bin = channel_info.loc['DAQ_Trigger_Offset']
-    
-    # if args['smoothing_range'] is None:
-    #     if zero_bin <= 100:
-    #         args['smoothing_range'] = [
-    #             -int(channel_info.loc['DAQ_Trigger_Offset']) + 100,
-    #             sig.bins.size - 1
-    #             ]
-    #     else:
-    #         args['smoothing_range'] = [
-    #             0,
-    #             sig.bins.size - 1
-    #             ]  
-    
-    # resol = channel_info.loc['Raw_Data_Range_Resolution']
-    # smoothing_window = args['smoothing_window'] * resol
-    window = args['smoothing_window']
-    half_window = np.ceil(args['smoothing_window']/2)
-    
-    if args['smoothing_range'] is None:
-        args['smoothing_range'] = [0,
-            sig.bins.size - 1
-            ]    
-    
-    sig_sm = sig.copy()
-    sig_er = np.nan * sig.copy()
-    ranges_sm = 1E-3 * ranges.copy()
-    bins = sig.bins.copy()
-    
-    if args['smooth']:
-        sig_sm.values, sig_er.values = sliding_average_2D_fast(
-            z_vals = sig_sm.values, 
-            y_vals = ranges_sm.values,
-            y_sm_lims = args['smoothing_range'],
-            y_sm_win = window,
-            err_type = 'std',
-            mode = mode
-            )
-        
-        
-        bin_mask = (bins >= half_window) & \
-            (bins <= sig.bins.size - 1 - half_window) 
-            
-        sig_sm = sig_sm.where(bin_mask)
-        sig_er = sig_er.where(bin_mask)
-        
-    return(sig_sm, sig_er)
-
-def error_per_bin(sig, args, channel_info):
-
-    sig_av = sig.mean('time')
-
-    n_time = sig.time.size
-    
-    if args['background_range'] is None:
-        args['background_range'] = [
-            int(channel_info.loc['Background_Low_Bin']),
-            int(channel_info.loc['Background_High_Bin'])
-            ]
-
-    if args['background_range'] is not None:
-        
-        background_llim = args['background_range'][0]#np.where(ranges.values >= args['background_range'][0])[0][0]
-        background_ulim = args['background_range'][1]#np.where(ranges.values <= args['background_range'][1])[0][-1]
-        
-        bin_d = dict(bins = slice(background_llim,background_ulim))
-
-        er_region = sig_av.loc[bin_d].std(dim = 'bins').values
-        er_bin = er_region * np.sqrt(n_time)
-    
-    return(er_bin)
-
-def set_background_range(args, channel_info):
-    
-    if args['background_range'] is None:
-        args['background_range'] = [
-            int(channel_info.loc['Background_Low_Bin']),
-            int(channel_info.loc['Background_High_Bin'])
-            ]
-
-    if args['background_range'] is not None:
-        
-        background_llim = args['background_range'][0]#np.where(ranges.values >= args['background_range'][0])[0][0]
-        background_ulim = args['background_range'][1]#np.where(ranges.values <= args['background_range'][1])[0][-1]
-        args['background_range'] = [background_llim, background_ulim]
-        
-    
-def background_correction(sig, background_range):
-    
-    sig_bgc = sig.copy()
-
-    bin_d = dict(bins = slice(background_range[0], background_range[1]))
-
-    sig_bgr = sig.loc[bin_d].mean(dim = 'bins')
-
-    sig_bgc = sig_bgc - sig_bgr.copy()
-
-    return(sig_bgc, sig_bgr)
-
-def extract_xy_arrays(profiles, profiles_ray, ch_d):
-    
-    ch = ch_d['channel']
-    
-    sig_ch = profiles['sig'].loc[ch_d].copy()
-    ranges_ch = profiles['ranges'].loc[ch_d].copy()
-    
-    if profiles_ray is not None:
-        sig_ray_ch = profiles_ray['sig'].loc[ch_d].copy()
-        ranges_ray_ch = profiles_ray['ranges'].loc[ch_d].copy()
-        if not coords_are_subset(ranges_ray_ch, ranges_ch):
-            raise Exception(f"--Error: The range is different for the dark and normal files for channel {ch} ")
-        sig_ray_ch = sig_ray_ch + sig_ch
-            
-        index_ne = np.where((sig_ray_ch == sig_ray_ch) & (sig_ch == sig_ch))[0]
-        sig_ch = sig_ch[index_ne]
-        sig_ray_ch = sig_ray_ch[index_ne]
-        ranges_ch = ranges_ch[index_ne]
-        
-    else:
-        sig_ray_ch = np.nan * xr.zeros_like(sig_ch)
-        ranges_ray_ch = ranges_ch.copy()
-        
-    return(ranges_ch, sig_ch, sig_ray_ch)
-
-def coords_are_subset(da_small, da_big):
-    for dim in da_small.dims:
-        if dim not in da_big.dims:
-            return False
-        
-        small_vals = da_small.coords[dim].values
-        big_vals = da_big.coords[dim].values
-        
-        if not np.isin(small_vals, big_vals).all():
-            return False
-
-    return True
-
-def resampling(sig_raw, averaging_rate, averaging_threshold):
-
-    # Averaging the Rayleigh measurement for quicklooks
-    if averaging_rate == None:
-        mask_incomplete = xr.full_like(sig_raw, 
-                                       fill_value = False, 
-                                       dtype=bool)
-    else:
-        sig_avg_ray_qck, mask_incomplete = temporal_averaging(
-            sig = sig_raw, 
-            averaging_rate = averaging_rate, 
-            averaging_threshold = averaging_threshold
-            )
-        
-    return()
-
-def temporal_averaging(sig: xr.DataArray, averaging_rate: str, 
-                       averaging_threshold: float):
-    
-    delta_t_min = np.min(sig.time[1:].values-sig.time[:-1].values)
-    
-    expected_profiles = expected_profiles_per_window(averaging_rate, delta_t_min)
-    
-    if expected_profiles < 1:
-        print(f"The provided averaging_rate ({averaging_rate}) is smaller than the temporal resolution. Averaging is not possible, the raw temporal resolution will be used")
-        sig_avg = sig
-    
-    else:    
-        
-        origin = pd.Timestamp(sig.time.values[0])
-
-        actual_profiles = sig.resample({"time" : averaging_rate},
-                                       label = "left", 
-                                       origin = origin).count()
-        
-        mask_incomplete = actual_profiles / expected_profiles < averaging_threshold
-        
-        sig_avg = sig.resample({"time" : averaging_rate},
-                               label = "left", 
-                               origin = origin).mean()
-    
-        sig_avg = sig_avg.where(~mask_incomplete, np.nan)
-        
-    return(sig_avg, mask_incomplete)
-
-def expected_profiles_per_window(freq: str,
-                                 sample_dt: np.timedelta64,
-                                 include_end: bool = False) -> int:
-    """
-    Return the expected number of profiles within one resampling window.
-
-    freq        : pandas offset alias (e.g. '3min', '1H', '90s', '1H30min')
-    sample_dt   : np.timedelta64 (e.g. np.timedelta64(15_000_000_000, 'ns'))
-    include_end : if True, count includes the right edge when it lands exactly on a sample
-                  (i.e., closed='both' / right-closed windows)
-
-    Assumes windows are left-closed, right-open by default (include_end=False),
-    matching xarray/pandas resample defaults.
-    """
-    # Convert both to integer nanoseconds to avoid unit mismatches
-    W_ns = pd.to_timedelta(freq).value                  # window length in ns (int)
-    dt_ns = pd.to_timedelta(sample_dt).value            # sample spacing in ns (int)
-
-    if W_ns <= 0 or dt_ns <= 0:
-        raise ValueError("freq and sample_dt must be positive durations.")
-
-    count = W_ns // dt_ns  # floor(W/dt) for [left-closed, right-open) bins
-
-    # If you want to include the right edge when exactly aligned:
-    if include_end and (W_ns % dt_ns == 0):
-        count += 1
-
-    return int(count)
-
 def pass_to_args(args, data_list, data_keys):
     
     for i in range(len(data_keys)):
         args[data_keys[i]] = data_list[i]
         
     return(args)
-    
-def get_max_channel_height(norm_region, norm_region_flag):
-    
-    max_channel_height = np.mean(norm_region)
-    max_channel_height = str(int(np.round(1E3*max_channel_height, decimals=-2)))
-    
-    return(max_channel_height)
-    
-
-def get_y_limits(y1_vals, y2_vals, y_lims, wavelength, use_lin_scale):
-    
-    # Get the max signal bin and value       
-    y_max = np.nanmax(y1_vals)
-    y_min = np.nanmin(y2_vals)
-
-    scale_f = wavelength / 355.
-    scat_ratio_f = 2.5
-    
-    # Get the signal axis upper limit
-    if use_lin_scale == False:
-        if y_lims[-1] == None:
-            y_ulim = scat_ratio_f * scale_f * y_max
-        else:
-            if y_lims[0] <= 0:
-                print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
-                y_ulim = 1
-            else:
-                y_ulim =  y_lims[-1]
-    else:
-        if y_lims[-1] == None:
-            y_ulim = scat_ratio_f * scale_f * y_max
-        else:
-            if y_lims[0] <= 0:
-                print('-- Warning: rayleigh y axis upper limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
-                y_ulim = 1
-            else:
-                y_ulim =  y_lims[-1]
-        
-    # Get the signal axis lower limit
-    if use_lin_scale == False:
-        if y_lims[0] == None:
-            y_llim = y_min / 2.
-        else:
-            if y_lims[0] <= 0:
-                print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
-                y_llim = 0.
-            else:
-                y_llim =  y_lims[0]
-    else:
-        if y_lims[0] == None:
-            y_llim = y_min / 2.
-        else:
-            if y_lims[0] <= 0:
-                print('-- Warning: rayleigh y axis lower limit <= 0 although the scale is logarithmic. The limit has automatically been replaced')
-                y_llim = 0.
-            else:
-                y_llim =  y_lims[0]
-    
-    y_lims = [y_llim, y_ulim]
-    
-    return(y_lims)
-
-def x_unit_conversions(ranges):
-   
-    # Convert meters to kilometers and select ranges or heights for the x axis depending on the use_dis value 
-    x_vals = 1E-3 * ranges
-
-    return(x_vals)
-
-def get_x_label(use_range):
-   
-    # Convert meters to kilometers and select ranges or heights for the x axis depending on the use_dis value 
-    if use_range:
-        x_label = "Range from the lidar [km]"
-        
-    else:
-        x_label = "Height above the lidar [km]"
-
-    return(x_label)
-
-def y_unit_conversions(sig, sig_err, norm_coef):
-    
-    # Multiply the   
-    y_vals  = norm_coef * sig.copy()
-    
-    y_errs = norm_coef * sig_err.copy()
-    
-    return(y_vals, y_errs)
-
-def slice_arrays(x_lims, x_vals, y1_vals, y2_vals):
-    
-    x_mask = (x_vals >= x_lims[0]) & (x_vals <= x_lims[1])
-    
-    X = x_vals[x_mask]
-
-    Y1  = y1_vals[x_mask]
-    Y2  = y2_vals[x_mask]
-    
-    return(X, Y1, Y2)
-
-def slice_2D_array(x_lims, x_vals, y_vals):
-    
-    x_mask = (x_vals >= x_lims[0]) & (x_vals <= x_lims[1])
-    
-    X = x_vals[x_mask]
-
-    Y  = y_vals[:,x_mask]
-    
-    return(X, Y)
 
 def add_extra_plot_metadata(plot_metadata, norm_region_flag, 
                             stats_norm_region, maximum_channel_height):
@@ -1144,132 +1226,3 @@ def add_extra_plot_metadata(plot_metadata, norm_region_flag,
     plot_metadata['maximum_channel_height'] = f"{maximum_channel_height}"
     
     return(plot_metadata)
-
-if __name__ == '__main__':
-    # Get the command line argument information
-    args = call_parser()
-
-    # Call main
-    main(args)
-
-def _parse_duration_to_timedelta64(freq: str) -> np.timedelta64:
-    """
-    Parse strings like '2min', '1h', '30s', '500ms', '1D' into np.timedelta64.
-    Supported units: ns, us, ms, s, min, h, D
-    """
-    s = freq.strip()
-    # split into leading integer + unit
-    i = 0
-    while i < len(s) and s[i].isdigit():
-        i += 1
-    if i == 0:
-        raise ValueError(f"Duration must start with an integer, got: {freq!r}")
-
-    n = int(s[:i])
-    unit = s[i:].strip()
-
-    unit_map = {
-        "s": "s",
-        "sec": "s",
-        "secs": "s",
-        "min": "m",
-        "mins": "m",
-        "m": "m",
-        "h": "h",
-        "hr": "h",
-        "hrs": "h",
-    }
-    if unit not in unit_map:
-        raise ValueError(
-            f"Unsupported unit {unit!r} in {freq!r}. "
-            "Use one of: s, min, h"
-        )
-
-    return np.timedelta64(n, unit_map[unit])
-
-def infer_dt(time_values: np.ndarray, method: str = "median") -> np.timedelta64:
-    """
-    Infer a representative sampling interval from a 1D np.datetime64 array.
-    Uses median (robust) by default.
-    """
-    t = np.asarray(time_values)
-    if t.size < 2:
-        raise ValueError("Need at least 2 time samples to infer resolution.")
-    diffs = np.diff(t).astype("timedelta64[ns]").astype(np.int64)
-    if method == "mean":
-        dt_ns = int(np.mean(diffs))
-    elif method == "mode":
-        # simple mode-ish: most common diff
-        vals, counts = np.unique(diffs, return_counts=True)
-        dt_ns = int(vals[np.argmax(counts)])
-    else:
-        raise ValueError("method must be 'mean' or 'mode'")
-    return np.timedelta64(dt_ns, "ns")
-
-def block_mean_fixed_samples(
-    da: xr.DataArray,
-    N: int,
-    dim: str = "time",
-    label: str = "start",  # 'start' | 'middle' | 'end'
-) -> xr.DataArray:
-    if N <= 0:
-        raise ValueError("N must be a positive integer.")
-    if da.sizes[dim] < N:
-        raise ValueError(f"Not enough samples ({da.sizes[dim]}) for N={N}.")
-
-    # Trim to exact multiple of N so every block has exactly N samples
-    nblocks = da.sizes[dim] // N
-    da_trim = da.isel({dim: slice(0, nblocks * N)})
-
-    # Coarsen does exactly what we want
-    out = da_trim.coarsen({dim: N}, boundary="exact").mean()
-
-    # Assign a representative time coordinate
-    t = da_trim[dim].values
-    if label == "start":
-        t_rep = t[::N]
-    elif label == "middle":
-        t_rep = t[(N // 2)::N]
-    elif label == "end":
-        t_rep = t[(N - 1)::N]
-    else:
-        raise ValueError("label must be 'start', 'middle', or 'end'")
-
-    out = out.assign_coords({dim: t_rep[: out.sizes[dim]]})
-    return out
-
-def block_mean_by_duration(
-    da: xr.DataArray,
-    duration: str,               # e.g. "2min", "1h"
-    dim: str = "time",
-    dt_method: str = "mean",   # 'mean' or 'mode'
-    label: str = "start",
-) -> xr.DataArray:
-    target = _parse_duration_to_timedelta64(duration)
-    dt = infer_dt(da[dim].values, method=dt_method)
-
-    # Compute N = target / dt (rounded to nearest)
-    target_ns = target.astype("timedelta64[ns]").astype(np.int64)
-    dt_ns = dt.astype("timedelta64[ns]").astype(np.int64)
-    if dt_ns <= 0:
-        raise ValueError("Inferred dt is non-positive; check time coordinate ordering.")
-
-    N = int(np.round(target_ns / dt_ns))
-    N = max(N, 1)
-
-    return (block_mean_fixed_samples(da, N=N, dim=dim, label=label), N)
-
-def make_colorscale(colorscale, n_time):
-    
-    if colorscale == 'discrete':
-        colors = int(np.ceil(n_time / 10)) * Category10[10]
-    elif colorscale == 'sequential':
-        if n_time <= 256:
-            colors = turbo(n_time)
-        else:
-            max_colors = turbo(256)
-            indexes = np.arange(0, n_time)
-            color_index = (np.round(255 * indexes / n_time, decimals = 0)).astype(int)
-            colors = tuple([max_colors[ind] for ind in color_index])
-                
-    return(colors)

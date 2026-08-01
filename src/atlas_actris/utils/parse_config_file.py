@@ -146,6 +146,10 @@ POL_CAL_KEYS = {
     "R_to_T_transmission_ratio"
     }
 
+GL_KEYS = {
+    "ch_n",
+    "ch_f",
+    }
 
 WV_KEYS = {
     "ch_w",
@@ -389,6 +393,24 @@ def _expand_channel_lists_with_defaults(parser_args: Dict[str, Any]) -> None:
             else:
                 if len(arg) != n_channel:
                     raise ConfigError(f"{key} length {len(arg)} must equal recorder_channel_id length {n_channel}")
+
+def _expand_gluing_lists_with_defaults(parser_args: Dict[str, Any]) -> None:
+    """Ensure every [gluing] list has length N (ch_n), filling from schema default scalar."""
+    ch_n = parser_args.get("ch_n")
+    n_pairs = len(ch_n)
+    
+    if n_pairs > 0:
+        # Expand K and R_to_T_transmission_ratio if omitted
+        for key in GL_KEYS:
+            if key in ("ch_n", "ch_f"):
+                continue
+            arg = parser_args.get(key)
+            if arg is None or len(arg) == 0:
+                parser_args[key] = [SCHEMA[key]["default"]] * n_pairs
+            elif len(arg) != n_pairs:
+                raise ConfigError(f"{key} length {len(arg)} must equal {n_pairs} length {n_pairs}")
+    
+    return parser_args
 
 def _expand_pol_cal_lists_with_defaults(parser_args: Dict[str, Any]) -> None:
     """Ensure every [polarisation_calibration] list has length N (ch_r), filling from schema default scalar."""

@@ -733,7 +733,7 @@ def statistics(y1, y2, x, y1_err = None, y1_avg = None, keyw_args = {},
             y_vals = y1, 
             x_vals = x,
             x_sm_lims = keyw_args['fit_mask_region'],
-            x_sm_win = 150.,
+            x_sm_win = 0.150,
             expo = False,
             err_type = 'std'
             )

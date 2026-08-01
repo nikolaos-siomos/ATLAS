@@ -45,109 +45,66 @@ def expected_profiles_per_window(freq: str,
     return int(count)
 
 
-def temporal_averaging(
-    sig: xr.DataArray,
-    averaging_rate: str,
-    averaging_threshold: float,
-) -> Tuple[Optional[xr.DataArray], Optional[xr.DataArray]]:
-    """Average along time, or return ``(None, None)`` when averaging is impossible.
-
-    Returning ``None`` allows the calling processing stage to leave its already
-    initialized output arrays unchanged when ``averaging_rate`` is shorter than
-    the native measurement resolution.
-    """
-
-    if sig.sizes.get("time", 0) < 2:
-        CustomWarning(
-            "Temporal averaging was skipped because fewer than two time "
-            "samples are available."
-        )
-        return None, None
-
-    delta_t_min = np.min(sig.time[1:].values - sig.time[:-1].values)
+def temporal_averaging(sig: xr.DataArray, averaging_rate: str, 
+                       averaging_threshold: float) -> Tuple[xr.DataArray, xr.DataArray]:
+    
+    delta_t_min = np.min(sig.time[1:].values-sig.time[:-1].values)
+    
     expected_profiles = expected_profiles_per_window(averaging_rate, delta_t_min)
-
+    
     if expected_profiles < 1:
-        CustomWarning(
-            f"The provided averaging_rate ({averaging_rate}) is smaller than "
-            "the temporal resolution. Averaging was skipped."
-        )
-        return None, None
+        CustomWarning(f"The provided averaging_rate ({averaging_rate}) is smaller than the temporal resolution. Averaging is not possible, the raw temporal resolution will be used")
+        sig_avg = sig
+    
+    else:    
+        
+        origin = pd.Timestamp(sig.time.values[0])
 
-    origin = pd.Timestamp(sig.time.values[0])
-
-    actual_profiles = sig.resample(
-        {"time": averaging_rate},
-        label="left",
-        origin=origin,
-    ).count()
-
-    mask_incomplete = (
-        actual_profiles / expected_profiles < averaging_threshold
-    )
-
-    sig_avg = sig.resample(
-        {"time": averaging_rate},
-        label="left",
-        origin=origin,
-    ).mean()
-
-    sig_avg = sig_avg.where(~mask_incomplete, np.nan)
-
-    return sig_avg, mask_incomplete
-
+        actual_profiles = sig.resample({"time" : averaging_rate},
+                                       label = "left", 
+                                       origin = origin).count()
+        
+        mask_incomplete = actual_profiles / expected_profiles < averaging_threshold
+        
+        sig_avg = sig.resample({"time" : averaging_rate},
+                               label = "left", 
+                               origin = origin).mean()
+    
+        sig_avg = sig_avg.where(~mask_incomplete, np.nan)
+        
+    return(sig_avg, mask_incomplete)
 
 def temporal_averaging_error(
-    sig_err: xr.DataArray,
-    averaging_rate: str,
-    averaging_threshold: float,
-) -> Tuple[Optional[xr.DataArray], Optional[xr.DataArray]]:
-    """Average temporal errors, or return ``(None, None)`` when skipped."""
-
-    if sig_err.sizes.get("time", 0) < 2:
-        CustomWarning(
-            "Temporal error averaging was skipped because fewer than two "
-            "time samples are available."
-        )
-        return None, None
-
-    delta_t_min = np.min(
-        sig_err.time[1:].values - sig_err.time[:-1].values
-    )
-    expected_profiles = expected_profiles_per_window(
-        averaging_rate,
-        delta_t_min,
-    )
-
+        sig_err: xr.DataArray, averaging_rate: str, 
+        averaging_threshold: float) -> Tuple[xr.DataArray, xr.DataArray]:
+    
+    delta_t_min = np.min(sig_err.time[1:].values-sig_err.time[:-1].values)
+    
+    expected_profiles = expected_profiles_per_window(averaging_rate, delta_t_min)
+    
     if expected_profiles < 1:
-        CustomWarning(
-            f"The provided averaging_rate ({averaging_rate}) is smaller than "
-            "the temporal resolution. Error averaging was skipped."
-        )
-        return None, None
+        CustomWarning(f"The provided averaging_rate ({averaging_rate}) is smaller than the temporal resolution. Averaging is not possible, the raw temporal resolution will be used")
+        sig_avg_err = sig_err
+    
+    else:    
+        
+        origin = pd.Timestamp(sig_err.time.values[0])
 
-    origin = pd.Timestamp(sig_err.time.values[0])
+        actual_profiles = sig_err.resample({"time" : averaging_rate},
+                                           label = "left", 
+                                           origin = origin).count()
+        
+        mask_incomplete = actual_profiles / expected_profiles < averaging_threshold
+        
+        sig_mean_err = sig_err.resample({"time" : averaging_rate},
+                                       label = "left", 
+                                       origin = origin).mean()
 
-    actual_profiles = sig_err.resample(
-        {"time": averaging_rate},
-        label="left",
-        origin=origin,
-    ).count()
-
-    mask_incomplete = (
-        actual_profiles / expected_profiles < averaging_threshold
-    )
-
-    sig_mean_err = sig_err.resample(
-        {"time": averaging_rate},
-        label="left",
-        origin=origin,
-    ).mean()
-
-    sig_avg_err = sig_mean_err / np.sqrt(actual_profiles)
-    sig_avg_err = sig_avg_err.where(~mask_incomplete, np.nan)
-
-    return sig_avg_err, mask_incomplete
+        sig_avg_err = sig_mean_err / np.sqrt(actual_profiles)
+        
+        sig_avg_err = sig_avg_err.where(~mask_incomplete, np.nan)
+        
+    return(sig_avg_err, mask_incomplete)
 
 def rolling_noise(
     sig: xr.DataArray,
@@ -493,15 +450,17 @@ def _rebin_to_true_bins(
     """
     Lazily rebin a DataArray from file bins to true bins.
 
-    Fast path
-    ---------
-    If all channel shifts are integers, use simple per-channel positional
-    slicing plus padding. This avoids the expensive interpolation graph.
+    Required dims:
+        channel, bins
 
-    Fractional path
-    ---------------
-    If any shift has a fractional component, use the conservative
-    fractional-overlap implementation.
+    Optional dims:
+        time, or anything else
+
+    Conservative fractional-overlap logic:
+        old bin i: [i + zero_bin, i + zero_bin + 1]
+        new bin j: [j, j + 1]
+
+    Missing shifted signal is set to NaN.
     """
 
     if "bins" not in da.dims or "channel" not in da.dims:
@@ -510,76 +469,20 @@ def _rebin_to_true_bins(
     if "channels" in zero_bin.dims and "channel" not in zero_bin.dims:
         zero_bin = zero_bin.rename({"channels": "channel"})
 
-    zero_bin = zero_bin.sel(channel=da.channel)
-    shifts = np.asarray(zero_bin.values, dtype="float64")
-    shift_int = np.rint(shifts).astype("int64")
-    is_integer_shift = np.all(np.isclose(shifts, shift_int, atol=1e-10, rtol=0.0))
-
     n_old_bins = da.sizes["bins"]
-    target_bins = np.asarray(target_bins, dtype="float64")
-
-    if is_integer_shift:
-        out_channels = []
-        target_start = int(target_bins[0])
-        target_stop = int(target_bins[-1]) + 1
-
-        for ch, shift in zip(da.channel.values, shift_int):
-            # true_bin = file_bin + shift
-            old_start = target_start - int(shift)
-            old_stop = target_stop - int(shift)
-
-            src_start = max(old_start, 0)
-            src_stop = min(old_stop, n_old_bins)
-
-            left_pad = max(0, -old_start)
-            right_pad = max(0, old_stop - n_old_bins)
-
-            da_ch = da.sel(channel=ch, drop=False)
-            sliced = da_ch.isel(bins=slice(src_start, src_stop))
-
-            pieces = []
-            if left_pad:
-                left = xr.full_like(
-                    da_ch.isel(bins=slice(0, left_pad)),
-                    False if np.issubdtype(da.dtype, np.bool_) else np.nan,
-                )
-                pieces.append(left)
-
-            pieces.append(sliced)
-
-            if right_pad:
-                right = xr.full_like(
-                    da_ch.isel(bins=slice(0, right_pad)),
-                    False if np.issubdtype(da.dtype, np.bool_) else np.nan,
-                )
-                pieces.append(right)
-
-            out_ch = xr.concat(pieces, dim="bins") if len(pieces) > 1 else pieces[0]
-            out_ch = out_ch.assign_coords(bins=target_bins)
-
-            if not np.issubdtype(da.dtype, np.bool_):
-                out_ch = out_ch.astype(output_dtype)
-
-            out_channels.append(out_ch)
-
-        out = xr.concat(out_channels, dim="channel")
-        out = out.assign_coords(channel=da.channel)
-        return out.transpose(*da.dims)
-
-    # Fractional-overlap fallback.
     out_channels = []
 
     for ch in da.channel.values:
         zb = float(zero_bin.sel(channel=ch).values)
 
-        shift_int_ch = int(np.floor(zb))
-        frac = float(zb - shift_int_ch)
+        shift_int = int(np.floor(zb))
+        frac = float(zb - shift_int)
 
         weight_main = 1.0 - frac
         weight_prev = frac
 
         old_i_main = xr.DataArray(
-            target_bins - shift_int_ch,
+            target_bins - shift_int,
             dims=["bins_new"],
             coords={"bins_new": target_bins},
         )
@@ -602,7 +505,9 @@ def _rebin_to_true_bins(
 
         da_ch = da.sel(channel=ch)
         work = da_ch.rename({"bins": "bins_old"})
-        work = work.assign_coords(bins_old=np.arange(n_old_bins))
+        work = work.assign_coords(
+            bins_old=np.arange(n_old_bins)
+        )
 
         old_i_main_clip = old_i_main.clip(
             min=0,
@@ -625,18 +530,20 @@ def _rebin_to_true_bins(
                 main.where(valid_main, 0.0) * weight_main
                 + prev.where(valid_prev, 0.0) * weight_prev
             )
+
+            # No measured signal exists here.
             out_ch = out_ch.where(valid_out, np.nan)
             out_ch = out_ch.astype(output_dtype)
 
         out_ch = out_ch.rename({"bins_new": "bins"})
         out_ch = out_ch.assign_coords(bins=target_bins)
+
         out_channels.append(out_ch)
 
     out = xr.concat(out_channels, dim=da.channel)
     out = out.assign_coords(channel=da.channel)
 
     return out.transpose(*da.dims)
-
 
 def _rebin_and_trim_all_binned_arrays(
     output_data: Dict[str, Any],
@@ -647,45 +554,36 @@ def _rebin_and_trim_all_binned_arrays(
     skip_stores: set[str] = {"range", "height_agl", "height_asl"},
 ) -> None:
     """
-    Rebin and mask all channel/bin arrays for one QA key.
+    Rebin and trim all output_data[store_name][key] arrays that are
+    DataArrays with channel + bins.
 
-    Repeated references to the same DataArray are transformed only once.
-    ``drop=True`` is intentionally avoided: ``target_bins`` already defines
-    the shared retained grid, while the channel-specific height mask only
-    needs to set invalid channel/bin cells to NaN (or False).
+    The operation is in-place on output_data.
     """
-
-    transformed: Dict[int, xr.DataArray] = {}
 
     for store_name, store in output_data.items():
 
         if store_name in skip_stores:
             continue
-        if not isinstance(store, dict) or key not in store:
+
+        if not isinstance(store, dict):
+            continue
+
+        if key not in store:
             continue
 
         arr = store[key]
 
         if not isinstance(arr, xr.DataArray):
             continue
+
         if "channel" not in arr.dims or "bins" not in arr.dims:
             continue
 
-        arr_id = id(arr)
-        if arr_id not in transformed:
-            rebinned = _rebin_to_true_bins(
-                da=arr,
-                zero_bin=zero_bin,
-                target_bins=target_bins,
-                output_dtype="float32",
-            )
+        arr = _rebin_to_true_bins(
+            da=arr,
+            zero_bin=zero_bin,
+            target_bins=target_bins,
+            output_dtype="float32",
+        )
 
-            channel_mask = mask_bins
-            if np.issubdtype(rebinned.dtype, np.bool_):
-                rebinned = rebinned.where(channel_mask, False)
-            else:
-                rebinned = rebinned.where(channel_mask)
-
-            transformed[arr_id] = rebinned.reset_coords(drop=True)
-
-        store[key] = transformed[arr_id]
+        store[key] = arr.where(mask_bins, drop=True).reset_coords(drop=True)

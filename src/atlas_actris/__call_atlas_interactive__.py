@@ -14,10 +14,10 @@ from utils.caller_utils import export_report
 from utils.find_radiosonde import find_radiosonde
 from utils.get_scc_config import export_scc_config
 from utils.parse_init_file import parse_call_atlas_ini
-from visualizer.signal_viewer import generate_line_plots
 from utils.parse_config_file import parse_atlas_config_file
 from utils.parse_settings_file import parse_atlas_settings_file
 
+from visualizer.qa_test_dark import generate_dark
 from visualizer.qa_test_quicklook import generate_quicklooks
 from visualizer.qa_test_rayleigh_fit import generate_rayleigh_fit
 from visualizer.qa_test_ring_telecover import generate_ring_telecover
@@ -32,11 +32,10 @@ from readers.read_radiosondes import load_radiosonde
 from readers.read_raw_lidar_files_cache import infer_format, flexible_reader
 
 from utils.cookbook import (
-    run_linear_recipe,
-    screening_recipe, 
-    preprocessing_recipe, 
-    pol_cal_recipe,
+    recipes,
+    checkin_stages, 
     checkout_stages,
+    run_linear_recipe
     )
 
 from processor.modify import (
@@ -51,12 +50,7 @@ from processor.modify import (
 
 from utils.export_processing_stage import (
     export_processor_stages,
-    export_processing_stage,
-    import_processing_stage,
-    export_processor_stage,
-    list_exported_stages,
     delete_all_exported_stages,
-    import_processing_entry
 )
 
 # Get the input .ini file path of the ATLAS caller
@@ -128,34 +122,28 @@ ctx = Context(
 # Initialize the Processor class
 processor = Processor(ctx)
 
-# Apply screening recipe
-run_linear_recipe(
-    processor, 
-    recipe = screening_recipe, 
-    initial_input = checkout_stages['init'],
-    checkout_id = checkout_stages['screening'],
-    )
-
-# Apply preprocessing recipe
-run_linear_recipe(
-    processor, 
-    recipe = preprocessing_recipe, 
-    initial_input = checkout_stages['screening'],
-    checkout_id = checkout_stages['preprocessing'],
-    )
-
-run_linear_recipe(
-    processor, 
-    recipe = pol_cal_recipe, 
-    initial_input = checkout_stages['preprocessing'],
-    checkout_id = checkout_stages["pol_cal"],
-    )
+for key, recipe in recipes.items():
+    run_linear_recipe(
+        processor, 
+        recipe = recipe, 
+        initial_input = checkin_stages[key],
+        checkout_id = checkout_stages[key],
+        )
 
 # Package measurements for quicklooks
 processor.package(
     output_id = 'preprocessing_complete_qck', 
     input_id = 'preprocessing_complete'
     )
+
+dark__metadata = generate_dark(
+    # data_pack = processor.export_test_from_stage("background_calculated"),
+    data_pack = processor.export_test_from_stage("dark_preprocessing_complete"),
+    # data_pack_rc = processor.export_test_from_stage("preprocessing_complete"),
+    caller_info = processor.processing_info["caller_info"],
+    settings_info = settings_info['drk'],
+)
+raise Exception
 
 pol_cal__metadata = generate_polarization_calibration(
     data_pack = processor.export_test_from_stage("pol_cal_complete"),

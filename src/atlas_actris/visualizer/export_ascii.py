@@ -9,9 +9,57 @@ Created on Wed Dec 14 15:00:07 2022
 import numpy as np
 import os
 
+
+def dark(dir_out, fname, header, x_dict, y_dict, y_err_dict):
+    
+    x_av = x_dict['av'] 
+    x_bc = x_dict['bc'] 
+    x_sm = x_dict['sm'] 
+    x_rc = x_dict['rc'] 
+    x_rc_ray = x_dict['rc_ray']
+    x_rc_drk_ray = x_dict['rc_drk_ray']
+    y_av = y_dict['av'] 
+    y_bc = y_dict['bc'] 
+    y_sm = y_dict['sm'] 
+    y_rc = y_dict['rc'] 
+    y_rc_ray = y_dict['rc_ray']
+    y_rc_drk_ray = y_dict['rc_drk_ray']
+    y_rc_er = y_err_dict['rc'] 
+    y_rc_ray_er = y_err_dict['rc_ray']
+    y_rc_drk_ray_er = y_err_dict['rc_drk_ray']
+    
+    body = np.vstack((
+        x_av, 
+        np.mean(y_av, axis = 0), 
+        x_bc, 
+        np.mean(y_bc, axis = 0), 
+        x_sm,
+        np.mean(y_sm, axis = 0),
+        x_rc,
+        y_rc,
+        y_rc_er,
+        x_rc_ray,
+        y_rc_ray,
+        y_rc_ray_er,
+        x_rc_drk_ray,
+        y_rc_drk_ray,
+        y_rc_drk_ray_er,
+        )).T
+
+    mask = np.any(np.isnan(body), axis = 1)
+    body = body[~mask,:]
+    
+    fpath = os.path.join(dir_out, 'ascii', fname)
+    
+    os.makedirs(os.path.join(dir_out, "ascii"), exist_ok=True)
+
+    np.savetxt(fpath, body, header = header, comments = '', 
+               delimiter = ',', fmt = '%.6e')
+    
+    return()
+
 def rayleigh(dir_out, fname, header, alt, atb, rcs):
     
-
     body = np.vstack((alt, atb, rcs)).T
 
     mask = np.any(np.isnan(body), axis = 1)
@@ -25,6 +73,7 @@ def rayleigh(dir_out, fname, header, alt, atb, rcs):
                delimiter = ',', fmt = '%.6e')
     
     return()
+
 
 def telecover(dir_out, fname, header, iters, 
               alt, sectors, sectors_e):

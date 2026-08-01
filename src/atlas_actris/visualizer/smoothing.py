@@ -2,6 +2,33 @@ import numpy as np
 import xarray as xr
 
 
+def _dataarray_template(value):
+    """Return xarray metadata needed to rebuild an output, or None."""
+    if not isinstance(value, xr.DataArray):
+        return None
+
+    return {
+        "dims": value.dims,
+        "coords": value.coords,
+        "attrs": value.attrs.copy(),
+        "name": value.name,
+    }
+
+
+def _restore_dataarray(values, template):
+    """Restore DataArray metadata without affecting NumPy-only behavior."""
+    if template is None:
+        return values
+
+    return xr.DataArray(
+        values,
+        dims=template["dims"],
+        coords=template["coords"],
+        attrs=template["attrs"],
+        name=template["name"],
+    )
+
+
 def _to_numpy_copy(a, name):
     if isinstance(a, xr.DataArray):
         return a.copy(deep=True).values
@@ -215,12 +242,14 @@ def sliding_average_1D_fast(
 
     _check_err_type(err_type)
 
+    output_template = _dataarray_template(y_vals)
+
     x_vals = _to_numpy_copy(x_vals, "x_vals")
     y_vals = _to_numpy_copy(y_vals, "y_vals").astype(float)
 
     dx = _coord_step(x_vals)
 
-    win = _as_odd_window(1E-3 * x_sm_win / dx)
+    win = _as_odd_window(x_sm_win / dx)
 
     s_bin, e_bin = _limits_to_slice(x_vals, x_sm_lims)
 
@@ -228,7 +257,10 @@ def sliding_average_1D_fast(
     y_err = np.full(y_vals.shape, np.nan, dtype=float)
 
     if s_bin >= e_bin:
-        return y_avg, y_err
+        return (
+            _restore_dataarray(y_avg, output_template),
+            _restore_dataarray(y_err, output_template),
+        )
 
     avg_all, std_all, count_all = _rolling_mean_std_1d_left_partial_right_required(
         y_vals,
@@ -245,7 +277,10 @@ def sliding_average_1D_fast(
     elif err_type == "std":
         y_err[s_bin:e_bin] = std_all[s_bin:e_bin]
 
-    return y_avg, y_err
+    return (
+        _restore_dataarray(y_avg, output_template),
+        _restore_dataarray(y_err, output_template),
+    )
 
 
 def sliding_average_2D_fast(
@@ -254,12 +289,14 @@ def sliding_average_2D_fast(
 
     _check_err_type(err_type)
 
+    output_template = _dataarray_template(z_vals)
+
     z_vals = _to_numpy_copy(z_vals, "z_vals").astype(float)
     y_vals = _to_numpy_copy(y_vals, "y_vals")
 
     dy = _coord_step(y_vals)
 
-    win = _as_odd_window(1E-3 * y_sm_win / dy)
+    win = _as_odd_window(y_sm_win / dy)
 
     s_bin, e_bin = _limits_to_slice(y_vals, y_sm_lims)
 
@@ -267,7 +304,10 @@ def sliding_average_2D_fast(
     z_err = np.full(z_vals.shape, np.nan, dtype=float)
 
     if s_bin >= e_bin:
-        return z_avg, z_err
+        return (
+            _restore_dataarray(z_avg, output_template),
+            _restore_dataarray(z_err, output_template),
+        )
 
     avg_all, std_all, count_all = _rolling_mean_std_2d_left_partial_right_required(
         z_vals,
@@ -284,7 +324,10 @@ def sliding_average_2D_fast(
     elif err_type == "std":
         z_err[:, s_bin:e_bin] = std_all[:, s_bin:e_bin]
 
-    return z_avg, z_err
+    return (
+        _restore_dataarray(z_avg, output_template),
+        _restore_dataarray(z_err, output_template),
+    )
 
 
 def sliding_average_2D_bin_fast(
@@ -292,6 +335,8 @@ def sliding_average_2D_bin_fast(
         expo=None, err_type="sem"):
 
     _check_err_type(err_type)
+
+    output_template = _dataarray_template(z_vals)
 
     z_vals = _to_numpy_copy(z_vals, "z_vals").astype(float)
     y_vals = _to_numpy_copy(y_vals, "y_vals")
@@ -308,7 +353,10 @@ def sliding_average_2D_bin_fast(
     z_err = np.full(z_vals.shape, np.nan, dtype=float)
 
     if s_bin >= e_bin:
-        return z_avg, z_err
+        return (
+            _restore_dataarray(z_avg, output_template),
+            _restore_dataarray(z_err, output_template),
+        )
 
     avg_all, std_all, count_all = _rolling_mean_std_2d_left_partial_right_required(
         z_vals,
@@ -325,13 +373,18 @@ def sliding_average_2D_bin_fast(
     elif err_type == "std":
         z_err[:, s_bin:e_bin] = std_all[:, s_bin:e_bin]
 
-    return z_avg, z_err
+    return (
+        _restore_dataarray(z_avg, output_template),
+        _restore_dataarray(z_err, output_template),
+    )
 
 def sliding_average_1D(
         y_vals, x_vals, x_sm_lims, x_sm_win,
         expo=False, err_type="sem"):
 
     _check_err_type(err_type)
+
+    output_template = _dataarray_template(y_vals)
 
     x_vals = _to_numpy_copy(x_vals, "x_vals")
     y_vals = _to_numpy_copy(y_vals, "y_vals").astype(float)
@@ -344,10 +397,13 @@ def sliding_average_1D(
     y_vals_err = np.full(y_vals.shape, np.nan, dtype=float)
 
     if s_bin >= e_bin:
-        return y_vals_sm, y_vals_err
+        return (
+            _restore_dataarray(y_vals_sm, output_template),
+            _restore_dataarray(y_vals_err, output_template),
+        )
 
-    s_ihwin = int(1E-3 * x_sm_win[0] / (2.0 * dx))
-    e_ihwin = int(1E-3 * x_sm_win[-1] / (2.0 * dx))
+    s_ihwin = int(x_sm_win[0] / (2.0 * dx))
+    e_ihwin = int(x_sm_win[-1] / (2.0 * dx))
 
     s_ihwin = max(s_ihwin, 0)
     e_ihwin = max(e_ihwin, 0)
@@ -401,13 +457,18 @@ def sliding_average_1D(
         elif err_type == "std":
             y_vals_err[i] = np.nanstd(window)
 
-    return y_vals_sm, y_vals_err
+    return (
+        _restore_dataarray(y_vals_sm, output_template),
+        _restore_dataarray(y_vals_err, output_template),
+    )
 
 def sliding_average_2D(
         z_vals, y_vals, y_sm_lims, y_sm_win,
         expo=False, err_type="sem"):
 
     _check_err_type(err_type)
+
+    output_template = _dataarray_template(z_vals)
 
     z_vals = _to_numpy_copy(z_vals, "z_vals").astype(float)
     y_vals = _to_numpy_copy(y_vals, "y_vals")
@@ -420,10 +481,13 @@ def sliding_average_2D(
     z_vals_err = np.full(z_vals.shape, np.nan, dtype=float)
 
     if s_bin >= e_bin:
-        return z_vals_sm, z_vals_err
+        return (
+            _restore_dataarray(z_vals_sm, output_template),
+            _restore_dataarray(z_vals_err, output_template),
+        )
 
-    s_ihwin = int(1E-3 * y_sm_win[0] / (2.0 * dy))
-    e_ihwin = int(1E-3 * y_sm_win[-1] / (2.0 * dy))
+    s_ihwin = int(y_sm_win[0] / (2.0 * dy))
+    e_ihwin = int(y_sm_win[-1] / (2.0 * dy))
 
     s_ihwin = max(s_ihwin, 0)
     e_ihwin = max(e_ihwin, 0)

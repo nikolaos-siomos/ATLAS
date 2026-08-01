@@ -239,7 +239,9 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
     c_bsc = np.nan * np.zeros_like(temperature_scale)
         
     forward_wavelength = float(emitted_wavelength.loc[ch].values)
-    backward_wavelength = float(detected_wavelength.loc[ch].values)
+  
+    vrn_wavelength = arc(incident_wavelength=forward_wavelength).lamda_pol['N2']
+    vro_wavelength = arc(incident_wavelength=forward_wavelength).lamda_pol['O2']
     
     filter_parameters = {
         'central_wavelength':float(detected_wavelength.loc[ch].values),
@@ -248,11 +250,13 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
      
     if ch[5] == 'v' and ch[7] == 'n':
         mode = 'vibrational_raman_N2'
+        backward_wavelength = vrn_wavelength
         filter_parameters['transmission_shape'] = 'Gaussian'
         normalize = False
         
     elif ch[5] == 'v' and ch[7] == 'o':
         mode = 'vibrational_raman_O2'
+        backward_wavelength = vro_wavelength
         filter_parameters['transmission_shape'] = 'Gaussian'
         normalize = False
         
@@ -260,10 +264,12 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
         mode = 'rotational_raman'
         
         if ch[5] == 'r':
+            backward_wavelength = float(detected_wavelength.loc[ch].values)
             filter_parameters['transmission_shape'] = 'Tophat'
             normalize = False
             
         else:
+            backward_wavelength = forward_wavelength
             filter_parameters['transmission_shape'] = 'Gaussian'
             normalize = True
             
@@ -305,9 +311,11 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
                     mldr = rrb.mldr(mldr_type = 'full')
 
                     if ch[5] == 'p':
-                        c_bsc[i] = 2. / (1. + mldr) * c_bsc[i]
+                        # c_bsc[i] = 2. / (1. + mldr) * c_bsc[i]
+                        c_bsc[i] = 1. / (1. + mldr) * c_bsc[i]
                     elif ch[5] == 'c':
-                        c_bsc[i] = 2. * mldr / (1. + mldr) * c_bsc[i]
+                        # c_bsc[i] = 2. * mldr / (1. + mldr) * c_bsc[i]
+                        c_bsc[i] = mldr / (1. + mldr) * c_bsc[i]
 
                 elif ch[5] in ['v']:
                     rrb = arc(

@@ -207,7 +207,6 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
                     qa_test_info = {'qa_test': key}
                     )
                 
-                
                 # Call GenerateText class
                 text_generator = GenerateText(lib = lib)
                 

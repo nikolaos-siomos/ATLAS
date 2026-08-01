@@ -14,6 +14,7 @@ from version import __version__
 from dataclasses import dataclass
 
 label = {
+    'drk' : "Dark",
     'ray' : "Rayleigh",
     'tlc' : "Telecover",
     'pcb' : "Polarization Calibration",
@@ -263,6 +264,27 @@ class GenerateText:
                             
         return title 
     
+    def make_dark_title(self):
+
+        sm_part = sm_text(
+            smooth = self.settings['smooth'], 
+            sm_lims = self.settings['smoothing_range'], 
+            sm_win = self.settings['smoothing_window'], 
+            sm_expo = False,
+            )
+
+        avg_rate_alias = self.settings['averaging_rate']
+        averaging_rate = self.caller_info[f'{avg_rate_alias}_averaging_rate']
+        avg_rate_part = f'Averaging rate ({avg_rate_alias}): {averaging_rate}'
+        
+        drk_text = quicklook_text(self.qa_test_info['qa_test'])
+        
+        title = self.system_part + ' ' + self.channel_part + '\n'+\
+            self.config_part  + ' - ' + sm_part + ' - ' + avg_rate_part + '\n'+\
+                drk_text + ' - ' + self.dateloc_part
+                            
+        return title 
+    
     
     def make_vldr_title(self):
 
@@ -442,6 +464,37 @@ class GenerateText:
                             
         return title 
     
+    def make_header_dark(self):
+                
+        parts = []
+        
+        parts.append(
+            header_system_text(
+                station_id = self.metadata['station_id'],
+                station_name = self.metadata['station_name'],
+                lidar_name = self.metadata['lidar_name']
+                )
+            )
+
+        parts.append(
+            header_signal_text(self.metadata['atlas_channel_id'])
+            )
+        
+        parts.append(
+            header_time_text(
+                start_timestamp = self.metadata['start_timestamp'], 
+                stop_timestamp = self.metadata['stop_timestamp'], 
+                label = label['drk']
+                )
+            )
+        
+        parts.append(
+            header_dark_text()
+            )
+        
+        header = '\n'.join(parts)
+        
+        return header
     
     def make_header_rayleigh_fit(self):
                 
@@ -640,6 +693,14 @@ def header_radiosonde_text(rs_station_name, wmo_id, rs_start_timestamp):
 
     return text
 
+def header_dark_text():
+    
+    line_1 = "range_RawSignal, RawSignal, range_BackgrCorrectedSignal, BackgrCorrectedSignal, range_RangeCorrectedSignal, RangeCorrectedSignal, range_RayleighRangeCorrectedSignal, RayleighRangeCorrectedSignal, RayleighRangeCorrectedSignalError, range_RayleighDarkRangeCorrectedSignal, RayleighDarkRangeCorrectedSignal, RayleighDarkRangeCorrectedSignalError"
+    
+    text = f"{line_1}"
+    
+    return text
+
 def header_rayleigh_fit_text(norm_region):
     
     ray_l = np.round(norm_region[0], decimals = 1)
@@ -680,16 +741,19 @@ def header_polcal_text(G_R, G_T, H_R, H_T, K):
 
     return text
     
-def sm_text(smooth, sm_lims, sm_win, sm_expo):
+def sm_text(smooth, sm_lims, sm_win, sm_expo, flavour = ''):
 
+    if flavour:
+        caption = 'Smoothing'
+    else:
+        caption = f'Smoothing {flavour}'
+        
     if smooth != True:
-        return "No Smoothing"
-
-    sm_llim = np.round(float(sm_lims[0]), decimals=3)
-    sm_ulim = np.round(float(sm_lims[-1]), decimals=3)
-
+        return "No Smoothing {flavour}"
+    
     if isinstance(sm_win, (list, tuple, np.ndarray)):
         if len(sm_win):
+            
             sm_lwin = np.round(float(sm_win[0]), decimals=3)
             sm_uwin = np.round(float(sm_win[-1]), decimals=3)
     
@@ -702,23 +766,46 @@ def sm_text(smooth, sm_lims, sm_win, sm_expo):
                 sm_type = "Exp"
             else:
                 sm_type = "Lin"
-    
-            sm_part = (
-                f"Smoothing: {sm_llim} to {sm_ulim} km, "
-                f"Win: {sm_lwin} km to {sm_uwin} km, "
-                f"{change}: {sm_type}"
-            )
+                
+            if len(sm_lims) == 0:
+                sm_part = (
+                    f"{caption}: All range, "
+                    f"Win: {sm_lwin} km to {sm_uwin} km, "
+                    f"{change}: {sm_type}"
+                )
+                
+            else:
+                sm_llim = np.round(float(sm_lims[0]), decimals=3)
+                sm_ulim = np.round(float(sm_lims[-1]), decimals=3)
+                sm_part = (
+                    f"{caption}: {sm_llim} to {sm_ulim} km, "
+                    f"Win: {sm_lwin} km to {sm_uwin} km, "
+                    f"{change}: {sm_type}"
+                )
         
         else:
-            sm_part = "No Smoothing"
+            sm_part = "No {caption}"
 
     else:
         if sm_win:
             sm_win = np.round(float(sm_win), decimals=3)
-            sm_part = f"Smoothing: {sm_llim} to {sm_ulim} km, Win: {sm_win} km"
+            
+            if len(sm_lims) == 0:
+                sm_part = (
+                    f"{caption}: All range, "
+                    f"Win: {sm_win} km "
+                )
+                
+            else:
+                sm_llim = np.round(float(sm_lims[0]), decimals=3)
+                sm_ulim = np.round(float(sm_lims[-1]), decimals=3)
+                sm_part = (
+                    f"{caption}: {sm_llim} to {sm_ulim} km, "
+                    f"Win: {sm_win} km"
+                )
        
         else:
-            sm_part = "No Smoothing"
+            sm_part = "No {caption}"
 
     return sm_part
 

@@ -344,26 +344,13 @@ def compute_averaging_by_time_low_res(
     profile_mask = output_data['profile_mask']
     background_mask = output_data['background_mask']
     
-    output_data["profile_low_res"] = _initialize_from(
-        output_data["profile"]
-        )
-    
-    output_data["profile_error_low_res"] = _initialize_from(
-        output_data["profile_error"]
-    )
-    output_data["background_low_res"] = _initialize_from(
-        output_data["background"]
-    )
-    output_data["background_error_low_res"] = _initialize_from(
-        output_data["background_error"]
-    )
-    
-    output_data["profile_mask_low_res"] = _initialize_from(
-        output_data["profile_mask"]
-    )
-    output_data["background_mask_low_res"] = _initialize_from(
-        output_data["background_mask"]
-    )
+    output_data['profile_low_res'] = output_data['profile']
+    output_data['profile_error_low_res'] = output_data['profile_error']
+    output_data['background_low_res'] = output_data['background']
+    output_data['background_error_low_res'] = output_data['background_error']
+                
+    output_data['profile_mask_low_res'] = output_data['profile_mask']
+    output_data['background_mask_low_res'] = output_data['background_mask']
     
     qa_tests = list(profile.keys())
     
@@ -382,11 +369,6 @@ def compute_averaging_by_time_low_res(
                     averaging_threshold = low_res_averaging_threshold
                     )
 
-                # The destination arrays were initialized from the native
-                # resolution. If averaging was skipped, leave them unchanged.
-                if sig_avg is None:
-                    continue
-
                 output_data['profile_low_res'][key] = sig_avg
                 
                 if key in background:
@@ -398,8 +380,7 @@ def compute_averaging_by_time_low_res(
                         averaging_threshold = low_res_averaging_threshold
                         )
                     
-                    if bgd_avg is not None:
-                        output_data['background_low_res'][key] = bgd_avg
+                    output_data['background_low_res'][key] = bgd_avg
                 
                 if key in profile_error:
                     sig_err = profile_error[key]
@@ -410,8 +391,7 @@ def compute_averaging_by_time_low_res(
                         averaging_threshold = low_res_averaging_threshold
                         )
 
-                    if sig_avg_err is not None:
-                        output_data['profile_error_low_res'][key] = sig_avg_err
+                    output_data['profile_error_low_res'][key] = sig_avg_err
 
                 if key in background_error:
                     bgd_err = background_error[key]
@@ -423,8 +403,7 @@ def compute_averaging_by_time_low_res(
                         )
            
             
-                    if bgd_avg_err is not None:
-                        output_data['background_error_low_res'][key] = bgd_avg_err
+                    output_data['background_error_low_res'][key] = bgd_avg_err
                 
                 if key in profile_mask:    
                     output_data['profile_mask_low_res'][key] = sig_avg_mask
@@ -457,26 +436,13 @@ def compute_averaging_by_time_high_res(
     profile_mask = output_data['profile_mask']
     background_mask = output_data['background_mask']
     
-    output_data["profile_high_res"] = _initialize_from(
-        output_data["profile"]
-        )
-    
-    output_data["profile_error_high_res"] = _initialize_from(
-        output_data["profile_error"]
-    )
-    output_data["background_high_res"] = _initialize_from(
-        output_data["background"]
-    )
-    output_data["background_error_high_res"] = _initialize_from(
-        output_data["background_error"]
-    )
-    
-    output_data["profile_mask_high_res"] = _initialize_from(
-        output_data["profile_mask"]
-    )
-    output_data["background_mask_high_res"] = _initialize_from(
-        output_data["background_mask"]
-    )
+    output_data['profile_high_res'] = output_data['profile']
+    output_data['profile_error_high_res'] = output_data['profile_error']
+    output_data['background_high_res'] = output_data['background']
+    output_data['background_error_high_res'] = output_data['background_error']
+                
+    output_data['profile_mask_high_res'] = output_data['profile_mask']
+    output_data['background_mask_high_res'] = output_data['background_mask']
     
     qa_tests = list(profile.keys())
     
@@ -488,18 +454,12 @@ def compute_averaging_by_time_high_res(
             sig = profile[key]
                                 
             # Averaging the measurement
-            if high_res_averaging_rate:   
-
+            if high_res_averaging_rate:       
                 sig_avg, sig_avg_mask = temporal_averaging(
                     sig = sig, 
                     averaging_rate = high_res_averaging_rate, 
                     averaging_threshold = high_res_averaging_threshold
                     )
-
-                # The destination arrays were initialized from the native
-                # resolution. If averaging was skipped, leave them unchanged.
-                if sig_avg is None:
-                    continue
 
                 output_data['profile_high_res'][key] = sig_avg
                 
@@ -513,8 +473,7 @@ def compute_averaging_by_time_high_res(
                             averaging_threshold = high_res_averaging_threshold
                             )
                         
-                        if bgd_avg is not None:
-                            output_data['background_high_res'][key] = bgd_avg
+                        output_data['background_high_res'][key] = bgd_avg
                 
                 if key in profile_error:
                     sig_err = profile_error[key]
@@ -526,8 +485,7 @@ def compute_averaging_by_time_high_res(
                             averaging_threshold = high_res_averaging_threshold
                             )
 
-                        if sig_avg_err is not None:
-                            output_data['profile_error_high_res'][key] = sig_avg_err
+                        output_data['profile_error_high_res'][key] = sig_avg_err
                 
 
                 if key in background_error:
@@ -541,8 +499,7 @@ def compute_averaging_by_time_high_res(
                             )
                
                 
-                        if bgd_avg_err is not None:
-                            output_data['background_error_high_res'][key] = bgd_avg_err
+                        output_data['background_error_high_res'][key] = bgd_avg_err
                 
                 if key in profile_mask:    
                     output_data['profile_mask_high_res'][key] = sig_avg_mask
@@ -633,15 +590,9 @@ def compute_trim_vertically(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
-    """Re-bin and vertically trim all binned arrays lazily.
-
-    Only the small channel/bin coordinate arrays are evaluated. Large profile
-    arrays remain Dask-backed and are reduced with positional ``isel`` slices,
-    avoiding repeated ``where(..., drop=True)`` operations and large task
-    graphs.
-    """
 
     max_height_agl = 1.0e3 * processing_info["caller_info"]["max_height_agl"]
+
     output_data = shallow_copy(input_data)
 
     ranges = output_data["range"]
@@ -655,91 +606,102 @@ def compute_trim_vertically(
         )
         return output_data
 
-    for key, range_ref in ranges.items():
-        if key not in channel_info or key not in system_info:
+    qa_tests = list(ranges.keys())
+
+    for key in qa_tests:
+
+        if key not in channel_info:
             continue
 
-        # The existing range array is the cheapest and most reliable source of
-        # the original bins length; avoid scanning every store for a reference.
-        if not isinstance(range_ref, xr.DataArray) or "bins" not in range_ref.dims:
+        if key not in system_info:
             continue
 
         ci = channel_info[key]
-        zero_bin = ci.sel(parameters="zero_bin").astype("float32").reset_coords(drop=True)
-        resolution = (
-            ci.sel(parameters="range_resolution")
+
+        zero_bin = (
+            ci
+            .sel(parameters="zero_bin")
             .astype("float32")
             .reset_coords(drop=True)
         )
 
-        rename_dims = {}
-        if "channels" in zero_bin.dims and "channel" not in zero_bin.dims:
-            rename_dims["channels"] = "channel"
-        if rename_dims:
-            zero_bin = zero_bin.rename(rename_dims)
-
-        rename_dims = {}
-        if "channels" in resolution.dims and "channel" not in resolution.dims:
-            rename_dims["channels"] = "channel"
-        if rename_dims:
-            resolution = resolution.rename(rename_dims)
-
-        sys = system_info[key]
-        zenith_angle_rad = np.deg2rad(float(sys.loc["zenith_angle"].values))
-        cos_zenith = np.cos(zenith_angle_rad)
-        station_altitude = sys.loc["station_altitude"].values
-
-        # Build the complete true-bin grid available in the input data. Do not
-        # use the requested AGL cutoff to limit this helper call: the requested
-        # limit applies to height above ground, not to slant range. The exact
-        # cutoff is applied below after ``z_agl`` has been calculated.
-        available_height_agl = range_ref * cos_zenith
-        available_max_height_agl = float(
-            available_height_agl.max(skipna=True).values
+        resolution = (
+            ci
+            .sel(parameters="range_resolution")
+            .astype("float32")
+            .reset_coords(drop=True)
         )
+
+        if "channels" in zero_bin.dims and "channel" not in zero_bin.dims:
+            zero_bin = zero_bin.rename({"channels": "channel"})
+
+        if "channels" in resolution.dims and "channel" not in resolution.dims:
+            resolution = resolution.rename({"channels": "channel"})
+
+        zenith_angle = float(system_info[key].loc["zenith_angle"].values)
+        zenith_angle_rad = np.pi * zenith_angle / 180.0
+
+        station_altitude = system_info[key].loc["station_altitude"].values
+
+        # Find a representative array to get the original number of bins.
+        reference = None
+
+        for store in output_data.values():
+            if not isinstance(store, dict):
+                continue
+
+            if key not in store:
+                continue
+
+            arr = store[key]
+
+            if not isinstance(arr, xr.DataArray):
+                continue
+
+            if "channel" in arr.dims and "bins" in arr.dims:
+                reference = arr
+                break
+
+        if reference is None:
+            continue
+
+        n_old_bins = reference.sizes["bins"]
 
         target_bins = _true_bin_grid(
             zero_bin=zero_bin,
-            n_old_bins=range_ref.sizes["bins"],
+            n_old_bins=n_old_bins,
             resolution=resolution,
             zenith_angle_rad=zenith_angle_rad,
-            max_height_agl=available_max_height_agl,
+            max_height_agl=max_height_agl,
         )
-
-        if len(target_bins) == 0:
-            continue
 
         bins = xr.DataArray(
             target_bins,
-            dims=("bins",),
+            dims=["bins"],
             coords={"bins": target_bins},
         )
-        based_bins = bins + np.float32(0.5)
-        z_rng = (resolution * based_bins).reset_coords(drop=True)
-        z_agl = (z_rng * cos_zenith).reset_coords(drop=True)
 
-        # Evaluate only this small metadata mask. Determine one shared trailing
-        # slice and apply it before touching any large profile array.
+        # After rebinning, bins are true-bin left edges.
+        based_bins = bins + 0.5
+
+        z_rng = (
+            resolution * based_bins
+        ).reset_coords(drop=True)
+
+        z_agl = (
+            z_rng * np.cos(zenith_angle_rad)
+        ).reset_coords(drop=True)
+
+        if station_altitude is not None:
+            z_asl = (
+                z_agl + float(station_altitude)
+            ).reset_coords(drop=True)
+        else:
+            z_asl = None
+
+        # Bins below zero were already removed by target_bins.
         mask_bins = z_agl <= max_height_agl
-        non_bin_dims = [dim for dim in mask_bins.dims if dim != "bins"]
-        valid_any = mask_bins.any(dim=non_bin_dims) if non_bin_dims else mask_bins
-        valid_any_np = np.asarray(valid_any.values, dtype=bool)
 
-        valid_positions = np.flatnonzero(valid_any_np)
-        if valid_positions.size == 0:
-            continue
-
-        stop = int(valid_positions[-1]) + 1
-        bin_slice = slice(0, stop)
-
-        target_bins = target_bins[bin_slice]
-        mask_bins = mask_bins.isel(bins=bin_slice)
-        z_rng = z_rng.isel(bins=bin_slice)
-        z_agl = z_agl.isel(bins=bin_slice)
-
-        # The helper performs the channel-dependent true-bin alignment. Giving
-        # it the already-trimmed target grid keeps the resulting Dask graph and
-        # every downstream chunk substantially smaller.
         _rebin_and_trim_all_binned_arrays(
             output_data=output_data,
             key=key,
@@ -748,21 +710,27 @@ def compute_trim_vertically(
             mask_bins=mask_bins,
         )
 
-        # Positional trimming is cheap and lazy. ``where`` is only required for
-        # channel-specific tail differences; do not use ``drop=True`` here.
-        all_valid = bool(np.asarray(mask_bins.all().values))
-        if not all_valid:
-            z_rng = z_rng.where(mask_bins)
-            z_agl = z_agl.where(mask_bins)
+        output_data["range"][key] = (
+            z_rng
+            .where(mask_bins, drop=True)
+            .reset_coords(drop=True)
+        )
 
-        output_data["range"][key] = z_rng.reset_coords(drop=True)
-        output_data["height_agl"][key] = z_agl.reset_coords(drop=True)
+        output_data["height_agl"][key] = (
+            z_agl
+            .where(mask_bins, drop=True)
+            .reset_coords(drop=True)
+        )
 
-        if station_altitude is not None:
-            z_asl = z_agl + float(station_altitude)
-            output_data["height_asl"][key] = z_asl.reset_coords(drop=True)
+        if z_asl is not None:
+            output_data["height_asl"][key] = (
+                z_asl
+                .where(mask_bins, drop=True)
+                .reset_coords(drop=True)
+            )
 
     print_entry("Vertical trimming succesfully performed!")
+
     return output_data
 
 def compute_background_correction(
@@ -1173,5 +1141,3 @@ def slice_signal_by_range(sig, ranges, region, drop=False, min_bins=10):
     return sig_slice, range_slice
     
 
-def _initialize_from(source):
-    return source.copy() if isinstance(source, dict) else source
