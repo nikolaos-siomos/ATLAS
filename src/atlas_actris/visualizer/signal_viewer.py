@@ -840,6 +840,16 @@ def generate_line_plots(processor, stage, db):
             settings = caller_info
             )
         
+        # IDentify signal type
+        if processor.has_stage_id(item_id = stage, stage_id ='range_correction'):
+            signal_type = 'range corr. signal'
+        elif processor.has_stage_id(item_id = stage, stage_id ='background_correction'):
+            signal_type = 'background corr. signal'
+        else:
+            signal_type = 'raw signal'
+        
+        if processor.has_stage_id(item_id = stage, stage_id ='gluing'):
+            signal_type = f"Glued {signal_type}"
 
         sys_info = dict(zip(system_info.parameters.values, system_info.values))
 
@@ -865,7 +875,7 @@ def generate_line_plots(processor, stage, db):
                 metadata = metadata,
                 extra_metadata = {},
                 settings = {},
-                qa_test_info = {'stage': stage, 'qa_test':key, 'db': db}
+                qa_test_info = {'stage': stage, 'qa_test':key, 'db': db, 'sig_type': signal_type}
                 )
             
             

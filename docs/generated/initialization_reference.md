@@ -499,9 +499,9 @@ Controls signal trimming, overflow handling, temporal averaging options, and opt
 | [`max_height_agl`](#max-height-agl) | `float` | `40.0` |  |
 | [`low_shot_threshold`](#low-shot-threshold) | `float` | `0.9` | Range: 0.0 to 0.999 |
 | [`trim_overflows`](#trim-overflows) | `int` | `0` | Allowed values: 0, 1, 2, 3 |
-| [`low_res_averaging_rate`](#low-res-averaging-rate) | `str` | `1H` |  |
+| [`low_res_averaging_period`](#low-res-averaging-period) | `str` | `1H` |  |
 | [`low_res_averaging_threshold`](#low-res-averaging-threshold) | `float` | `0.5` | Range: 0.0 to 1.0 |
-| [`high_res_averaging_rate`](#high-res-averaging-rate) | `str` | `10min` |  |
+| [`high_res_averaging_period`](#high-res-averaging-period) | `str` | `10min` |  |
 | [`high_res_averaging_threshold`](#high-res-averaging-threshold) | `float` | `0.5` | Range: 0.0 to 1.0 |
 | [`max_adjacent_overflows`](#max-adjacent-overflows) | `int` | `5` | Minimum: 0 |
 | [`slice_measurement`](#slice-measurement) | `list[str]` | `empty parameter --&gt; ignored or automatic selection` |  |
@@ -554,10 +554,10 @@ Controls signal trimming, overflow handling, temporal averaging options, and opt
     trim_overflows =
     ```
 
-<a id="low-res-averaging-rate"></a>
-??? info "`low_res_averaging_rate`"
+<a id="low-res-averaging-period"></a>
+??? info "`low_res_averaging_period`"
 
-    Not applied yet for QA - Averaging rate (low temporal resolution) for Rayleigh and dark measurements, specified in minutes or hours, for example 10min or 2h. If the measurement duration is shorter than the averaging rate, the full dataset is averaged. Otherwise, data are averaged over equal time intervals. Averages are masked when the fraction of missing profiles within an interval exceeds low_res_averaging_threshold.
+    Not applied yet for QA - Averaging period (low temporal resolution) for Rayleigh and dark measurements, specified in minutes or hours, for example 10min or 2h. If the measurement duration is shorter than the averaging period, the full dataset is averaged. Otherwise, data are averaged over equal time intervals. Averages are masked when the fraction of missing profiles within an interval exceeds low_res_averaging_threshold.
 
     - **Type:** `str`
     - **Category:** `optional`
@@ -566,13 +566,13 @@ Controls signal trimming, overflow handling, temporal averaging options, and opt
     - **Version history:** New in ATLAS `1.0.0`.
 
     ```ini
-    low_res_averaging_rate =
+    low_res_averaging_period =
     ```
 
 <a id="low-res-averaging-threshold"></a>
 ??? info "`low_res_averaging_threshold`"
 
-    Not applied for QA yet - Threshold for masking averages based on missing data within the averaging time interval. The interval is defined by low_res_averaging_rate; averages are masked when the fraction of missing profiles relative to the expected number of profiles exceeds low_res_averaging_threshold.
+    Not applied for QA yet - Threshold for masking averages based on missing data within the averaging time interval. The interval is defined by low_res_averaging_period; averages are masked when the fraction of missing profiles relative to the expected number of profiles exceeds low_res_averaging_threshold.
 
     - **Type:** `float`
     - **Category:** `optional`
@@ -585,10 +585,10 @@ Controls signal trimming, overflow handling, temporal averaging options, and opt
     low_res_averaging_threshold =
     ```
 
-<a id="high-res-averaging-rate"></a>
-??? info "`high_res_averaging_rate`"
+<a id="high-res-averaging-period"></a>
+??? info "`high_res_averaging_period`"
 
-    Not applied for QA yet - Averaging rate (high temporal resolution) for Rayleigh and dark measurements, specified in minutes or hours, for example 10min or 2h. Decimal values are also accepted: e.g. 0.5min --&gt; 30 seconds, 0.5h --&gt; 30 minutesIf the measurement duration is shorter than the averaging rate, the full dataset is averaged. Otherwise, data are averaged over equal time intervals. Averages are masked when the fraction of missing profiles within an interval exceeds high_res_averaging_threshold.
+    Not applied for QA yet - Averaging period (high temporal resolution) for Rayleigh and dark measurements, specified in minutes or hours, for example 10min or 2h. Decimal values are also accepted: e.g. 0.5min --&gt; 30 seconds, 0.5h --&gt; 30 minutesIf the measurement duration is shorter than the averaging period, the full dataset is averaged. Otherwise, data are averaged over equal time intervals. Averages are masked when the fraction of missing profiles within an interval exceeds high_res_averaging_threshold.
 
     - **Type:** `str`
     - **Category:** `optional`
@@ -597,7 +597,7 @@ Controls signal trimming, overflow handling, temporal averaging options, and opt
     - **Version history:** New in ATLAS `1.0.0`.
 
     ```ini
-    high_res_averaging_rate =
+    high_res_averaging_period =
     ```
 
 <a id="high-res-averaging-threshold"></a>

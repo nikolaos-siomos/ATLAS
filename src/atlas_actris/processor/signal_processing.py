@@ -330,7 +330,7 @@ def compute_averaging_by_time_low_res(
 
     allowed_qa_tests = ['ray', 'drk']
 
-    low_res_averaging_rate = processing_info['caller_info']["low_res_averaging_rate"]
+    low_res_averaging_period = processing_info['caller_info']["low_res_averaging_period"]
     low_res_averaging_threshold = processing_info['caller_info']["low_res_averaging_threshold"]
     
     output_data = shallow_copy(input_data)
@@ -375,10 +375,10 @@ def compute_averaging_by_time_low_res(
             sig = profile[key]
                                 
             # Averaging the measurement
-            if low_res_averaging_rate:       
+            if low_res_averaging_period:       
                 sig_avg, sig_avg_mask = temporal_averaging(
                     sig = sig, 
-                    averaging_rate = low_res_averaging_rate, 
+                    averaging_period = low_res_averaging_period, 
                     averaging_threshold = low_res_averaging_threshold
                     )
 
@@ -394,7 +394,7 @@ def compute_averaging_by_time_low_res(
 
                     bgd_avg, bgd_avg_mask = temporal_averaging(
                         sig = bgd, 
-                        averaging_rate = low_res_averaging_rate, 
+                        averaging_period = low_res_averaging_period, 
                         averaging_threshold = low_res_averaging_threshold
                         )
                     
@@ -406,7 +406,7 @@ def compute_averaging_by_time_low_res(
 
                     sig_avg_err, _ = temporal_averaging_error(
                         sig_err = sig_err, 
-                        averaging_rate = low_res_averaging_rate, 
+                        averaging_period = low_res_averaging_period, 
                         averaging_threshold = low_res_averaging_threshold
                         )
 
@@ -418,7 +418,7 @@ def compute_averaging_by_time_low_res(
 
                     bgd_avg_err, _ = temporal_averaging_error(
                         sig_err = bgd_err, 
-                        averaging_rate = low_res_averaging_rate, 
+                        averaging_period = low_res_averaging_period, 
                         averaging_threshold = low_res_averaging_threshold
                         )
            
@@ -443,7 +443,7 @@ def compute_averaging_by_time_high_res(
     
     allowed_qa_tests = ['ray', 'drk']
 
-    high_res_averaging_rate = processing_info['caller_info']["high_res_averaging_rate"]
+    high_res_averaging_period = processing_info['caller_info']["high_res_averaging_period"]
     high_res_averaging_threshold = processing_info['caller_info']["high_res_averaging_threshold"]
     
     output_data = shallow_copy(input_data)
@@ -488,11 +488,11 @@ def compute_averaging_by_time_high_res(
             sig = profile[key]
                                 
             # Averaging the measurement
-            if high_res_averaging_rate:   
+            if high_res_averaging_period:   
 
                 sig_avg, sig_avg_mask = temporal_averaging(
                     sig = sig, 
-                    averaging_rate = high_res_averaging_rate, 
+                    averaging_period = high_res_averaging_period, 
                     averaging_threshold = high_res_averaging_threshold
                     )
 
@@ -509,7 +509,7 @@ def compute_averaging_by_time_high_res(
                     if bgd:
                         bgd_avg, bgd_avg_mask = temporal_averaging(
                             sig = bgd, 
-                            averaging_rate = high_res_averaging_rate, 
+                            averaging_period = high_res_averaging_period, 
                             averaging_threshold = high_res_averaging_threshold
                             )
                         
@@ -522,7 +522,7 @@ def compute_averaging_by_time_high_res(
                     if sig_err:
                         sig_avg_err, _ = temporal_averaging_error(
                             sig_err = sig_err, 
-                            averaging_rate = high_res_averaging_rate, 
+                            averaging_period = high_res_averaging_period, 
                             averaging_threshold = high_res_averaging_threshold
                             )
 
@@ -536,7 +536,7 @@ def compute_averaging_by_time_high_res(
                     if bgd_err:
                         bgd_avg_err, _ = temporal_averaging_error(
                             sig_err = bgd_err, 
-                            averaging_rate = high_res_averaging_rate, 
+                            averaging_period = high_res_averaging_period, 
                             averaging_threshold = high_res_averaging_threshold
                             )
                

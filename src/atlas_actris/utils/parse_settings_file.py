@@ -79,7 +79,7 @@ SCHEMA_DRK: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
     "stats_range":                  {"dtype": float, "default": [5., 15.],   "is_list": True, "size": 2},
     "far_range_region":             {"dtype": float, "default": [25., None], "is_list": True, "size": 2},
-    "averaging_rate":               {"dtype": str,   "default": 'high_res',  "is_list": False, "allowed": ["raw", "low_res", "high_res"]},
+    "averaging_period":             {"dtype": str,   "default": 'high_res',  "is_list": False, "allowed": ["raw", "low_res", "high_res"]},
     "relative_molecular_deviation": {"dtype": float, "default": 0.01,       "is_list": False, "min": 0.001, "max": 2.},
     
     "smooth":                       {"dtype": bool,  "default": True,        "is_list": False},

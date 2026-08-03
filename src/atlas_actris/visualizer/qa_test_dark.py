@@ -72,15 +72,15 @@ def extract_arrays(ch_d, key, data_pack_bc,
     # RC signal is currently unused.
     # vertical_scale_rc = data_pack_rc[key][caller_info["vertical_scale"]].sel(ch_d)
 
-    averaging_rate = settings["averaging_rate"]
+    averaging_period = settings["averaging_period"]
 
-    if averaging_rate == "raw" or key != "drk":
+    if averaging_period == "raw" or key != "drk":
         profiles_bc = data_pack_bc[key]["profile"].sel(ch_d)
         background = data_pack_bc[key]["background"].sel(ch_d)
 
-    elif averaging_rate in ("low_res", "high_res") and key == "drk":
-        profiles_bc = data_pack_bc[key][f"profile_{averaging_rate}"].sel(ch_d)
-        background = data_pack_bc[key][f"background_{averaging_rate}"].sel(ch_d)
+    elif averaging_period in ("low_res", "high_res") and key == "drk":
+        profiles_bc = data_pack_bc[key][f"profile_{averaging_period}"].sel(ch_d)
+        background = data_pack_bc[key][f"background_{averaging_period}"].sel(ch_d)
 
         profiles_all_nan = not np.isfinite(_to_numpy(profiles_bc)).any()
         background_all_nan = not np.isfinite(_to_numpy(background)).any()
@@ -88,7 +88,7 @@ def extract_arrays(ch_d, key, data_pack_bc,
         if profiles_all_nan or background_all_nan:
             print()
             CustomWarning(
-                f"{averaging_rate} dark data are unavailable for "
+                f"{averaging_period} dark data are unavailable for "
                 f"channel {ch_d['channel']}; raw data will be used instead."
             )
             print()
@@ -97,7 +97,7 @@ def extract_arrays(ch_d, key, data_pack_bc,
 
     else:
         raise ValueError(
-            f"Unsupported averaging_rate {averaging_rate!r} for key {key!r}."
+            f"Unsupported averaging_period {averaging_period!r} for key {key!r}."
         )
 
     # Mean raw profile at the original raw temporal resolution.
@@ -849,7 +849,7 @@ def calculate_statistics(
         "Yes" if stats["gaussian_noise"] else "No"
     )
     stats["vert_slope_flag"] = (
-        "Significant" if stats["vert_slope_sign"] else "Insignificant"
+        f"{vert_fit.slope:.2e} \u00b1 {vert_fit.stderr:.1e}"
     )
 
     # Temporal trend from the time-resolved background-corrected signal.
@@ -870,9 +870,10 @@ def calculate_statistics(
         )
         stats["temp_slope"] = float(temp_fit.slope)
         stats["temp_slope_sign"] = bool(temp_fit.pvalue <= 0.05)
-        stats["temp_slope_flag"] = (
-            "Significant" if stats["temp_slope_sign"] else "Insignificant"
-        )
+        # stats["temp_slope_flag"] = (
+        #     "Signif." if stats["temp_slope_sign"] else "Insignif."
+        # )
+        stats["temp_slope_flag"] = f"{temp_fit.slope:.2e} \u00b1 {temp_fit.stderr:.1e}"
     else:
         stats["temp_slope"] = np.nan
         stats["temp_slope_sign"] = False

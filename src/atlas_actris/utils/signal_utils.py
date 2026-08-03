@@ -47,13 +47,13 @@ def expected_profiles_per_window(freq: str,
 
 def temporal_averaging(
     sig: xr.DataArray,
-    averaging_rate: str,
+    averaging_period: str,
     averaging_threshold: float,
 ) -> Tuple[Optional[xr.DataArray], Optional[xr.DataArray]]:
     """Average along time, or return ``(None, None)`` when averaging is impossible.
 
     Returning ``None`` allows the calling processing stage to leave its already
-    initialized output arrays unchanged when ``averaging_rate`` is shorter than
+    initialized output arrays unchanged when ``averaging_period`` is shorter than
     the native measurement resolution.
     """
 
@@ -65,11 +65,11 @@ def temporal_averaging(
         return None, None
 
     delta_t_min = np.min(sig.time[1:].values - sig.time[:-1].values)
-    expected_profiles = expected_profiles_per_window(averaging_rate, delta_t_min)
+    expected_profiles = expected_profiles_per_window(averaging_period, delta_t_min)
 
     if expected_profiles < 1:
         CustomWarning(
-            f"The provided averaging_rate ({averaging_rate}) is smaller than "
+            f"The provided averaging_period ({averaging_period}) is smaller than "
             "the temporal resolution. Averaging was skipped."
         )
         return None, None
@@ -77,7 +77,7 @@ def temporal_averaging(
     origin = pd.Timestamp(sig.time.values[0])
 
     actual_profiles = sig.resample(
-        {"time": averaging_rate},
+        {"time": averaging_period},
         label="left",
         origin=origin,
     ).count()
@@ -87,7 +87,7 @@ def temporal_averaging(
     )
 
     sig_avg = sig.resample(
-        {"time": averaging_rate},
+        {"time": averaging_period},
         label="left",
         origin=origin,
     ).mean()
@@ -99,7 +99,7 @@ def temporal_averaging(
 
 def temporal_averaging_error(
     sig_err: xr.DataArray,
-    averaging_rate: str,
+    averaging_period: str,
     averaging_threshold: float,
 ) -> Tuple[Optional[xr.DataArray], Optional[xr.DataArray]]:
     """Average temporal errors, or return ``(None, None)`` when skipped."""
@@ -115,13 +115,13 @@ def temporal_averaging_error(
         sig_err.time[1:].values - sig_err.time[:-1].values
     )
     expected_profiles = expected_profiles_per_window(
-        averaging_rate,
+        averaging_period,
         delta_t_min,
     )
 
     if expected_profiles < 1:
         CustomWarning(
-            f"The provided averaging_rate ({averaging_rate}) is smaller than "
+            f"The provided averaging_period ({averaging_period}) is smaller than "
             "the temporal resolution. Error averaging was skipped."
         )
         return None, None
@@ -129,7 +129,7 @@ def temporal_averaging_error(
     origin = pd.Timestamp(sig_err.time.values[0])
 
     actual_profiles = sig_err.resample(
-        {"time": averaging_rate},
+        {"time": averaging_period},
         label="left",
         origin=origin,
     ).count()
@@ -139,7 +139,7 @@ def temporal_averaging_error(
     )
 
     sig_mean_err = sig_err.resample(
-        {"time": averaging_rate},
+        {"time": averaging_period},
         label="left",
         origin=origin,
     ).mean()

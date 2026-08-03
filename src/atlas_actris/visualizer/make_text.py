@@ -63,7 +63,35 @@ subtype_map = {
     'x' : ''
     }
 
-
+qa_dataset_labels = {
+    'drk': 'Long dark test',
+    'ray': 'Rayleigh measurement',
+    'ray_pcb': 'Rayleigh pol. cal. mode measurement',
+    'tlc': 'Quadrant telecover test',
+    'tlc_rin': 'Ring telecover test',
+    'pcb': 'Pol. Cal. measurement',
+    'pcb_aux': 'Auxialliary Pol. Cal. measurement',
+    'trg': 'Zero bin test',
+    'dtm': 'Dead time measurement',
+    "pcb_p45": 'Pol. Cal. measurement | +45°',
+    "pcb_m45": 'Pol. Cal. measurement | -45°',
+    "tlc_north": 'Quadr. telecover test | North sector',
+    "tlc_east": 'Quadr. telecover test | East sector',
+    "tlc_south": 'Quadr. telecover test | South sector',
+    "tlc_west": 'Quadrant telecover test | West sector',
+    "tlc_inner": 'Ring telecover test (Inner sector)',
+    "tlc_outer": 'Ring telecover test (Outer sector)',
+    "pcb_aux_p45": 'Auxialliary Pol. Cal. measurement | -45°',
+    "pcb_aux_m45": 'Auxialliary Pol. Cal. measurement | +45°',
+    "drk_ray": 'Dark measurent for Rayleigh',
+    "drk_pcb": 'Dark measurent for pol. cal.',
+    "drk_tlc": 'Dark measurent for quadr. telecover',
+    "drk_tlc_rin": 'Dark measurent for ring telecover',
+    "drk_trg": 'Dark measurent for zero bin',
+    "drk_dtm": 'Dark measurent for dead time',
+    "drk_ray_pcb": 'Dark measurent for Rayleigh pol. cal. mode',
+    "drk_pcb_aux": 'Dark measurent for aux. pol. cal.',
+    }
 @dataclass(frozen=True)
 class Libraries:
     caller_info: Dict[str, Any]
@@ -273,9 +301,9 @@ class GenerateText:
             sm_expo = False,
             )
 
-        avg_rate_alias = self.settings['averaging_rate']
-        averaging_rate = self.caller_info[f'{avg_rate_alias}_averaging_rate']
-        avg_rate_part = f'Averaging rate ({avg_rate_alias}): {averaging_rate}'
+        avg_rate_alias = self.settings['averaging_period']
+        averaging_period = self.caller_info[f'{avg_rate_alias}_averaging_period']
+        avg_rate_part = f'Averaging period: {averaging_period}'
         
         drk_text = quicklook_text(self.qa_test_info['qa_test'])
         
@@ -452,15 +480,20 @@ class GenerateText:
         stage_part = stage_text(self.qa_test_info['stage'])
 
         if self.qa_test_info['db'] == 'profile':
-            sig_type = 'Signal'
+            sig_type = self.qa_test_info['sig_type'].capitalize()
         else:
-            sig_type = 'Mean Signal'
+            sig_type = f"Averaged {self.qa_test_info['sig_type']}"
             
-        signal_part = sig_type + ' - ' + self.qa_test_info['qa_test']
+        qa_dataset_text = qa_dataset_labels[self.qa_test_info['qa_test']]
+        alias = self.qa_test_info['qa_test']
+        
+        signal_part = f"{sig_type} - {qa_dataset_text} ({alias})"
+            
+            
         
         title = self.system_part + ' ' + self.channel_part + '\n'+\
             self.config_part + ' - ' + stage_part + '\n'+\
-                signal_part + ' - ' + self.dateloc_part
+                signal_part + ': ' + self.dateloc_part
                             
         return title 
     
@@ -850,7 +883,7 @@ def quicklook_text(qa_test):
 
 def stage_text(stage):
     
-    return f'Stage: {stage}'
+    return f'ATLAS Processing Stage: {stage}'
 
 def system_text(lidar_name, station_name):
     

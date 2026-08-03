@@ -204,16 +204,17 @@ def generate_plot(bins_dict, x_dict, y_dict, m_dict, args):
 
 def collect_stats(args):
     y_units = "mV" if args["channel_mode"] == "a" else "MHz"
-
+    
+    z_alias = args["vertical_scale"]
+    
     stats_names = [
-        "Region [km]",
-        f"Baseline offset [{y_units}]",
-        f"Noise / bin / shot [{y_units}]",
-        "Vertical trend",
-        "Temporal trend",
-        "Gaussian noise",
-        "N: bins / profiles / shots",
-        f"Max channel {args.get('vertical_scale_alias', args.get('vertical_scale', 'range'))} [km]",
+        "Stats Region [km]",
+        f"Mean offset [{y_units}]",
+        f"Noise / bin / shot [{y_units}]\n(stdev of full period)",
+        f"Slope over {z_alias} [{y_units} km$^{{-1}}$]",
+        f"Temporal slope [{y_units} s$^{{-1}}$]",
+        "Is noise Gaussian?",
+        "N: bins, avg. signals, shots",
     ]
 
     noise_per_bin_per_shot = args.get(
@@ -234,12 +235,7 @@ def collect_stats(args):
         str(args["vert_slope_flag"]),
         str(args["temp_slope_flag"]),
         str(args["gaussian_noise_flag"]),
-        f"{bins} / {profiles} / {shots}",
-        (
-            f"{float(args['max_channel_vertical_scale']):.2f}"
-            if np.isfinite(float(args.get("max_channel_vertical_scale", np.nan)))
-            else "Not exceeded"
-        ),
+        f"{bins}, {profiles}, {shots}",
     ]
     return stats_names, stats_values
 
@@ -374,7 +370,9 @@ def plot_normalized_sm_deviation(
     ax.set_xlim(xlims_bins)
     ax.set_ylim(-2.0 * relative_limit, 2.0 * relative_limit)
     ax.xaxis.set_minor_locator(AutoMinorLocator())
+    ax.yaxis.set_minor_locator(AutoMinorLocator(2))
     ax.tick_params(axis="x", which="minor", length=3)
+    ax.tick_params(axis="y", which="minor", length=3)
 
     ax_top = ax.twiny()
     ax_top.set_xlim(xlims_range)
@@ -387,6 +385,33 @@ def plot_normalized_sm_deviation(
     ax_top.set_xlabel(x_label_2, labelpad=5)
     ax.set_ylabel(y_label)
     ax.grid(which="both")
+
+    max_vertical = float(args.get("max_channel_vertical_scale", np.nan))
+    vertical_alias = args.get(
+        "vertical_scale_alias",
+        args.get("vertical_scale", "range"),
+    )
+    max_vertical_text = (
+        f"Max channel {vertical_alias}: {max_vertical:.2f} km"
+        if np.isfinite(max_vertical)
+        else f"Max channel {vertical_alias}: Not exceeded"
+    )
+    text = ax.text(
+        0.03,
+        0.96,
+        max_vertical_text,
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        zorder=100,
+        bbox=dict(
+            facecolor="tab:grey",
+            alpha=0.22,
+            edgecolor="none",
+        ),
+    )
+    
+    text.get_bbox_patch().set_zorder(99)
 
     # The shared elapsed-time colorbar is displayed only on plot 2-2.
     # Plot 1-3 uses the same colormap and normalization without duplicating it.
@@ -433,7 +458,9 @@ def plot_raw_multi(
     ax.set_xlim(xlims)
     ax.set_ylim(ylims)
     ax.xaxis.set_minor_locator(AutoMinorLocator())
+    ax.yaxis.set_minor_locator(AutoMinorLocator(2))
     ax.tick_params(axis="x", which="minor", length=3)
+    ax.tick_params(axis="y", which="minor", length=3)
 
     ax_top = ax.twiny()
     ax_top.set_xlim(xlims_upper)
@@ -473,23 +500,56 @@ def plot_raw_multi(
 
 def plot_stats_table(fig, ax_coords, args, title=None):
     stats_names, stats_values = collect_stats(args)
-    ax = fig.add_axes(ax_coords)
+
+    # Make the table slightly wider and extend it mainly to the left while
+    # keeping its right edge aligned with the original panel.
+    table_coords = list(ax_coords)
+    extra_width = 0.018
+    table_coords[0] -= extra_width
+    table_coords[2] += extra_width
+
+    ax = fig.add_axes(table_coords)
     ax.axis("off")
 
     table = ax.table(
         cellText=[[name, value] for name, value in zip(stats_names, stats_values)],
         colLabels=["Statistics on region", "Value"],
         cellLoc="left", colLoc="left", loc="center",
+        # Move the separator slightly to the right by widening the first column.
+        colWidths=[0.60, 0.40],
     )
     table.auto_set_font_size(False)
     table.set_fontsize(10)
     table.scale(1.0, 1.5)
 
-    for (row, _), cell in table.get_celld().items():
+    for (row, column), cell in table.get_celld().items():
         cell.set_linewidth(0.8)
+
+        # Keep the left-column text close to the border without touching it.
+        if column == 0:
+            cell.PAD = 0.04
+
         if row == 0:
             cell.set_text_props(weight="bold")
             cell.set_facecolor("#eaeaea")
+
+    # Row 3 is the two-line noise entry (row 0 contains the headers).
+    # Double the height of both cells so the second line fits comfortably.
+    for column in (0, 1):
+        if (3, column) in table.get_celld():
+            cell = table[(3, column)]
+            cell.set_height(cell.get_height() * 2.0)
+
+    # Rows are offset by one because row 0 contains the column headers.
+    slope_rows = {
+        4: bool(args.get("vert_slope_sign", False)),
+        5: bool(args.get("temp_slope_sign", False)),
+    }
+    for row, is_significant in slope_rows.items():
+        if (row, 1) in table.get_celld():
+            table[(row, 1)].get_text().set_color(
+                "red" if is_significant else "green"
+            )
 
     if title is not None:
         ax.set_title(title, pad=23)
@@ -514,7 +574,7 @@ def make_labels(signal_type, channel_mode, y_offset=""):
         return (
             "Bins",
             "Range [km]",
-            f"Relative deviations to\nmolecular[{display_units}]",
+            f"Relative deviations from\nmolecular[{display_units}]",
             "Relative",
         )
 

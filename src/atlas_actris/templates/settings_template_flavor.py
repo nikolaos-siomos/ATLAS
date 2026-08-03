@@ -923,7 +923,7 @@ SETTINGS_FLAVOR["drk"] = {
         "example": "25, _",
         "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},
     },
-    "averaging_rate": {
+    "averaging_period": {
         "description": "Select the signal averaging level used by the dark test.",
         "example": "high_res",
         "legacy": {"status": "new", "introduced": "1.0.1", "old_names": [], "old_location": "", "old_names_removed_in": "", "note": ""},

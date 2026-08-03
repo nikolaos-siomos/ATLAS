@@ -142,7 +142,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `stats_range` | Height/range interval used to calculate dark-signal statistics. | `list[float]` | optional | `5.0, 15.0` | Required list size: 2 | `5, 15` | New in ATLAS `1.0.1`. |
 | `far_range_region` | Far-range interval used for the dark-signal quality check. | `list[float]` | optional | `25.0, empty parameter --&gt; ignored or automatic selection` | Required list size: 2 | `25, _` | New in ATLAS `1.0.1`. |
-| `averaging_rate` | Select the signal averaging level used by the dark test. | `str` | optional | `high_res` | Allowed values: raw, low_res, high_res | `high_res` | New in ATLAS `1.0.1`. |
+| `averaging_period` | Select the signal averaging level used by the dark test. | `str` | optional | `high_res` | Allowed values: raw, low_res, high_res | `high_res` | New in ATLAS `1.0.1`. |
 | `relative_molecular_deviation` | Maximum relative molecular-signal deviation accepted by the dark test. | `float` | optional | `0.01` | Range: 0.001 to 2.0 | `0.01` | New in ATLAS `1.0.1`. |
 | `smooth` | Apply smoothing to the dark signal before plotting or evaluation. | `bool` | optional | `True` |  | `True` | New in ATLAS `1.0.1`. |
 | `smoothing_range` | Height/range interval over which dark-signal smoothing is applied. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` | Required list size: 2 | `5, 15` | New in ATLAS `1.0.1`. |

@@ -73,9 +73,9 @@ INIT_TEMPLATE_SECTIONS = INIT_FILE_SECTIONS
 #  'trimming_options': ['max_height_agl',
 #                       'low_shot_threshold',
 #                       'trim_overflows',
-#                       'low_res_averaging_rate',
+#                       'low_res_averaging_period',
 #                       'low_res_averaging_threshold',
-#                       'high_res_averaging_rate',
+#                       'high_res_averaging_period',
 #                       'high_res_averaging_threshold',
 #                       'max_adjacent_overflows',
 #                       'slice_measurement',
@@ -629,13 +629,13 @@ INIT_FLAVOR = {
              }
          },
 
-    'low_res_averaging_rate': {
+    'low_res_averaging_period': {
         'description': 
             'Not applied yet for QA - '
-            'Averaging rate (low temporal resolution) for Rayleigh and dark '
+            'Averaging period (low temporal resolution) for Rayleigh and dark '
             'measurements, specified in minutes or hours, '
             'for example 10min or 2h. '
-            'If the measurement duration is shorter than the averaging rate, '
+            'If the measurement duration is shorter than the averaging period, '
             'the full dataset is averaged. '
             'Otherwise, data are averaged over equal time intervals. '
             'Averages are masked when the fraction of missing profiles within '
@@ -656,7 +656,7 @@ INIT_FLAVOR = {
             'Not applied for QA yet - '
             'Threshold for masking averages based on missing data within the '
             'averaging time interval. The interval is defined by '
-            'low_res_averaging_rate; averages are masked when the fraction of '
+            'low_res_averaging_period; averages are masked when the fraction of '
             'missing profiles relative to the expected number of profiles '
             'exceeds low_res_averaging_threshold.',
          'example': '1h',
@@ -670,15 +670,15 @@ INIT_FLAVOR = {
              }
          },     
 
-    'high_res_averaging_rate': {
+    'high_res_averaging_period': {
         'description': 
             'Not applied for QA yet - '
-            'Averaging rate (high temporal resolution) for Rayleigh and dark '
+            'Averaging period (high temporal resolution) for Rayleigh and dark '
             'measurements, specified in minutes or hours, '
             'for example 10min or 2h. '
             'Decimal values are also accepted: e.g. 0.5min --> 30 seconds, '
             '0.5h --> 30 minutes'
-            'If the measurement duration is shorter than the averaging rate, '
+            'If the measurement duration is shorter than the averaging period, '
             'the full dataset is averaged. '
             'Otherwise, data are averaged over equal time intervals. '
             'Averages are masked when the fraction of missing profiles within '
