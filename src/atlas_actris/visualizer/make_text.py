@@ -64,33 +64,63 @@ subtype_map = {
     }
 
 qa_dataset_labels = {
-    'drk': 'Long dark test',
-    'ray': 'Rayleigh measurement',
-    'ray_pcb': 'Rayleigh pol. cal. mode measurement',
-    'tlc': 'Quadrant telecover test',
-    'tlc_rin': 'Ring telecover test',
-    'pcb': 'Pol. Cal. measurement',
-    'pcb_aux': 'Auxialliary Pol. Cal. measurement',
-    'trg': 'Zero bin test',
-    'dtm': 'Dead time measurement',
-    "pcb_p45": 'Pol. Cal. measurement | +45°',
-    "pcb_m45": 'Pol. Cal. measurement | -45°',
-    "tlc_north": 'Quadr. telecover test | North sector',
-    "tlc_east": 'Quadr. telecover test | East sector',
-    "tlc_south": 'Quadr. telecover test | South sector',
-    "tlc_west": 'Quadrant telecover test | West sector',
-    "tlc_inner": 'Ring telecover test (Inner sector)',
-    "tlc_outer": 'Ring telecover test (Outer sector)',
-    "pcb_aux_p45": 'Auxialliary Pol. Cal. measurement | -45°',
-    "pcb_aux_m45": 'Auxialliary Pol. Cal. measurement | +45°',
-    "drk_ray": 'Dark measurent for Rayleigh',
-    "drk_pcb": 'Dark measurent for pol. cal.',
-    "drk_tlc": 'Dark measurent for quadr. telecover',
-    "drk_tlc_rin": 'Dark measurent for ring telecover',
-    "drk_trg": 'Dark measurent for zero bin',
-    "drk_dtm": 'Dark measurent for dead time',
-    "drk_ray_pcb": 'Dark measurent for Rayleigh pol. cal. mode',
-    "drk_pcb_aux": 'Dark measurent for aux. pol. cal.',
+    'drk': 'Long dark',
+    'ray': 'Rayleigh',
+    'ray_pcb': 'Rayleigh pol. cal. mode',
+    'tlc': 'Quadrant telecover',
+    'tlc_rin': 'Ring telecover',
+    'pcb': 'Pol. cal.',
+    'pcb_aux': 'Auxialliary pol. cal.',
+    'trg': 'Zero bin',
+    'dtm': 'Dead time',
+    "pcb_p45": 'Pol. cal.',
+    "pcb_m45": 'Pol. cal.',
+    "tlc_north": 'Quadr. telecover',
+    "tlc_east": 'Quadr. telecover',
+    "tlc_south": 'Quadr. telecover',
+    "tlc_west": 'Quadrant telecover',
+    "tlc_inner": 'Ring telecover',
+    "tlc_outer": 'Ring telecover',
+    "pcb_aux_p45": 'Auxialliary pol. cal.',
+    "pcb_aux_m45": 'Auxialliary pol. cal.',
+    "drk_ray": 'Rayleigh dark',
+    "drk_pcb": 'Pol. cal. dark',
+    "drk_tlc": 'Quadr. telecover dark',
+    "drk_tlc_rin": 'Ring telecover dark',
+    "drk_trg": 'Zero bin dark',
+    "drk_dtm": 'Dead time dark measurent',
+    "drk_ray_pcb": 'Rayleigh pol. cal. mode dark',
+    "drk_pcb_aux": 'Auxilliary pol. cal. dark',
+    }
+
+qa_dataset_label_extensions = {
+    'drk': 'test',
+    'ray': 'measurement',
+    'ray_pcb': 'measurement',
+    'tlc': 'test',
+    'tlc_rin': 'test',
+    'pcb': 'measurement',
+    'pcb_aux': 'measurement',
+    'trg': 'test',
+    'dtm': 'measurement',
+    "pcb_p45": 'measurement | +45°',
+    "pcb_m45": 'measurement | -45°',
+    "tlc_north": 'test | North sector',
+    "tlc_east": 'test | East sector',
+    "tlc_south": 'test | South sector',
+    "tlc_west": 'test | West sector',
+    "tlc_inner": 'test (Inner sector)',
+    "tlc_outer": 'test (Outer sector)',
+    "pcb_aux_p45": 'measurement | -45°',
+    "pcb_aux_m45": 'measurement | +45°',
+    "drk_ray": 'measurent for Rayleigh',
+    "drk_pcb": 'measurent for pol. cal.',
+    "drk_tlc": 'measurent',
+    "drk_tlc_rin": 'measurent',
+    "drk_trg": 'measurent',
+    "drk_dtm": 'measurent',
+    "drk_ray_pcb": 'measurent',
+    "drk_pcb_aux": 'measurent',
     }
 @dataclass(frozen=True)
 class Libraries:
@@ -284,11 +314,23 @@ class GenerateText:
             sm_expo = self.settings['smoothing_exponential']
             )
         
-        qck_text = quicklook_text(self.qa_test_info['qa_test'])
+        qa_test = self.qa_test_info['qa_test']
+        qck_text = f"Quicklook {qa_dataset_labels[qa_test]}"
         
         title = self.system_part + ' ' + self.channel_part + '\n'+\
             self.config_part  + ' - ' + sm_part + '\n'+\
                 qck_text + ' - ' + self.dateloc_part
+                            
+        return title 
+    
+    def make_background_title(self):
+        
+        qa_test = self.qa_test_info['qa_test']
+        bgd_text = f"Background {qa_dataset_labels[qa_test]}"
+
+        title = self.system_part + ' ' + self.channel_part + '\n'+\
+            self.config_part + '\n'+\
+                bgd_text + ' - ' + self.dateloc_part
                             
         return title 
     
@@ -303,9 +345,10 @@ class GenerateText:
 
         avg_rate_alias = self.settings['averaging_period']
         averaging_period = self.caller_info[f'{avg_rate_alias}_averaging_period']
-        avg_rate_part = f'Averaging period: {averaging_period}'
+        avg_rate_part = f'Averaging period ({avg_rate_alias}): {averaging_period}'
         
-        drk_text = quicklook_text(self.qa_test_info['qa_test'])
+        qa_test = self.qa_test_info['qa_test']
+        drk_text = f"{qa_dataset_labels[qa_test]}"
         
         title = self.system_part + ' ' + self.channel_part + '\n'+\
             self.config_part  + ' - ' + sm_part + ' - ' + avg_rate_part + '\n'+\
@@ -782,7 +825,7 @@ def sm_text(smooth, sm_lims, sm_win, sm_expo, flavour = ''):
         caption = f'Smoothing {flavour}'
         
     if smooth != True:
-        return "No Smoothing {flavour}"
+        return f"No Smoothing {flavour}"
     
     if isinstance(sm_win, (list, tuple, np.ndarray)):
         if len(sm_win):
@@ -868,18 +911,9 @@ def channel_text(atlas_channel_id, scc_channel_id=""):
 
     return channel_part
 
-def quicklook_text(qa_test):
-    
-    qa_test_map = {
-        'drk': 'Long Dark',
-        'ray': 'Rayleigh',
-        'ray_pcb': 'Rayleigh Pol. Cal. Mode',
-        'tlc': 'Quadrant Telecover',
-        'tlc_rin': 'Ring Telecover',
-        'pcb': 'Pol. Calibration',
-        }
+def q_text(qa_test):
 
-    return f'Quicklook {qa_test_map[qa_test]}'
+    return f'Quicklook {qa_dataset_labels[qa_test]}'
 
 def stage_text(stage):
     

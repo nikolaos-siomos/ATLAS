@@ -360,6 +360,8 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
                     )
         
                 # Add the metadata to the molecular mask plot 
+                plot_metadata["QA_test_ID"] = f"{key}_mask"
+
                 add_plot_metadata(
                     plot_path = qa_test_info[key][ch]['ray_mask_plot_path'], 
                     plot_metadata = plot_metadata

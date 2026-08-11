@@ -22,7 +22,7 @@ This page is generated automatically from the initialization parser schema and t
 
 - [`configuration`](#configuration): Controls how ATLAS obtains or uses the system configuration, including optional SCC HOI export behaviour. (3 parameters).
 - [`explicit_paths`](#explicit-paths): Defines the main input, configuration, settings, radiosonde, and output paths. Relative paths are interpreted with respect to the folder containing the initialization file. (6 parameters).
-- [`general_options`](#general-options): Selects which QA tests and quicklooks are produced and controls general output and plotting behaviour. (11 parameters).
+- [`general_options`](#general-options): Selects which QA tests and quicklooks are produced and controls general output and plotting behaviour. (12 parameters).
 - [`filter_channels`](#filter-channels): Restricts the channels that are processed, either by selecting explicit ATLAS channel IDs or excluding groups of channels based on parts of the channel ID. (6 parameters).
 - [`trimming_options`](#trimming-options): Controls signal trimming, overflow handling, temporal averaging options, and optional time slicing/exclusion of measurements. (10 parameters).
 - [`explicit_folders`](#explicit-folders): Overrides the default measurement folder names inside parent_folder. Leave these empty when the standard ATLAS folder structure is used. (10 parameters).
@@ -199,7 +199,8 @@ Selects which QA tests and quicklooks are produced and controls general output a
 | Parameter | Type | Default | Allowed / limits |
 | --- | --- | --- | --- |
 | [`process`](#process) | `list[str]` | `ray, pcb, tlc, tlc_rin, drk, trg, dtm, ray_pcb, pcb_aux, cam` | Allowed values: ray, pcb, tlc, tlc_rin, drk, trg, dtm, ray_pcb, pcb_aux, cam, off |
-| [`process_qck`](#process-qck) | `list[str]` | `ray, pcb, tlc, tlc_rin, drk, ray_pcb, pcb_aux, vldr` | Allowed values: ray, pcb, tlc, tlc_rin, drk, ray_pcb, pcb_aux, vldr, off |
+| [`process_qck`](#process-qck) | `list[str]` | `drk, ray, pcb, tlc, tlc_rin, ray_pcb, pcb_aux, vldr` | Allowed values: ray, pcb, tlc, tlc_rin, ray_pcb, pcb_aux, trg, dtm, drk, drk_ray, drk_pcb, drk_tlc, drk_tlc_rin, drk_ray_pcb, drk_pcb_aux, drk_trg, drk_dtm, vldr, off |
+| [`process_bgd`](#process-bgd) | `list[str]` | `drk, ray, pcb, tlc, tlc_rin, ray_pcb, pcb_aux` | Allowed values: ray, pcb, tlc, tlc_rin, ray_pcb, pcb_aux, trg, dtm, drk, drk_ray, drk_pcb, drk_tlc, drk_tlc_rin, drk_ray_pcb, drk_pcb_aux, drk_trg, drk_dtm, off |
 | [`vertical_scale`](#vertical-scale) | `str` | `range` | Allowed values: range, height_agl, height_asl |
 | [`view_mean_signal_stages`](#view-mean-signal-stages) | `list[str]` | `common_preprocessing_complete, preprocessing_complete, dark_preprocessing_complete` | Allowed values: init, ranges_and_heights, sliced, shots_screened, overflows_checked, dark_assigned, photon_units_converted, dead_time_corrected, averaged, averaged_low_res, averaged_high_res, mean_computed, dark_smoothed, dark_corrected, background_raw_calculated, background_calculated, background_corrected, range_corrected, vert_trimmed, molecular_calculated, mldr_generated, noise_calculated, dark_background_raw_calculated, dark_background_calculated, dark_background_corrected, gain_ratio_generated, calibration_factor_generated, calibrated_ratio_generated_mean, vldr_generated_mean, calibrated_ratio_generated, vldr_generated, screening_complete, common_preprocessing_complete, preprocessing_complete, dark_preprocessing_complete, pol_cal_complete |
 | [`view_signal_stages`](#view-signal-stages) | `list[str]` | `screening_complete` | Allowed values: init, ranges_and_heights, sliced, shots_screened, overflows_checked, dark_assigned, photon_units_converted, dead_time_corrected, averaged, averaged_low_res, averaged_high_res, mean_computed, dark_smoothed, dark_corrected, background_raw_calculated, background_calculated, background_corrected, range_corrected, vert_trimmed, molecular_calculated, mldr_generated, noise_calculated, dark_background_raw_calculated, dark_background_calculated, dark_background_corrected, gain_ratio_generated, calibration_factor_generated, calibrated_ratio_generated_mean, vldr_generated_mean, calibrated_ratio_generated, vldr_generated, screening_complete, common_preprocessing_complete, preprocessing_complete, dark_preprocessing_complete, pol_cal_complete |
@@ -233,13 +234,29 @@ Selects which QA tests and quicklooks are produced and controls general output a
 
     - **Type:** `list[str]`
     - **Category:** `optional`
-    - **Default:** `ray, pcb, tlc, tlc_rin, drk, ray_pcb, pcb_aux, vldr`
-    - **Limits / allowed values:** Allowed values: ray, pcb, tlc, tlc_rin, drk, ray_pcb, pcb_aux, vldr, off
+    - **Default:** `drk, ray, pcb, tlc, tlc_rin, ray_pcb, pcb_aux, vldr`
+    - **Limits / allowed values:** Allowed values: ray, pcb, tlc, tlc_rin, ray_pcb, pcb_aux, trg, dtm, drk, drk_ray, drk_pcb, drk_tlc, drk_tlc_rin, drk_ray_pcb, drk_pcb_aux, drk_trg, drk_dtm, vldr, off
     - **Example:** `ray, drk`
     - **Version history:** Unchanged from previous ATLAS versions.
 
     ```ini
     process_qck =
+    ```
+
+<a id="process-bgd"></a>
+??? info "`process_bgd`"
+
+    The user can generate background time-series plots for specific QA tests. Choose one or more of the allowed keys to process the corresponding background plots.
+
+    - **Type:** `list[str]`
+    - **Category:** `optional`
+    - **Default:** `drk, ray, pcb, tlc, tlc_rin, ray_pcb, pcb_aux`
+    - **Limits / allowed values:** Allowed values: ray, pcb, tlc, tlc_rin, ray_pcb, pcb_aux, trg, dtm, drk, drk_ray, drk_pcb, drk_tlc, drk_tlc_rin, drk_ray_pcb, drk_pcb_aux, drk_trg, drk_dtm, off
+    - **Example:** `ray, drk`
+    - **Version history:** New in ATLAS `1.0.1`.
+
+    ```ini
+    process_bgd =
     ```
 
 <a id="vertical-scale"></a>
@@ -499,7 +516,7 @@ Controls signal trimming, overflow handling, temporal averaging options, and opt
 | [`max_height_agl`](#max-height-agl) | `float` | `40.0` |  |
 | [`low_shot_threshold`](#low-shot-threshold) | `float` | `0.9` | Range: 0.0 to 0.999 |
 | [`trim_overflows`](#trim-overflows) | `int` | `0` | Allowed values: 0, 1, 2, 3 |
-| [`low_res_averaging_period`](#low-res-averaging-period) | `str` | `1H` |  |
+| [`low_res_averaging_period`](#low-res-averaging-period) | `str` | `1h` |  |
 | [`low_res_averaging_threshold`](#low-res-averaging-threshold) | `float` | `0.5` | Range: 0.0 to 1.0 |
 | [`high_res_averaging_period`](#high-res-averaging-period) | `str` | `10min` |  |
 | [`high_res_averaging_threshold`](#high-res-averaging-threshold) | `float` | `0.5` | Range: 0.0 to 1.0 |
@@ -561,7 +578,7 @@ Controls signal trimming, overflow handling, temporal averaging options, and opt
 
     - **Type:** `str`
     - **Category:** `optional`
-    - **Default:** `1H`
+    - **Default:** `1h`
     - **Example:** `1h`
     - **Version history:** New in ATLAS `1.0.0`.
 

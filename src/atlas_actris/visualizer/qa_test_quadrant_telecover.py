@@ -251,7 +251,7 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
 
         text_generator = GenerateText(lib=lib)
 
-        qa_test_info[QA_KEY][ch]["title"] = text_generator.make_telecover_title("Quadrant")
+        qa_test_info[QA_KEY][ch]["title"] = text_generator.make_telecover_title("Quadrant  Telecover")
         qa_test_info[QA_KEY][ch]["filename"] = text_generator.make_filename(
             qa_test=QA_KEY,
         )

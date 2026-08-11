@@ -207,12 +207,14 @@ def collect_stats(args):
     
     z_alias = args["vertical_scale"]
     
+    averaging_period = args['averaging_period']
+    
     stats_names = [
         "Stats Region [km]",
         f"Mean offset [{y_units}]",
         f"Noise / bin / shot [{y_units}]\n(stdev of full period)",
         f"Slope over {z_alias} [{y_units} km$^{{-1}}$]",
-        f"Temporal slope [{y_units} s$^{{-1}}$]",
+        f"Temporal {averaging_period} offset\nderivative [{y_units} s$^{{-1}}$]",
         "Is noise Gaussian?",
         "N: bins, avg. signals, shots",
     ]
@@ -533,12 +535,12 @@ def plot_stats_table(fig, ax_coords, args, title=None):
             cell.set_text_props(weight="bold")
             cell.set_facecolor("#eaeaea")
 
-    # Row 3 is the two-line noise entry (row 0 contains the headers).
-    # Double the height of both cells so the second line fits comfortably.
-    for column in (0, 1):
-        if (3, column) in table.get_celld():
-            cell = table[(3, column)]
-            cell.set_height(cell.get_height() * 2.0)
+    # Rows 3 and 4 are double-height (row 0 contains the headers).
+    for row in (3, 5):
+        for column in (0, 1):
+            if (row, column) in table.get_celld():
+                cell = table[(row, column)]
+                cell.set_height(cell.get_height() * 2.0)
 
     # Rows are offset by one because row 0 contains the column headers.
     slope_rows = {
@@ -574,7 +576,7 @@ def make_labels(signal_type, channel_mode, y_offset=""):
         return (
             "Bins",
             "Range [km]",
-            f"Relative deviations from\nmolecular[{display_units}]",
+            f"Relative deviations from\nmolecular [{display_units}]",
             "Relative",
         )
 

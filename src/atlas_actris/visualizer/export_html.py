@@ -14,13 +14,13 @@ import shutil
 import platform
 import subprocess
 import numpy as np
-from PIL import Image
+from PIL import Image, PngImagePlugin
 import datetime, os, glob, base64
 import zipfile
 import tempfile
 import re
 from pathlib import Path
-from utils.parse_init_file import qa_tests, quicklooks
+from utils.parse_init_file import qa_tests, allowed_quicklooks
 
 qck_text_map = {
     'qck_ray': 'Rayleigh measurement', 
@@ -35,6 +35,14 @@ qck_text_map = {
 # Keep the table and figure widths tied to the same value.
 # Pandoc is used only for the editable DOCX export.
 REPORT_CONTENT_WIDTH_PX = 1420
+
+# Relative widths of quicklook and background panels in each combined image.
+# Change these to 0.66 and 0.34, for example, to give the quicklook more space.
+QCK_COMBINED_FRACTION = 0.50
+BGD_COMBINED_FRACTION = 0.50
+COMBINED_PLOT_GAP_PX = 12
+COMBINED_PLOT_BACKGROUND = (255, 255, 255)
+COMBINED_PLOTS_FOLDERNAME = ".atlas_report_combined"
 DOCX_PAGE_BREAK_MARKER = "__ATLAS_REPORT_PAGE_BREAK__"
 
 REPORT_CSS = f'''
@@ -629,7 +637,8 @@ def _index_plot_metadata(plots_folder: str):
     valid_ids.update(
         f"drk_{qa}" for qa in qa_tests if qa != "drk"
     )
-    valid_ids.update(f"qck_{qa}" for qa in quicklooks)
+    valid_ids.update(f"qck_{qa}" for qa in allowed_quicklooks)
+    valid_ids.update(f"bgd_{qa}" for qa in qa_tests)
 
     indexed = {qa_id: [] for qa_id in valid_ids}
 
@@ -748,6 +757,153 @@ def _metadata_entries(entries, key_name):
     return out
 
 
+def _resample_filter():
+    """Return a high-quality Pillow resampling filter across Pillow versions."""
+    try:
+        return Image.Resampling.LANCZOS
+    except AttributeError:
+        return Image.LANCZOS
+
+
+def _combined_plot_metadata(qck_meta, bgd_meta):
+    """Build PNG metadata for a combined quicklook/background image.
+
+    Quicklook metadata remains available under its original keys so existing
+    report-table logic remains unchanged. Background metadata is also retained
+    using a ``bgd_`` prefix whenever the same key is not already present.
+    """
+    combined = {str(key): str(value) for key, value in qck_meta.items()}
+
+    for key, value in bgd_meta.items():
+        prefixed_key = f"bgd_{key}"
+        if prefixed_key not in combined:
+            combined[prefixed_key] = str(value)
+
+    combined["combined_plot"] = "qck_bgd"
+    combined["qck_fraction"] = str(QCK_COMBINED_FRACTION)
+    combined["bgd_fraction"] = str(BGD_COMBINED_FRACTION)
+    return combined
+
+
+def _combine_qck_and_bgd_images(
+    qck_entry,
+    bgd_entry,
+    output_path,
+    qck_fraction=QCK_COMBINED_FRACTION,
+    bgd_fraction=BGD_COMBINED_FRACTION,
+    gap_px=COMBINED_PLOT_GAP_PX,
+):
+    """Join matching quicklook and background PNGs into one side-by-side PNG.
+
+    Each panel keeps its aspect ratio. The requested fractions control the
+    horizontal allocation in the final image. The shorter resized panel is
+    vertically centred on a white canvas.
+    """
+    qck_fraction = float(qck_fraction)
+    bgd_fraction = float(bgd_fraction)
+    fraction_sum = qck_fraction + bgd_fraction
+    if qck_fraction <= 0 or bgd_fraction <= 0 or fraction_sum <= 0:
+        raise ValueError("Quicklook/background fractions must be positive.")
+
+    qck_fraction /= fraction_sum
+    bgd_fraction /= fraction_sum
+
+    qck_path = qck_entry.get("path")
+    bgd_path = bgd_entry.get("path")
+    if not qck_path or not bgd_path:
+        raise ValueError("Both quicklook and background image paths are required.")
+
+    with Image.open(qck_path) as qck_source, Image.open(bgd_path) as bgd_source:
+        qck_image = qck_source.convert("RGB")
+        bgd_image = bgd_source.convert("RGB")
+
+        # Choose the largest total width that does not upscale either source.
+        total_width = int(min(
+            qck_image.width / qck_fraction,
+            bgd_image.width / bgd_fraction,
+        ))
+        total_width = max(total_width, 2)
+
+        qck_width = max(1, int(round(total_width * qck_fraction)))
+        bgd_width = max(1, total_width - qck_width)
+
+        qck_height = max(1, int(round(qck_image.height * qck_width / qck_image.width)))
+        bgd_height = max(1, int(round(bgd_image.height * bgd_width / bgd_image.width)))
+
+        resample = _resample_filter()
+        qck_image = qck_image.resize((qck_width, qck_height), resample)
+        bgd_image = bgd_image.resize((bgd_width, bgd_height), resample)
+
+        canvas_height = max(qck_height, bgd_height)
+        canvas = Image.new(
+            "RGB",
+            (qck_width + int(gap_px) + bgd_width, canvas_height),
+            COMBINED_PLOT_BACKGROUND,
+        )
+        canvas.paste(qck_image, (0, (canvas_height - qck_height) // 2))
+        canvas.paste(
+            bgd_image,
+            (qck_width + int(gap_px), (canvas_height - bgd_height) // 2),
+        )
+
+        png_info = PngImagePlugin.PngInfo()
+        metadata = _combined_plot_metadata(qck_source.text, bgd_source.text)
+        for key, value in metadata.items():
+            png_info.add_text(str(key), str(value))
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        canvas.save(output_path, format="PNG", pnginfo=png_info)
+
+    combined_entry = dict(qck_entry)
+    combined_entry.update({
+        "path": output_path,
+        "data_uri": _encode_png_as_data_uri(output_path),
+        "combined_qck_bgd": True,
+        "qck_path": qck_path,
+        "bgd_path": bgd_path,
+    })
+    return combined_entry
+
+
+def _combine_report_quicklooks_with_backgrounds(data, plots_folder):
+    """Replace matched qck entries with combined qck/background images."""
+    combined_folder = os.path.join(plots_folder, COMBINED_PLOTS_FOLDERNAME)
+
+    for quicklook_key in [
+        "qck_ray", "qck_ray_pcb", "qck_tlc", "qck_tlc_rin",
+        "qck_pcb", "qck_drk",
+    ]:
+        background_key = _background_key_for_quicklook(quicklook_key)
+        quicklook_entries = data.get(quicklook_key, {})
+        background_entries = data.get(background_key, {})
+
+        for channel, qck_entry in list(quicklook_entries.items()):
+            bgd_entry = background_entries.get(channel)
+            if not bgd_entry:
+                continue
+
+            safe_channel = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(channel))
+            output_path = os.path.join(
+                combined_folder,
+                f"combined_{quicklook_key}_{safe_channel}.png",
+            )
+
+            try:
+                quicklook_entries[channel] = _combine_qck_and_bgd_images(
+                    qck_entry=qck_entry,
+                    bgd_entry=bgd_entry,
+                    output_path=output_path,
+                )
+            except Exception as exc:
+                print(
+                    "Warning: Could not combine quicklook and background plot "
+                    f"for {quicklook_key}/{channel}. Using separate plots. "
+                    f"Exception: {exc}"
+                )
+
+    return data
+
+
 def _collect_report_data(plots_folder: str):
     """Collect report data using the exact embedded ``QA_test_ID`` metadata."""
     data = {}
@@ -760,6 +916,15 @@ def _collect_report_data(plots_folder: str):
         )
         data[f"qck_{qa}"] = _metadata_entries(
             entries,
+            "atlas_channel_id",
+        )
+
+    # Background time-series plots. Missing entries are harmless, so the
+    # report automatically follows whichever QA tests the background generator
+    # currently allows.
+    for qa in allowed_quicklooks:
+        data[f"bgd_{qa}"] = _metadata_entries(
+            indexed.get(f"bgd_{qa}", []),
             "atlas_channel_id",
         )
 
@@ -806,7 +971,9 @@ def _collect_report_data(plots_folder: str):
         "vldr_id",
     )
 
-    return data
+    # Join matching qck and bgd plots only after both metadata collections are
+    # complete. Unmatched plots remain unchanged and are still exported.
+    return _combine_report_quicklooks_with_backgrounds(data, plots_folder)
 
 def channel_entry(f, meta, plot_width):
     """Write an embedded image tag.
@@ -833,7 +1000,41 @@ def channel_entry(f, meta, plot_width):
     )
     f.write('\n')
 
-def QA_report(
+def _background_key_for_quicklook(quicklook_key):
+    """Return the matching background-data key for one quicklook key."""
+    if not str(quicklook_key).startswith("qck_"):
+        return None
+    return f"bgd_{str(quicklook_key)[4:]}"
+
+
+def _write_html_quicklook_with_background(f, data, quicklook_key, channel, plot_width):
+    """Write one combined plot, with separate-image fallback on failure."""
+    quicklook_entry = data[quicklook_key][channel]
+    channel_entry(f, quicklook_entry, plot_width)
+
+    if quicklook_entry.get("combined_qck_bgd"):
+        return
+
+    background_key = _background_key_for_quicklook(quicklook_key)
+    if background_key and channel in data.get(background_key, {}):
+        f.write('<br>\n')
+        channel_entry(f, data[background_key][channel], plot_width)
+
+
+def _add_docx_quicklook_with_background(document, data, quicklook_key, channel):
+    """Insert one combined plot, with separate-image fallback on failure."""
+    quicklook_entry = data[quicklook_key][channel]
+    _add_docx_picture(document, quicklook_entry.get('path'))
+
+    if quicklook_entry.get("combined_qck_bgd"):
+        return
+
+    background_key = _background_key_for_quicklook(quicklook_key)
+    if background_key and channel in data.get(background_key, {}):
+        _add_docx_picture(document, data[background_key][channel].get('path'))
+
+
+def _QA_report_impl(
     plots_folder,
     html_filepath,
     photon_only=False,
@@ -894,7 +1095,9 @@ def QA_report(
                     if ch in data[key]:
                         f.write(f'<h3>{qck_text_map[key]}</h3>')
                         f.write('<br>\n')
-                        channel_entry(f, data[key][ch], plot_width)
+                        _write_html_quicklook_with_background(
+                            f, data, key, ch, plot_width
+                        )
 
         # Pure dark-test analysis plots
         if data.get("drk"):
@@ -999,6 +1202,47 @@ def QA_report(
             )
         except Exception as exc:
             print(f"Warning: DOCX export failed. Skipping DOCX export. Exception:\n{exc}")
+
+
+def _remove_combined_plots_folder(plots_folder):
+    """Remove temporary combined qck/bgd images created for the report."""
+    combined_folder = os.path.join(
+        os.path.abspath(plots_folder),
+        COMBINED_PLOTS_FOLDERNAME,
+    )
+
+    if not os.path.isdir(combined_folder):
+        return
+
+    try:
+        shutil.rmtree(combined_folder)
+    except Exception as exc:
+        print(
+            "Warning: Could not remove temporary combined-plot folder "
+            f"{combined_folder}. Exception: {exc}"
+        )
+
+
+def QA_report(
+    plots_folder,
+    html_filepath,
+    photon_only=False,
+    export_all=False,
+    export_docx=True,
+    docx_filepath=None,
+    ):
+    """Create the QA report and always remove temporary combined images."""
+    try:
+        return _QA_report_impl(
+            plots_folder=plots_folder,
+            html_filepath=html_filepath,
+            photon_only=photon_only,
+            export_all=export_all,
+            export_docx=export_docx,
+            docx_filepath=docx_filepath,
+        )
+    finally:
+        _remove_combined_plots_folder(plots_folder)
 
 
 def atlas_to_scc_triggering(meta):
@@ -1631,7 +1875,9 @@ def convert_report_data_to_docx(
             for key in qck_list:
                 if ch in data.get(key, {}):
                     document.add_heading(qck_text_map[key], level=3)
-                    _add_docx_picture(document, data[key][ch].get('path'))
+                    _add_docx_quicklook_with_background(
+                        document, data, key, ch
+                    )
 
     if data.get("drk"):
         document.add_heading("Dark Test", level=1)

@@ -19,6 +19,7 @@ from utils.parse_settings_file import parse_atlas_settings_file
 
 from visualizer.qa_test_dark import generate_dark
 from visualizer.qa_test_quicklook import generate_quicklooks
+from visualizer.qa_test_background import generate_background
 from visualizer.qa_test_rayleigh_fit import generate_rayleigh_fit
 from visualizer.qa_test_ring_telecover import generate_ring_telecover
 from visualizer.qa_test_quicklook_vldr import generate_vldr_quicklooks
@@ -136,28 +137,28 @@ processor.package(
     input_id = 'preprocessing_complete'
     )
 
-pol_cal__metadata = generate_polarization_calibration(
+pol_cal_metadata = generate_polarization_calibration(
     data_pack = processor.export_test_from_stage("pol_cal_complete"),
     caller_info = processor.processing_info["caller_info"],
     settings_info = settings_info,
 )
 
 # Rayleigh fit test
-rayleigh_fit__metadata = generate_rayleigh_fit(
+rayleigh_fit_metadata = generate_rayleigh_fit(
     data_pack = processor.export_test_from_stage('preprocessing_complete'),
     caller_info = processor.processing_info['caller_info'],
     settings_info = settings_info
     )
 
 # Quadrant telecover test
-quadrant_telecover__metadata = generate_quadrant_telecover(
+quadrant_telecover_metadata = generate_quadrant_telecover(
     data_pack = processor.export_test_from_stage('preprocessing_complete'),
     caller_info = processor.processing_info['caller_info'],
     settings_info = settings_info['tlc']
     )
 
 # Ring telecover test
-ring_telecover__metadata = generate_ring_telecover(
+ring_telecover_metadata = generate_ring_telecover(
     data_pack = processor.export_test_from_stage('preprocessing_complete'),
     caller_info = processor.processing_info['caller_info'],
     settings_info = settings_info['tlc_rin']
@@ -165,13 +166,11 @@ ring_telecover__metadata = generate_ring_telecover(
 
 
 #Dark test
-dark__metadata = generate_dark(
-    # data_pack = processor.export_test_from_stage("background_calculated"),
+dark_metadata = generate_dark(
     data_pack = processor.export_test_from_stage("dark_preprocessing_complete"),
-    # data_pack_rc = processor.export_test_from_stage("preprocessing_complete"),
     caller_info = processor.processing_info["caller_info"],
     settings_info = settings_info['drk'],
-)
+    )
 
 # Quicklooks
 generate_quicklooks(
@@ -184,6 +183,13 @@ generate_vldr_quicklooks(
     data_pack = processor.export_test_from_stage('pol_cal_complete'),
     caller_info = processor.processing_info['caller_info'],
     settings_info = settings_info['qck_vldr'],
+    )
+
+# Background
+generate_background(
+    data_pack = processor.export_test_from_stage('preprocessing_complete_qck'),
+    caller_info = processor.processing_info['caller_info'],
+    settings_info = settings_info['bgd'],
     )
 
 # Create report

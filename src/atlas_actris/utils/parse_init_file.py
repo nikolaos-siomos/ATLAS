@@ -47,15 +47,68 @@ qa_tests = [
     "cam",
 ]
 
-quicklooks = [
+allowed_quicklooks = [
     "ray",
     "pcb",
     "tlc",
     "tlc_rin",
+    "ray_pcb",
+    "pcb_aux",
+    "trg",
+    "dtm",
     "drk",
+    "drk_ray",
+    "drk_pcb",
+    "drk_tlc",
+    "drk_tlc_rin",
+    "drk_ray_pcb",
+    "drk_pcb_aux",
+    "drk_trg",
+    "drk_dtm",
+    "vldr",
+    "off"
+]
+
+allowed_background = [
+    "ray",
+    "pcb",
+    "tlc",
+    "tlc_rin",
+    "ray_pcb",
+    "pcb_aux",
+    "trg",
+    "dtm",
+    "drk",
+    "drk_ray",
+    "drk_pcb",
+    "drk_tlc",
+    "drk_tlc_rin",
+    "drk_ray_pcb",
+    "drk_pcb_aux",
+    "drk_trg",
+    "drk_dtm",
+    "off"
+]
+
+default_quicklooks = [
+    "drk",
+    "ray",
+    "pcb",
+    "tlc",
+    "tlc_rin",
     "ray_pcb",
     "pcb_aux",
     "vldr",
+]
+
+default_background = [
+    "drk",
+    "ray",
+    "pcb",
+    "tlc",
+    "tlc_rin",
+    "ray_pcb",
+    "pcb_aux",
 ]
 
 qa_measurement_folders = [
@@ -143,7 +196,8 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "radiosonde_file":           {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "file"},
 
     "process":                 {"dtype": str,  "default": qa_tests,                   "is_list": True,  "category": "optional", "allowed": qa_tests + ["off"]},
-    "process_qck":             {"dtype": str,  "default": quicklooks,                 "is_list": True,  "category": "optional", "allowed": quicklooks + ["off"]},
+    "process_qck":             {"dtype": str,  "default": default_quicklooks,         "is_list": True,  "category": "optional", "allowed": allowed_quicklooks},
+    "process_bgd":             {"dtype": str,  "default": default_background,         "is_list": True,  "category": "optional", "allowed": allowed_background},
     "vertical_scale":          {"dtype": str,  "default": "range",                    "is_list": False, "category": "optional", "allowed": allowed_vertical_scales},
     "view_mean_signal_stages": {"dtype": str,  "default": default_mean_signal_stages, "is_list": True,  "category": "optional", "allowed": allowed_stages},
     "view_signal_stages":      {"dtype": str,  "default": default_signal_stages,      "is_list": True,  "category": "optional", "allowed": allowed_stages},
@@ -165,7 +219,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "max_height_agl":               {"dtype": float, "default": 40.,     "is_list": False, "category": "optional"},
     "low_shot_threshold":           {"dtype": float, "default": 0.9,     "is_list": False, "category": "optional", "min": 0., "max": 0.999},
     "trim_overflows":               {"dtype": int,   "default": 0,       "is_list": False, "category": "optional", "allowed": [0, 1, 2, 3]},
-    "low_res_averaging_period":     {"dtype": str,   "default": '1H',    "is_list": False, "category": "optional"},
+    "low_res_averaging_period":     {"dtype": str,   "default": '1h',    "is_list": False, "category": "optional"},
     "low_res_averaging_threshold":  {"dtype": float, "default": 0.5,     "is_list": False, "category": "optional", "min": 0., "max": 1.},
     "high_res_averaging_period":    {"dtype": str,   "default": '10min', "is_list": False, "category": "optional"},
     "high_res_averaging_threshold": {"dtype": float, "default": 0.5,     "is_list": False, "category": "optional", "min": 0., "max": 1.},
@@ -224,6 +278,7 @@ INIT_FILE_SECTIONS: Dict[str, List[str]] = {
     "general_options": [
         "process",
         "process_qck",
+        "process_bgd",
         "vertical_scale",
         "view_mean_signal_stages",
         "view_signal_stages",
@@ -726,37 +781,45 @@ def _compute_emitted_wavelength_if_missing(parser_args: Dict[str, Any]) -> Dict[
 
 def _special_checks(parser_args: Dict[str, Any]) -> None:
 
-    ray_averaging_time = parser_args.get("ray_averaging_time")
-    ray_qck_averaging_time = parser_args.get("ray_qck_averaging_time")
+    low_res_averaging_period = parser_args.get("low_res_averaging_period")
+    high_res_averaging_period = parser_args.get("high_res_averaging_period")
 
-    pattern = re.compile(r"^\d{1,2}(?:min|h)$")
+    if isinstance(low_res_averaging_period, str):
+        low_res_averaging_period = low_res_averaging_period.replace("H", "h")
+        parser_args["low_res_averaging_period"] = low_res_averaging_period
+
+    if isinstance(high_res_averaging_period, str):
+        high_res_averaging_period = high_res_averaging_period.replace("H", "h")
+        parser_args["high_res_averaging_period"] = high_res_averaging_period
+
+    pattern = re.compile(r"^\d{1,2}(?:min|[hH])$")
 
     def is_valid_time_format(s: str) -> bool:
         return bool(pattern.match(s))
 
-    if ray_averaging_time is not None:
-        if not is_valid_time_format(ray_averaging_time):
+    if low_res_averaging_period is not None:
+        if not is_valid_time_format(low_res_averaging_period):
             raise ConfigError(
-                f"The provided ray_averaging_time format was not understood: "
-                f"{ray_averaging_time} Allowed formats: 'xmin' or 'xH' where x "
+                f"The provided low_res_averaging_period format was not understood: "
+                f"{low_res_averaging_period} Allowed formats: 'xmin' or 'xh' where x "
                 "is an up to 2 digit positive integer that corresponds either "
                 "the number of integers or the number of hours. For exacmple: "
-                "10min or 3H"
+                "10min or 3h"
             )
     else:
-        parser_args["ray_averaging_time"] = "all"
+        parser_args["low_res_averaging_period"] = "all"
 
-    if ray_averaging_time is not None:
-        if not is_valid_time_format(ray_qck_averaging_time):
+    if high_res_averaging_period is not None:
+        if not is_valid_time_format(high_res_averaging_period):
             raise ConfigError(
-                f"The provided ray_qck_averaging_time format was not understood: "
-                f"{ray_qck_averaging_time} Allowed formats: 'xmin' or 'xH' where x "
+                f"The provided high_res_averaging_period format was not understood: "
+                f"{high_res_averaging_period} Allowed formats: 'xmin' or 'xh' where x "
                 "is an up to 2 digit positive integer that corresponds either "
                 "the number of integers or the number of hours. For exacmple: "
-                "10min or 3H"
+                "10min or 3h"
             )
     else:
-        parser_args["ray_qck_averaging_time"] = "raw"
+        parser_args["high_res_averaging_period"] = "raw"
 
     rsonde_column_units = parser_args.get("rsonde_column_units")
 

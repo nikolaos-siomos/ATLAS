@@ -50,6 +50,20 @@ SCHEMA_QCK: Dict[str, Dict[str, Any]] = {
     "exclude_channel_subtype":  {"dtype": str, "default": [], "is_list": True, "allowed": ["r", "t", "n", "o", "w", "c", "h", "l", "a", "m", "b", "s", "x"]},
 }
 
+SCHEMA_BGD: Dict[str, Dict[str, Any]] = {
+    # -------------------- [System] --------------------
+    "t_lims":      {"dtype": str,   "default": [],        "is_list": True},
+    "t_tick":      {"dtype": int,   "default": None,      "is_list": False, "min": 5},
+    "y_lims":      {"dtype": float, "default": [],        "is_list": True, "size": 2}, 
+
+    "select_channels":          {"dtype": str, "default": [], "is_list": True},
+    "exclude_wavelength":       {"dtype": str, "default": [], "is_list": True},
+    "exclude_telescope_type":   {"dtype": str, "default": [], "is_list": True, "allowed": ["n", "f", "x", "m", "g", "y", "l", "h", "z"]},
+    "exclude_channel_type":     {"dtype": str, "default": [], "is_list": True, "allowed": ["p", "c", "t", "v", "r", "a", "f"]},
+    "exclude_acquisition_mode": {"dtype": str, "default": [], "is_list": True, "allowed": ["a", "p", "g"]},
+    "exclude_channel_subtype":  {"dtype": str, "default": [], "is_list": True, "allowed": ["r", "t", "n", "o", "w", "c", "h", "l", "a", "m", "b", "s", "x"]},
+}
+
 SCHEMA_QCK_VLDR: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
     "t_lims":      {"dtype": str,   "default": [],         "is_list": True, "size": 2},
@@ -199,6 +213,7 @@ SCHEMA_PCB: Dict[str, Dict[str, Any]] = {
 
 SCHEMA = {
     'qck': SCHEMA_QCK,
+    'bgd': SCHEMA_BGD,
     'qck_vldr': SCHEMA_QCK_VLDR,
     'drk': SCHEMA_DRK,
     'ray': SCHEMA_RAY,
@@ -209,6 +224,7 @@ SCHEMA = {
 
 recognized_sections = {
     'qck': "quicklooks",
+    'bgd': "background",
     'qck_vldr': "quicklooks_vldr",
     'drk': "dark",
     'ray': "rayleigh_fit",

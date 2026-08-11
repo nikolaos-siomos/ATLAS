@@ -299,6 +299,22 @@ INIT_FLAVOR = {
              }
          },
         
+    'process_bgd': {
+         'description': 
+             'The user can generate background time-series plots for specific '
+             'QA tests. Choose one or more of the allowed keys to process the '
+             'corresponding background plots.',
+         'example': 'ray, drk',
+         'legacy': {
+             'status': 'new',
+             'introduced': '1.0.1',
+             'old_names': [],
+             'old_location': '',
+             'old_names_removed_in': '',
+             'note': ''
+             }
+         },
+        
     'vertical_scale': {
         'description': 
             'Select the vertical scale used for all QA tests. Select one of:'

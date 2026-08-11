@@ -26,6 +26,20 @@
 | `exclude_acquisition_mode` | Acquisition modes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: a, p, g | `a` | Unchanged from previous ATLAS versions. |
 | `exclude_channel_subtype` | Channel subtypes to exclude. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | Unchanged from previous ATLAS versions. |
 
+## `background`
+
+| Parameter | Description | Type | Category | Default | Limits / allowed values | Example | Version history |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `t_lims` | Time limits used in the background plot. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `2300, 0100` | New in ATLAS `1.0.1`. |
+| `t_tick` | Tick spacing for the time axis of the background plot. | `int` | optional | `empty parameter --&gt; ignored or automatic selection` | Minimum: 5 | `30` | New in ATLAS `1.0.1`. |
+| `y_lims` | Vertical-axis limits used in the background plot. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` | Required list size: 2 | `0, 1` | New in ATLAS `1.0.1`. |
+| `select_channels` | Channel IDs to include explicitly in background plots. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `0532xcpr, 1064xtax` | New in ATLAS `1.0.1`. |
+| `exclude_wavelength` | Wavelengths to exclude from background plots. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` |  | `1064` | New in ATLAS `1.0.1`. |
+| `exclude_telescope_type` | Telescope types to exclude from background plots. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: n, f, x, m, g, y, l, h, z | `n, f` | New in ATLAS `1.0.1`. |
+| `exclude_channel_type` | Channel types to exclude from background plots. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: p, c, t, v, r, a, f | `a, f` | New in ATLAS `1.0.1`. |
+| `exclude_acquisition_mode` | Acquisition modes to exclude from background plots. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: a, p, g | `a` | New in ATLAS `1.0.1`. |
+| `exclude_channel_subtype` | Channel subtypes to exclude from background plots. | `list[str]` | optional | `empty parameter --&gt; ignored or automatic selection` | Allowed values: r, t, n, o, w, c, h, l, a, m, b, s, x | `w, c` | New in ATLAS `1.0.1`. |
+
 ## `quicklooks_vldr`
 
 | Parameter | Description | Type | Category | Default | Limits / allowed values | Example | Version history |

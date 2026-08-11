@@ -96,6 +96,7 @@ atlas-signal-viewer = "atlas_actris.cli_viewer:main"
 atlas-smoke-test = "atlas_actris.testing.smoke_test:main"
 atlas-signal-viewer-smoke-test = "atlas_actris.testing.signal_viewer_smoke_test:main"
 atlas-generate-templates = "atlas_actris.templates.generator:main"
+atlas-intercomparison = "atlas_actris.cli_intercomparison:main"
 
 # ----------------------------------------------------------
 # Setuptools configuration for src/atlas_actris layout
@@ -109,6 +110,7 @@ namespaces = false
 [tool.setuptools.package-data]
 atlas_actris = [
     "templates/*.ini",
+    "intercomparison/*.ini",
 ]
 
 [build-system]

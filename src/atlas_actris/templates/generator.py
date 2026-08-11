@@ -55,6 +55,11 @@ from atlas_actris.templates.template_profiles import (
     BEGINNER_CONFIG_TEMPLATE_SECTIONS,
     BEGINNER_SETTINGS_TEMPLATE_KEYS,
 )
+from atlas_actris.templates.generate_intercomparison_template import (
+    render_ini as render_intercomparison_ini,
+    render_bare_ini as render_intercomparison_bare_ini,
+    render_markdown as render_intercomparison_markdown,
+)
 
 AUTO_SELECTION = "empty parameter --> ignored or automatic selection"
 ALLOWED_TARGETS = ("all", "ini", "docs")
@@ -950,6 +955,13 @@ def build_outputs(
                 include_flavor=include_flavor,
             )
 
+    if target in ("all", "ini"):
+        requested_profiles = _profiles_to_generate(profile)
+        if "full" in requested_profiles:
+            outputs[template_dir / "intercomparison.ini"] = render_intercomparison_ini()
+        if "bare" in requested_profiles:
+            outputs[template_dir / "intercomparison_bare.ini"] = render_intercomparison_bare_ini()
+
     if target in ("all", "docs"):
         outputs[docs_dir / "initialization_reference.md"] = _render_initialization_markdown()
         outputs[docs_dir / "configuration_reference.md"] = _render_flat_markdown(
@@ -961,6 +973,7 @@ def build_outputs(
             flavor=CONFIG_FLAVOR,
         )
         outputs[docs_dir / "settings_reference.md"] = _render_settings_markdown()
+        outputs[docs_dir / "intercomparison_reference.md"] = render_intercomparison_markdown()
 
     return outputs
 

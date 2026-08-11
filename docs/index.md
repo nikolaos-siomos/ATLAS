@@ -16,6 +16,7 @@ These pages are generated from the ATLAS parser schemas and template flavor file
 - [Initialization file reference](generated/initialization_reference.md)
 - [Configuration file reference](generated/configuration_reference.md)
 - [Settings file reference](generated/settings_reference.md)
+- [Intercomparison file reference](generated/intercomparison_reference.md)
 
 ## Extra tools
 

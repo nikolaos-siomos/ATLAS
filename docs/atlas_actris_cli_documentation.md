@@ -143,6 +143,7 @@ The package also exposes commands for the signal viewer and for automated smoke 
 [project.scripts]
 atlas = "atlas_actris.cli:main"
 atlas-signal-viewer = "atlas_actris.cli_viewer:main"
+atlas-intercomparison = "atlas_actris.cli_intercomparison:main"
 atlas-smoke-test = "atlas_actris.testing.smoke_test:main"
 atlas-signal-viewer-smoke-test = "atlas_actris.testing.signal_viewer_smoke_test:main"
 ```
@@ -151,6 +152,60 @@ After changing `[project.scripts]`, reinstall the package in editable mode so th
 
 ```bash
 python -m pip install -e .
+```
+
+
+## Command: `atlas-intercomparison`
+
+Runs the ATLAS exported-stage intercomparison workflow. The command expects one intercomparison initialization file.
+
+### Usage
+
+```bash
+atlas-intercomparison -i /path/to/intercomparison.ini
+```
+
+Equivalent long-option form:
+
+```bash
+atlas-intercomparison --ini_file /path/to/intercomparison.ini
+```
+
+The command dispatches through:
+
+```text
+src/atlas_actris/cli_intercomparison.py
+```
+
+and runs the main interactive script:
+
+```text
+src/atlas_actris/__intercomparison_interactive__.py
+```
+
+The same main script can be opened and run directly in Spyder. Configure the Spyder run arguments with:
+
+```text
+-i /path/to/intercomparison.ini
+```
+
+The parsed initialization dictionary remains available in the Spyder namespace as `intercomparison_info`.
+
+### Intercomparison templates
+
+The generated full and bare templates are:
+
+```text
+src/atlas_actris/templates/intercomparison.ini
+src/atlas_actris/templates/intercomparison_bare.ini
+```
+
+The full template contains parameter descriptions, defaults, allowed values, and examples, but all assignments are intentionally empty. The bare template contains the same section and parameter structure without per-parameter flavor comments.
+
+The generated reference page is:
+
+```text
+docs/generated/intercomparison_reference.md
 ```
 
 ## Command: `atlas-signal-viewer`
@@ -280,6 +335,54 @@ Use a longer timeout on a slower machine or CI runner:
 atlas-smoke-test --timeout 3600
 atlas-signal-viewer-smoke-test --timeout 3600
 ```
+
+
+## Generating INI templates and reference pages
+
+Generate all full, bare, and beginner ATLAS templates together with the generated documentation pages:
+
+```bash
+atlas-generate-templates
+```
+
+The intercomparison generator participates in the same command. With the default `--profile all`, the command writes both:
+
+```text
+src/atlas_actris/templates/intercomparison.ini
+src/atlas_actris/templates/intercomparison_bare.ini
+```
+
+and:
+
+```text
+docs/generated/intercomparison_reference.md
+```
+
+Generate only full templates:
+
+```bash
+atlas-generate-templates --target ini --profile full
+```
+
+Generate only bare templates:
+
+```bash
+atlas-generate-templates --target ini --profile bare
+```
+
+Generate only the documentation pages:
+
+```bash
+atlas-generate-templates --target docs
+```
+
+Check whether committed generated files are current without rewriting them:
+
+```bash
+atlas-generate-templates --check
+```
+
+After changing parser schemas or flavor files, rerun the generator from the repository root. Editable reinstallation is only required when console-script definitions in `pyproject.toml` change.
 
 ## Developer execution from Python
 
