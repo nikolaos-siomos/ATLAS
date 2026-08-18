@@ -10,18 +10,31 @@ GENERAL_TEMPLATE_KEYS = [
     "default_pair_source", "default_pair_error_source",
     "vertical_scale", "vertical_method", "vertical_binning",
     "vertical_min", "vertical_max", "slice_measurement", "exclude_measurement",
-    "background_correction", "background_region", "normalisation",
-    "normalisation_region", "normalise_to_molecular", "plot_molecular",
+    "default_channel_background_correction", "default_channel_background_region",
+    "default_channel_normalisation", "default_channel_normalisation_region",
+    "default_channel_normalise_to_molecular", "default_channel_plot_molecular",
+    "default_pair_background_correction", "default_pair_background_region",
+    "default_pair_normalisation", "default_pair_normalisation_region",
+    "default_pair_plot_molecular",
     "dpi", "color_reduction",
 ]
 
-SYSTEM_TEMPLATE_KEYS = ["stage_path", "reference", "label"]
-CHANNEL_TEMPLATE_KEYS = [
-    "label", "force_qa_test", "background_correction", "background_region",
+DATASET_TEMPLATE_KEYS = [
+    "stage_path", "reference", "system_label", "dataset_label",
+    "qa_test", "signal_source", "signal_error_source",
+    "pair_source", "pair_error_source",
+]
+
+CHANNEL_GROUP_TEMPLATE_KEYS = [
+    "label", "background_correction", "background_region",
     "normalisation", "normalisation_region", "normalise_to_molecular",
     "plot_molecular",
 ]
-PAIR_TEMPLATE_KEYS = ["label", "force_qa_test"]
+
+PAIR_GROUP_TEMPLATE_KEYS = [
+    "label", "background_correction", "background_region",
+    "normalisation", "normalisation_region", "plot_molecular",
+]
 
 
 def _legacy() -> dict[str, object]:
@@ -42,55 +55,65 @@ def _entry(description: str, example: str = "") -> dict[str, object]:
 GENERAL_FLAVOR = {
     "output_folder": _entry("Folder where intercomparison plots, tables, and cached products are written. Relative paths are resolved against the folder containing this INI file.", "./analysis"),
     "overwrite_output": _entry("If True, existing intercomparison outputs with the same names may be overwritten.", "False"),
-    "default_qa_test": _entry("General QA-test source used by channel and pair comparisons unless force_qa_test is provided in that comparison section.", "ray"),
-    "default_signal_source": _entry("Fallback exported-stage parameter containing channel signals. A source specified for the reference system in a channel bundle becomes the effective default for all systems in that bundle.", "profile"),
-    "default_signal_error_source": _entry("Fallback exported-stage parameter containing channel uncertainties. A source specified for the reference system in a channel bundle becomes the effective default for all systems in that bundle.", "profile_error"),
-    "default_pair_source": _entry("Fallback exported-stage parameter containing channel-pair products. A source specified for the reference system in a pair bundle becomes the effective default for all systems in that bundle.", "pol_cal_ratio_mean"),
-    "default_pair_error_source": _entry("Fallback exported-stage parameter containing channel-pair uncertainties. A source specified for the reference system in a pair bundle becomes the effective default for all systems in that bundle.", "pol_cal_ratio_error_mean"),
-    "vertical_scale": _entry("Physical vertical coordinate used for all comparisons. height_asl is strongly recommended because systems may be located at different station altitudes.", "height_asl"),
-    "vertical_method": _entry("Method used to place systems on a common physical vertical grid. interpolation uses the reference-system grid; vertical_binning creates common altitude intervals.", "interpolation"),
+    "default_qa_test": _entry("Universal fallback QA test. A dataset-specific qa_test takes priority.", "ray"),
+    "default_signal_source": _entry("Universal fallback exported-stage parameter containing channel signals. A dataset-specific signal_source takes priority.", "profile"),
+    "default_signal_error_source": _entry("Universal fallback exported-stage parameter containing channel uncertainties. A dataset-specific signal_error_source takes priority.", "profile_error"),
+    "default_pair_source": _entry("Universal fallback exported-stage parameter containing channel-pair products. A dataset-specific pair_source takes priority.", "pol_cal_ratio_mean"),
+    "default_pair_error_source": _entry("Universal fallback exported-stage parameter containing channel-pair uncertainties. A dataset-specific pair_error_source takes priority.", "pol_cal_ratio_error_mean"),
+    "vertical_scale": _entry("Vertical coordinate to use later for harmonization and plotting. Allowed values are bins, range, height_agl, and height_asl. All four coordinates are loaded when available; this option only selects which one downstream processing will use. Default: height_asl.", "height_asl"),
+    "vertical_method": _entry("Method used to place datasets on a common physical vertical grid. interpolation uses the reference-dataset grid; vertical_binning creates common altitude intervals.", "interpolation"),
     "vertical_binning": _entry("Vertical bin width in kilometres. Required only when vertical_method is vertical_binning.", "0.03"),
     "vertical_min": _entry("Optional lower comparison and plotting limit in kilometres. Empty uses the common valid overlap.", "0.5"),
     "vertical_max": _entry("Optional upper comparison and plotting limit in kilometres. Empty uses the common valid overlap.", "15.0"),
     "slice_measurement": _entry("Optional temporal slices as repeating start, stop pairs. Accepted formats match call_atlas.ini: HHMM, yyyymmdd, yyyymmdd_HH, yyyymmdd_HHMM, or yyyymmdd_HHMMSS.", "20260801_2100, 20260802_0200"),
     "exclude_measurement": _entry("Optional temporal exclusions as repeating start, stop pairs, using the same time formats as slice_measurement.", "20260801_2330, 20260801_2345"),
-    "background_correction": _entry("General switch for subtracting the mean signal in background_region. Disabled by default and overridable per channel comparison.", "False"),
-    "background_region": _entry("General fallback background interval in kilometres. A channel-specific value takes priority; when empty, later metadata loading may use the reference channel's stored region.", "18.0, 22.0"),
-    "normalisation": _entry("General switch for channel normalization. It may be disabled or overridden per channel comparison. Pair products are not normalized.", "True"),
-    "normalisation_region": _entry("General fallback normalization interval in kilometres. A channel-specific value takes priority; when empty, later metadata loading uses the reference channel's stored Rayleigh-fit region.", "7.5, 9.0"),
-    "normalise_to_molecular": _entry("If True, normalize measured channel profiles to the reference system's molecular profile using arithmetic means over the resolved normalization region.", "True"),
-    "plot_molecular": _entry("If True, include the reference system's molecular profile in channel-comparison plots.", "True"),
+    "default_channel_background_correction": _entry("Default background-correction switch for channel groups. A value set directly in a [channel_group:<id>] section overrides this default.", "False"),
+    "default_channel_background_region": _entry("Default channel background region in kilometres. A channel-group background_region overrides it.", "18.0, 22.0"),
+    "default_channel_normalisation": _entry("Default normalization switch for channel groups. A channel-group normalisation value overrides it.", "True"),
+    "default_channel_normalisation_region": _entry("Default channel normalization region in kilometres. A channel-group normalisation_region overrides it.", "7.5, 9.0"),
+    "default_channel_normalise_to_molecular": _entry("Default channel normalization target. If True, channel groups are normalized to the reference dataset's molecular profile; if False, they are normalized to the reference measured signal.", "True"),
+    "default_channel_plot_molecular": _entry("Default switch controlling whether the reference molecular channel profile is included in plots.", "True"),
+    "default_pair_background_correction": _entry("Default background-correction switch for pair groups. A value set directly in a [pair_group:<id>] section overrides this default.", "False"),
+    "default_pair_background_region": _entry("Default pair background region in kilometres. A pair-group background_region overrides it.", "18.0, 22.0"),
+    "default_pair_normalisation": _entry("Default normalization switch for pair groups. Pair normalization is always to the reference measured pair ratio, never to the molecular ratio.", "False"),
+    "default_pair_normalisation_region": _entry("Default pair normalization region in kilometres. A pair-group normalisation_region overrides it.", "7.5, 9.0"),
+    "default_pair_plot_molecular": _entry("Default switch controlling whether the reference molecular ratio is included in pair plots.", "True"),
     "dpi": _entry("Resolution of exported figures in dots per inch.", "150"),
     "color_reduction": _entry("If True, apply the ATLAS image color-reduction workflow to exported figures.", "False"),
 }
 
-SYSTEM_FLAVOR = {
-    "stage_path": _entry("Absolute or relative path to one exported ATLAS stage directory. The path may point anywhere and no common parent-folder layout is required.", "../reference_system/exported/preprocessing_complete"),
-    "reference": _entry("Set True for exactly one system. Its vertical grid, molecular profile, data IDs, source parameters, and channel-specific metadata defaults define the comparison reference.", "True"),
-    "label": _entry("Optional display label. When empty, metadata loading will use lidar_name and finally the system section ID as fallback.", "Reference lidar"),
+DATASET_FLAVOR = {
+    "stage_path": _entry("Absolute or relative path to one exported ATLAS stage directory. Different datasets may point to different stage paths, or multiple datasets may intentionally point to the same stage path with different QA/source selections.", "../dataset_a/exported/preprocessing_complete"),
+    "reference": _entry("Set True for exactly one dataset. Its vertical grid, molecular profile, product IDs, and metadata defaults define the comparison reference.", "True"),
+    "system_label": _entry("Optional label for the physical lidar/system that produced this dataset. Multiple datasets may share the same system_label.", "Lidar A"),
+    "dataset_label": _entry("Optional label describing this particular dataset or processing realization. When empty, later code may fall back to the dataset section ID.", "Rayleigh processing"),
+    "qa_test": _entry("QA test used when reading this dataset. When empty, default_qa_test from [general] is used.", "ray"),
+    "signal_source": _entry("Exported-stage parameter containing channel signals for this dataset. When empty, default_signal_source is used.", "profile"),
+    "signal_error_source": _entry("Exported-stage parameter containing channel uncertainties for this dataset. When empty, default_signal_error_source is used.", "profile_error"),
+    "pair_source": _entry("Exported-stage parameter containing pair products for this dataset. When empty, default_pair_source is used.", "pol_cal_ratio_mean"),
+    "pair_error_source": _entry("Exported-stage parameter containing pair uncertainties for this dataset. When empty, default_pair_error_source is used.", "pol_cal_ratio_error_mean"),
 }
 
-CHANNEL_FLAVOR = {
-    "label": _entry("Optional comparison label. When empty, the reference system's atlas_channel_id is used.", "355 nm parallel"),
-    "force_qa_test": _entry("Optional QA-test source forced for all systems in this channel comparison. When empty, default_qa_test is used.", "ray_pcb"),
-    "background_correction": _entry("Enable or disable background correction for this complete channel-comparison bundle.", "True"),
-    "background_region": _entry("Channel-specific background interval in kilometres, applied to every system in this comparison. Empty falls back to the general value or later reference-channel metadata.", "18.0, 22.0"),
-    "normalisation": _entry("Enable or disable normalization for this complete channel-comparison bundle.", "True"),
-    "normalisation_region": _entry("Channel-specific normalization interval in kilometres, applied to every system in this comparison. Empty falls back to the general value or later reference-channel metadata.", "7.5, 9.0"),
-    "normalise_to_molecular": _entry("Override whether this channel bundle is normalized to the reference molecular profile.", "True"),
-    "plot_molecular": _entry("Override whether the reference molecular profile is plotted for this channel bundle.", "True"),
+CHANNEL_GROUP_FLAVOR = {
+    "label": _entry("Optional channel-group display label. When empty, the reference dataset's atlas_channel_id is used.", "355 nm parallel"),
+    "background_correction": _entry("Optional channel-group override for background correction. Empty inherits default_channel_background_correction from [general].", "False"),
+    "background_region": _entry("Optional channel-group override for the background interval in kilometres. Empty inherits default_channel_background_region from [general].", "18.0, 22.0"),
+    "normalisation": _entry("Optional channel-group override for normalization. Empty inherits default_channel_normalisation from [general].", "True"),
+    "normalisation_region": _entry("Optional channel-group override for the normalization interval in kilometres. Empty inherits default_channel_normalisation_region from [general].", "7.5, 9.0"),
+    "normalise_to_molecular": _entry("Optional channel-group override. True normalizes every participating channel to the reference dataset's molecular profile; False normalizes every channel to the reference measured signal.", "True"),
+    "plot_molecular": _entry("Optional channel-group override controlling whether the reference molecular profile is plotted. Empty inherits default_channel_plot_molecular from [general].", "True"),
 }
 
-PAIR_FLAVOR = {
-    "label": _entry("Optional pair-comparison label. When empty, the reference system's atlas_pair_id is used.", "VLDR 355 nm"),
-    "force_qa_test": _entry("Optional QA-test source forced for all systems in this pair comparison. When empty, default_qa_test is used.", "pcb"),
+PAIR_GROUP_FLAVOR = {
+    "label": _entry("Optional pair-group display label. When empty, the reference dataset's atlas_pair_id is used.", "VLDR 355 nm"),
+    "background_correction": _entry("Optional pair-group override for background correction. Empty inherits default_pair_background_correction from [general].", "False"),
+    "background_region": _entry("Optional pair-group override for the background interval in kilometres. Empty inherits default_pair_background_region from [general].", "18.0, 22.0"),
+    "normalisation": _entry("Optional pair-group override for normalization. Pair products are normalized to the reference measured pair ratio; molecular normalization is not used for pairs.", "False"),
+    "normalisation_region": _entry("Optional pair-group override for the normalization interval in kilometres. Empty inherits default_pair_normalisation_region from [general].", "7.5, 9.0"),
+    "plot_molecular": _entry("Optional pair-group override controlling whether the reference molecular ratio is plotted. Empty inherits default_pair_plot_molecular from [general].", "True"),
 }
 
 SPECIAL_FLAVOR = {
-    "system_channel_id": _entry("Map this system to an atlas_channel_id. The reference system mapping is mandatory. Other systems inherit the reference ID when omitted. Use off to exclude a non-reference system from this comparison.", "0355xpgx"),
-    "system_pair_id": _entry("Map this system to an atlas_pair_id. The reference system mapping is mandatory. Other systems inherit the reference ID when omitted. Use off to exclude a non-reference system from this comparison.", "vldr355_b"),
-    "system_signal_source": _entry("System-specific channel signal source. When omitted, the reference system's signal_source is inherited; if the reference also omits it, default_signal_source is used.", "derived_profile"),
-    "system_signal_error_source": _entry("System-specific channel uncertainty source. When omitted, the reference system's signal_error_source is inherited; if the reference also omits it, default_signal_error_source is used.", "derived_profile_error"),
-    "system_pair_source": _entry("System-specific pair-product source. When omitted, the reference system's pair_source is inherited; if the reference also omits it, default_pair_source is used.", "pol_cal_ratio_mean"),
-    "system_pair_error_source": _entry("System-specific pair uncertainty source. When omitted, the reference system's pair_error_source is inherited; if the reference also omits it, default_pair_error_source is used.", "pol_cal_ratio_error_mean"),
+    "dataset_atlas_channel_id": _entry("ATLAS channel ID selected from this dataset for the channel group. Leave empty or omit the parameter to exclude this dataset from the group. If all dataset channel IDs are empty, the group is ignored. For an active group, the reference dataset must provide an ID.", "0355xpgx"),
+    "dataset_atlas_pair_id": _entry("ATLAS pair ID selected from this dataset for the pair group. Leave empty or omit the parameter to exclude this dataset from the group. If all dataset pair IDs are empty, the group is ignored. For an active group, the reference dataset must provide an ID.", "0355UVAX"),
 }

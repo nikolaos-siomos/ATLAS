@@ -45,8 +45,6 @@
 | `data_acquisition_range` | Data acquisition range for each channel. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` | Minimum: 0.0 | `100000, 100000, 100000` | Unchanged from previous ATLAS versions. |
 | `range_resolution` | Range resolution for each channel in meters. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` | Range: 1.0 to 30.0 | `7.5, 7.5, 7.5` | Unchanged from previous ATLAS versions. |
 | `laser_repetition_rate` | Laser repetition rate for each channel in Hz. | `list[float]` | optional | `empty parameter --&gt; ignored or automatic selection` | Range: 10.0 to 200.0 | `20, 20, 20` | Unchanged from previous ATLAS versions. |
-| `analog_noise_per_bin` | Analog noise per bin used for analog-channel uncertainty estimates. | `list[float]` | optional | `0.22` | Minimum: 0.0 | `0.22, 0.22, 0.22` | Unchanged from previous ATLAS versions. |
-| `analog_noise_scaling_factor` | Scaling factor applied to analog noise estimates. | `list[float]` | optional | `0.7` | Minimum: 0.0 | `0.7, 0.7, 0.7` | Unchanged from previous ATLAS versions. |
 
 ## `polarization_calibration`
 

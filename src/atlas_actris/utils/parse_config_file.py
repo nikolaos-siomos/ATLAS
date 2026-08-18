@@ -69,8 +69,8 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "data_acquisition_range":      {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 0.},
     "range_resolution":            {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 1.,  "max": 30.},
     "laser_repetition_rate":       {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 10., "max": 200.},
-    "analog_noise_per_bin":        {"dtype": float, "default": 0.22, "is_list": True, "category": "optional", "min": 0.},
-    "analog_noise_scaling_factor": {"dtype": float, "default": 0.7,  "is_list": True, "category": "optional", "min": 0.},
+    # "analog_noise_per_bin":        {"dtype": float, "default": 0.22, "is_list": True, "category": "optional", "min": 0.},
+    # "analog_noise_scaling_factor": {"dtype": float, "default": 0.7,  "is_list": True, "category": "optional", "min": 0.},
     # "analog_to_digital_resolution": {"dtype": int, "default": None, "is_list": True, "category": "optional", "allowed": [12, 14, 16]},
 
     # -------------------- [polarization_calibration] --------------------
@@ -143,7 +143,8 @@ POL_CAL_KEYS = {
     "ch_r",
     "ch_t",
     "K",
-    "R_to_T_transmission_ratio"
+    "R_to_T_transmission_ratio",
+    "eta"
     }
 
 GL_KEYS = {
@@ -158,9 +159,11 @@ WV_KEYS = {
     }
 
 TEMP_KEYS = {
-    "ch_w",
-    "ch_v",
-    "T_calibration_factor"
+    "ch_h",
+    "ch_l",
+    "alpha_prime",
+    "beta_prime",
+    "gamma_prime"
     }
 
 recognized_sections = [
