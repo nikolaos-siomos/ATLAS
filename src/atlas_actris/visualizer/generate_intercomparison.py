@@ -174,6 +174,61 @@ def _smooth_profiles(
     return Y_out, YE_out
 
 
+def _profiles_for_axis_limits(
+    X: Mapping[str, np.ndarray],
+    Y: Mapping[str, np.ndarray],
+    stage_errors: Mapping[str, Optional[np.ndarray]],
+    group: Mapping[str, Any],
+    *,
+    plotted_data_are_binned: bool,
+) -> Tuple[Dict[str, np.ndarray], Dict[str, Optional[np.ndarray]]]:
+    """Return signal/error pairs used only for automatic axis limits.
+
+    The signal used for limit estimation is always the plotted processed signal:
+    conservatively binned values are used directly, while non-binned values may
+    be smoothed (including a temporary smoothing pass when plotting smoothing is
+    disabled).  SNR, however, is *always* evaluated with the uncertainty loaded
+    from the stage and propagated through intercomparison preprocessing / vertical
+    harmonization.  The local standard deviation calculated by plotting smoothing
+    is deliberately not used as an SNR uncertainty.
+    """
+    stored_errors = {
+        key: None if stage_errors.get(key) is None else np.asarray(stage_errors[key], dtype=float)
+        for key in Y
+    }
+
+    if plotted_data_are_binned or group.get("smooth", False):
+        return (
+            {key: np.asarray(value, dtype=float) for key, value in Y.items()},
+            stored_errors,
+        )
+
+    window = group.get("smoothing_window")
+    if not window:
+        return (
+            {key: np.asarray(value, dtype=float) for key, value in Y.items()},
+            stored_errors,
+        )
+
+    settings = {
+        "smooth": True,
+        "smoothing_range": group.get("smoothing_range", []),
+        "smoothing_window": window,
+    }
+
+    out_y: Dict[str, np.ndarray] = {}
+    for dataset_id, y in Y.items():
+        y_sm, _ = smoothing(
+            args=settings,
+            x_vals=np.asarray(X[dataset_id], dtype=float),
+            y_vals=np.asarray(y, dtype=float),
+            err_type="std",
+        )
+        out_y[dataset_id] = np.asarray(y_sm, dtype=float)
+
+    return out_y, stored_errors
+
+
 def _smooth_molecular(
     molecular: Optional[Dict[str, np.ndarray]],
     group: Mapping[str, Any],
@@ -228,53 +283,149 @@ def _auto_x_lims(X: Mapping[str, np.ndarray]) -> list:
     return [low, high]
 
 
-def _auto_y_lims(Y, molecular, *, use_log_y_scale: bool) -> list:
-    values = list(Y.values())
-    if molecular is not None:
-        values.append(molecular["y"])
-    vals = _finite_concat(values)
-    if vals.size == 0:
+def _auto_y_lims(
+    Y,
+    YE,
+    molecular,
+    *,
+    use_log_y_scale: bool,
+    dynamic_range_floor: float = 1.0e-5,
+    snr_threshold: float = 1.0,
+) -> list:
+    """Determine automatic intercomparison y-axis limits.
+
+    The logic intentionally follows the Rayleigh-fit convention when a
+    molecular profile is plotted: the upper limit is controlled by the
+    measured-profile peak, while the lower limit is controlled by the
+    molecular profile.  Without molecular data, logarithmic plots are
+    protected against isolated low/noisy values by a fixed dynamic-range
+    floor relative to the measured peak.
+    """
+
+    signal_vals = _finite_concat(Y.values())
+    if signal_vals.size == 0:
         return [1.0e-6, 1.0] if use_log_y_scale else [0.0, 1.0]
 
-    if use_log_y_scale:
-        positive = vals[vals > 0]
+    # Use only statistically meaningful signal points to determine the upper
+    # automatic limit. This prevents isolated noisy spikes from controlling
+    # the full plot range. SNR is defined as abs(signal) / uncertainty.
+    snr_signal_pieces = []
+    for dataset_id, y in Y.items():
+        y = np.asarray(y, dtype=float)
+        err = YE.get(dataset_id)
+        if err is None:
+            continue
+        err = np.asarray(err, dtype=float)
+        if err.shape != y.shape:
+            continue
+        valid = (
+            np.isfinite(y)
+            & np.isfinite(err)
+            & (err > 0.0)
+            & (np.abs(y) / err > snr_threshold)
+        )
+        if np.any(valid):
+            snr_signal_pieces.append(y[valid])
+
+    if snr_signal_pieces:
+        signal_for_max = np.concatenate(snr_signal_pieces)
+        signal_max = float(np.nanmax(signal_for_max))
+    else:
+        print(
+            f"      Warning: no finite signal points with SNR > {snr_threshold:g}; "
+            "falling back to all finite signal values for automatic y limits"
+        )
+        signal_max = float(np.nanmax(signal_vals))
+
+    if not np.isfinite(signal_max):
+        return [1.0e-6, 1.0] if use_log_y_scale else [0.0, 1.0]
+
+    # Rayleigh-fit-style upper margin.  This deliberately uses the measured
+    # profiles, not the molecular profile, so a molecular tail cannot control
+    # the upper plotting limit.
+    upper_margin_factor = 2.5
+    if signal_max > 0.0:
+        high = upper_margin_factor * signal_max
+    else:
+        high = 1.0
+
+    molecular_vals = np.asarray([], dtype=float)
+    if molecular is not None:
+        molecular_vals = _finite_concat([molecular.get("y", [])])
+
+    if molecular_vals.size:
+        # Match the Rayleigh-fit convention: the molecular profile determines
+        # the lower limit, with a factor-of-two margin.
+        if use_log_y_scale:
+            molecular_positive = molecular_vals[molecular_vals > 0.0]
+            if molecular_positive.size:
+                low = float(np.nanmin(molecular_positive)) / 2.0
+            else:
+                low = max(high * dynamic_range_floor, 1.0e-12)
+        else:
+            low = float(np.nanmin(molecular_vals)) / 2.0
+
+    elif use_log_y_scale:
+        # No molecular reference is available.  Ignore non-positive samples
+        # and prevent a few tiny positive noise excursions from creating an
+        # excessive logarithmic dynamic range.
+        positive = signal_vals[signal_vals > 0.0]
         if positive.size == 0:
-            print("      Warning: no positive values available for logarithmic y scale; using fallback limits")
+            print(
+                "      Warning: no positive values available for logarithmic "
+                "y scale; using fallback limits"
+            )
             return [1.0e-6, 1.0]
-        low = float(np.nanmin(positive)) / 2.0
-        high = float(np.nanmax(positive)) * 2.0
-        if high <= low:
-            high = low * 10.0
-        return [low, high]
 
-    low = float(np.nanmin(vals))
-    high = float(np.nanmax(vals))
-    if high <= low:
-        spread = max(abs(low) * 0.1, 1.0)
-        return [low - spread, high + spread]
-    pad = 0.05 * (high - low)
-    return [low - pad, high + pad]
+        low_from_data = float(np.nanmin(positive)) / 2.0
+        low_from_dynamic_range = high * dynamic_range_floor
+        low = max(low_from_data, low_from_dynamic_range)
+
+    else:
+        # Without molecular data, negative excursions are normally noise for
+        # the intercomparison products, so keep the linear scale anchored at 0.
+        low = 0.0
+
+    if not np.isfinite(low) or not np.isfinite(high) or high <= low:
+        if use_log_y_scale:
+            high = max(high, 1.0)
+            low = min(max(high * dynamic_range_floor, 1.0e-12), high / 10.0)
+        else:
+            low = 0.0
+            high = max(signal_max * upper_margin_factor, 1.0)
+
+    return [low, high]
 
 
-def _relative_to_reference(
+def _differences_to_reference(
     Y: Mapping[str, np.ndarray],
     YE: Mapping[str, Optional[np.ndarray]],
     *,
     reference_dataset: str,
+    difference_mode: str,
 ) -> Tuple[Dict[str, np.ndarray], Dict[str, Optional[np.ndarray]]]:
+    """Calculate dataset differences to the reference.
+
+    Channel groups use relative differences, while pair groups use absolute
+    differences. Uncertainties from the dataset and reference are treated as
+    independent and propagated in quadrature.
+    """
     if reference_dataset not in Y:
-        raise ValueError(f"Reference dataset {reference_dataset!r} is missing from the plotted group")
+        raise ValueError(
+            f"Reference dataset {reference_dataset!r} is missing from the plotted group"
+        )
 
     y_ref = np.asarray(Y[reference_dataset], dtype=float)
     e_ref = YE.get(reference_dataset)
     e_ref_arr = None if e_ref is None else np.asarray(e_ref, dtype=float)
 
-    relative: Dict[str, np.ndarray] = {}
-    relative_error: Dict[str, Optional[np.ndarray]] = {}
+    differences: Dict[str, np.ndarray] = {}
+    difference_error: Dict[str, Optional[np.ndarray]] = {}
 
     for dataset_id, y in Y.items():
         if dataset_id == reference_dataset:
             continue
+
         y = np.asarray(y, dtype=float)
         if y.shape != y_ref.shape:
             raise ValueError(
@@ -282,30 +433,118 @@ def _relative_to_reference(
                 f"does not match the reference shape {y_ref.shape}."
             )
 
-        rel = np.full_like(y, np.nan, dtype=float)
-        valid = np.isfinite(y) & np.isfinite(y_ref) & (y_ref != 0)
-        rel[valid] = (y[valid] - y_ref[valid]) / y_ref[valid]
-        relative[dataset_id] = rel
+        diff = np.full_like(y, np.nan, dtype=float)
+
+        if difference_mode == "absolute":
+            valid = np.isfinite(y) & np.isfinite(y_ref)
+            diff[valid] = y[valid] - y_ref[valid]
+        elif difference_mode == "relative":
+            valid = np.isfinite(y) & np.isfinite(y_ref) & (y_ref != 0)
+            diff[valid] = (y[valid] - y_ref[valid]) / y_ref[valid]
+        else:
+            raise ValueError(
+                f"Unsupported difference_mode {difference_mode!r}; "
+                "expected 'relative' or 'absolute'"
+            )
+
+        differences[dataset_id] = diff
 
         err = YE.get(dataset_id)
         if err is None and e_ref_arr is None:
-            relative_error[dataset_id] = None
+            difference_error[dataset_id] = None
             continue
 
-        err_arr = np.zeros_like(y, dtype=float) if err is None else np.asarray(err, dtype=float)
-        ref_err_arr = np.zeros_like(y_ref, dtype=float) if e_ref_arr is None else e_ref_arr
+        err_arr = (
+            np.zeros_like(y, dtype=float)
+            if err is None
+            else np.asarray(err, dtype=float)
+        )
+        ref_err_arr = (
+            np.zeros_like(y_ref, dtype=float)
+            if e_ref_arr is None
+            else e_ref_arr
+        )
+
         sigma = np.full_like(y, np.nan, dtype=float)
         valid_err = valid & np.isfinite(err_arr) & np.isfinite(ref_err_arr)
-        sigma[valid_err] = np.sqrt(
-            (err_arr[valid_err] / y_ref[valid_err]) ** 2
-            + (
-                y[valid_err] * ref_err_arr[valid_err]
-                / (y_ref[valid_err] ** 2)
-            ) ** 2
-        )
-        relative_error[dataset_id] = sigma
 
-    return relative, relative_error
+        if difference_mode == "absolute":
+            sigma[valid_err] = np.sqrt(
+                err_arr[valid_err] ** 2 + ref_err_arr[valid_err] ** 2
+            )
+        else:
+            sigma[valid_err] = np.sqrt(
+                (err_arr[valid_err] / y_ref[valid_err]) ** 2
+                + (
+                    y[valid_err] * ref_err_arr[valid_err]
+                    / (y_ref[valid_err] ** 2)
+                ) ** 2
+            )
+
+        difference_error[dataset_id] = sigma
+
+    return differences, difference_error
+
+
+def _auto_absolute_difference_lims(
+    differences: Mapping[str, np.ndarray],
+    Y: Mapping[str, np.ndarray],
+    YE: Mapping[str, Optional[np.ndarray]],
+    *,
+    reference_dataset: str,
+    snr_threshold: float = 1.0,
+) -> list:
+    """Return robust symmetric limits for pair absolute differences.
+
+    Only locations where both the compared dataset and reference have SNR above
+    the threshold are allowed to control the automatic limit. The complete
+    difference curve is still plotted; this filter is only for axis scaling.
+    """
+    y_ref = np.asarray(Y[reference_dataset], dtype=float)
+    e_ref = YE.get(reference_dataset)
+    e_ref = None if e_ref is None else np.asarray(e_ref, dtype=float)
+
+    pieces = []
+    for dataset_id, diff in differences.items():
+        y = np.asarray(Y[dataset_id], dtype=float)
+        e = YE.get(dataset_id)
+        e = None if e is None else np.asarray(e, dtype=float)
+        diff = np.asarray(diff, dtype=float)
+
+        if e is None or e_ref is None or e.shape != y.shape or e_ref.shape != y_ref.shape:
+            continue
+
+        valid = (
+            np.isfinite(diff)
+            & np.isfinite(y)
+            & np.isfinite(y_ref)
+            & np.isfinite(e)
+            & np.isfinite(e_ref)
+            & (e > 0.0)
+            & (e_ref > 0.0)
+            & (np.abs(y) / e > snr_threshold)
+            & (np.abs(y_ref) / e_ref > snr_threshold)
+        )
+        if np.any(valid):
+            pieces.append(diff[valid])
+
+    if pieces:
+        vals = np.concatenate(pieces)
+    else:
+        print(
+            f"      Warning: no pair-difference points with both SNR > {snr_threshold:g}; "
+            "falling back to all finite differences for automatic limits"
+        )
+        vals = _finite_concat(differences.values())
+
+    if vals.size == 0:
+        return [-1.0, 1.0]
+
+    extent = float(np.nanmax(np.abs(vals)))
+    if not np.isfinite(extent) or extent == 0.0:
+        extent = 1.0
+    extent *= 1.10
+    return [-extent, extent]
 
 
 def _plot_one_group(
@@ -337,6 +576,14 @@ def _plot_one_group(
     if not Y:
         raise ValueError(f"[{group_kind}:{group_id}] contains no plottable signals")
 
+    # Keep the stage-derived / preprocessing-propagated uncertainty separate
+    # from any local STD later calculated only for plotting smoothing.  Automatic
+    # SNR-based axis limits must use this stored uncertainty.
+    YE_stage = {
+        key: None if YE.get(key) is None else np.asarray(YE[key], dtype=float).copy()
+        for key in Y
+    }
+
     # Smoothing/local-STD estimation is only useful when the plotted profiles
     # have not already been conservatively binned. Binning already provides a
     # weighted mean and propagated uncertainty. Native-scale plotting is also
@@ -364,20 +611,44 @@ def _plot_one_group(
 
     use_log_y_scale = bool(group_settings.get("use_log_y_scale", False))
 
+    axis_limit_Y, axis_limit_YE = _profiles_for_axis_limits(
+        X,
+        Y,
+        YE_stage,
+        group_settings,
+        plotted_data_are_binned=plotted_data_are_binned,
+    )
+
     x_lims = list(group_settings.get("x_lims") or _auto_x_lims(X))
+    auto_y_limits = not bool(group_settings.get("y_lims"))
     y_lims = list(
         group_settings.get("y_lims")
-        or _auto_y_lims(Y, molecular, use_log_y_scale=use_log_y_scale)
+        or _auto_y_lims(
+            axis_limit_Y,
+            axis_limit_YE,
+            molecular,
+            use_log_y_scale=use_log_y_scale,
+        )
+    )
+
+    # Pair ratios are linear by default and their physically meaningful lower
+    # plotting bound is zero. Keep explicit user y_lims untouched.
+    if group_kind == "pair_group" and auto_y_limits and not use_log_y_scale:
+        y_lims[0] = 0.0
+
+    difference_mode = (
+        "relative" if group_kind == "channel_group" else "absolute"
     )
 
     if plot_native_scale:
-        relative = {}
-        relative_error = {}
+        differences = {}
+        difference_error = {}
     else:
-        relative, relative_error = _relative_to_reference(
+        differences, difference_error = _differences_to_reference(
             Y,
             YE,
             reference_dataset=reference_dataset,
+            difference_mode=difference_mode,
         )
 
     lib = IntercomparisonLibraries(
@@ -397,6 +668,22 @@ def _plot_one_group(
     if vertical_scale in PHYSICAL_VERTICAL_SCALES and group_settings.get("normalisation"):
         normalisation_region = group_settings.get("normalisation_region")
 
+    configured_difference_lims = group_settings.get("difference_y_lims")
+
+    if configured_difference_lims:
+        difference_lims = list(configured_difference_lims)
+    elif difference_mode == "absolute":
+        difference_lims = _auto_absolute_difference_lims(
+            differences,
+            Y,
+            YE_stage,
+            reference_dataset=reference_dataset,
+        )
+    else:
+        # Channel relative-difference defaults are normally resolved by the
+        # parser, but retain an automatic fallback for robustness.
+        difference_lims = [-0.4, 0.4]
+
     args = {
         "title": text_generator.make_title(),
         "filename": text_generator.make_filename(),
@@ -407,7 +694,8 @@ def _plot_one_group(
         "x_lims": x_lims,
         "x_tick": float(group_settings["x_tick"]),
         "y_lims": y_lims,
-        "relative_difference_lims": list(group_settings["relative_difference_lims"]),
+        "difference_lims": difference_lims,
+        "difference_mode": difference_mode,
         "use_log_y_scale": use_log_y_scale,
         "normalisation_region": normalisation_region,
         "dataset_labels": dataset_labels,
@@ -433,6 +721,12 @@ def _plot_one_group(
             )
     print(f"        x limits: {args['x_lims']}")
     print(f"        y limits: {args['y_lims']}")
+    if not group_settings.get("y_lims"):
+        print(
+            "        axis-limit signal basis: "
+            + ("binned values" if plotted_data_are_binned else "smoothed values")
+            + " with SNR > 1 using stage-derived processed errors"
+        )
     if group_kind == "channel_group":
         print(f"        y scale: {'log' if use_log_y_scale else 'linear'}")
     else:
@@ -440,14 +734,17 @@ def _plot_one_group(
     if plot_native_scale:
         print("        right panel: empty (native scales are not aligned)")
     else:
-        print(f"        right panel: relative differences to {reference_dataset!r}")
+        print(
+            f"        right panel: {difference_mode} differences to "
+            f"{reference_dataset!r}"
+        )
 
     return plot_intercomparison.generate_plot(
         X=X,
         Y=Y,
         YE=YE,
-        relative=relative,
-        relative_error=relative_error,
+        differences=differences,
+        difference_error=difference_error,
         molecular=molecular,
         args=args,
     )

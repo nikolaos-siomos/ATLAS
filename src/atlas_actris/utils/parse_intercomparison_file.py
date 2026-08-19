@@ -74,16 +74,18 @@ GENERAL_SCHEMA: dict[str, dict[str, Any]] = {
 }
 
 PLOTTING_SCHEMA: dict[str, dict[str, Any]] = {
-    "x_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
+    "channel_x_lims": {"dtype": float, "default": [0,30], "is_list": True, "size": 2, "category": "optional"},
+    "pair_x_lims": {"dtype": float, "default": [0,10], "is_list": True, "size": 2, "category": "optional"},
     "x_tick": {"dtype": float, "default": 2.0, "min": 0.0, "category": "optional"},
-    "relative_difference_lims": {"dtype": float, "default": [-0.4, 0.4], "is_list": True, "size": 2, "category": "optional"},
+    "channel_difference_y_lims": {"dtype": float, "default": [-0.4, 0.4], "is_list": True, "size": 2, "category": "optional"},
+    "pair_difference_y_lims": {"dtype": float, "default": [-0.1,0.1], "is_list": True, "size": 2, "category": "optional"},
     "channel_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
     "channel_smooth": {"dtype": bool, "default": True, "category": "optional"},
-    "channel_smoothing_range": {"dtype": float, "default": [0.05, 35.0], "is_list": True, "size": 2, "category": "optional"},
+    "channel_smoothing_range": {"dtype": float, "default": [0.05, 31.0], "is_list": True, "size": 2, "category": "optional"},
     "channel_smoothing_window": {"dtype": float, "default": 0.5, "min": 0.0, "category": "optional"},
-    "pair_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
-    "pair_smooth": {"dtype": bool, "default": False, "category": "optional"},
-    "pair_smoothing_range": {"dtype": float, "default": [0.05, 15.0], "is_list": True, "size": 2, "category": "optional"},
+    "pair_y_lims": {"dtype": float, "default": [0,0.1], "is_list": True, "size": 2, "category": "optional"},
+    "pair_smooth": {"dtype": bool, "default": True, "category": "optional"},
+    "pair_smoothing_range": {"dtype": float, "default": [0.05, 11.0], "is_list": True, "size": 2, "category": "optional"},
     "pair_smoothing_window": {"dtype": float, "default": 0.5, "min": 0.0, "category": "optional"},
 }
 
@@ -114,7 +116,7 @@ CHANNEL_GROUP_SCHEMA: dict[str, dict[str, Any]] = {
     "x_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "x_tick": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
     "y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
-    "relative_difference_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "difference_y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "use_log_y_scale": {"dtype": bool, "default": True, "category": "optional"},
 }
 
@@ -132,7 +134,7 @@ PAIR_GROUP_SCHEMA: dict[str, dict[str, Any]] = {
     "x_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "x_tick": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
     "y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
-    "relative_difference_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "difference_y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "use_log_y_scale": {"dtype": bool, "default": False, "category": "optional"},
 }
 
@@ -365,10 +367,10 @@ def _resolve_group_defaults(
             values[key] = deepcopy(general[processing_prefix + key])
 
     plotting_map = {
-        "x_lims": "x_lims",
+        "x_lims": f"{kind}_x_lims",
         "x_tick": "x_tick",
         "y_lims": f"{kind}_y_lims",
-        "relative_difference_lims": "relative_difference_lims",
+        "difference_y_lims": f"{kind}_difference_y_lims",
         "smooth": f"{kind}_smooth",
         "smoothing_range": f"{kind}_smoothing_range",
         "smoothing_window": f"{kind}_smoothing_window",
@@ -516,7 +518,7 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
             "x_lims": values["x_lims"],
             "x_tick": values["x_tick"],
             "y_lims": values["y_lims"],
-            "relative_difference_lims": values["relative_difference_lims"],
+            "difference_y_lims": values["difference_y_lims"],
             "use_log_y_scale": values["use_log_y_scale"],
         }
 
@@ -568,7 +570,7 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
             "x_lims": values["x_lims"],
             "x_tick": values["x_tick"],
             "y_lims": values["y_lims"],
-            "relative_difference_lims": values["relative_difference_lims"],
+            "difference_y_lims": values["difference_y_lims"],
             "use_log_y_scale": values["use_log_y_scale"],
         }
 

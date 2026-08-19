@@ -49,16 +49,18 @@ Exactly one dataset must set `reference = True`. Group sections map participatin
 
 | Parameter | Description | Type | Default | Allowed / limits | Example |
 | --- | --- | --- | --- | --- | --- |
-| `x_lims` | Default horizontal limits for intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `` | size=2 | `0.0, 15.0` |
-| `x_tick` | Default major horizontal-axis tick spacing for intercomparison plots. Units follow vertical_scale. | `float` | `1.0` | &gt; 0.0 | `1.0` |
-| `relative_difference_lims` | Default right-panel relative-difference limits. Group-specific relative_difference_lims can override these values. | `list[float]` | `-0.4, 0.4` | size=2 | `-0.4, 0.4` |
+| `channel_x_lims` | Default horizontal limits for channel-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `` | size=2 | `0.0, 20.0` |
+| `pair_x_lims` | Default horizontal limits for pair-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `` | size=2 | `0.0, 10.0` |
+| `x_tick` | Default major horizontal-axis tick spacing for intercomparison plots. Units follow vertical_scale. | `float` | `2.0` | &gt; 0.0 | `1.0` |
+| `channel_difference_y_lims` | Default right-panel y-axis limits for channel-group relative differences. Group-specific difference_y_lims can override these values. | `list[float]` | `-0.4, 0.4` | size=2 | `-0.4, 0.4` |
+| `pair_difference_y_lims` | Default right-panel y-axis limits for pair-group absolute differences. Empty means determine them automatically from the SNR-filtered absolute differences. Group-specific difference_y_lims can override these values. | `list[float]` | `` | size=2 | `-0.1, 0.1` |
 | `channel_y_lims` | Default left-panel y limits for channel-group plots. Empty means determine them automatically from all plotted channel signals and, when enabled, the reference molecular profile. | `list[float]` | `` | size=2 |  |
 | `channel_smooth` | Default smoothing switch for channel-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned signal and propagated error directly. | `bool` | `True` |  | `True` |
 | `channel_smoothing_range` | Default channel smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 35.0` | size=2 | `0.05, 35.0` |
 | `channel_smoothing_window` | Default channel smoothing window. Units follow vertical_scale: km for physical scales, bin units for bins. | `float` | `0.5` | &gt; 0.0 | `0.5` |
 | `pair_y_lims` | Default left-panel y limits for pair-group plots. Empty means determine them automatically. | `list[float]` | `` | size=2 |  |
-| `pair_smooth` | Default smoothing switch for pair-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned values and propagated errors directly. | `bool` | `False` |  | `False` |
-| `pair_smoothing_range` | Default pair smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 15.0` | size=2 | `0.05, 15.0` |
+| `pair_smooth` | Default smoothing switch for pair-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned values and propagated errors directly. | `bool` | `True` |  | `True` |
+| `pair_smoothing_range` | Default pair smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 10.0` | size=2 | `0.05, 10.0` |
 | `pair_smoothing_window` | Default pair smoothing window. Units follow vertical_scale: km for physical scales, bin units for bins. | `float` | `0.5` | &gt; 0.0 | `0.5` |
 
 ## `dataset:<dataset_id>`
@@ -90,10 +92,10 @@ Exactly one dataset must set `reference = True`. Group sections map participatin
 | `smooth` | Optional channel-group plotting smoothing override. Empty inherits channel_smooth from [plotting]. | `bool` | `` |  | `True` |
 | `smoothing_range` | Optional channel-group smoothing-range override. Empty inherits channel_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.05, 35.0` |
 | `smoothing_window` | Optional channel-group smoothing-window override. Empty inherits channel_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.5` |
-| `x_lims` | Optional channel-group x-axis limits. Empty inherits x_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 | `0.0, 20.0` |
+| `x_lims` | Optional channel-group x-axis limits. Empty inherits channel_x_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 | `0.0, 20.0` |
 | `x_tick` | Optional channel-group major x-axis tick spacing. Empty inherits x_tick from [plotting]. | `float` | `` | &gt; 0.0 | `2.0` |
 | `y_lims` | Optional channel-group left-panel y limits. Empty inherits channel_y_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 |  |
-| `relative_difference_lims` | Optional channel-group right-panel relative-difference limits. Empty inherits relative_difference_lims from [plotting]. | `list[float]` | `` | size=2 | `-0.4, 0.4` |
+| `difference_y_lims` | Optional channel-group right-panel y-axis limits for relative differences. Empty inherits channel_difference_y_lims from [plotting]. | `list[float]` | `` | size=2 | `-0.4, 0.4` |
 | `use_log_y_scale` | Channel-group logarithmic-y switch. Default: True. Set False in this group to use a linear left-panel y axis. | `bool` | `True` |  | `True` |
 
 ### Dynamic channel-group entries
@@ -111,13 +113,13 @@ Exactly one dataset must set `reference = True`. Group sections map participatin
 | `normalisation_region` | Optional pair-group override for the normalization interval in kilometres. Empty inherits default_pair_normalisation_region from [general]. | `list[float]` | `` | size=2 | `7.5, 9.0` |
 | `plot_molecular` | Optional pair-group override controlling whether the reference molecular ratio is plotted. Empty inherits default_pair_plot_molecular from [general]. | `bool` | `` |  | `True` |
 | `vertical_bin_width` | Optional pair-group conservative bin-width override. Empty uses [general] vertical_bin_width. If the requested width is smaller than the coarsest nominal native step in this group, ATLAS warns and uses the coarsest native step instead. | `float` | `` | &gt; 0.0 | `0.03` |
-| `smooth` | Optional pair-group plotting smoothing override. Empty inherits pair_smooth from [plotting]. | `bool` | `` |  | `False` |
-| `smoothing_range` | Optional pair-group smoothing-range override. Empty inherits pair_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.05, 15.0` |
+| `smooth` | Optional pair-group plotting smoothing override. Empty inherits pair_smooth from [plotting]. | `bool` | `` |  | `True` |
+| `smoothing_range` | Optional pair-group smoothing-range override. Empty inherits pair_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.05, 10.0` |
 | `smoothing_window` | Optional pair-group smoothing-window override. Empty inherits pair_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.5` |
-| `x_lims` | Optional pair-group x-axis limits. Empty inherits x_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 | `0.0, 15.0` |
+| `x_lims` | Optional pair-group x-axis limits. Empty inherits pair_x_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 | `0.0, 10.0` |
 | `x_tick` | Optional pair-group major x-axis tick spacing. Empty inherits x_tick from [plotting]. | `float` | `` | &gt; 0.0 | `1.0` |
 | `y_lims` | Optional pair-group left-panel y limits. Empty inherits pair_y_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 |  |
-| `relative_difference_lims` | Optional pair-group right-panel relative-difference limits. Empty inherits relative_difference_lims from [plotting]. | `list[float]` | `` | size=2 | `-0.4, 0.4` |
+| `difference_y_lims` | Optional pair-group right-panel y-axis limits for absolute differences. Empty inherits pair_difference_y_lims from [plotting]; if both are empty, limits are calculated automatically. | `list[float]` | `` | size=2 | `-0.1, 0.1` |
 | `use_log_y_scale` | Pair-group logarithmic-y switch. Default: False. Set True in this group only when a logarithmic left-panel y axis is explicitly desired. | `bool` | `False` |  | `False` |
 
 ### Dynamic pair-group entries

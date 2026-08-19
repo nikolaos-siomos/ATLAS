@@ -3,8 +3,9 @@
 """Two-panel ATLAS intercomparison plot renderer.
 
 The left panel shows all participating datasets and, optionally, the reference
-molecular profile.  The right panel shows relative differences to the
-reference dataset when the vertical grids are aligned.  When native vertical
+molecular profile. The right panel shows relative channel differences or
+absolute pair differences to the reference when vertical grids are aligned.
+When native vertical
 scales are requested, the right panel is intentionally left without data.
 """
 
@@ -15,6 +16,22 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import MultipleLocator
 
 from visualizer.plot_utils import export_plot
+
+
+# Reserve tab:green for molecular products. Dataset colours intentionally skip it.
+DATASET_COLORS = (
+    "tab:blue",
+    "tab:orange",
+    "tab:red",
+    "tab:purple",
+    "tab:brown",
+    "tab:pink",
+    "tab:gray",
+    "tab:olive",
+    "tab:cyan",
+)
+MOLECULAR_COLOR = "tab:green"
+DATASET_LINESTYLES = ("-", "--", "-.", ":")
 
 
 def _vertical_axis_label(vertical_scale):
@@ -62,12 +79,22 @@ def _shade_normalisation_region(ax, args):
 def left_panel(fig, ax_coords, X, Y, YE, molecular, args):
     ax = fig.add_axes(ax_coords)
 
-    for dataset_id, y in Y.items():
+    dataset_colors = {}
+    dataset_styles = {}
+    for index, (dataset_id, y) in enumerate(Y.items()):
         x = np.asarray(X[dataset_id], dtype=float)
         y = np.asarray(y, dtype=float)
         label = args.get("dataset_labels", {}).get(dataset_id, dataset_id)
+        color_index = index % len(DATASET_COLORS)
+        style_index = (index // len(DATASET_COLORS)) % len(DATASET_LINESTYLES)
+        color = DATASET_COLORS[color_index]
+        linestyle = DATASET_LINESTYLES[style_index]
+        dataset_colors[dataset_id] = color
+        dataset_styles[dataset_id] = linestyle
 
-        line, = ax.plot(x, y, label=label)
+        line, = ax.plot(
+            x, y, label=label, color=color, linestyle=linestyle
+        )
         error = YE.get(dataset_id)
         if _finite_error(error):
             error = np.asarray(error, dtype=float)
@@ -83,8 +110,9 @@ def left_panel(fig, ax_coords, X, Y, YE, molecular, args):
         ax.plot(
             np.asarray(molecular["x"], dtype=float),
             np.asarray(molecular["y"], dtype=float),
-            linestyle="--",
-            linewidth=1.5,
+            linestyle="-",
+            linewidth=1.6,
+            color=MOLECULAR_COLOR,
             label=molecular.get("label", "molecular"),
         )
 
@@ -101,41 +129,55 @@ def left_panel(fig, ax_coords, X, Y, YE, molecular, args):
     if ax.get_legend_handles_labels() != ([], []):
         ax.legend(loc="best", fontsize=8)
 
+    args["dataset_colors"] = dataset_colors
+    args["dataset_styles"] = dataset_styles
     return ax
 
 
-def right_panel(fig, ax_coords, X, relative, relative_error, args):
+def right_panel(fig, ax_coords, X, differences, difference_error, args):
     ax = fig.add_axes(ax_coords)
     _apply_x_axis(ax, args)
-    ax.set_ylabel("Relative Diff. to Reference")
+    if args.get("difference_mode") == "absolute":
+        ax.set_ylabel("Absolute Diff. to Reference")
+    else:
+        ax.set_ylabel("Relative Diff. to Reference")
     ax.axhline(0.0, linewidth=1.0)
     _shade_normalisation_region(ax, args)
 
     if args.get("plot_native_scale", False):
         # Keep the Rayleigh-like two-panel layout, but deliberately do not plot
         # differences because native vertical grids are not aligned.
-        ax.set_ylim(args["relative_difference_lims"])
+        ax.set_ylim(args["difference_lims"])
         ax.grid(which="both")
         return ax
 
-    for dataset_id, rel in relative.items():
+    colors = args.get("dataset_colors", {})
+    styles = args.get("dataset_styles", {})
+    for index, (dataset_id, diff) in enumerate(differences.items()):
         x = np.asarray(X[dataset_id], dtype=float)
-        rel = np.asarray(rel, dtype=float)
+        diff = np.asarray(diff, dtype=float)
         label = args.get("dataset_labels", {}).get(dataset_id, dataset_id)
+        color = colors.get(dataset_id, DATASET_COLORS[index % len(DATASET_COLORS)])
+        default_style = DATASET_LINESTYLES[
+            (index // len(DATASET_COLORS)) % len(DATASET_LINESTYLES)
+        ]
+        linestyle = styles.get(dataset_id, default_style)
 
-        line, = ax.plot(x, rel, label=label)
-        error = relative_error.get(dataset_id)
+        line, = ax.plot(
+            x, diff, label=label, color=color, linestyle=linestyle
+        )
+        error = difference_error.get(dataset_id)
         if _finite_error(error):
             error = np.asarray(error, dtype=float)
             ax.fill_between(
                 x,
-                rel - error,
-                rel + error,
+                diff - error,
+                diff + error,
                 alpha=0.18,
                 color=line.get_color(),
             )
 
-    ax.set_ylim(args["relative_difference_lims"])
+    ax.set_ylim(args["difference_lims"])
     ax.grid(which="both")
 
     if ax.get_legend_handles_labels() != ([], []):
@@ -144,7 +186,7 @@ def right_panel(fig, ax_coords, X, relative, relative_error, args):
     return ax
 
 
-def generate_plot(X, Y, YE, relative, relative_error, molecular, args):
+def generate_plot(X, Y, YE, differences, difference_error, molecular, args):
     """Generate and export one two-panel intercomparison figure."""
 
     ax1_coords = [0.055, 0.17, 0.52, 0.66]
@@ -166,8 +208,8 @@ def generate_plot(X, Y, YE, relative, relative_error, molecular, args):
         fig=fig,
         ax_coords=ax2_coords,
         X=X,
-        relative=relative,
-        relative_error=relative_error,
+        differences=differences,
+        difference_error=difference_error,
         args=args,
     )
 

@@ -21,7 +21,7 @@ GENERAL_TEMPLATE_KEYS = [
 ]
 
 PLOTTING_TEMPLATE_KEYS = [
-    "x_lims", "x_tick", "relative_difference_lims",
+    "channel_x_lims", "pair_x_lims", "x_tick", "channel_difference_y_lims", "pair_difference_y_lims",
     "channel_y_lims", "channel_smooth", "channel_smoothing_range",
     "channel_smoothing_window", "pair_y_lims", "pair_smooth",
     "pair_smoothing_range", "pair_smoothing_window",
@@ -38,14 +38,14 @@ CHANNEL_GROUP_TEMPLATE_KEYS = [
     "normalisation", "normalisation_region", "normalise_to_molecular",
     "plot_molecular", "vertical_bin_width", "smooth", "smoothing_range",
     "smoothing_window", "x_lims", "x_tick", "y_lims",
-    "relative_difference_lims", "use_log_y_scale",
+    "difference_y_lims", "use_log_y_scale",
 ]
 
 PAIR_GROUP_TEMPLATE_KEYS = [
     "label", "background_correction", "background_region",
     "normalisation", "normalisation_region", "plot_molecular",
     "vertical_bin_width", "smooth", "smoothing_range", "smoothing_window",
-    "x_lims", "x_tick", "y_lims", "relative_difference_lims",
+    "x_lims", "x_tick", "y_lims", "difference_y_lims",
     "use_log_y_scale",
 ]
 
@@ -98,16 +98,18 @@ GENERAL_FLAVOR = {
 }
 
 PLOTTING_FLAVOR = {
-    "x_lims": _entry("Default horizontal limits for intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins.", "0.0, 15.0"),
+    "channel_x_lims": _entry("Default horizontal limits for channel-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins.", "0.0, 20.0"),
+    "pair_x_lims": _entry("Default horizontal limits for pair-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins.", "0.0, 10.0"),
     "x_tick": _entry("Default major horizontal-axis tick spacing for intercomparison plots. Units follow vertical_scale.", "1.0"),
-    "relative_difference_lims": _entry("Default right-panel relative-difference limits. Group-specific relative_difference_lims can override these values.", "-0.4, 0.4"),
+    "channel_difference_y_lims": _entry("Default right-panel y-axis limits for channel-group relative differences. Group-specific difference_y_lims can override these values.", "-0.4, 0.4"),
+    "pair_difference_y_lims": _entry("Default right-panel y-axis limits for pair-group absolute differences. Empty means determine them automatically from the SNR-filtered absolute differences. Group-specific difference_y_lims can override these values.", "-0.1, 0.1"),
     "channel_y_lims": _entry("Default left-panel y limits for channel-group plots. Empty means determine them automatically from all plotted channel signals and, when enabled, the reference molecular profile.", ""),
     "channel_smooth": _entry("Default smoothing switch for channel-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned signal and propagated error directly.", "True"),
     "channel_smoothing_range": _entry("Default channel smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins.", "0.05, 35.0"),
     "channel_smoothing_window": _entry("Default channel smoothing window. Units follow vertical_scale: km for physical scales, bin units for bins.", "0.5"),
     "pair_y_lims": _entry("Default left-panel y limits for pair-group plots. Empty means determine them automatically.", ""),
-    "pair_smooth": _entry("Default smoothing switch for pair-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned values and propagated errors directly.", "False"),
-    "pair_smoothing_range": _entry("Default pair smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins.", "0.05, 15.0"),
+    "pair_smooth": _entry("Default smoothing switch for pair-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned values and propagated errors directly.", "True"),
+    "pair_smoothing_range": _entry("Default pair smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins.", "0.05, 10.0"),
     "pair_smoothing_window": _entry("Default pair smoothing window. Units follow vertical_scale: km for physical scales, bin units for bins.", "0.5"),
 }
 
@@ -135,10 +137,10 @@ CHANNEL_GROUP_FLAVOR = {
     "smooth": _entry("Optional channel-group plotting smoothing override. Empty inherits channel_smooth from [plotting].", "True"),
     "smoothing_range": _entry("Optional channel-group smoothing-range override. Empty inherits channel_smoothing_range from [plotting].", "0.05, 35.0"),
     "smoothing_window": _entry("Optional channel-group smoothing-window override. Empty inherits channel_smoothing_window from [plotting].", "0.5"),
-    "x_lims": _entry("Optional channel-group x-axis limits. Empty inherits x_lims from [plotting]; an empty resolved value triggers automatic limits.", "0.0, 20.0"),
+    "x_lims": _entry("Optional channel-group x-axis limits. Empty inherits channel_x_lims from [plotting]; an empty resolved value triggers automatic limits.", "0.0, 20.0"),
     "x_tick": _entry("Optional channel-group major x-axis tick spacing. Empty inherits x_tick from [plotting].", "2.0"),
     "y_lims": _entry("Optional channel-group left-panel y limits. Empty inherits channel_y_lims from [plotting]; an empty resolved value triggers automatic limits.", ""),
-    "relative_difference_lims": _entry("Optional channel-group right-panel relative-difference limits. Empty inherits relative_difference_lims from [plotting].", "-0.4, 0.4"),
+    "difference_y_lims": _entry("Optional channel-group right-panel y-axis limits for relative differences. Empty inherits channel_difference_y_lims from [plotting].", "-0.4, 0.4"),
     "use_log_y_scale": _entry("Channel-group logarithmic-y switch. Default: True. Set False in this group to use a linear left-panel y axis.", "True"),
 }
 
@@ -150,13 +152,13 @@ PAIR_GROUP_FLAVOR = {
     "normalisation_region": _entry("Optional pair-group override for the normalization interval in kilometres. Empty inherits default_pair_normalisation_region from [general].", "7.5, 9.0"),
     "plot_molecular": _entry("Optional pair-group override controlling whether the reference molecular ratio is plotted. Empty inherits default_pair_plot_molecular from [general].", "True"),
     "vertical_bin_width": _entry("Optional pair-group conservative bin-width override. Empty uses [general] vertical_bin_width. If the requested width is smaller than the coarsest nominal native step in this group, ATLAS warns and uses the coarsest native step instead.", "0.03"),
-    "smooth": _entry("Optional pair-group plotting smoothing override. Empty inherits pair_smooth from [plotting].", "False"),
-    "smoothing_range": _entry("Optional pair-group smoothing-range override. Empty inherits pair_smoothing_range from [plotting].", "0.05, 15.0"),
+    "smooth": _entry("Optional pair-group plotting smoothing override. Empty inherits pair_smooth from [plotting].", "True"),
+    "smoothing_range": _entry("Optional pair-group smoothing-range override. Empty inherits pair_smoothing_range from [plotting].", "0.05, 10.0"),
     "smoothing_window": _entry("Optional pair-group smoothing-window override. Empty inherits pair_smoothing_window from [plotting].", "0.5"),
-    "x_lims": _entry("Optional pair-group x-axis limits. Empty inherits x_lims from [plotting]; an empty resolved value triggers automatic limits.", "0.0, 15.0"),
+    "x_lims": _entry("Optional pair-group x-axis limits. Empty inherits pair_x_lims from [plotting]; an empty resolved value triggers automatic limits.", "0.0, 10.0"),
     "x_tick": _entry("Optional pair-group major x-axis tick spacing. Empty inherits x_tick from [plotting].", "1.0"),
     "y_lims": _entry("Optional pair-group left-panel y limits. Empty inherits pair_y_lims from [plotting]; an empty resolved value triggers automatic limits.", ""),
-    "relative_difference_lims": _entry("Optional pair-group right-panel relative-difference limits. Empty inherits relative_difference_lims from [plotting].", "-0.4, 0.4"),
+    "difference_y_lims": _entry("Optional pair-group right-panel y-axis limits for absolute differences. Empty inherits pair_difference_y_lims from [plotting]; if both are empty, limits are calculated automatically.", "-0.1, 0.1"),
     "use_log_y_scale": _entry("Pair-group logarithmic-y switch. Default: False. Set True in this group only when a logarithmic left-panel y axis is explicitly desired.", "False"),
 }
 
