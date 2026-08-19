@@ -9,6 +9,8 @@ from utils.intercomparison_bundles import prepare_intercomparison_bundles
 from utils.intercomparison_time_processing import filter_and_average_intercomparison_bundles
 from utils.intercomparison_background import apply_intercomparison_background_correction
 from utils.intercomparison_normalization import apply_intercomparison_normalization
+from utils.intercomparison_vertical_processing import harmonize_intercomparison_vertical
+from visualizer.generate_intercomparison import generate_intercomparison
 
 
 cmd_args = parse_intercomparison_args()
@@ -47,8 +49,15 @@ intercomparison_bundles = apply_intercomparison_normalization(
     intercomparison_bundles=intercomparison_bundles,
 )
 
-print("7) Preprocessing complete")
+print("7) Harmonize vertical grids")
+intercomparison_bundles = harmonize_intercomparison_vertical(
+    intercomparison_info=intercomparison_info,
+    intercomparison_bundles=intercomparison_bundles,
+)
 
-# Next intercomparison phases:
-# 1. vertical harmonization / comparison preparation
-# 2. plotting and output generation
+print("8) Generate intercomparison plots")
+intercomparison_plots = generate_intercomparison(
+    intercomparison_info=intercomparison_info,
+    intercomparison_bundles=intercomparison_bundles,
+)
+

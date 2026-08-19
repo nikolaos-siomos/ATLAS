@@ -92,6 +92,31 @@ def _available_ids(value: Any, coordinate: str, *, limit: int = 20) -> str:
     return ", ".join(shown) + suffix
 
 
+
+def _select_channel_molecular_profile(value: Any, *, location: str) -> Any:
+    """Select the attenuated molecular backscatter profile used for channels.
+
+    The exported ``molecular`` source contains several optical parameters along
+    ``opto_parameters``.  Intercomparison processing uses only ``atten_bsc``.
+    """
+
+    if value is None:
+        return None
+
+    try:
+        return value.sel(opto_parameters="atten_bsc")
+    except Exception:
+        available = _available_ids(value, "opto_parameters")
+        extra = (
+            f" Available opto_parameters: {available}."
+            if available
+            else ""
+        )
+        raise ValueError(
+            f"{location}: molecular source does not contain "
+            f"opto_parameters='atten_bsc'.{extra}"
+        ) from None
+
 def _select_product(value: Any, product_id: str, *, kind: str, location: str) -> Any:
     """Select one ATLAS channel or pair using the fixed coordinate name."""
 
@@ -342,6 +367,13 @@ def _prepare_channel_groups(
                     f"molecular source {CHANNEL_MOLECULAR_PROFILE_SOURCE!r}"
                 ),
             )
+            molecular_profile = _select_channel_molecular_profile(
+                molecular_profile,
+                location=(
+                    f"channel group {group_id!r}, dataset {dataset_id!r}, "
+                    f"molecular source {CHANNEL_MOLECULAR_PROFILE_SOURCE!r}"
+                ),
+            )
 
             datasets[dataset_id] = {
                 "system_label": dataset_cfg.get("system_label"),
@@ -353,6 +385,7 @@ def _prepare_channel_groups(
                 "metadata": metadata,
                 "molecular": {
                     "profile_source": CHANNEL_MOLECULAR_PROFILE_SOURCE,
+                    "profile_parameter": "atten_bsc",
                     "profile": molecular_profile,
                     "metadata_source": None,
                     "metadata": None,

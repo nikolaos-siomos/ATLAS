@@ -51,15 +51,17 @@ GENERAL_SCHEMA: dict[str, dict[str, Any]] = {
     "default_pair_error_source": {"dtype": str, "default": "pol_cal_ratio_error_mean", "category": "optional"},
     "vertical_scale": {"dtype": str, "default": "height_asl", "allowed": VERTICAL_SCALES, "category": "optional"},
     "vertical_method": {"dtype": str, "default": "interpolation", "allowed": VERTICAL_METHODS, "category": "optional"},
-    "vertical_binning": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "vertical_bin_width": {"dtype": float, "default": 0.1, "min": 0.0, "category": "optional"},
+    "first_bin_left_edge": {"dtype": float, "default": 0.0, "category": "optional"},
     "vertical_min": {"dtype": float, "default": None, "category": "optional"},
     "vertical_max": {"dtype": float, "default": None, "category": "optional"},
+    "plot_native_scale": {"dtype": bool, "default": False, "category": "optional"},
     "slice_measurement": {"dtype": str, "default": [], "is_list": True, "category": "optional"},
     "exclude_measurement": {"dtype": str, "default": [], "is_list": True, "category": "optional"},
     "default_channel_background_correction": {"dtype": bool, "default": False, "category": "optional"},
     "default_channel_background_region": {"dtype": float, "default": [18.0, 22.0], "is_list": True, "size": 2, "category": "optional"},
     "default_channel_normalisation": {"dtype": bool, "default": True, "category": "optional"},
-    "default_channel_normalisation_region": {"dtype": float, "default": [7.5, 9.0], "is_list": True, "size": 2, "category": "optional"},
+    "default_channel_normalisation_region": {"dtype": float, "default": [4.0, 6.0], "is_list": True, "size": 2, "category": "optional"},
     "default_channel_normalise_to_molecular": {"dtype": bool, "default": True, "category": "optional"},
     "default_channel_plot_molecular": {"dtype": bool, "default": True, "category": "optional"},
     "default_pair_background_correction": {"dtype": bool, "default": False, "category": "optional"},
@@ -69,6 +71,20 @@ GENERAL_SCHEMA: dict[str, dict[str, Any]] = {
     "default_pair_plot_molecular": {"dtype": bool, "default": True, "category": "optional"},
     "dpi": {"dtype": int, "default": 150, "min": 1, "category": "optional"},
     "color_reduction": {"dtype": bool, "default": False, "category": "optional"},
+}
+
+PLOTTING_SCHEMA: dict[str, dict[str, Any]] = {
+    "x_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
+    "x_tick": {"dtype": float, "default": 2.0, "min": 0.0, "category": "optional"},
+    "relative_difference_lims": {"dtype": float, "default": [-0.4, 0.4], "is_list": True, "size": 2, "category": "optional"},
+    "channel_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
+    "channel_smooth": {"dtype": bool, "default": True, "category": "optional"},
+    "channel_smoothing_range": {"dtype": float, "default": [0.05, 35.0], "is_list": True, "size": 2, "category": "optional"},
+    "channel_smoothing_window": {"dtype": float, "default": 0.5, "min": 0.0, "category": "optional"},
+    "pair_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
+    "pair_smooth": {"dtype": bool, "default": False, "category": "optional"},
+    "pair_smoothing_range": {"dtype": float, "default": [0.05, 15.0], "is_list": True, "size": 2, "category": "optional"},
+    "pair_smoothing_window": {"dtype": float, "default": 0.5, "min": 0.0, "category": "optional"},
 }
 
 DATASET_SCHEMA: dict[str, dict[str, Any]] = {
@@ -91,6 +107,15 @@ CHANNEL_GROUP_SCHEMA: dict[str, dict[str, Any]] = {
     "normalisation_region": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "normalise_to_molecular": {"dtype": bool, "default": None, "category": "optional"},
     "plot_molecular": {"dtype": bool, "default": None, "category": "optional"},
+    "vertical_bin_width": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "smooth": {"dtype": bool, "default": None, "category": "optional"},
+    "smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "smoothing_window": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "x_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "x_tick": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "relative_difference_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "use_log_y_scale": {"dtype": bool, "default": True, "category": "optional"},
 }
 
 PAIR_GROUP_SCHEMA: dict[str, dict[str, Any]] = {
@@ -100,16 +125,26 @@ PAIR_GROUP_SCHEMA: dict[str, dict[str, Any]] = {
     "normalisation": {"dtype": bool, "default": None, "category": "optional"},
     "normalisation_region": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "plot_molecular": {"dtype": bool, "default": None, "category": "optional"},
+    "vertical_bin_width": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "smooth": {"dtype": bool, "default": None, "category": "optional"},
+    "smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "smoothing_window": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "x_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "x_tick": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "relative_difference_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "use_log_y_scale": {"dtype": bool, "default": False, "category": "optional"},
 }
 
 SECTION_SCHEMAS = {
     "general": GENERAL_SCHEMA,
+    "plotting": PLOTTING_SCHEMA,
     "dataset": DATASET_SCHEMA,
     "channel_group": CHANNEL_GROUP_SCHEMA,
     "pair_group": PAIR_GROUP_SCHEMA,
 }
 
-_SECTION_PATTERN = re.compile(r"^(general|dataset|channel_group|pair_group)(?::(.+))?$")
+_SECTION_PATTERN = re.compile(r"^(general|plotting|dataset|channel_group|pair_group)(?::(.+))?$")
 
 
 def _split_list(value: str) -> list[str]:
@@ -308,13 +343,14 @@ def _resolve_dataset_defaults(
 def _resolve_group_defaults(
     values: dict[str, Any],
     general: Mapping[str, Any],
+    plotting: Mapping[str, Any],
     *,
     kind: str,
 ) -> dict[str, Any]:
-    """Resolve empty group processing settings from kind-specific general defaults."""
+    """Resolve empty group processing and plotting settings."""
 
-    prefix = f"default_{kind}_"
-    keys = [
+    processing_prefix = f"default_{kind}_"
+    processing_keys = [
         "background_correction",
         "background_region",
         "normalisation",
@@ -322,11 +358,29 @@ def _resolve_group_defaults(
         "plot_molecular",
     ]
     if kind == "channel":
-        keys.append("normalise_to_molecular")
+        processing_keys.append("normalise_to_molecular")
 
-    for key in keys:
+    for key in processing_keys:
         if values.get(key) is None:
-            values[key] = deepcopy(general[prefix + key])
+            values[key] = deepcopy(general[processing_prefix + key])
+
+    plotting_map = {
+        "x_lims": "x_lims",
+        "x_tick": "x_tick",
+        "y_lims": f"{kind}_y_lims",
+        "relative_difference_lims": "relative_difference_lims",
+        "smooth": f"{kind}_smooth",
+        "smoothing_range": f"{kind}_smoothing_range",
+        "smoothing_window": f"{kind}_smoothing_window",
+    }
+    for key, plotting_key in plotting_map.items():
+        if values.get(key) is None:
+            values[key] = deepcopy(plotting[plotting_key])
+
+    # use_log_y_scale intentionally comes only from the group schema:
+    # True by default for channel groups, False by default for pair groups.
+    # vertical_bin_width remains unresolved here. The vertical processor resolves
+    # group override -> [general] -> coarsest native-step fallback.
     return values
 
 def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
@@ -353,13 +407,13 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
         match = _SECTION_PATTERN.match(section)
         if not match:
             raise ValueError(
-                f"Unknown section [{section}]. Allowed sections are [general], "
+                f"Unknown section [{section}]. Allowed sections are [general], [plotting], "
                 "[dataset:<id>], [channel_group:<id>], and [pair_group:<id>]"
             )
         kind, section_id = match.groups()
-        if kind == "general":
-            if section != "general":
-                raise ValueError("The general section must be named exactly [general]")
+        if kind in {"general", "plotting"}:
+            if section != kind:
+                raise ValueError(f"The {kind} section must be named exactly [{kind}]")
             continue
         if not section_id or not section_id.strip():
             raise ValueError(f"[{section}]: section ID is missing")
@@ -374,6 +428,11 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
 
     ini_dir = ini_path.parent
     general = _parse_fixed_section(parser, "general", GENERAL_SCHEMA)
+    if "plotting" in parser:
+        plotting = _parse_fixed_section(parser, "plotting", PLOTTING_SCHEMA)
+    else:
+        plotting = {key: deepcopy(meta.get("default")) for key, meta in PLOTTING_SCHEMA.items()}
+
     general["output_folder"] = _resolve_path(general["output_folder"], ini_dir)
     general["slice_measurement"] = _validate_time_ranges(
         general["slice_measurement"], location="[general] slice_measurement"
@@ -382,10 +441,6 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
         general["exclude_measurement"], location="[general] exclude_measurement"
     )
 
-    if general["vertical_method"] == "vertical_binning" and general["vertical_binning"] is None:
-        raise ValueError("[general] vertical_binning is mandatory when vertical_method=vertical_binning")
-    if general["vertical_method"] == "interpolation" and general["vertical_binning"] is not None:
-        raise ValueError("[general] vertical_binning must be empty when vertical_method=interpolation")
     if (
         general["vertical_min"] is not None
         and general["vertical_max"] is not None
@@ -423,7 +478,7 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
             dataset_ids=dataset_ids,
             id_key="atlas_channel_id",
         )
-        values = _resolve_group_defaults(values, general, kind="channel")
+        values = _resolve_group_defaults(values, general, plotting, kind="channel")
 
         resolved_datasets: dict[str, dict[str, Any]] = {}
         for dataset_id in datasets:
@@ -454,6 +509,15 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
             "normalisation_region": values["normalisation_region"],
             "normalise_to_molecular": values["normalise_to_molecular"],
             "plot_molecular": values["plot_molecular"],
+            "vertical_bin_width": values["vertical_bin_width"],
+            "smooth": values["smooth"],
+            "smoothing_range": values["smoothing_range"],
+            "smoothing_window": values["smoothing_window"],
+            "x_lims": values["x_lims"],
+            "x_tick": values["x_tick"],
+            "y_lims": values["y_lims"],
+            "relative_difference_lims": values["relative_difference_lims"],
+            "use_log_y_scale": values["use_log_y_scale"],
         }
 
     pair_groups: dict[str, dict[str, Any]] = {}
@@ -468,7 +532,7 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
             dataset_ids=dataset_ids,
             id_key="atlas_pair_id",
         )
-        values = _resolve_group_defaults(values, general, kind="pair")
+        values = _resolve_group_defaults(values, general, plotting, kind="pair")
 
         resolved_datasets: dict[str, dict[str, Any]] = {}
         for dataset_id in datasets:
@@ -497,11 +561,21 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
             "normalisation": values["normalisation"],
             "normalisation_region": values["normalisation_region"],
             "plot_molecular": values["plot_molecular"],
+            "vertical_bin_width": values["vertical_bin_width"],
+            "smooth": values["smooth"],
+            "smoothing_range": values["smoothing_range"],
+            "smoothing_window": values["smoothing_window"],
+            "x_lims": values["x_lims"],
+            "x_tick": values["x_tick"],
+            "y_lims": values["y_lims"],
+            "relative_difference_lims": values["relative_difference_lims"],
+            "use_log_y_scale": values["use_log_y_scale"],
         }
 
     return {
         "ini_file": ini_path,
         "general": general,
+        "plotting": plotting,
         "reference_dataset": reference_dataset,
         "datasets": datasets,
         "channel_groups": channel_groups,

@@ -12,16 +12,19 @@ from typing import Any, Mapping
 
 from atlas_actris.utils.parse_intercomparison_file import (
     GENERAL_SCHEMA,
+    PLOTTING_SCHEMA,
     DATASET_SCHEMA,
     CHANNEL_GROUP_SCHEMA,
     PAIR_GROUP_SCHEMA,
 )
 from atlas_actris.templates.intercomparison_template_flavor import (
     GENERAL_TEMPLATE_KEYS,
+    PLOTTING_TEMPLATE_KEYS,
     DATASET_TEMPLATE_KEYS,
     CHANNEL_GROUP_TEMPLATE_KEYS,
     PAIR_GROUP_TEMPLATE_KEYS,
     GENERAL_FLAVOR,
+    PLOTTING_FLAVOR,
     DATASET_FLAVOR,
     CHANNEL_GROUP_FLAVOR,
     PAIR_GROUP_FLAVOR,
@@ -139,6 +142,16 @@ def render_ini(*, include_flavor: bool = True) -> str:
 
     lines.extend([
         "",
+        "# Global plotting defaults. Group-level plotting values override these.",
+        "[plotting]", "",
+    ])
+    _render_schema_block(
+        lines, PLOTTING_SCHEMA, PLOTTING_FLAVOR, PLOTTING_TEMPLATE_KEYS,
+        include_flavor=include_flavor,
+    )
+
+    lines.extend([
+        "",
         "# Repeat one [dataset:<dataset_id>] section per comparison dataset.",
         "# Dataset IDs are arbitrary; reference status is defined only by reference = True.",
         "[dataset:dataset_a_reference]", "",
@@ -241,13 +254,14 @@ def render_markdown() -> str:
         "",
         "## Structure",
         "",
-        "The file contains one `[general]` section, repeated `[dataset:<id>]` sections, and repeated `[channel_group:<id>]` and `[pair_group:<id>]` sections.",
+        "The file contains one `[general]` section, one optional `[plotting]` section, repeated `[dataset:<id>]` sections, and repeated `[channel_group:<id>]` and `[pair_group:<id>]` sections.",
         "",
         "Dataset sections define the exported stage, QA test, source parameters, and labels for each independently selectable comparison dataset. Different datasets may use different stages, QA tests, or source parameters, even when they originate from the same physical lidar.",
         "",
         "Exactly one dataset must set `reference = True`. Group sections map participating datasets to one `atlas_channel_id` or `atlas_pair_id`. Empty or omitted mappings exclude that dataset. A group with no provided IDs is ignored. For an active group, the reference dataset must provide its ID.",
         "",
         "## `general`", "", _md_table(GENERAL_SCHEMA, GENERAL_FLAVOR, GENERAL_TEMPLATE_KEYS), "",
+        "## `plotting`", "", _md_table(PLOTTING_SCHEMA, PLOTTING_FLAVOR, PLOTTING_TEMPLATE_KEYS), "",
         "## `dataset:<dataset_id>`", "", _md_table(DATASET_SCHEMA, DATASET_FLAVOR, DATASET_TEMPLATE_KEYS), "",
         "## `channel_group:<group_id>`", "", _md_table(CHANNEL_GROUP_SCHEMA, CHANNEL_GROUP_FLAVOR, CHANNEL_GROUP_TEMPLATE_KEYS), "",
         "### Dynamic channel-group entries", "",
@@ -258,7 +272,7 @@ def render_markdown() -> str:
         f"- `<dataset_id>.atlas_pair_id = <atlas_pair_id>` selects one pair from that dataset. Empty or omitted mappings exclude the dataset. If no dataset provides an ID, the group is ignored. For an active group, the reference dataset must provide an ID. Example: `{SPECIAL_FLAVOR['dataset_atlas_pair_id']['example']}`.",
         "",
         "## Deferred metadata defaults", "",
-        "Dataset labels may remain empty after parsing. Background, normalization, and molecular-plot controls are resolved per group: an explicit group value overrides the corresponding channel/pair default from [general].",
+        "Dataset labels may remain empty after parsing. Background, normalization, and molecular-plot controls are resolved per group from [general]. Plotting controls are resolved per group from [plotting], except use_log_y_scale, whose group-level defaults are True for channel groups and False for pair groups.",
         "",
     ])
 
