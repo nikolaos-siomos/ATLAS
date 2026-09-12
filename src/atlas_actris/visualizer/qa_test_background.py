@@ -44,11 +44,11 @@ def _to_numpy_selected(da):
             
 def generate_background(data_pack, caller_info, settings_info):
     
-    process_qck = caller_info['process_bgd']
+    process_bgd = caller_info['process_bgd']
     
     qa_test_info = defaultdict(dict)
 
-    for key in process_qck:
+    for key in process_bgd:
         # if key not in BACKGROUND_PLOT_QA_TESTS:
         #     continue
 

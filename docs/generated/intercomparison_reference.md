@@ -49,18 +49,18 @@ Exactly one dataset must set `reference = True`. Group sections map participatin
 
 | Parameter | Description | Type | Default | Allowed / limits | Example |
 | --- | --- | --- | --- | --- | --- |
-| `channel_x_lims` | Default horizontal limits for channel-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `` | size=2 | `0.0, 20.0` |
-| `pair_x_lims` | Default horizontal limits for pair-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `` | size=2 | `0.0, 10.0` |
+| `channel_x_lims` | Default horizontal limits for channel-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0, 30` | size=2 | `0.0, 20.0` |
+| `pair_x_lims` | Default horizontal limits for pair-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0, 10` | size=2 | `0.0, 10.0` |
 | `x_tick` | Default major horizontal-axis tick spacing for intercomparison plots. Units follow vertical_scale. | `float` | `2.0` | &gt; 0.0 | `1.0` |
 | `channel_difference_y_lims` | Default right-panel y-axis limits for channel-group relative differences. Group-specific difference_y_lims can override these values. | `list[float]` | `-0.4, 0.4` | size=2 | `-0.4, 0.4` |
-| `pair_difference_y_lims` | Default right-panel y-axis limits for pair-group absolute differences. Empty means determine them automatically from the SNR-filtered absolute differences. Group-specific difference_y_lims can override these values. | `list[float]` | `` | size=2 | `-0.1, 0.1` |
+| `pair_difference_y_lims` | Default right-panel y-axis limits for pair-group absolute differences. Empty means determine them automatically from the SNR-filtered absolute differences. Group-specific difference_y_lims can override these values. | `list[float]` | `-0.1, 0.1` | size=2 | `-0.1, 0.1` |
 | `channel_y_lims` | Default left-panel y limits for channel-group plots. Empty means determine them automatically from all plotted channel signals and, when enabled, the reference molecular profile. | `list[float]` | `` | size=2 |  |
 | `channel_smooth` | Default smoothing switch for channel-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned signal and propagated error directly. | `bool` | `True` |  | `True` |
-| `channel_smoothing_range` | Default channel smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 35.0` | size=2 | `0.05, 35.0` |
+| `channel_smoothing_range` | Default channel smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 31.0` | size=2 | `0.05, 35.0` |
 | `channel_smoothing_window` | Default channel smoothing window. Units follow vertical_scale: km for physical scales, bin units for bins. | `float` | `0.5` | &gt; 0.0 | `0.5` |
-| `pair_y_lims` | Default left-panel y limits for pair-group plots. Empty means determine them automatically. | `list[float]` | `` | size=2 |  |
+| `pair_y_lims` | Default left-panel y limits for pair-group plots. Empty means determine them automatically. | `list[float]` | `0, 0.1` | size=2 |  |
 | `pair_smooth` | Default smoothing switch for pair-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned values and propagated errors directly. | `bool` | `True` |  | `True` |
-| `pair_smoothing_range` | Default pair smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 10.0` | size=2 | `0.05, 10.0` |
+| `pair_smoothing_range` | Default pair smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 11.0` | size=2 | `0.05, 10.0` |
 | `pair_smoothing_window` | Default pair smoothing window. Units follow vertical_scale: km for physical scales, bin units for bins. | `float` | `0.5` | &gt; 0.0 | `0.5` |
 
 ## `dataset:<dataset_id>`

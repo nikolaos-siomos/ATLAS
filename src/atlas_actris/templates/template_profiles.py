@@ -29,6 +29,13 @@ BEGINNER_INIT_TEMPLATE_SECTIONS = {
         "radiosonde_file",
         "output_folder",
     ],
+    "general_options": [
+        "process",
+        "process_qck",
+        "process_bgd",
+        "process_vldr",
+        "process_dedicated_dark",
+    ],
     "trimming_options": [
         "max_height_agl",
         "slice_measurement",

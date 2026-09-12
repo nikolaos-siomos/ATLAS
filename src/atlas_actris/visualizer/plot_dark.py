@@ -65,9 +65,19 @@ def _plot_colored_profiles(ax, x, y, color_values, cmap, norm):
     segments[:, :, 0] = x[np.newaxis, :]
     segments[:, :, 1] = y
 
+    normalized_colors = np.asarray(norm(color_values), dtype=float)
+
+    # Avoid the extreme ends of the colormap so valid profiles are never
+    # rendered with potentially white/very-light endpoint colors.
+    normalized_colors = 0.05 + 0.90 * normalized_colors
+
+    # If there is only one profile, place it at the middle of the colormap.
+    if normalized_colors.size == 1:
+        normalized_colors[...] = 0.5
+
     collection = LineCollection(
         segments,
-        colors=cmap(norm(color_values)),
+        colors=cmap(normalized_colors),
         linewidths=plt.rcParams["lines.linewidth"],
         antialiaseds=plt.rcParams["lines.antialiased"],
         capstyle=plt.rcParams["lines.solid_capstyle"],

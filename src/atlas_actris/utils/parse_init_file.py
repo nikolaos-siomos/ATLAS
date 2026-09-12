@@ -65,7 +65,6 @@ allowed_quicklooks = [
     "drk_pcb_aux",
     "drk_trg",
     "drk_dtm",
-    "vldr",
     "off"
 ]
 
@@ -98,7 +97,6 @@ default_quicklooks = [
     "tlc_rin",
     "ray_pcb",
     "pcb_aux",
-    "vldr",
 ]
 
 default_background = [
@@ -110,6 +108,33 @@ default_background = [
     "ray_pcb",
     "pcb_aux",
 ]
+
+# Plot defaults derived from an explicitly selected QA-test list.  The base
+# measurement is always retained.  Dedicated-dark companions are optional and
+# are controlled by process_dedicated_dark.  The standalone ``drk`` entry is
+# deliberately independent of that flag.
+PROCESS_PLOT_MAP = {
+    "ray": "ray",
+    "pcb": "pcb",
+    "tlc": "tlc",
+    "tlc_rin": "tlc_rin",
+    "ray_pcb": "ray_pcb",
+    "pcb_aux": "pcb_aux",
+    "trg": "trg",
+    "dtm": "dtm",
+    "drk": "drk",
+}
+
+PROCESS_DEDICATED_DARK_MAP = {
+    "ray": "drk_ray",
+    "pcb": "drk_pcb",
+    "tlc": "drk_tlc",
+    "tlc_rin": "drk_tlc_rin",
+    "ray_pcb": "drk_ray_pcb",
+    "pcb_aux": "drk_pcb_aux",
+    "trg": "drk_trg",
+    "dtm": "drk_dtm",
+}
 
 qa_measurement_folders = [
     "ray",
@@ -198,6 +223,8 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "process":                 {"dtype": str,  "default": qa_tests,                   "is_list": True,  "category": "optional", "allowed": qa_tests + ["off"]},
     "process_qck":             {"dtype": str,  "default": default_quicklooks,         "is_list": True,  "category": "optional", "allowed": allowed_quicklooks},
     "process_bgd":             {"dtype": str,  "default": default_background,         "is_list": True,  "category": "optional", "allowed": allowed_background},
+    "process_vldr":            {"dtype": bool, "default": True,                       "is_list": False, "category": "optional"},
+    "process_dedicated_dark":  {"dtype": bool, "default": True,                       "is_list": False, "category": "optional"},
     "vertical_scale":          {"dtype": str,  "default": "range",                    "is_list": False, "category": "optional", "allowed": allowed_vertical_scales},
     "view_mean_signal_stages": {"dtype": str,  "default": default_mean_signal_stages, "is_list": True,  "category": "optional", "allowed": allowed_stages},
     "view_signal_stages":      {"dtype": str,  "default": default_signal_stages,      "is_list": True,  "category": "optional", "allowed": allowed_stages},
@@ -279,6 +306,8 @@ INIT_FILE_SECTIONS: Dict[str, List[str]] = {
         "process",
         "process_qck",
         "process_bgd",
+        "process_vldr",
+        "process_dedicated_dark",
         "vertical_scale",
         "view_mean_signal_stages",
         "view_signal_stages",
@@ -694,6 +723,73 @@ def _warn_recommended(name: str, msg: str, recommended_missing: bool) -> None:
 # -------------------------------------------------------------------
 # Expansion & computed defaults
 # -------------------------------------------------------------------
+
+def _append_unique(values: List[str], value: str) -> None:
+    if value not in values:
+        values.append(value)
+
+
+def _derive_plot_process(process: List[str], include_dedicated_dark: bool) -> List[str]:
+    """Derive qck/bgd selections from an explicitly selected ``process`` list.
+
+    ``process_dedicated_dark`` only controls automatically associated
+    ``drk_<test>`` entries.  A standalone ``drk`` selection is always kept.
+    """
+    derived: List[str] = []
+
+    for qa_test in process:
+        base = PROCESS_PLOT_MAP.get(qa_test)
+        if base is not None:
+            _append_unique(derived, base)
+
+        if include_dedicated_dark:
+            dedicated_dark = PROCESS_DEDICATED_DARK_MAP.get(qa_test)
+            if dedicated_dark is not None:
+                _append_unique(derived, dedicated_dark)
+
+    # ``off`` is a valid explicit no-plot selection and also prevents the later
+    # generic default filler from replacing an intentionally empty derived list.
+    if not derived:
+        return ["off"]
+
+    return derived
+
+
+def _resolve_processing_defaults(parser_args: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve plot defaults from the selected QA tests before generic defaults.
+
+    Rules
+    -----
+    * If ``process`` is empty/omitted, keep the standard independent defaults.
+    * If ``process`` is provided, derive ``process_qck`` and ``process_bgd``
+      from it unless either option was explicitly provided.
+    * ``process_dedicated_dark=False`` suppresses only automatically added
+      ``drk_<test>`` companions; it never removes standalone ``drk``.
+    * ``process_vldr`` is independent of ``process`` and ``process_qck`` and
+      defaults to ``True``.
+    """
+    process = list(parser_args.get("process") or [])
+    process_qck = list(parser_args.get("process_qck") or [])
+    process_bgd = list(parser_args.get("process_bgd") or [])
+
+    dedicated_dark = parser_args.get("process_dedicated_dark")
+    if dedicated_dark is None:
+        dedicated_dark = True
+    parser_args["process_dedicated_dark"] = bool(dedicated_dark)
+
+    if process:
+        derived = _derive_plot_process(
+            process=process,
+            include_dedicated_dark=bool(dedicated_dark),
+        )
+
+        if not process_qck:
+            parser_args["process_qck"] = derived.copy()
+        if not process_bgd:
+            parser_args["process_bgd"] = derived.copy()
+
+    return parser_args
+
 
 def _fill_with_defaults(parser_args: Dict[str, Any]) -> Dict[str, Any]:
     """Fill empty entries with default values."""
@@ -1912,7 +2008,11 @@ def parse_call_atlas_ini(filepath: str, debug: bool = False) -> Dict[str, Any]:
     # the INI, but an internal compatibility value is still populated.
     parser_args = _resolve_default_base_paths(parser_args, filepath)
 
-    # 4) Fill with default values if empty
+    # 4) Resolve processing-dependent defaults while empty/omitted values are
+    # still distinguishable from the independent defaults.
+    parser_args = _resolve_processing_defaults(parser_args)
+
+    # 4b) Fill remaining empty entries with their schema defaults.
     parser_args = _fill_with_defaults(parser_args)
 
     # 5) Keep the existing HOI export conflict check. For export_hoi_cfg 1 or 2,

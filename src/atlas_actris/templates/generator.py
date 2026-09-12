@@ -610,8 +610,10 @@ def _section_intro(section: str) -> str:
             "folder containing the initialization file."
         ),
         "general_options": (
-            "Selects which QA tests and quicklooks are produced and controls "
-            "general output and plotting behaviour."
+            "Selects which QA tests, profile quicklooks, background plots, and "
+            "VLDR plots are produced. When process is explicitly selected, "
+            "empty process_qck/process_bgd values are derived from it, while "
+            "process_dedicated_dark controls automatic drk_* companions."
         ),
         "filter_channels": (
             "Restricts the channels that are processed, either by selecting "
@@ -735,8 +737,9 @@ def _render_initialization_markdown() -> str:
         "## Purpose",
         "",
         "The initialization file tells ATLAS where the input data and metadata "
-        "files are located, which QA tests and quicklooks should be produced, "
-        "and which optional filtering, trimming, export, and radiosonde parsing "
+        "files are located, which QA tests, quicklooks, background plots, and "
+        "VLDR plots should be produced, and which optional filtering, trimming, "
+        "export, and radiosonde parsing "
         "settings should be applied for one processing run.",
         "",
         "This page is generated automatically from the initialization parser "

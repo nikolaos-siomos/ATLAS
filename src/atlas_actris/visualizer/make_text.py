@@ -344,8 +344,11 @@ class GenerateText:
             )
 
         avg_rate_alias = self.settings['averaging_period']
-        averaging_period = self.caller_info[f'{avg_rate_alias}_averaging_period']
-        avg_rate_part = f'Averaging period ({avg_rate_alias}): {averaging_period}'
+        if avg_rate_alias == 'raw':
+            avg_rate_part = 'No averaging'
+        else:
+            averaging_period = self.caller_info[f'{avg_rate_alias}_averaging_period']
+            avg_rate_part = f'Averaging period ({avg_rate_alias}): {averaging_period}'
         
         qa_test = self.qa_test_info['qa_test']
         drk_text = f"{qa_dataset_labels[qa_test]}"

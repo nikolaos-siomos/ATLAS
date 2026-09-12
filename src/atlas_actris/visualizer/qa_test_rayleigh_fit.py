@@ -57,11 +57,16 @@ def generate_rayleigh_fit(data_pack, caller_info, settings_info):
         
     qa_test_info = defaultdict(dict)
     
-    if 'ray' not in caller_info['process']:
+    selected_process = set(caller_info.get('process', []))
+    selected_keys = [
+        key for key in ['ray', 'ray_pcb']
+        if key in selected_process and key in data_pack
+    ]
+
+    if not selected_keys:
         return
-    
-    for key in ['ray','ray_pcb']:
-        if key in data_pack:
+
+    for key in selected_keys:
     
             print_header(f'Initializing the Rayleigh fit test ({key})')
             

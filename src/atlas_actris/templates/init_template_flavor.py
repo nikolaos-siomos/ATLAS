@@ -269,8 +269,11 @@ INIT_FLAVOR = {
     'process': {
         'description': 
             'The user can choose specific QA test(s) to process. '
-            'Choose one or more of the allowed keys to process the '+
-            'corresponding QA tests.',
+            'Choose one or more of the allowed keys to process the '
+            'corresponding QA tests. If left empty, ATLAS keeps the standard '
+            'default behaviour. If one or more tests are provided, empty '
+            'process_qck and process_bgd entries are derived automatically '
+            'from this selection.',
         
          'example': 'ray, pcb, tlc',
          'legacy': {
@@ -285,9 +288,11 @@ INIT_FLAVOR = {
         
     'process_qck': {
          'description': 
-             'The user can generate quicklooks for specific QA tests. '
-             'Choose one or more of the allowed keys to process the '+
-             'corresponding QA tests.',
+             'Generate profile quicklooks for specific QA tests. When process '
+             'is explicitly selected and process_qck is left empty, this list '
+             'is derived automatically from process. An explicit process_qck '
+             'value overrides that derived list. VLDR quicklooks are controlled '
+             'separately by process_vldr.',
          'example': 'ray, drk',
          'legacy': {
              'status': 'unchanged',
@@ -301,10 +306,47 @@ INIT_FLAVOR = {
         
     'process_bgd': {
          'description': 
-             'The user can generate background time-series plots for specific '
-             'QA tests. Choose one or more of the allowed keys to process the '
-             'corresponding background plots.',
+             'Generate background time-series plots for specific QA tests. '
+             'When process is explicitly selected and process_bgd is left '
+             'empty, this list is derived automatically from process. An '
+             'explicit process_bgd value overrides that derived list.',
          'example': 'ray, drk',
+         'legacy': {
+             'status': 'new',
+             'introduced': '1.0.1',
+             'old_names': [],
+             'old_location': '',
+             'old_names_removed_in': '',
+             'note': ''
+             }
+         },
+        
+    'process_vldr': {
+         'description':
+             'Generate VLDR quicklook plots independently of process and '
+             'process_qck. VLDR quicklooks are enabled by default and can be '
+             'disabled explicitly with process_vldr = False.',
+         'example': 'True',
+         'legacy': {
+             'status': 'new',
+             'introduced': '1.0.1',
+             'old_names': [],
+             'old_location': '',
+             'old_names_removed_in': '',
+             'note': ''
+             }
+         },
+
+    'process_dedicated_dark': {
+         'description':
+             'Control automatic dedicated-dark companions for explicitly '
+             'selected QA tests. If True, process = ray automatically adds '
+             'drk_ray to derived quicklook/background selections, process = '
+             'tlc adds drk_tlc, and so on. If False, those automatic drk_* '
+             'companions are omitted. The standalone drk test is never removed '
+             'by this option when drk is selected. If process is empty, the '
+             'standard independent defaults are used.',
+         'example': 'True',
          'legacy': {
              'status': 'new',
              'introduced': '1.0.1',

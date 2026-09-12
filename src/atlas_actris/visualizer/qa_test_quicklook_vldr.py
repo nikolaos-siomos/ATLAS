@@ -147,7 +147,7 @@ def generate_vldr_quicklooks(data_pack, caller_info, settings_info):
     and trimmed by the eager vertical scale.
     """
 
-    if 'vldr' not in caller_info['process_qck']:
+    if not caller_info.get('process_vldr', False):
         return
     
     qa_test_info = defaultdict(dict)

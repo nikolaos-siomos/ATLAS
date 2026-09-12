@@ -161,6 +161,17 @@ def insert_mol_sig(ch, ch_info, height, background, x_dict):
     )
 
     sm_template = x_dict["sm"]
+
+    # Some analog channels do not have a usable molecular reference profile.
+    # Treat those channels like photon-counting channels for the dark-test
+    # plotting layout, i.e. skip the extended molecular analysis.
+    if sig_mol.size == 0:
+        CustomWarning(
+            f"No molecular profile is available for channel {ch}. "
+            "The compact dark-test layout will be used."
+        )
+        return None
+
     if sig_mol.size != sm_template.size:
         raise ValueError(
             "Molecular-profile/smoothed-grid mismatch: "
@@ -226,20 +237,87 @@ def convert_x_dict_to_km(x_dict):
     return {name: convert_m_to_km(values) for name, values in x_dict.items()}
 
 
+DEDICATED_DARK_BY_PROCESS = {
+    "ray": "drk_ray",
+    "pcb": "drk_pcb",
+    "tlc": "drk_tlc",
+    "tlc_rin": "drk_tlc_rin",
+    "ray_pcb": "drk_ray_pcb",
+    "pcb_aux": "drk_pcb_aux",
+    "trg": "drk_trg",
+    "dtm": "drk_dtm",
+}
+
+
+def _dark_source_key(dark_key, data_pack, caller_info):
+    """Resolve a logical dark key to the dataset actually present in data_pack.
+
+    ``loading_map`` may map a dedicated dark measurement such as ``drk_tlc``
+    to the common physical ``drk`` measurement.  The logical key is still used
+    for filenames and plot metadata; only the source dataset is aliased.
+    """
+    if dark_key in data_pack:
+        return dark_key
+
+    source_key = caller_info.get("loading_map", {}).get(dark_key)
+    if source_key in data_pack:
+        return source_key
+
+    return None
+
+
+def _selected_dark_keys(data_pack, caller_info):
+    """Return logical dark QA keys selected by the current processing options.
+
+    Standalone ``drk`` is controlled only by the presence of ``drk`` in
+    ``process``.  ``process_dedicated_dark`` affects only associated
+    ``drk_<test>`` entries and can therefore never erase standalone ``drk``.
+    Dedicated-dark keys are considered available when they exist directly in
+    ``data_pack`` or resolve through ``caller_info['loading_map']``.
+    """
+    process = list(caller_info.get("process", []))
+    include_dedicated = bool(caller_info.get("process_dedicated_dark", True))
+    selected = []
+
+    if "drk" in process and _dark_source_key("drk", data_pack, caller_info) is not None:
+        selected.append("drk")
+
+    if include_dedicated:
+        for qa_test in process:
+            dark_key = DEDICATED_DARK_BY_PROCESS.get(qa_test)
+            if (
+                dark_key is not None
+                and _dark_source_key(dark_key, data_pack, caller_info) is not None
+                and dark_key not in selected
+            ):
+                selected.append(dark_key)
+
+    return selected
+
+
 def generate_dark(
         # data_pack, data_pack_bc, data_pack_rc, caller_info, settings_info
         data_pack, caller_info, settings_info
         ):
 
     qa_test_info = defaultdict(dict)
-    
-    if 'drk' not in caller_info['process']:
+
+    selected_dark_keys = _selected_dark_keys(data_pack, caller_info)
+    if not selected_dark_keys:
         return
-    
-    for key in data_pack:
-        
-        if key.startswith('drk'):
-            
+
+    for key in selected_dark_keys:
+
+            source_key = _dark_source_key(key, data_pack, caller_info)
+            if source_key is None:
+                continue
+
+            source_pack = data_pack[source_key]
+            active_data_pack = data_pack
+            if source_key != key:
+                active_data_pack = dict(data_pack)
+                active_data_pack[key] = source_pack
+
             print_header(f'Initializing the Dark test ({key})')
             
             # Prepare folders
@@ -252,13 +330,13 @@ def generate_dark(
             settings = settings_info.copy()
             
             # Load arrays
-            system_info = data_pack[key]["system_info"]
-            channel_info = data_pack[key]["channel_info"]
+            system_info = source_pack["system_info"]
+            channel_info = source_pack["channel_info"]
             
-            shots = data_pack[key]["shots"]
-            background = data_pack[key]["background_mean"]
+            shots = source_pack["shots"]
+            background = source_pack["background_mean"]
         
-            profiles = data_pack[key]['profile']
+            profiles = source_pack['profile']
             
             system_info_d = dict(
                 zip(
@@ -298,7 +376,7 @@ def generate_dark(
                         ch_d = ch_d, 
                         key = key, 
                         # data_pack = data_pack, 
-                        data_pack_bc = data_pack, 
+                        data_pack_bc = active_data_pack, 
                         # data_pack_rc = data_pack_rc, 
                         caller_info = caller_info, 
                         settings = channel_settings
@@ -314,10 +392,16 @@ def generate_dark(
                     m_dict = insert_mol_sig(
                         ch=ch,
                         ch_info=ch_info,
-                        height=data_pack[key]["height_agl"].sel(ch_d),
+                        height=source_pack["height_agl"].sel(ch_d),
                         background=background.sel(ch_d),
                         x_dict=x_dict,
                     )
+
+                    # An analog channel may legitimately have no molecular
+                    # reference profile. In that case use the same compact
+                    # dark-test layout as photon-counting channels.
+                    if m_dict is None:
+                        extended_dark_analysis = False
                 else:
                     m_dict = None
 
@@ -373,7 +457,7 @@ def generate_dark(
                 )
 
                 # Gather the metadata that are common for all QA tests in a dictonary
-                metadata = collect_metadata(data_pack[key], atlas_channel_id = ch)
+                metadata = collect_metadata(source_pack, atlas_channel_id = ch)
                             
                 plot_metadata = (
                     {
