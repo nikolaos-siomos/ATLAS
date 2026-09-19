@@ -4,52 +4,6 @@
 
 from __future__ import annotations
 
-GENERAL_TEMPLATE_KEYS = [
-    "output_folder", "overwrite_output", "default_qa_test",
-    "default_signal_source", "default_signal_error_source",
-    "default_pair_source", "default_pair_error_source",
-    "vertical_scale", "vertical_method", "vertical_bin_width", "first_bin_left_edge",
-    "vertical_min", "vertical_max", "plot_native_scale",
-    "slice_measurement", "exclude_measurement",
-    "default_channel_background_correction", "default_channel_background_region",
-    "default_channel_normalisation", "default_channel_normalisation_region",
-    "default_channel_normalise_to_molecular", "default_channel_plot_molecular",
-    "default_pair_background_correction", "default_pair_background_region",
-    "default_pair_normalisation", "default_pair_normalisation_region",
-    "default_pair_plot_molecular",
-    "dpi", "color_reduction",
-]
-
-PLOTTING_TEMPLATE_KEYS = [
-    "channel_x_lims", "pair_x_lims", "x_tick", "channel_difference_y_lims", "pair_difference_y_lims",
-    "channel_y_lims", "channel_smooth", "channel_smoothing_range",
-    "channel_smoothing_window", "pair_y_lims", "pair_smooth",
-    "pair_smoothing_range", "pair_smoothing_window",
-]
-
-DATASET_TEMPLATE_KEYS = [
-    "stage_path", "reference", "system_label", "dataset_label",
-    "qa_test", "signal_source", "signal_error_source",
-    "pair_source", "pair_error_source",
-]
-
-CHANNEL_GROUP_TEMPLATE_KEYS = [
-    "label", "background_correction", "background_region",
-    "normalisation", "normalisation_region", "normalise_to_molecular",
-    "plot_molecular", "vertical_bin_width", "smooth", "smoothing_range",
-    "smoothing_window", "x_lims", "x_tick", "y_lims",
-    "difference_y_lims", "use_log_y_scale",
-]
-
-PAIR_GROUP_TEMPLATE_KEYS = [
-    "label", "background_correction", "background_region",
-    "normalisation", "normalisation_region", "plot_molecular",
-    "vertical_bin_width", "smooth", "smoothing_range", "smoothing_window",
-    "x_lims", "x_tick", "y_lims", "difference_y_lims",
-    "use_log_y_scale",
-]
-
-
 def _legacy() -> dict[str, object]:
     return {
         "status": "new",

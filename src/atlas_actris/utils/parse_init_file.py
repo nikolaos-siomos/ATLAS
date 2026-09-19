@@ -100,13 +100,7 @@ default_quicklooks = [
 ]
 
 default_background = [
-    "drk",
-    "ray",
-    "pcb",
-    "tlc",
-    "tlc_rin",
-    "ray_pcb",
-    "pcb_aux",
+    "off",
 ]
 
 # Plot defaults derived from an explicitly selected QA-test list.  The base
@@ -224,12 +218,12 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "process_qck":             {"dtype": str,  "default": default_quicklooks,         "is_list": True,  "category": "optional", "allowed": allowed_quicklooks},
     "process_bgd":             {"dtype": str,  "default": default_background,         "is_list": True,  "category": "optional", "allowed": allowed_background},
     "process_vldr":            {"dtype": bool, "default": True,                       "is_list": False, "category": "optional"},
-    "process_dedicated_dark":  {"dtype": bool, "default": True,                       "is_list": False, "category": "optional"},
+    "process_dedicated_dark":  {"dtype": bool, "default": False,                      "is_list": False, "category": "optional"},
     "vertical_scale":          {"dtype": str,  "default": "range",                    "is_list": False, "category": "optional", "allowed": allowed_vertical_scales},
     "view_mean_signal_stages": {"dtype": str,  "default": default_mean_signal_stages, "is_list": True,  "category": "optional", "allowed": allowed_stages},
     "view_signal_stages":      {"dtype": str,  "default": default_signal_stages,      "is_list": True,  "category": "optional", "allowed": allowed_stages},
     "dpi":                     {"dtype": int,  "default": 150,                        "is_list": False, "category": "optional"},
-    "color_reduction":         {"dtype": bool, "default": False,                      "is_list": False, "category": "optional"},
+    "color_reduction":         {"dtype": bool, "default": True,                       "is_list": False, "category": "optional"},
     "output_folder":           {"dtype": str,  "default": None,                       "is_list": False, "category": "optional"},
     "overwrite_output":        {"dtype": bool, "default": False,                      "is_list": False, "category": "optional"},
     "expert_analyst":          {"dtype": str,  "default": None,                       "is_list": False, "category": "optional"},
@@ -1682,25 +1676,23 @@ def _distribute_files_into_sectors(
 ) -> None:
     """
     If cfg[files_per_key] is not None, distribute files from cfg[base_key] into subfolders
-    named <sector> (e.g., north/east/south/west) in sequential blocks of size files_per_quadrant.
+    named <sector> (e.g., north/east/south/west) in sequential blocks of the requested size.
+    If the corresponding base folder is absent, the distribution option is ignored.
     Enforces:
-      - base folder must exist when files_per_quadrant is not None
-      - base folder must not be empty when files_per_quadrant is not None
-      - total files must be divisible by files_per_quadrant * len(sectors)
+      - a configured base path must point to an existing directory
+      - total files must be divisible by the requested size * len(sectors)
     Moves files in the order of sorted names to keep behavior deterministic.
     """
 
-    files_per_quadrant = cfg.get(files_per_key, None)
+    files_per_sector = cfg.get(files_per_key, None)
 
-    if files_per_quadrant is None:
+    if files_per_sector is None:
         return
 
     base_val = cfg.get(base_key, None)
 
     if base_val is None:
-        raise DistributionError(
-            f"{base_key} is None but {files_per_key} is set to {files_per_quadrant}."
-        )
+        return
 
     base = Path(base_val)
 
@@ -1712,18 +1704,18 @@ def _distribute_files_into_sectors(
     if not files:
         CustomWarning(
             f"No files detected in {base} (pattern='{pattern}') while "
-            f"{files_per_key}={files_per_quadrant}."
+            f"{files_per_key}={files_per_sector}."
         )
         return
 
     k = len(sectors)
-    group = files_per_quadrant * k
+    group = files_per_sector * k
 
     if len(files) % group != 0:
         raise DistributionError(
             f"The {files_per_key} was provided but the file count {len(files)} "
             f"in {base} is not divisible by {files_per_key} * folders "
-            f"({files_per_quadrant} * {k} = {group})."
+            f"({files_per_sector} * {k} = {group})."
         )
 
     dest_dirs = []
@@ -1734,7 +1726,7 @@ def _distribute_files_into_sectors(
         dest_dirs.append(d)
 
     for i, f in enumerate(files):
-        sector_idx = (i // files_per_quadrant) % k
+        sector_idx = (i // files_per_sector) % k
         dest_dir = dest_dirs[sector_idx]
         target = dest_dir / f.name
 
@@ -2092,4 +2084,3 @@ def parse_call_atlas_ini(filepath: str, debug: bool = False) -> Dict[str, Any]:
         pprint(parser_args)
 
     return parser_args
-

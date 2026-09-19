@@ -33,14 +33,6 @@ TEMPLATE_ATLAS_VERSION = ATLAS_VERSION
 
 LEGACY_STATUS_VALUES = {"", "new", "unchanged", "renamed", "moved"}
 
-SETTINGS_TEMPLATE_SECTIONS = {'qck': 'quicklooks',
- 'bgd': 'background',
- 'qck_vldr': 'quicklooks_vldr',
- 'ray': 'rayleigh_fit',
- 'tlc': 'quadrant_telecover',
- 'tlc_rin': 'ring_telecover',
- 'pcb': 'polarization_calibration'}
-
 SETTINGS_FLAVOR = {'qck': {'t_lims': {'description': 'Time limits used in the plot.',
                     'example': '2300, 0100',
                     'legacy': {'status': '',
@@ -984,7 +976,6 @@ SETTINGS_FLAVOR = {'qck': {'t_lims': {'description': 'Time limits used in the pl
 
 # Dark-test settings added with the corresponding parser schema. Existing
 # flavor entries above are intentionally left unchanged.
-SETTINGS_TEMPLATE_SECTIONS["drk"] = "dark"
 SETTINGS_FLAVOR["drk"] = {
     "stats_range": {
         "description": "Height/range interval used to calculate dark-signal statistics.",

@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """Generate ATLAS INI templates and MkDocs reference pages.
 
-The parser schemas are the technical source of truth. The flavor files provide
-only user-facing descriptions, examples, legacy/version-history information, and
-section ordering.  This generator can write three INI template profiles:
+Parser schemas own technical metadata, flavor files own user-facing text, and
+``template_profiles.py`` explicitly owns inclusion and ordering. This generator
+can write three INI template profiles:
 
 * full:     all schema parameters with flavor comments
 * bare:     all schema parameters without per-parameter comments
@@ -38,19 +38,15 @@ from atlas_actris.utils.parse_settings_file import (
     SCHEMA as SETTINGS_SCHEMA,
     recognized_sections as SETTINGS_RECOGNIZED_SECTIONS,
 )
-from atlas_actris.templates.init_template_flavor import (
-    INIT_FLAVOR,
-    INIT_TEMPLATE_SECTIONS,
-)
-from atlas_actris.templates.config_template_flavor import (
-    CONFIG_FLAVOR,
-    CONFIG_TEMPLATE_SECTIONS,
-)
-from atlas_actris.templates.settings_template_flavor import (
-    SETTINGS_FLAVOR,
-    SETTINGS_TEMPLATE_SECTIONS,
-)
+from atlas_actris.templates.init_template_flavor import INIT_FLAVOR
+from atlas_actris.templates.config_template_flavor import CONFIG_FLAVOR
+from atlas_actris.templates.settings_template_flavor import SETTINGS_FLAVOR
 from atlas_actris.templates.template_profiles import (
+    GENERATED_TEMPLATES_DIRECTORY,
+    INIT_TEMPLATE_SECTIONS,
+    CONFIG_TEMPLATE_SECTIONS,
+    SETTINGS_TEMPLATE_SECTIONS,
+    SETTINGS_TEMPLATE_KEYS,
     BEGINNER_INIT_TEMPLATE_SECTIONS,
     BEGINNER_CONFIG_TEMPLATE_SECTIONS,
     BEGINNER_SETTINGS_TEMPLATE_KEYS,
@@ -230,7 +226,7 @@ def _template_header(title: str, flavor_file: str | None = None) -> str:
         f"# Template format version: {ATLAS_VERSION}",
         "#",
         "# This file was generated automatically from the ATLAS parser schema",
-        "# and the ATLAS template generator.",
+        "# using the explicit selection in template_profiles.py.",
     ]
 
     if flavor_file:
@@ -239,6 +235,7 @@ def _template_header(title: str, flavor_file: str | None = None) -> str:
                 "#",
                 "# Developers should not edit this generated file manually.",
                 f"# To update user-facing comments and examples, edit: {flavor_file}",
+                "# To change included parameters or ordering, edit: src/atlas_actris/templates/template_profiles.py",
                 "# Then regenerate with: atlas-generate-templates",
             ]
         )
@@ -304,7 +301,7 @@ def _section_key_list(sections: Mapping[str, Iterable[str]]) -> list[str]:
     return keys
 
 
-def _validate_full_flat(
+def _validate_flat_template(
     *,
     schema: Mapping[str, Mapping[str, Any]],
     sections: Mapping[str, Iterable[str]],
@@ -320,15 +317,12 @@ def _validate_full_flat(
     errors: list[str] = []
     missing_flavor = schema_keys - flavor_keys
     unknown_flavor = flavor_keys - schema_keys
-    missing_sections = schema_keys - section_key_set
     unknown_sections = section_key_set - schema_keys
 
     if missing_flavor:
         errors.append(f"{label}: schema keys missing flavor entries: {sorted(missing_flavor)}")
     if unknown_flavor:
         errors.append(f"{label}: flavor keys not present in schema: {sorted(unknown_flavor)}")
-    if missing_sections:
-        errors.append(f"{label}: schema keys not assigned to a section: {sorted(missing_sections)}")
     if unknown_sections:
         errors.append(f"{label}: section keys not present in schema: {sorted(unknown_sections)}")
     if duplicates:
@@ -359,7 +353,7 @@ def _validate_subset_flat(
     if duplicates:
         errors.append(f"{label}: keys assigned to more than one section: {duplicates}")
     if not section_key_set:
-        errors.append(f"{label}: beginner profile contains no keys")
+        errors.append(f"{label}: template contains no keys")
 
     if errors:
         raise ValueError("\n".join(errors))
@@ -368,13 +362,17 @@ def _validate_subset_flat(
 def _validate_settings() -> None:
     schema_groups = set(SETTINGS_SCHEMA.keys())
     section_groups = set(SETTINGS_TEMPLATE_SECTIONS.keys())
+    key_groups = set(SETTINGS_TEMPLATE_KEYS.keys())
     flavor_groups = set(SETTINGS_FLAVOR.keys())
 
     errors: list[str] = []
-    if schema_groups != section_groups:
+    unknown_groups = section_groups - schema_groups
+    if unknown_groups:
+        errors.append(f"settings: template groups not present in schema: {sorted(unknown_groups)}")
+    if section_groups != key_groups:
         errors.append(
-            "settings: template section groups do not match schema groups: "
-            f"schema={sorted(schema_groups)}, sections={sorted(section_groups)}"
+            "settings: section and parameter-selection groups do not match: "
+            f"sections={sorted(section_groups)}, keys={sorted(key_groups)}"
         )
     if schema_groups != flavor_groups:
         errors.append(
@@ -382,7 +380,7 @@ def _validate_settings() -> None:
             f"schema={sorted(schema_groups)}, flavor={sorted(flavor_groups)}"
         )
 
-    for group in sorted(schema_groups):
+    for group in SETTINGS_TEMPLATE_SECTIONS:
         section_name = SETTINGS_TEMPLATE_SECTIONS[group]
         expected_section_name = SETTINGS_RECOGNIZED_SECTIONS[group]
         if section_name != expected_section_name:
@@ -395,6 +393,7 @@ def _validate_settings() -> None:
         flavor = SETTINGS_FLAVOR[group]
         schema_keys = set(schema.keys())
         flavor_keys = set(flavor.keys())
+        template_keys = list(SETTINGS_TEMPLATE_KEYS.get(group, ()))
 
         missing_flavor = schema_keys - flavor_keys
         unknown_flavor = flavor_keys - schema_keys
@@ -402,6 +401,14 @@ def _validate_settings() -> None:
             errors.append(f"settings/{group}: schema keys missing flavor entries: {sorted(missing_flavor)}")
         if unknown_flavor:
             errors.append(f"settings/{group}: flavor keys not present in schema: {sorted(unknown_flavor)}")
+        unknown_template = set(template_keys) - schema_keys
+        duplicates = sorted({key for key in template_keys if template_keys.count(key) > 1})
+        if unknown_template:
+            errors.append(f"settings/{group}: template keys not present in schema: {sorted(unknown_template)}")
+        if duplicates:
+            errors.append(f"settings/{group}: duplicate template keys: {duplicates}")
+        if not template_keys:
+            errors.append(f"settings/{group}: template contains no keys")
 
         for key, entry in flavor.items():
             errors.extend(_validate_flavor_entry(f"settings/{group}", key, entry))
@@ -430,13 +437,13 @@ def _validate_beginner_settings() -> None:
 
 
 def validate_all() -> None:
-    _validate_full_flat(
+    _validate_flat_template(
         schema=INIT_SCHEMA,
         sections=INIT_TEMPLATE_SECTIONS,
         flavor=INIT_FLAVOR,
         label="initialization",
     )
-    _validate_full_flat(
+    _validate_flat_template(
         schema=CONFIG_SCHEMA,
         sections=CONFIG_TEMPLATE_SECTIONS,
         flavor=CONFIG_FLAVOR,
@@ -554,10 +561,6 @@ def _render_settings_ini_template(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _full_settings_keys_by_group() -> dict[str, list[str]]:
-    return {group: list(schema.keys()) for group, schema in SETTINGS_SCHEMA.items()}
-
-
 # ---------------------------------------------------------------------------
 # Markdown rendering
 # ---------------------------------------------------------------------------
@@ -577,7 +580,7 @@ def _markdown_header(title: str, template_name: str, flavor_file: str) -> str:
             f"# {title}",
             "",
             '!!! note "Generated reference"',
-            f"    This page was generated by ATLAS `{ATLAS_VERSION}` from the parser schema and `{flavor_file}`.",
+            f"    This page was generated by ATLAS `{ATLAS_VERSION}` from the parser schema, `{flavor_file}`, and the explicit selection in `src/atlas_actris/templates/template_profiles.py`.",
             f"    The corresponding generated full INI template is `{template_name}`.",
             "",
         ]
@@ -746,6 +749,8 @@ def _render_initialization_markdown() -> str:
         "schema and the user-facing template flavor text. Edit "
         "`src/atlas_actris/templates/init_template_flavor.py` to change "
         "descriptions, examples, or version notes. Edit "
+        "`src/atlas_actris/templates/template_profiles.py` to change which "
+        "parameters are included or their ordering. Edit "
         "`src/atlas_actris/utils/parse_init_file.py` only when the technical "
         "schema itself changes.",
         "",
@@ -911,7 +916,7 @@ def _profile_config_sections(profile: str) -> Mapping[str, Iterable[str]]:
 def _profile_settings_keys(profile: str) -> Mapping[str, Iterable[str]]:
     if profile == "beginner":
         return BEGINNER_SETTINGS_TEMPLATE_KEYS
-    return _full_settings_keys_by_group()
+    return SETTINGS_TEMPLATE_KEYS
 
 
 def build_outputs(
@@ -925,7 +930,7 @@ def build_outputs(
     validate_all()
 
     root = Path(repo_root).resolve() if repo_root is not None else _repo_root_from_this_file()
-    template_dir = root / "src" / "atlas_actris" / "templates"
+    template_dir = root / GENERATED_TEMPLATES_DIRECTORY
     docs_dir = root / "docs" / "generated"
 
     outputs: dict[Path, str] = {}

@@ -155,6 +155,101 @@ def _cache_metadata_path(cache_root: str, meas_key: str) -> str:
     return os.path.join(_cache_entry_dir(cache_root, meas_key), "metadata.pkl")
 
 
+def _cache_manifest_path(cache_root: str) -> str:
+    """Return the path of the source-folder manifest stored with the cache."""
+
+    return os.path.join(cache_root, "source_manifest.pkl")
+
+
+def _folder_snapshot(filepath: str) -> Dict[str, Any]:
+    """Return a deterministic snapshot of one raw measurement folder.
+
+    Relative file names detect additions, removals, and renames. File sizes and
+    nanosecond-resolution modification times also detect files that have been
+    replaced or modified in place.
+    """
+
+    absolute_path = os.path.abspath(os.path.normpath(filepath))
+
+    if not os.path.exists(absolute_path):
+        return {
+            "path": absolute_path,
+            "kind": "missing",
+            "files": (),
+        }
+
+    if os.path.isfile(absolute_path):
+        stat = os.stat(absolute_path)
+        return {
+            "path": absolute_path,
+            "kind": "file",
+            "files": ((os.path.basename(absolute_path), stat.st_size, stat.st_mtime_ns),),
+        }
+
+    files = []
+
+    for root, dirnames, filenames in os.walk(absolute_path):
+        dirnames.sort()
+
+        for filename in sorted(filenames):
+            source_path = os.path.join(root, filename)
+
+            try:
+                stat = os.stat(source_path)
+            except FileNotFoundError:
+                # A concurrent removal means that this snapshot must not match
+                # the previously saved state.
+                files.append((os.path.relpath(source_path, absolute_path), None, None))
+                continue
+
+            files.append(
+                (
+                    os.path.relpath(source_path, absolute_path),
+                    stat.st_size,
+                    stat.st_mtime_ns,
+                )
+            )
+
+    return {
+        "path": absolute_path,
+        "kind": "directory",
+        "files": tuple(files),
+    }
+
+
+def _source_manifest(physical_paths: List[Tuple[str, str]]) -> Dict[str, Any]:
+    """Build the current source-folder manifest for all measurements."""
+
+    return {
+        meas_key: _folder_snapshot(filepath)
+        for meas_key, filepath in physical_paths
+    }
+
+
+def _write_source_manifest(cache_root: str, manifest: Dict[str, Any]) -> None:
+    """Store the source state corresponding to a completed cache build."""
+
+    with open(_cache_manifest_path(cache_root), "wb") as f:
+        pickle.dump(manifest, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def _source_manifest_matches(cache_root: str, current_manifest: Dict[str, Any]) -> bool:
+    """Return True when the cached and current source-folder states match."""
+
+    manifest_path = _cache_manifest_path(cache_root)
+
+    if not os.path.isfile(manifest_path):
+        return False
+
+    try:
+        with open(manifest_path, "rb") as f:
+            cached_manifest = pickle.load(f)
+    except (OSError, EOFError, pickle.PickleError):
+        return False
+
+    return cached_manifest == current_manifest
+
+
 def _cache_entry_exists(cache_root: str, meas_key: str) -> bool:
     """Check whether one measurement cache entry is complete enough to read."""
 
@@ -164,13 +259,22 @@ def _cache_entry_exists(cache_root: str, meas_key: str) -> bool:
     )
 
 
-def _cache_is_full(cache_root: str, physical_paths: List[Tuple[str, str]]) -> bool:
-    """Return True only if every physical measurement has a cache entry."""
+def _cache_is_full(
+    cache_root: str,
+    physical_paths: List[Tuple[str, str]],
+    current_manifest: Dict[str, Any],
+) -> bool:
+    """Return True only if the entries exist and their sources are unchanged."""
 
     if len(physical_paths) == 0:
         return False
 
-    return all(_cache_entry_exists(cache_root, meas_key) for meas_key, _ in physical_paths)
+    entries_exist = all(
+        _cache_entry_exists(cache_root, meas_key)
+        for meas_key, _ in physical_paths
+    )
+
+    return entries_exist and _source_manifest_matches(cache_root, current_manifest)
 
 
 def _clear_raw_cache(cache_root: str) -> None:
@@ -317,10 +421,10 @@ def flexible_reader(
 
     Cache behavior is now unconditional and matches the old quick_run=True mode:
 
-    A1. If the raw cache is complete:
+    A1. If the raw cache is complete and the source folders are unchanged:
         Read profiles and metadata directly from the cache. Do not write again.
 
-    A2. If the raw cache is missing/incomplete:
+    A2. If the raw cache is missing/incomplete or the source folders changed:
         Read raw files normally and write a fresh cache.
 
     The cache stores signals and shots as Zarr, so reopening from cache remains
@@ -347,7 +451,12 @@ def flexible_reader(
     if len(physical_paths) == 0:
         endpoint(1)
 
-    read_from_cache = _cache_is_full(cache_root, physical_paths)
+    current_manifest = _source_manifest(physical_paths)
+    read_from_cache = _cache_is_full(
+        cache_root,
+        physical_paths,
+        current_manifest,
+    )
 
     if read_from_cache:
         print(f"-- Raw cache is complete. Reading from cache:\n   {cache_root}")
@@ -372,7 +481,10 @@ def flexible_reader(
 
         return profiles, metadata
 
-    print(f"-- Raw cache is missing or incomplete. Reading raw files and replacing raw cache:\n   {cache_root}")
+    print(
+        "-- Raw cache is missing, incomplete, or its source data changed. "
+        f"Reading raw files and replacing raw cache:\n   {cache_root}"
+    )
 
     # For missing/incomplete cache, rebuild the cache so that future runs are
     # consistent and complete.
@@ -441,5 +553,9 @@ def flexible_reader(
 
     if profiles == {}:
         endpoint(1)
+
+    # Write this last so an interrupted or incomplete rebuild cannot be
+    # mistaken for a cache matching the current raw files.
+    _write_source_manifest(cache_root, current_manifest)
 
     return profiles, metadata

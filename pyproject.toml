@@ -1,6 +1,6 @@
 [project]
 name = "atlas_actris"
-version = "1.1.1"
+version = "1.2.0"
 
 authors = [
     { name = "Nikolaos Siomos", email = "nikolaos.siomos@lmu.de" },
@@ -105,12 +105,10 @@ where = ["src"]
 include = ["atlas_actris*"]
 namespaces = false
 
-# Include runtime package data
+# Runtime-owned intercomparison defaults remain package data. Generated user
+# templates are written to the repository-root templates directory instead.
 [tool.setuptools.package-data]
-atlas_actris = [
-    "templates/*.ini",
-    "intercomparison/*.ini",
-]
+atlas_actris = ["intercomparison/*.ini"]
 
 [build-system]
 requires = ["setuptools>=64", "wheel"]
