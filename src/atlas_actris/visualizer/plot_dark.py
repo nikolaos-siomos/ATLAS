@@ -87,6 +87,52 @@ def _plot_colored_profiles(ax, x, y, color_values, cmap, norm):
     return collection
 
 
+def _region_label_position(x, y, region, xlims, ylims, occupied=()):
+    """Place a region label where the displayed profiles are least dense."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    region_low, region_high = sorted(np.asarray(region, dtype=float))
+
+    x_span = float(xlims[1] - xlims[0])
+    if not np.isfinite(x_span) or x_span == 0.0:
+        x_fraction = 0.5
+    else:
+        region_mid = 0.5 * (region_low + region_high)
+        x_fraction = (region_mid - xlims[0]) / x_span
+        x_fraction = float(np.clip(x_fraction, 0.12, 0.88))
+
+    y_span = float(ylims[1] - ylims[0])
+    in_region = (
+        np.isfinite(x)
+        & (x >= region_low)
+        & (x <= region_high)
+    )
+    values = y[:, in_region].ravel() if np.any(in_region) else y.ravel()
+    values = values[np.isfinite(values)]
+
+    candidates = np.linspace(0.12, 0.88, 9)
+    if values.size and np.isfinite(y_span) and y_span != 0.0:
+        normalized = (values - ylims[0]) / y_span
+        normalized = normalized[(normalized >= 0.0) & (normalized <= 1.0)]
+        crowding = np.asarray([
+            np.count_nonzero(np.abs(normalized - candidate) < 0.075)
+            for candidate in candidates
+        ], dtype=float)
+    else:
+        crowding = np.zeros(candidates.size, dtype=float)
+
+    # Keep labels for overlapping bands from selecting the same location.
+    for other_x, other_y in occupied:
+        close_x = abs(x_fraction - other_x) < 0.22
+        if close_x:
+            crowding += 2.0 * values.size * (
+                np.abs(candidates - other_y) < 0.14
+            )
+
+    y_fraction = float(candidates[np.argmin(crowding)])
+    return x_fraction, y_fraction
+
+
 
 def _scientific_y_axis(fig, ax):
     """Use Matplotlib scientific notation and return its order multiplier."""
@@ -198,7 +244,8 @@ def generate_plot(bins_dict, x_dict, y_dict, m_dict, args):
         fig, ax4_coords,
         bins_dict["sm"], x_dict["sm"], y_dict["sm"],
         args["xlims_sm"], args["xlims_range_sm"], args["ylims_sm"],
-        "sm_bc", args, disable_x2_label=True, show_stats_region=True,
+        "sm_bc", args, disable_x2_label=True,
+        show_stats_region=True, show_background_region=True,
     )
 
     plot_raw_multi(
@@ -433,6 +480,7 @@ def plot_raw_multi(
     xlims, xlims_upper, ylims, signal_type, args,
     disable_x1_label=False, disable_x2_label=False,
     activate_colorbar=False, show_stats_region=False,
+    show_background_region=False,
 ):
     ax = fig.add_axes(ax_coords)
 
@@ -491,15 +539,46 @@ def plot_raw_multi(
     # The upper x-axis is already in km.
     ax_top.axvline(0.0, linewidth=2.0, color="tab:blue", alpha=0.3)
 
+    label_positions = []
+
     if show_stats_region:
+        stats_region = args["stats_range"]
         ax_top.axvspan(
-            args["stats_range"][0], args["stats_range"][1],
+            stats_region[0], stats_region[1],
             alpha=0.2, zorder=10, facecolor="tab:grey",
         )
-        ax.text(
-            0.25, 0.07, "Stats region", transform=ax.transAxes,
-            bbox=dict(facecolor="tab:grey", alpha=0.22, zorder=3),
+        label_position = _region_label_position(
+            x_km, y, stats_region, xlims_upper, ylims, label_positions,
         )
+        ax.text(
+            *label_position, "Stats region", transform=ax.transAxes,
+            ha="center", va="center", zorder=20,
+            bbox=dict(
+                facecolor="tab:grey", alpha=0.22, edgecolor="none",
+            ),
+        )
+        label_positions.append(label_position)
+
+    if show_background_region:
+        background_low_bin, background_high_bin = args[
+            "background_range_bins"
+        ]
+        background_region = (background_low_bin, background_high_bin)
+        ax.axvspan(
+            background_low_bin, background_high_bin,
+            alpha=0.2, zorder=9, facecolor="tab:orange",
+        )
+        label_position = _region_label_position(
+            x_bins, y, background_region, xlims, ylims, label_positions,
+        )
+        ax.text(
+            *label_position, "BG region", transform=ax.transAxes,
+            ha="center", va="center", zorder=20,
+            bbox=dict(
+                facecolor="tab:orange", alpha=0.22, edgecolor="none",
+            ),
+        )
+        label_positions.append(label_position)
 
     ax.grid(which="both")
 

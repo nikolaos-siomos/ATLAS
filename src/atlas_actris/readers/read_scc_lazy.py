@@ -92,9 +92,12 @@ def read_dataset(dir_meas: str, meas_type: str):
                     raise FileReaderError("Measurement_ID parameter not found in the netcdf file. This is not a scc raw file")
                     
                 # Reading the scc file metadata
-                time_info_f = get_time_info(raw_data, 
-                                            meas_type = meas_type,
-                                            filename = mfiles[k].name)
+                time_info_f = get_time_info(
+                    raw_data, 
+                    meas_type = meas_type,
+                    filename = mfiles[k].name
+                    )
+                
                 if time_info_f.empty:
                     return(system_info, channel_info, time_info, sig_raw, shots)
                 
@@ -104,16 +107,20 @@ def read_dataset(dir_meas: str, meas_type: str):
                 else:
                     continue
                        
-                # Reading the licel signals
-                sig_raw_f = read_signals(raw_data, 
-                                         time = time_info_f.index, 
-                                         channels = channel_info.index, 
-                                         meas_type = meas_type)
+                # Reading the SCC signals
+                sig_raw_f = read_signals(
+                    raw_data, 
+                    time = time_info_f.index, 
+                    channels = channel_info.index, 
+                    meas_type = meas_type
+                    )
                 
-                shots_f = read_shots(raw_data, 
-                                     time = time_info_f.index, 
-                                     channels = channel_info.index,
-                                     meas_type = meas_type)
+                shots_f = read_shots(
+                    raw_data, 
+                    time = time_info_f.index, 
+                    channels = channel_info.index,
+                    meas_type = meas_type
+                    )
                 
                 channel_info["bins"] = channel_info.index.size * [int(sig_raw_f.shape[-1] + 1)]
 
@@ -162,17 +169,29 @@ def get_time_info(raw_data, meas_type, filename):
     time_info = pd.Series()
     
     if meas_type == 'drk':
-        if "Raw_Bck_Start_Time" not in list(raw_data.variables):
-            print("--Raw_Bck_Start_Time parameter not found. No dark profile embedded in SCC file -> skipping")
-            return(time_info)
-        if "Raw_Bck_Stop_Time" not in list(raw_data.variables):
-            print("--Raw_Bck_Stop_Time parameter not found. No dark profile embedded in SCC file -> skipping")
-            return(time_info)
-        sdate = raw_data.RawBck_Start_Date
-        stime = raw_data.RawBck_Start_Time_UT
-        start_time_sec = raw_data.Raw_Bck_Start_Time[:,0].values.astype(float)
-        stop_time_sec = raw_data.Raw_Bck_Stop_Time[:,0].values.astype(float)
-        filenames = np.empty(raw_data.time_bck.size, dtype = object)
+        if "Raw_Bck_Start_Time" not in list(raw_data.variables) or\
+            "Raw_Bck_Stop_Time" not in list(raw_data.variables):
+          
+            print("--Raw_Bck_Start_Time/Raw_Bck_Stop_Time parameters not found. Dark measurement is not following strictly the SCC format -> attempting to read dark from the dark measurement folder")
+            
+            if "Raw_Data_Start_Time" not in list(raw_data.variables):
+                print("--Raw_Data_Start_Time parameter not found. No profile other than dark embedded in SCC file -> skipping")
+                return(time_info)
+            if "Raw_Data_Stop_Time" not in list(raw_data.variables):
+                print("--Raw_Data_Stop_Time parameter not found. No profile other than dark embedded in SCC file -> skipping")
+                return(time_info)
+            sdate = raw_data.RawData_Start_Date
+            stime = raw_data.RawData_Start_Time_UT
+            start_time_sec = raw_data.Raw_Data_Start_Time[:,0].values.astype(float)
+            stop_time_sec = raw_data.Raw_Data_Stop_Time[:,0].values.astype(float)
+            filenames = np.empty(raw_data.time.size, dtype = object)
+            
+        else:
+            sdate = raw_data.RawBck_Start_Date
+            stime = raw_data.RawBck_Start_Time_UT
+            start_time_sec = raw_data.Raw_Bck_Start_Time[:,0].values.astype(float)
+            stop_time_sec = raw_data.Raw_Bck_Stop_Time[:,0].values.astype(float)
+            filenames = np.empty(raw_data.time_bck.size, dtype = object)
 
     else:
         if "Raw_Data_Start_Time" not in list(raw_data.variables):
@@ -181,6 +200,7 @@ def get_time_info(raw_data, meas_type, filename):
         if "Raw_Data_Stop_Time" not in list(raw_data.variables):
             print("--Raw_Data_Stop_Time parameter not found. No profile other than dark embedded in SCC file -> skipping")
             return(time_info)
+        
         sdate = raw_data.RawData_Start_Date
         stime = raw_data.RawData_Start_Time_UT
         start_time_sec = raw_data.Raw_Data_Start_Time[:,0].values.astype(float)
@@ -210,9 +230,15 @@ def read_signals(raw_data, time, channels, meas_type):
     
     if meas_type == 'drk':
         if "Background_Profile" not in list(raw_data.variables):
-            raise FileReaderError("--Background_Profile parameter not found. Is this really a dark measurement file?")
+            print("--Background_Profile parameters not found. Dark measurement is not following strictly the SCC format -> attempting to read dark through Raw_Lidar_Data parameter")
+            if "Raw_Lidar_Data" not in list(raw_data.variables):
+                raise FileReaderError("--Raw_Lidar_Data parameter not found. Is this really a non-dark measurement file?")
+         
+            sig_arr = raw_data["Raw_Lidar_Data"].astype(float)
+           
+        else:
+            sig_arr = raw_data["Background_Profile"].astype(float)
             
-        sig_arr = raw_data["Background_Profile"].astype(float)
     else:
         if "Raw_Lidar_Data" not in list(raw_data.variables):
             raise FileReaderError("--Raw_Lidar_Data parameter not found. Is this really a non-dark measurement file?")

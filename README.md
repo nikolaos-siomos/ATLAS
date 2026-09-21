@@ -1,10 +1,10 @@
 # ATLAS ACTRIS
 
 [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](pyproject.toml)
+[![PyPI version](https://img.shields.io/pypi/v/atlas-actris.svg)](https://pypi.org/project/atlas-actris/)
+[![Development status](https://img.shields.io/badge/status-development-orange)](https://github.com/nikolaos-siomos/atlas_dev)
 [![Tests](https://github.com/nikolaos-siomos/atlas_dev/actions/workflows/tests.yml/badge.svg)](https://github.com/nikolaos-siomos/atlas_dev/actions/workflows/tests.yml)
 [![License](https://img.shields.io/badge/license-see%20LICENSE-lightgrey)](LICENSE)
-
 Automated Lidar Analysis Software (ATLAS) for lidar data processing, visualization, and quality-assurance workflows.
 
 ATLAS is intended for users involved in ACTRIS aerosol high-power lidar (AHL) quality-assurance activities. The primary users are the ACTRIS CARS group, who use ATLAS for the evaluation of quality-assurance tests of AHL systems, and National Facility PIs, who use ATLAS to check and monitor the status of their systems.

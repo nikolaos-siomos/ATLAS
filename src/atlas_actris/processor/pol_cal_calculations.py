@@ -206,7 +206,6 @@ def simple_ratio(
 
     return ratio_da
 
-
 def ratio_error_independent(
     numerator: xr.DataArray,
     denominator: xr.DataArray,
@@ -744,6 +743,21 @@ def _ideal_GH_for_channel(channel_id: str) -> Tuple[float, float]:
 
     return G, H
 
+def _ideal_eta_for_channel(channel_id: str) -> Tuple[float, float]:
+    """Return ideal/default eta values for one channel id."""
+    """The reason that is part is needed is that the ideal calibration factor
+    for a pair of total and parallel or cross channels is 2 or 0.5, NOT 1
+    The reason is that an ideal analyser introduces a transmission of 1/2 
+    for a parallel or cross channel but the total channel has no analyser.
+    In parallel and cross channel ratios the 1/2 factors cancel out. This is 
+    not the case for ratios that include the total channel."""
+
+    if channel_id[5] == "c" or channel_id[5] == "p":
+        eta = 0.5
+    else:
+        eta = 1.0
+
+    return eta
 
 def _as_1d_list(values) -> List[Any]:
     """Convert scalar, numpy scalar, DataArray values, list, tuple to a 1D list."""
@@ -754,6 +768,43 @@ def _as_1d_list(values) -> List[Any]:
     arr = np.atleast_1d(values)
 
     return arr.tolist()
+
+def _ideal_eta_for_pairs(
+    ch_r: Sequence[str],
+    ch_t: Sequence[str],
+    pair_ids: Sequence[str],
+) -> Tuple[xr.DataArray, xr.DataArray, xr.DataArray, xr.DataArray]:
+    """Return ideal pair-based G_R, G_T, H_R, H_T arrays."""
+
+    ch_r = _as_1d_list(ch_r)
+    ch_t = _as_1d_list(ch_t)
+    pair_ids = _as_1d_list(pair_ids)
+
+    if not (len(ch_r) == len(ch_t) == len(pair_ids)):
+        raise ValueError(
+            "Cannot create ideal GH parameters because lengths differ: "
+            f"len(ch_r)={len(ch_r)}, len(ch_t)={len(ch_t)}, "
+            f"len(pair_ids)={len(pair_ids)}."
+        )
+
+    eta_values = []
+
+    for r, t in zip(ch_r, ch_t):
+        eta_r = _ideal_eta_for_channel(r)
+        eta_t = _ideal_eta_for_channel(t)
+        
+        eta = eta_r / eta_t
+
+        eta_values.append(eta)
+        
+    coords = {"pair": pair_ids}
+
+    eta_arr = xr.DataArray(
+        eta_values, dims=["pair"], coords=coords, name="eta"
+        ).astype("float64")
+    
+    return eta_arr 
+    
 
 def _ideal_GH_for_pairs(
     ch_r: Sequence[str],
@@ -2440,13 +2491,12 @@ def compute_mldr(
     molec_r = molec.sel(channel=ch_r)
     molec_t = molec.sel(channel=ch_t)
 
-    mldr = simple_ratio(
+    delta_star_m = simple_ratio(
         numerator=molec_r,
         denominator=molec_t,
         info=mldr_info,
     )
-
-
+    
     # The molecular ratio must be converted with the same ideal analyzer
     # response used for calibrated_ratio before comparing MLDR and VLDR.
     G_R, G_T, H_R, H_T = _ideal_GH_for_pairs(
@@ -2454,15 +2504,24 @@ def compute_mldr(
         ch_t=ch_t,
         pair_ids=mldr_ids,
     )
+    
+    eta = _ideal_eta_for_pairs(
+        ch_r=ch_r,
+        ch_t=ch_t,
+        pair_ids=mldr_ids,
+    )
 
+    # Correct for eta which is important for ratios that involve total channels
+    delta_cor_m = delta_star_m / eta
+    
     mldr = _GH_correct_values(
-        ratio=mldr,
+        ratio=delta_cor_m,
         G_R=G_R,
         G_T=G_T,
         H_R=H_R,
         H_T=H_T,
     )
-
+    
     mldr = mldr.rename("ratio")
 
     mldr_info = _add_GH_to_info(

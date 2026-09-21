@@ -167,7 +167,7 @@ def prepare_folder(caller_info, pattern, exclude_patterns=None, exclude_pattern=
     strings. ``exclude_pattern`` is kept as a backward-compatible alias.
     """
     
-    plot_dir = os.path.join(caller_info["output_folder"], "plots")
+    plot_dir = caller_info["plot_folder"]
             
     os.makedirs(plot_dir, exist_ok=True)
             

@@ -198,7 +198,7 @@ default_mean_signal_stages = [
     ]
 default_signal_stages = ['screening_complete']
 
-allowed_stages = collect_stages()
+allowed_stages = collect_stages() + ['off']
         
 allowed_vertical_scales = ["range", "height_agl", "height_asl"]
 

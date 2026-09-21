@@ -100,7 +100,7 @@ def compute_molecular_calculations(
                 .sel(channel=ch, atmo_parameters="T")
                 .reset_coords(drop=True)
             )
-
+            
             N_on_bins = (
                 meteo_on_bins
                 .sel(channel=ch, atmo_parameters="N")
@@ -240,8 +240,15 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
         
     forward_wavelength = float(emitted_wavelength.loc[ch].values)
   
-    vrn_wavelength = arc(incident_wavelength=forward_wavelength).lamda_pol['N2']
-    vro_wavelength = arc(incident_wavelength=forward_wavelength).lamda_pol['O2']
+    vrn_wavelength = arc(
+        incident_wavelength=forward_wavelength, 
+        mode='vibrational_raman_N2'
+        ).lamda_pol['N2']
+    
+    vro_wavelength = arc(
+        incident_wavelength=forward_wavelength, 
+        mode='vibrational_raman_O2'
+        ).lamda_pol['O2']
     
     filter_parameters = {
         'central_wavelength':float(detected_wavelength.loc[ch].values),
@@ -309,14 +316,13 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
                     c_bsc[i] = rrb.cross_section(cross_section_type = 'full', normalize = normalize)
 
                     mldr = rrb.mldr(mldr_type = 'full')
+                    alpha = (1. - mldr) / (1. + mldr)
 
                     if ch[5] == 'p':
-                        # c_bsc[i] = 2. / (1. + mldr) * c_bsc[i]
-                        c_bsc[i] = 1. / (1. + mldr) * c_bsc[i]
+                        c_bsc[i] = c_bsc[i] * (1. + alpha) / 2. 
                     elif ch[5] == 'c':
-                        # c_bsc[i] = 2. * mldr / (1. + mldr) * c_bsc[i]
-                        c_bsc[i] = mldr / (1. + mldr) * c_bsc[i]
-
+                        c_bsc[i] =  c_bsc[i] * (1. - alpha) / 2.
+                        
                 elif ch[5] in ['v']:
                     rrb = arc(
                         incident_wavelength = forward_wavelength, 
@@ -327,16 +333,18 @@ def get_optical_parameters(ch, temperature_scale, emitted_wavelength,
                         filter_parameters = filter_parameters,
                         )
                     
-                    c_bsc[i] = rrb.cross_section(cross_section_type = 'full', normalize = normalize)
+                    c_bsc[i] = rrb.cross_section(cross_section_type = 'full', normalize = normalize)    
                     
                 else:
                     c_bsc[i] = np.nan
                 
+                
                 c_ext_f[i] = rre_f.cross_section(cross_section_type = 'full')
                 c_ext_b[i] = rre_b.cross_section(cross_section_type = 'full')
-    
+                
+                
     c_ext_f = xr.DataArray(c_ext_f, dims = ['T'], coords = [temperature_scale])
     c_ext_b = xr.DataArray(c_ext_b, dims = ['T'], coords = [temperature_scale])
     c_bsc = xr.DataArray(c_bsc, dims = ['T'], coords = [temperature_scale])
-    
+        
     return(c_ext_f, c_ext_b, c_bsc)

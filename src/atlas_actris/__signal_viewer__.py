@@ -117,11 +117,13 @@ for key, recipe in recipes.items():
         checkout_id = checkout_stages[key],
         )
 
-for view_stage in caller_info['view_mean_signal_stages']:
-    generate_line_plots(processor, stage = view_stage, db = 'profile_mean')
+if 'off' not in caller_info['view_mean_signal_stages']:
+    for view_stage in caller_info['view_mean_signal_stages']:
+        generate_line_plots(processor, stage = view_stage, db = 'profile_mean')
 
-for view_stage in caller_info['view_signal_stages']:
-    generate_line_plots(processor, stage = view_stage, db = 'profile')
+if 'off' not in caller_info['view_signal_stages']:
+    for view_stage in caller_info['view_signal_stages']:
+        generate_line_plots(processor, stage = view_stage, db = 'profile')
 
 # Commandline promt to clean cache or not
 ask_clean_cache(caller_info)

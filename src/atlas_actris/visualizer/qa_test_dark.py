@@ -547,8 +547,6 @@ def generate_dark(
                             y_dict['sm'],
                             bins=bins_dict['sm'],
                             ranges=x_dict['sm'],
-                            zero_bin=zero_bin,
-                            region=channel_settings['far_range_region'],
                         )
 
                     # Time-resolved smoothed-BC deviation normalized by the
@@ -608,6 +606,7 @@ def generate_dark(
                         ylims_rc,
                         ch[6],
                         extended_dark_analysis,
+                        background_range,
                         ],
                     data_keys = [
                         'xlims_av',
@@ -626,6 +625,7 @@ def generate_dark(
                         'ylims_rc',
                         'channel_mode',
                         'extended_dark_analysis',
+                        'background_range_bins',
                         ]
                     )
                 
@@ -1150,8 +1150,8 @@ def zero_bin_lims(sig, bins, ranges, zero_bin, left_bins=100, right_bins=300):
     ylims = [-1.1 * y_edge, 1.1 * y_edge]
     return xlims_bins, xlims_range, ylims
 
-def smoothed_lims(sig, bins, ranges, zero_bin, region):
-    """Return full-profile x limits and tightly fitted smoothed-signal y limits."""
+def smoothed_lims(sig, bins, ranges):
+    """Fit smoothed-signal y limits to all profiles and bins."""
 
     first_bin, last_bin, _, bin_edge = get_span(_to_numpy(bins).astype(float))
     first_range, last_range, _, range_edge = get_span(
@@ -1161,17 +1161,28 @@ def smoothed_lims(sig, bins, ranges, zero_bin, region):
     xlims_bins = [first_bin - bin_edge, last_bin + bin_edge]
     xlims_range = [first_range - range_edge, last_range + range_edge]
 
-    # Use the same mean-centred extrema approach as the raw panel, but evaluate
-    # it in the explicitly configured far-range interval on x_dict.
-    min_y, max_y, mean_y, y_edge = region_extrema(
-        sig=sig,
-        bins=ranges,
-        region=region,
-    )
-    if not np.isfinite(y_edge) or y_edge == 0.0:
-        y_edge = np.finfo(float).eps
+    # Add 10% of each extreme's absolute value as outward padding.
+    sig_vals = _to_numpy(sig).astype(float)
+    if sig_vals.ndim == 1:
+        sig_vals = sig_vals[np.newaxis, :]
 
-    ylims = [mean_y - 3.3 * y_edge, mean_y + 3.3 * y_edge]
+    finite_values = sig_vals[np.isfinite(sig_vals)]
+    if finite_values.size == 0:
+        raise ValueError("The smoothed profiles contain no finite values.")
+
+    min_value = float(np.min(finite_values))
+    max_value = float(np.max(finite_values))
+    ylims = [
+        min_value - 0.1 * abs(min_value),
+        max_value + 0.1 * abs(max_value),
+    ]
+
+    # Matplotlib cannot use identical y limits (for example, all-zero
+    # profiles), so retain a minimal non-zero span for that edge case.
+    if ylims[0] == ylims[1]:
+        padding = max(0.1 * abs(min_value), np.finfo(float).eps)
+        ylims = [min_value - padding, max_value + padding]
+
     return xlims_bins, xlims_range, ylims
 
 def normalized_sm_deviation_lims(
