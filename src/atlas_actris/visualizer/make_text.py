@@ -344,11 +344,8 @@ class GenerateText:
             )
 
         avg_rate_alias = self.settings['averaging_period']
-        if avg_rate_alias == 'raw':
-            avg_rate_part = 'No averaging'
-        else:
-            averaging_period = self.caller_info[f'{avg_rate_alias}_averaging_period']
-            avg_rate_part = f'Averaging period ({avg_rate_alias}): {averaging_period}'
+        averaging_period = self.caller_info[f'{avg_rate_alias}_averaging_period']
+        avg_rate_part = f'Averaging period ({avg_rate_alias}): {averaging_period}'
         
         qa_test = self.qa_test_info['qa_test']
         drk_text = f"{qa_dataset_labels[qa_test]}"
@@ -1035,8 +1032,8 @@ class IntercomparisonLibraries:
     """Inputs required for intercomparison plot text generation.
 
     This is deliberately separate from ``Libraries`` above because an
-    intercomparison plot represents several datasets rather than one ATLAS
-    channel/QA-test package.
+    intercomparison plot represents several named entries, which may include
+    multiple channels or pairs from the same dataset.
     """
 
     intercomparison_info: Dict[str, Any]
@@ -1072,13 +1069,22 @@ class GenerateIntercomparisonText:
         return "".join(chars).strip("_") or "group"
 
     def _reference_label(self):
-        reference_id = self.intercomparison_info.get("reference_dataset", "reference")
-        dataset = self.intercomparison_info.get("datasets", {}).get(reference_id, {})
-        return (
+        reference_entry = self.group.get("reference_entry")
+        entry = self.group.get("entries", {}).get(reference_entry, {})
+        if entry.get("entry_label") or entry.get("label"):
+            return entry.get("entry_label") or entry.get("label")
+
+        dataset_id = entry.get("dataset_id") or self.intercomparison_info.get("reference_dataset", "reference")
+        dataset = self.intercomparison_info.get("datasets", {}).get(dataset_id, {})
+        dataset_label = (
             dataset.get("dataset_label")
             or dataset.get("system_label")
-            or reference_id
+            or dataset_id
         )
+        product_id = entry.get("atlas_channel_id") or entry.get("atlas_pair_id")
+        if product_id:
+            return f"{dataset_label} - {product_id}"
+        return dataset_label
 
     def make_title(self):
         general = self.intercomparison_info.get("general", {})

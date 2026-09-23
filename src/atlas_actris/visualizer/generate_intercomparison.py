@@ -5,7 +5,7 @@
 This module plays the role that ``qa_test_rayleigh_fit.py`` plays for the
 Rayleigh-fit plot: it extracts one comparison group, applies optional plotting
 smoothing / local-STD estimation, determines plot limits, prepares relative
-comparisons to the reference dataset, creates text, and calls
+comparisons to the reference entry, creates text, and calls
 ``visualizer.plot_intercomparison``.
 """
 
@@ -41,10 +41,21 @@ def _array_values(value: Optional[xr.DataArray]) -> Optional[np.ndarray]:
     return np.asarray(value.values, dtype=float)
 
 
-def _dataset_label(intercomparison_info: Mapping[str, Any], dataset_id: str) -> str:
-    dataset = intercomparison_info["datasets"].get(dataset_id, {})
-    return dataset.get("dataset_label") or dataset.get("system_label") or dataset_id
+def _entry_label(
+    intercomparison_info: Mapping[str, Any],
+    entry_id: str,
+    entry: Mapping[str, Any],
+) -> str:
+    if entry.get("entry_label"):
+        return str(entry["entry_label"])
 
+    dataset_id = str(entry.get("dataset_id", ""))
+    dataset = intercomparison_info["datasets"].get(dataset_id, {})
+    dataset_label = dataset.get("dataset_label") or dataset.get("system_label") or dataset_id
+    product_id = entry.get("atlas_channel_id") or entry.get("atlas_pair_id")
+    if product_id:
+        return f"{dataset_label} - {product_id}"
+    return dataset_label or entry_id
 
 def _native_group_arrays(
     group: Mapping[str, Any],
@@ -55,15 +66,15 @@ def _native_group_arrays(
     Y: Dict[str, np.ndarray] = {}
     YE: Dict[str, Optional[np.ndarray]] = {}
 
-    for dataset_id, dataset in group.get("datasets", {}).items():
-        signal = dataset.get("signal")
-        vertical = dataset.get("metadata", {}).get(vertical_scale)
+    for entry_id, entry in group.get("entries", {}).items():
+        signal = entry.get("signal")
+        vertical = entry.get("metadata", {}).get(vertical_scale)
         if not isinstance(signal, xr.DataArray) or not isinstance(vertical, xr.DataArray):
             continue
 
-        X[dataset_id] = _to_plot_units(vertical, vertical_scale)
-        Y[dataset_id] = np.asarray(signal.values, dtype=float)
-        YE[dataset_id] = _array_values(dataset.get("error"))
+        X[entry_id] = _to_plot_units(vertical, vertical_scale)
+        Y[entry_id] = np.asarray(signal.values, dtype=float)
+        YE[entry_id] = _array_values(entry.get("error"))
 
     return X, Y, YE
 
@@ -74,7 +85,7 @@ def _harmonized_group_arrays(
     vertical_scale: str,
 ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, Optional[np.ndarray]]]:
     signals = group.get("signals")
-    if not isinstance(signals, xr.DataArray) or "dataset" not in signals.dims:
+    if not isinstance(signals, xr.DataArray) or "entry" not in signals.dims:
         raise ValueError(
             "Harmonized group array 'signals' is missing. Run vertical harmonization "
             "before plotting, or set plot_native_scale=True."
@@ -90,14 +101,14 @@ def _harmonized_group_arrays(
     Y: Dict[str, np.ndarray] = {}
     YE: Dict[str, Optional[np.ndarray]] = {}
 
-    dataset_ids = [str(v) for v in signals["dataset"].values]
-    for dataset_id in dataset_ids:
-        X[dataset_id] = x_common.copy()
-        Y[dataset_id] = np.asarray(signals.sel(dataset=dataset_id).values, dtype=float)
-        if isinstance(errors, xr.DataArray) and dataset_id in [str(v) for v in errors["dataset"].values]:
-            YE[dataset_id] = np.asarray(errors.sel(dataset=dataset_id).values, dtype=float)
+    entry_ids = [str(v) for v in signals["entry"].values]
+    for entry_id in entry_ids:
+        X[entry_id] = x_common.copy()
+        Y[entry_id] = np.asarray(signals.sel(entry=entry_id).values, dtype=float)
+        if isinstance(errors, xr.DataArray) and entry_id in [str(v) for v in errors["entry"].values]:
+            YE[entry_id] = np.asarray(errors.sel(entry=entry_id).values, dtype=float)
         else:
-            YE[dataset_id] = None
+            YE[entry_id] = None
 
     return X, Y, YE
 
@@ -105,7 +116,7 @@ def _harmonized_group_arrays(
 def _reference_molecular(
     group: Mapping[str, Any],
     *,
-    reference_dataset: str,
+    reference_entry: str,
     vertical_scale: str,
     plot_native_scale: bool,
 ) -> Optional[Dict[str, np.ndarray]]:
@@ -113,9 +124,9 @@ def _reference_molecular(
         return None
 
     if plot_native_scale:
-        dataset = group.get("datasets", {}).get(reference_dataset, {})
-        profile = dataset.get("molecular", {}).get("profile")
-        vertical = dataset.get("metadata", {}).get(vertical_scale)
+        entry = group.get("entries", {}).get(reference_entry, {})
+        profile = entry.get("molecular", {}).get("profile")
+        vertical = entry.get("metadata", {}).get(vertical_scale)
         if not isinstance(profile, xr.DataArray) or not isinstance(vertical, xr.DataArray):
             return None
         return {
@@ -128,13 +139,13 @@ def _reference_molecular(
     vertical = group.get("vertical_grid")
     if not isinstance(molecular, xr.DataArray) or not isinstance(vertical, xr.DataArray):
         return None
-    dataset_values = [str(v) for v in molecular["dataset"].values]
-    if reference_dataset not in dataset_values:
+    entry_values = [str(v) for v in molecular["entry"].values]
+    if reference_entry not in entry_values:
         return None
 
     return {
         "x": _to_plot_units(vertical, vertical_scale),
-        "y": np.asarray(molecular.sel(dataset=reference_dataset).values, dtype=float),
+        "y": np.asarray(molecular.sel(entry=reference_entry).values, dtype=float),
         "label": "reference molecular",
     }
 
@@ -401,35 +412,35 @@ def _differences_to_reference(
     Y: Mapping[str, np.ndarray],
     YE: Mapping[str, Optional[np.ndarray]],
     *,
-    reference_dataset: str,
+    reference_entry: str,
     difference_mode: str,
 ) -> Tuple[Dict[str, np.ndarray], Dict[str, Optional[np.ndarray]]]:
-    """Calculate dataset differences to the reference.
+    """Calculate entry differences to the reference.
 
     Channel groups use relative differences, while pair groups use absolute
-    differences. Uncertainties from the dataset and reference are treated as
+    differences. Uncertainties from the entry and reference are treated as
     independent and propagated in quadrature.
     """
-    if reference_dataset not in Y:
+    if reference_entry not in Y:
         raise ValueError(
-            f"Reference dataset {reference_dataset!r} is missing from the plotted group"
+            f"Reference entry {reference_entry!r} is missing from the plotted group"
         )
 
-    y_ref = np.asarray(Y[reference_dataset], dtype=float)
-    e_ref = YE.get(reference_dataset)
+    y_ref = np.asarray(Y[reference_entry], dtype=float)
+    e_ref = YE.get(reference_entry)
     e_ref_arr = None if e_ref is None else np.asarray(e_ref, dtype=float)
 
     differences: Dict[str, np.ndarray] = {}
     difference_error: Dict[str, Optional[np.ndarray]] = {}
 
-    for dataset_id, y in Y.items():
-        if dataset_id == reference_dataset:
+    for entry_id, y in Y.items():
+        if entry_id == reference_entry:
             continue
 
         y = np.asarray(y, dtype=float)
         if y.shape != y_ref.shape:
             raise ValueError(
-                f"Cannot calculate differences for {dataset_id!r}: its shape {y.shape} "
+                f"Cannot calculate differences for {entry_id!r}: its shape {y.shape} "
                 f"does not match the reference shape {y_ref.shape}."
             )
 
@@ -447,11 +458,11 @@ def _differences_to_reference(
                 "expected 'relative' or 'absolute'"
             )
 
-        differences[dataset_id] = diff
+        differences[entry_id] = diff
 
-        err = YE.get(dataset_id)
+        err = YE.get(entry_id)
         if err is None and e_ref_arr is None:
-            difference_error[dataset_id] = None
+            difference_error[entry_id] = None
             continue
 
         err_arr = (
@@ -481,7 +492,7 @@ def _differences_to_reference(
                 ) ** 2
             )
 
-        difference_error[dataset_id] = sigma
+        difference_error[entry_id] = sigma
 
     return differences, difference_error
 
@@ -491,23 +502,23 @@ def _auto_absolute_difference_lims(
     Y: Mapping[str, np.ndarray],
     YE: Mapping[str, Optional[np.ndarray]],
     *,
-    reference_dataset: str,
+    reference_entry: str,
     snr_threshold: float = 1.0,
 ) -> list:
     """Return robust symmetric limits for pair absolute differences.
 
-    Only locations where both the compared dataset and reference have SNR above
+    Only locations where both the compared entry and reference have SNR above
     the threshold are allowed to control the automatic limit. The complete
     difference curve is still plotted; this filter is only for axis scaling.
     """
-    y_ref = np.asarray(Y[reference_dataset], dtype=float)
-    e_ref = YE.get(reference_dataset)
+    y_ref = np.asarray(Y[reference_entry], dtype=float)
+    e_ref = YE.get(reference_entry)
     e_ref = None if e_ref is None else np.asarray(e_ref, dtype=float)
 
     pieces = []
-    for dataset_id, diff in differences.items():
-        y = np.asarray(Y[dataset_id], dtype=float)
-        e = YE.get(dataset_id)
+    for entry_id, diff in differences.items():
+        y = np.asarray(Y[entry_id], dtype=float)
+        e = YE.get(entry_id)
         e = None if e is None else np.asarray(e, dtype=float)
         diff = np.asarray(diff, dtype=float)
 
@@ -557,7 +568,7 @@ def _plot_one_group(
     general = intercomparison_info["general"]
     vertical_scale = general["vertical_scale"]
     plot_native_scale = bool(general.get("plot_native_scale", False))
-    reference_dataset = intercomparison_info["reference_dataset"]
+    reference_entry = group.get("reference_entry")
 
     # Plotting/processing configuration belongs to intercomparison_info, while
     # the bundle group contains the loaded/processed data.  Merge the two for
@@ -601,7 +612,7 @@ def _plot_one_group(
     )
     molecular = _reference_molecular(
         group,
-        reference_dataset=reference_dataset,
+        reference_entry=reference_entry,
         vertical_scale=vertical_scale,
         plot_native_scale=plot_native_scale,
     )
@@ -647,7 +658,7 @@ def _plot_one_group(
         differences, difference_error = _differences_to_reference(
             Y,
             YE,
-            reference_dataset=reference_dataset,
+            reference_entry=reference_entry,
             difference_mode=difference_mode,
         )
 
@@ -659,9 +670,9 @@ def _plot_one_group(
     )
     text_generator = GenerateIntercomparisonText(lib)
 
-    dataset_labels = {
-        dataset_id: _dataset_label(intercomparison_info, dataset_id)
-        for dataset_id in group.get("datasets", {})
+    entry_labels = {
+        entry_id: _entry_label(intercomparison_info, entry_id, entry)
+        for entry_id, entry in group.get("entries", {}).items()
     }
 
     normalisation_region = None
@@ -677,7 +688,7 @@ def _plot_one_group(
             differences,
             Y,
             YE_stage,
-            reference_dataset=reference_dataset,
+            reference_entry=reference_entry,
         )
     else:
         # Channel relative-difference defaults are normally resolved by the
@@ -698,7 +709,7 @@ def _plot_one_group(
         "difference_mode": difference_mode,
         "use_log_y_scale": use_log_y_scale,
         "normalisation_region": normalisation_region,
-        "dataset_labels": dataset_labels,
+        "entry_labels": entry_labels,
         "left_y_label": (
             "Signal"
             if group_kind == "channel_group"
@@ -736,7 +747,7 @@ def _plot_one_group(
     else:
         print(
             f"        right panel: {difference_mode} differences to "
-            f"{reference_dataset!r}"
+            f"{reference_entry!r}"
         )
 
     return plot_intercomparison.generate_plot(

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Two-panel ATLAS intercomparison plot renderer.
 
-The left panel shows all participating datasets and, optionally, the reference
+The left panel shows all participating entries and, optionally, the reference
 molecular profile. The right panel shows relative channel differences or
 absolute pair differences to the reference when vertical grids are aligned.
 When native vertical
@@ -18,8 +18,8 @@ from matplotlib.ticker import MultipleLocator
 from visualizer.plot_utils import export_plot
 
 
-# Reserve tab:green for molecular products. Dataset colours intentionally skip it.
-DATASET_COLORS = (
+# Reserve tab:green for molecular products. Entry colours intentionally skip it.
+ENTRY_COLORS = (
     "tab:blue",
     "tab:orange",
     "tab:red",
@@ -31,7 +31,7 @@ DATASET_COLORS = (
     "tab:cyan",
 )
 MOLECULAR_COLOR = "tab:green"
-DATASET_LINESTYLES = ("-", "--", "-.", ":")
+ENTRY_LINESTYLES = ("-", "--", "-.", ":")
 
 
 def _vertical_axis_label(vertical_scale):
@@ -79,23 +79,23 @@ def _shade_normalisation_region(ax, args):
 def left_panel(fig, ax_coords, X, Y, YE, molecular, args):
     ax = fig.add_axes(ax_coords)
 
-    dataset_colors = {}
-    dataset_styles = {}
-    for index, (dataset_id, y) in enumerate(Y.items()):
-        x = np.asarray(X[dataset_id], dtype=float)
+    entry_colors = {}
+    entry_styles = {}
+    for index, (entry_id, y) in enumerate(Y.items()):
+        x = np.asarray(X[entry_id], dtype=float)
         y = np.asarray(y, dtype=float)
-        label = args.get("dataset_labels", {}).get(dataset_id, dataset_id)
-        color_index = index % len(DATASET_COLORS)
-        style_index = (index // len(DATASET_COLORS)) % len(DATASET_LINESTYLES)
-        color = DATASET_COLORS[color_index]
-        linestyle = DATASET_LINESTYLES[style_index]
-        dataset_colors[dataset_id] = color
-        dataset_styles[dataset_id] = linestyle
+        label = args.get("entry_labels", {}).get(entry_id, entry_id)
+        color_index = index % len(ENTRY_COLORS)
+        style_index = (index // len(ENTRY_COLORS)) % len(ENTRY_LINESTYLES)
+        color = ENTRY_COLORS[color_index]
+        linestyle = ENTRY_LINESTYLES[style_index]
+        entry_colors[entry_id] = color
+        entry_styles[entry_id] = linestyle
 
         line, = ax.plot(
             x, y, label=label, color=color, linestyle=linestyle
         )
-        error = YE.get(dataset_id)
+        error = YE.get(entry_id)
         if _finite_error(error):
             error = np.asarray(error, dtype=float)
             ax.fill_between(
@@ -129,8 +129,8 @@ def left_panel(fig, ax_coords, X, Y, YE, molecular, args):
     if ax.get_legend_handles_labels() != ([], []):
         ax.legend(loc="best", fontsize=8)
 
-    args["dataset_colors"] = dataset_colors
-    args["dataset_styles"] = dataset_styles
+    args["entry_colors"] = entry_colors
+    args["entry_styles"] = entry_styles
     return ax
 
 
@@ -151,22 +151,22 @@ def right_panel(fig, ax_coords, X, differences, difference_error, args):
         ax.grid(which="both")
         return ax
 
-    colors = args.get("dataset_colors", {})
-    styles = args.get("dataset_styles", {})
-    for index, (dataset_id, diff) in enumerate(differences.items()):
-        x = np.asarray(X[dataset_id], dtype=float)
+    colors = args.get("entry_colors", {})
+    styles = args.get("entry_styles", {})
+    for index, (entry_id, diff) in enumerate(differences.items()):
+        x = np.asarray(X[entry_id], dtype=float)
         diff = np.asarray(diff, dtype=float)
-        label = args.get("dataset_labels", {}).get(dataset_id, dataset_id)
-        color = colors.get(dataset_id, DATASET_COLORS[index % len(DATASET_COLORS)])
-        default_style = DATASET_LINESTYLES[
-            (index // len(DATASET_COLORS)) % len(DATASET_LINESTYLES)
+        label = args.get("entry_labels", {}).get(entry_id, entry_id)
+        color = colors.get(entry_id, ENTRY_COLORS[index % len(ENTRY_COLORS)])
+        default_style = ENTRY_LINESTYLES[
+            (index // len(ENTRY_COLORS)) % len(ENTRY_LINESTYLES)
         ]
-        linestyle = styles.get(dataset_id, default_style)
+        linestyle = styles.get(entry_id, default_style)
 
         line, = ax.plot(
             x, diff, label=label, color=color, linestyle=linestyle
         )
-        error = difference_error.get(dataset_id)
+        error = difference_error.get(entry_id)
         if _finite_error(error):
             error = np.asarray(error, dtype=float)
             ax.fill_between(

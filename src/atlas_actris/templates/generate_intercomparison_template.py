@@ -10,7 +10,7 @@ import textwrap
 from pathlib import Path
 from typing import Any, Mapping
 
-from atlas_actris.utils.parse_intercomparison_file import (
+from atlas_actris.intercomparison.config import (
     GENERAL_SCHEMA,
     PLOTTING_SCHEMA,
     DATASET_SCHEMA,
@@ -18,6 +18,11 @@ from atlas_actris.utils.parse_intercomparison_file import (
     PAIR_GROUP_SCHEMA,
 )
 from atlas_actris.templates.intercomparison_template_flavor import (
+    GENERAL_TEMPLATE_KEYS,
+    PLOTTING_TEMPLATE_KEYS,
+    DATASET_TEMPLATE_KEYS,
+    CHANNEL_GROUP_TEMPLATE_KEYS,
+    PAIR_GROUP_TEMPLATE_KEYS,
     GENERAL_FLAVOR,
     PLOTTING_FLAVOR,
     DATASET_FLAVOR,
@@ -25,47 +30,6 @@ from atlas_actris.templates.intercomparison_template_flavor import (
     PAIR_GROUP_FLAVOR,
     SPECIAL_FLAVOR,
 )
-from atlas_actris.templates.template_profiles import (
-    GENERATED_TEMPLATES_DIRECTORY,
-    INTERCOMPARISON_TEMPLATE_KEYS,
-)
-
-GENERAL_TEMPLATE_KEYS = INTERCOMPARISON_TEMPLATE_KEYS["general"]
-PLOTTING_TEMPLATE_KEYS = INTERCOMPARISON_TEMPLATE_KEYS["plotting"]
-DATASET_TEMPLATE_KEYS = INTERCOMPARISON_TEMPLATE_KEYS["dataset"]
-CHANNEL_GROUP_TEMPLATE_KEYS = INTERCOMPARISON_TEMPLATE_KEYS["channel_group"]
-PAIR_GROUP_TEMPLATE_KEYS = INTERCOMPARISON_TEMPLATE_KEYS["pair_group"]
-
-
-def validate_template_layout() -> None:
-    """Fail early when the explicit template whitelist drifts from a schema."""
-
-    blocks = {
-        "general": (GENERAL_SCHEMA, GENERAL_FLAVOR),
-        "plotting": (PLOTTING_SCHEMA, PLOTTING_FLAVOR),
-        "dataset": (DATASET_SCHEMA, DATASET_FLAVOR),
-        "channel_group": (CHANNEL_GROUP_SCHEMA, CHANNEL_GROUP_FLAVOR),
-        "pair_group": (PAIR_GROUP_SCHEMA, PAIR_GROUP_FLAVOR),
-    }
-    errors: list[str] = []
-    for block, keys in INTERCOMPARISON_TEMPLATE_KEYS.items():
-        if block not in blocks:
-            errors.append(f"intercomparison: unknown template block {block!r}")
-            continue
-        schema, flavor = blocks[block]
-        duplicates = sorted({key for key in keys if keys.count(key) > 1})
-        unknown = sorted(set(keys) - set(schema))
-        missing_flavor = sorted(set(keys) - set(flavor))
-        if not keys:
-            errors.append(f"intercomparison/{block}: template contains no keys")
-        if duplicates:
-            errors.append(f"intercomparison/{block}: duplicate keys: {duplicates}")
-        if unknown:
-            errors.append(f"intercomparison/{block}: keys not present in schema: {unknown}")
-        if missing_flavor:
-            errors.append(f"intercomparison/{block}: selected keys missing flavor: {missing_flavor}")
-    if errors:
-        raise ValueError("\n".join(errors))
 
 
 def _format_value(value: Any) -> str:
@@ -142,12 +106,12 @@ def _header() -> str:
         "# " + "=" * 76,
         "# ATLAS intercomparison initialization file",
         "#",
-        "# Generated from parser schemas, flavor metadata, and template_profiles.py.",
+        "# Generated from the parser schemas and template flavor metadata.",
         "# Values are intentionally left empty. Parser defaults are applied at runtime.",
         "# Regenerate with: atlas-generate-templates",
         "#",
         "# Dataset sections define where/how data are read.",
-        "# Channel/pair group sections define which corresponding products are compared.",
+        "# Channel/pair group sections contain named entries that select the products compared.",
         "#",
         "# " + "=" * 76,
         "",
@@ -170,7 +134,6 @@ def _render_schema_block(
 
 
 def render_ini(*, include_flavor: bool = True) -> str:
-    validate_template_layout()
     lines = [_header(), "[general]", ""]
     _render_schema_block(
         lines, GENERAL_SCHEMA, GENERAL_FLAVOR, GENERAL_TEMPLATE_KEYS,
@@ -214,16 +177,35 @@ def render_ini(*, include_flavor: bool = True) -> str:
         include_flavor=include_flavor,
     )
 
-    for dataset_id in ("dataset_a_reference", "dataset_b"):
+    channel_examples = (
+        ("a_parallel", "dataset_a_reference", "0355xpgx", "A parallel", True),
+        ("a_analog", "dataset_a_reference", "0355xagx", "A analog", False),
+        ("b_parallel", "dataset_b", "0355xpgx", "B parallel", False),
+    )
+    for entry_id, dataset_id, channel_id, label, reference in channel_examples:
         if include_flavor:
             lines.extend([
-                f"# --- {dataset_id} ---",
-                *(_wrap(SPECIAL_FLAVOR["dataset_atlas_channel_id"]["description"])),
-                f"# Example: {SPECIAL_FLAVOR['dataset_atlas_channel_id']['example']}",
-                f"{dataset_id}.atlas_channel_id =", "",
+                f"# --- named entry: {entry_id} ---",
+                *(_wrap(SPECIAL_FLAVOR["entry_dataset"]["description"])),
+                f"# Example: {dataset_id}",
+                f"{entry_id}.dataset =",
+                *(_wrap(SPECIAL_FLAVOR["entry_atlas_channel_id"]["description"])),
+                f"# Example: {channel_id}",
+                f"{entry_id}.atlas_channel_id =",
+                *(_wrap(SPECIAL_FLAVOR["entry_label"]["description"])),
+                f"# Example: {label}",
+                f"{entry_id}.label =",
+                *(_wrap(SPECIAL_FLAVOR["entry_reference"]["description"])),
+                f"# Example: {reference}",
+                f"{entry_id}.reference =", "",
             ])
         else:
-            lines.extend([f"{dataset_id}.atlas_channel_id =", ""])
+            lines.extend([
+                f"{entry_id}.dataset =",
+                f"{entry_id}.atlas_channel_id =",
+                f"{entry_id}.label =",
+                f"{entry_id}.reference =", "",
+            ])
 
     lines.extend([
         "",
@@ -235,16 +217,34 @@ def render_ini(*, include_flavor: bool = True) -> str:
         include_flavor=include_flavor,
     )
 
-    for dataset_id in ("dataset_a_reference", "dataset_b"):
+    pair_examples = (
+        ("a_vldr", "dataset_a_reference", "0355uvpx", "A VLDR", True),
+        ("b_vldr", "dataset_b", "0355uvax", "B VLDR", False),
+    )
+    for entry_id, dataset_id, pair_id, label, reference in pair_examples:
         if include_flavor:
             lines.extend([
-                f"# --- {dataset_id} ---",
-                *(_wrap(SPECIAL_FLAVOR["dataset_atlas_pair_id"]["description"])),
-                f"# Example: {SPECIAL_FLAVOR['dataset_atlas_pair_id']['example']}",
-                f"{dataset_id}.atlas_pair_id =", "",
+                f"# --- named entry: {entry_id} ---",
+                *(_wrap(SPECIAL_FLAVOR["entry_dataset"]["description"])),
+                f"# Example: {dataset_id}",
+                f"{entry_id}.dataset =",
+                *(_wrap(SPECIAL_FLAVOR["entry_atlas_pair_id"]["description"])),
+                f"# Example: {pair_id}",
+                f"{entry_id}.atlas_pair_id =",
+                *(_wrap(SPECIAL_FLAVOR["entry_label"]["description"])),
+                f"# Example: {label}",
+                f"{entry_id}.label =",
+                *(_wrap(SPECIAL_FLAVOR["entry_reference"]["description"])),
+                f"# Example: {reference}",
+                f"{entry_id}.reference =", "",
             ])
         else:
-            lines.extend([f"{dataset_id}.atlas_pair_id =", ""])
+            lines.extend([
+                f"{entry_id}.dataset =",
+                f"{entry_id}.atlas_pair_id =",
+                f"{entry_id}.label =",
+                f"{entry_id}.reference =", "",
+            ])
 
     return "\n".join(lines).rstrip() + "\n"
 
@@ -283,7 +283,6 @@ def _md_table(
 
 
 def render_markdown() -> str:
-    validate_template_layout()
     return "\n".join([
         "# ATLAS intercomparison initialization reference",
         "",
@@ -294,23 +293,53 @@ def render_markdown() -> str:
         "",
         "The file contains one `[general]` section, one optional `[plotting]` section, repeated `[dataset:<id>]` sections, and repeated `[channel_group:<id>]` and `[pair_group:<id>]` sections.",
         "",
-        "Dataset sections define the exported stage, QA test, source parameters, and labels for each independently selectable comparison dataset. Different datasets may use different stages, QA tests, or source parameters, even when they originate from the same physical lidar.",
+        "Dataset sections define where and how exported data are read. Group sections do not map datasets directly anymore; instead they contain **named entries**. Each named entry points to a dataset and selects one ATLAS channel or pair. Several entries may point to the same dataset, so multiple channels or pairs from one dataset can be compared in the same plot.",
         "",
-        "Exactly one dataset must set `reference = True`. Group sections map participating datasets to one `atlas_channel_id` or `atlas_pair_id`. Empty or omitted mappings exclude that dataset. A group with no provided IDs is ignored. For an active group, the reference dataset must provide its ID.",
+        "Exactly one dataset must still set `reference = True`. In every active channel or pair group, exactly one named entry must also set `<entry_id>.reference = True`, and that entry must point to the global reference dataset. This identifies the exact channel/pair used as the normalization and difference reference.",
+        "",
+        "### Named-entry syntax",
+        "",
+        "```ini",
+        "[channel_group:355_comparison]",
+        "a_parallel.dataset = dataset_a_reference",
+        "a_parallel.atlas_channel_id = 0355xpgx",
+        "a_parallel.label = A parallel",
+        "a_parallel.reference = True",
+        "",
+        "a_analog.dataset = dataset_a_reference",
+        "a_analog.atlas_channel_id = 0355xagx",
+        "a_analog.label = A analog",
+        "",
+        "b_parallel.dataset = dataset_b",
+        "b_parallel.atlas_channel_id = 0355xpgx",
+        "b_parallel.label = B parallel",
+        "```",
+        "",
+        "The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs only need to be unique within their group.",
         "",
         "## `general`", "", _md_table(GENERAL_SCHEMA, GENERAL_FLAVOR, GENERAL_TEMPLATE_KEYS), "",
         "## `plotting`", "", _md_table(PLOTTING_SCHEMA, PLOTTING_FLAVOR, PLOTTING_TEMPLATE_KEYS), "",
         "## `dataset:<dataset_id>`", "", _md_table(DATASET_SCHEMA, DATASET_FLAVOR, DATASET_TEMPLATE_KEYS), "",
         "## `channel_group:<group_id>`", "", _md_table(CHANNEL_GROUP_SCHEMA, CHANNEL_GROUP_FLAVOR, CHANNEL_GROUP_TEMPLATE_KEYS), "",
-        "### Dynamic channel-group entries", "",
-        f"- `<dataset_id>.atlas_channel_id = <atlas_channel_id>` selects one channel from that dataset. Empty or omitted mappings exclude the dataset. If no dataset provides an ID, the group is ignored. For an active group, the reference dataset must provide an ID. Example: `{SPECIAL_FLAVOR['dataset_atlas_channel_id']['example']}`.",
+        "### Dynamic named channel entries", "",
+        "- `<entry_id>.dataset = <dataset_id>` selects the source dataset.",
+        "- `<entry_id>.atlas_channel_id = <atlas_channel_id>` selects one channel from that dataset.",
+        "- `<entry_id>.label = ...` is optional and controls the legend label.",
+        "- `<entry_id>.reference = True` must appear on exactly one entry in each active group.",
         "",
         "## `pair_group:<group_id>`", "", _md_table(PAIR_GROUP_SCHEMA, PAIR_GROUP_FLAVOR, PAIR_GROUP_TEMPLATE_KEYS), "",
-        "### Dynamic pair-group entries", "",
-        f"- `<dataset_id>.atlas_pair_id = <atlas_pair_id>` selects one pair from that dataset. Empty or omitted mappings exclude the dataset. If no dataset provides an ID, the group is ignored. For an active group, the reference dataset must provide an ID. Example: `{SPECIAL_FLAVOR['dataset_atlas_pair_id']['example']}`.",
+        "### Dynamic named pair entries", "",
+        "- `<entry_id>.dataset = <dataset_id>` selects the source dataset.",
+        "- `<entry_id>.atlas_pair_id = <atlas_pair_id>` selects one pair from that dataset.",
+        "- `<entry_id>.label = ...` is optional and controls the legend label.",
+        "- `<entry_id>.reference = True` must appear on exactly one entry in each active group.",
         "",
-        "## Deferred metadata defaults", "",
-        "Dataset labels may remain empty after parsing. Background, normalization, and molecular-plot controls are resolved per group from [general]. Plotting controls are resolved per group from [plotting], except use_log_y_scale, whose group-level defaults are True for channel groups and False for pair groups.",
+        "## Internal group representation",
+        "",
+        "Parsed and prepared groups are keyed by `entries`, not by `datasets`. Harmonized group arrays use an `entry` dimension. Each prepared entry retains its `dataset_id`, so dataset-level metadata and stage caching remain shared even when several entries point to the same dataset.",
+        "",
+        "## Deferred defaults", "",
+        "Entry labels may remain empty after parsing. Plotting then falls back to the dataset label/system label plus the selected ATLAS product ID. Background, normalization, and molecular-plot controls are resolved per group from `[general]`. Plotting controls are resolved per group from `[plotting]`, except `use_log_y_scale`, whose group-level defaults are True for channel groups and False for pair groups.",
         "",
     ])
 
@@ -322,8 +351,8 @@ def _repo_root_from_this_file() -> Path:
 def build_outputs(repo_root: str | Path | None = None) -> dict[Path, str]:
     root = Path(repo_root).resolve() if repo_root else _repo_root_from_this_file()
     return {
-        root / GENERATED_TEMPLATES_DIRECTORY / "intercomparison.ini": render_ini(),
-        root / GENERATED_TEMPLATES_DIRECTORY / "intercomparison_bare.ini": render_bare_ini(),
+        root / "src" / "atlas_actris" / "templates" / "intercomparison.ini": render_ini(),
+        root / "src" / "atlas_actris" / "templates" / "intercomparison_bare.ini": render_bare_ini(),
         root / "docs" / "generated" / "intercomparison_reference.md": render_markdown(),
     }
 

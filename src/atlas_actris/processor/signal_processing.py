@@ -891,14 +891,26 @@ def compute_dark_correction(
                 if key not in profiles:
                     continue
         
-                if drk_key_alias in profiles:
+                if drk_key_alias in dark_profiles:
                     drk_key = drk_key_alias
+                
                 elif drk_key_alias in loading_map:
-                    drk_key = loading_map[drk_key_alias]
+                    candidate = loading_map[drk_key_alias]
+                
+                    if candidate not in dark_profiles:
+                        print_entry(
+                            f"Dark measurement {candidate!r} was configured but "
+                            "no dark profiles were successfully read. Skipping correction."
+                        )
+                        continue
+                
+                    drk_key = candidate
+                
                 else:
                     continue
+                
+                drk = dark_profiles[drk_key]
             
-                print(key)
                 drk = dark_profiles[drk_key]                   
                 
                 acquisition_mode = channel_info[key].sel(parameters="acquisition_mode")
