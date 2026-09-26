@@ -322,6 +322,92 @@ def _has_object_dtype_xarray(obj: Union[xr.DataArray, xr.Dataset]) -> bool:
     return False
 
 
+def _normalize_key_filter(
+    values: Optional[Iterable[str]],
+) -> Optional[set[str]]:
+    """Normalize a key filter while treating a single string as one key."""
+
+    if values is None:
+        return None
+
+    if isinstance(values, str):
+        return {values}
+
+    return {str(value) for value in values}
+
+
+def _select_stage_data(
+    stage_data: Dict[str, Dict[str, Any]],
+    qa_tests: Optional[Iterable[str]] = None,
+    parameters: Optional[Iterable[str]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Select QA tests and parameters from one processor-stage dictionary."""
+
+    qa_filter = _normalize_key_filter(qa_tests)
+    parameter_filter = _normalize_key_filter(parameters)
+
+    available_qa_tests = {str(key) for key in stage_data}
+    if qa_filter is not None:
+        missing_qa_tests = sorted(qa_filter.difference(available_qa_tests))
+        if missing_qa_tests:
+            raise KeyError(
+                "QA tests not available in stage data: "
+                + ", ".join(missing_qa_tests)
+                + f". Available QA tests: {sorted(available_qa_tests)}"
+            )
+
+    selected: Dict[str, Dict[str, Any]] = {}
+
+    for qa_test, qa_dict in stage_data.items():
+        qa_key = str(qa_test)
+        if qa_filter is not None and qa_key not in qa_filter:
+            continue
+
+        if not isinstance(qa_dict, dict):
+            raise TypeError(
+                f"stage_data[{qa_test!r}] must be a dictionary of parameters"
+            )
+
+        if parameter_filter is None:
+            selected[qa_key] = dict(qa_dict)
+            continue
+
+        available_parameters = {str(key) for key in qa_dict}
+        matching_parameters = parameter_filter.intersection(available_parameters)
+        selected_parameters = {
+            str(parameter): value
+            for parameter, value in qa_dict.items()
+            if str(parameter) in matching_parameters
+        }
+
+        if len(selected_parameters) == 0:
+            if qa_filter is not None:
+                raise KeyError(
+                    f"None of the selected parameters are available for QA "
+                    f"test {qa_key!r}. Available parameters: "
+                    f"{sorted(available_parameters)}"
+                )
+            continue
+
+        selected[qa_key] = selected_parameters
+
+    if parameter_filter is not None:
+        found_parameters = {
+            parameter
+            for qa_dict in selected.values()
+            for parameter in qa_dict
+        }
+        missing_parameters = sorted(parameter_filter.difference(found_parameters))
+        if missing_parameters:
+            raise KeyError(
+                "Parameters not available in the selected QA tests: "
+                + ", ".join(missing_parameters)
+                + f". Available parameters: {sorted(found_parameters)}"
+            )
+
+    return selected
+
+
 def _write_pickle(obj: Any, path: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
@@ -508,6 +594,27 @@ def _make_zarr_safe_chunks(obj: Union[xr.DataArray, xr.Dataset]) -> Union[xr.Dat
     return obj.chunk(chunks)
 
 
+def _compute_xarray_for_export(
+    obj: Union[xr.DataArray, xr.Dataset],
+    preserve_chunks: bool = False,
+) -> Union[xr.DataArray, xr.Dataset]:
+    """Materialize one xarray entry before it is exported.
+
+    Computing entries individually limits peak memory use compared with
+    computing the complete processing stage at once. For numeric entries that
+    will be written to Zarr, preserve a safe version of the original Dask
+    chunking so the resulting store is not written as one very large chunk.
+    """
+
+    chunks = _dask_chunks_for_obj(obj) if preserve_chunks else None
+    computed = obj.compute()
+
+    if chunks is not None:
+        computed = computed.chunk(chunks)
+
+    return computed
+
+
 def _write_xarray_to_zarr(obj: Union[xr.DataArray, xr.Dataset], path: str) -> str:
     """Write one xarray object to a zarr folder and return the stored kind."""
 
@@ -585,6 +692,9 @@ def export_processing_stage(
     ask: bool = False,
     default_answer: bool = False,
     print_estimated_size: bool = True,
+    compute_before_export: bool = True,
+    qa_tests: Optional[Iterable[str]] = None,
+    parameters: Optional[Iterable[str]] = None,
 ) -> Optional[str]:
     """
     Export a full ATLAS processing stage to output_folder/exported.
@@ -610,6 +720,17 @@ def export_processing_stage(
     print_estimated_size
         If True, print an approximate exported size before writing. The estimate
         uses xarray nbytes and does not compute Dask-backed arrays.
+    compute_before_export
+        If True, compute each xarray entry immediately before exporting it.
+        Entries are computed one at a time to limit peak memory use. Numeric
+        entries retain Zarr-safe chunking; object/mixed entries are fully
+        materialized before being pickled.
+    qa_tests
+        Optional QA-test key or keys to export, for example ``"ray"`` or
+        ``["ray", "pcb"]``. If omitted, all QA tests are exported.
+    parameters
+        Optional parameter key or keys to export from the selected QA tests,
+        for example ``"profile"`` or ``["profile", "vertical_scale"]``.
 
     Returns
     -------
@@ -620,6 +741,12 @@ def export_processing_stage(
 
     if not isinstance(stage_data, dict):
         raise TypeError("stage_data must be a dictionary")
+
+    stage_data = _select_stage_data(
+        stage_data=stage_data,
+        qa_tests=qa_tests,
+        parameters=parameters,
+    )
 
     if output_folder is None:
         raise ValueError("output_folder is required for stage export/import")
@@ -685,10 +812,19 @@ def export_processing_stage(
             param_key = str(parameter)
             entry_dir = _entry_subdir(out_dir, qa_key, param_key)
 
+            is_xarray = isinstance(value, (xr.DataArray, xr.Dataset))
+            has_object_dtype = is_xarray and _has_object_dtype_xarray(value)
+
+            if compute_before_export and is_xarray:
+                value = _compute_xarray_for_export(
+                    value,
+                    preserve_chunks=not has_object_dtype,
+                )
+
             # Numeric/lazy xarray objects are stored as zarr. Mixed object
             # arrays, such as system_info/channel_info/pol_cal_info, are stored
             # with pickle to preserve their dtype and coordinates safely.
-            if isinstance(value, (xr.DataArray, xr.Dataset)) and not _has_object_dtype_xarray(value):
+            if is_xarray and not has_object_dtype:
                 rel_path = os.path.relpath(os.path.join(entry_dir, "data.zarr"), out_dir)
                 kind = _write_xarray_to_zarr(value, os.path.join(out_dir, rel_path))
             else:
@@ -1076,6 +1212,9 @@ def export_processing_stages(
     ask: bool = False,
     default_answer: bool = False,
     print_estimated_size: bool = True,
+    compute_before_export: bool = True,
+    qa_tests: Optional[Iterable[str]] = None,
+    parameters: Optional[Iterable[str]] = None,
 ) -> Dict[str, str]:
     """Export multiple ATLAS processing stages with one optional prompt.
 
@@ -1094,6 +1233,12 @@ def export_processing_stages(
         Default answer used by the prompt when the user presses Enter.
     print_estimated_size
         If True, print one combined approximate exported size before writing.
+    compute_before_export
+        If True, compute each selected xarray entry immediately before writing.
+    qa_tests
+        Optional QA-test key or keys applied to every selected stage.
+    parameters
+        Optional parameter key or keys applied to every selected stage.
 
     Returns
     -------
@@ -1132,7 +1277,11 @@ def export_processing_stages(
     )
 
     selected_stages_data = {
-        stage_name: stages_data[stage_name]
+        stage_name: _select_stage_data(
+            stages_data[stage_name],
+            qa_tests=qa_tests,
+            parameters=parameters,
+        )
         for stage_name in stage_names
     }
 
@@ -1168,13 +1317,14 @@ def export_processing_stages(
 
     for stage_name in stage_names:
         out_dir = export_processing_stage(
-            stage_data=stages_data[stage_name],
+            stage_data=selected_stages_data[stage_name],
             stage_name=stage_name,
             output_folder=output_folder,
             overwrite=overwrite,
             ask=False,
             default_answer=default_answer,
             print_estimated_size=False,
+            compute_before_export=compute_before_export,
         )
 
         if out_dir is not None:
@@ -1185,12 +1335,15 @@ def export_processing_stages(
 
 def export_processor_stage(
     processor: Any,
-    output_folder: 'str',
+    output_folder: str,
     stage_name: Optional[str] = None,
     overwrite: bool = False,
     ask: bool = False,
     default_answer: bool = False,
     print_estimated_size: bool = True,
+    compute_before_export: bool = True,
+    qa_tests: Optional[Iterable[str]] = None,
+    parameters: Optional[Iterable[str]] = None,
 ) -> Optional[str]:
     """
     Convenience wrapper that exports a stage directly from an ATLAS Processor.
@@ -1199,7 +1352,11 @@ def export_processor_stage(
     """
 
     stage_name = _resolve_processor_stage_name(processor, stage_name)
-    stage_data = processor.export_test_from_stage(stage_name)
+    stage_data = processor.export_test_from_stage(
+        stage_name,
+        qa_tests=qa_tests,
+        entries=parameters,
+    )
 
     return export_processing_stage(
         stage_data=stage_data,
@@ -1209,6 +1366,7 @@ def export_processor_stage(
         ask=ask,
         default_answer=default_answer,
         print_estimated_size=print_estimated_size,
+        compute_before_export=compute_before_export,
     )
 
 
@@ -1221,12 +1379,17 @@ def export_processor_stages(
     ask: bool = False,
     default_answer: bool = False,
     print_estimated_size: bool = True,
+    compute_before_export: bool = True,
+    qa_tests: Optional[Iterable[str]] = None,
+    parameters: Optional[Iterable[str]] = None,
 ) -> Dict[str, str]:
     """Convenience wrapper that exports multiple stages from an ATLAS Processor.
 
     Set ask=True to show exactly one terminal yes/no prompt before writing any
     of the requested stages. The printed size estimate is the combined total for
     all stages.
+
+    ``qa_tests`` and ``parameters`` select the same subset from every stage.
     """
 
     stage_names = _resolve_processor_stage_names(processor, stage_names)
@@ -1235,7 +1398,11 @@ def export_processor_stages(
         raise ValueError("stage_names must contain at least one stage")
 
     stages_data = {
-        stage_name: processor.export_test_from_stage(stage_name)
+        stage_name: processor.export_test_from_stage(
+            stage_name,
+            qa_tests=qa_tests,
+            entries=parameters,
+        )
         for stage_name in stage_names
     }
 
@@ -1247,25 +1414,7 @@ def export_processor_stages(
         ask=ask,
         default_answer=default_answer,
         print_estimated_size=print_estimated_size,
-    )
-
-
-def ask_export_processor_stages(
-    processor: Any,
-    stage_names: Optional[Iterable[str]] = None,
-    overwrite: bool = False,
-    default_answer: bool = False,
-    print_estimated_size: bool = True,
-) -> Dict[str, str]:
-    """Prompt once in the terminal before exporting multiple stages."""
-
-    return export_processor_stages(
-        processor=processor,
-        stage_names=stage_names,
-        overwrite=overwrite,
-        ask=True,
-        default_answer=default_answer,
-        print_estimated_size=print_estimated_size,
+        compute_before_export=compute_before_export,
     )
 
 def list_exported_stages(output_folder: str) -> list[str]:
@@ -1278,25 +1427,6 @@ def list_exported_stages(output_folder: str) -> list[str]:
         for name in os.listdir(root)
         if os.path.isdir(os.path.join(root, name))
         and os.path.isfile(os.path.join(root, name, _MANIFEST_NAME))
-    )
-
-
-def ask_export_processor_stage(
-    processor: Any,
-    stage_name: Optional[str] = None,
-    overwrite: bool = False,
-    default_answer: bool = False,
-    print_estimated_size: bool = True,
-) -> Optional[str]:
-    """Prompt in the terminal before exporting one processor stage."""
-
-    return export_processor_stage(
-        processor=processor,
-        stage_name=stage_name,
-        overwrite=overwrite,
-        ask=True,
-        default_answer=default_answer,
-        print_estimated_size=print_estimated_size,
     )
 
 
@@ -1434,17 +1564,3 @@ def list_exported_stage_contents(
         }
         for stage, qa_entries in detailed.items()
     }
-
-
-# Short aliases, in case you prefer shorter imports.
-export_stage = export_processing_stage
-export_stages = export_processing_stages
-export_processor_stage_list = export_processor_stages
-import_stage = import_processing_stage
-import_entry = import_processing_entry
-delete_stage = delete_exported_stage
-delete_all_stages = delete_all_exported_stages
-inspect_stages = inspect_exported_stages
-list_stage_contents = list_exported_stage_contents
-select_stage = select_exported_stage
-select_stages = select_exported_stages

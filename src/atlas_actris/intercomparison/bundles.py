@@ -145,112 +145,6 @@ def _select_product(value: Any, product_id: str, *, kind: str, location: str) ->
         ) from None
 
 
-
-def _diagnostic_scalar(value: Any) -> Any:
-    """Resolve a lazy scalar for diagnostic printing only."""
-    try:
-        if hasattr(value, "compute"):
-            value = value.compute()
-        if hasattr(value, "item"):
-            value = value.item()
-    except Exception:
-        pass
-    return value
-
-
-def _diagnostic_finite_count(value: Any) -> int | None:
-    """Count finite/non-null values without modifying the source object."""
-    try:
-        import numpy as np
-
-        finite = np.isfinite(value)
-        count = finite.sum()
-        return int(_diagnostic_scalar(count))
-    except Exception:
-        try:
-            count = value.notnull().sum()
-            return int(_diagnostic_scalar(count))
-        except Exception:
-            return None
-
-
-def _diagnostic_size(value: Any) -> int | None:
-    try:
-        return int(value.size)
-    except Exception:
-        return None
-
-
-def _diagnose_channel_selection(
-    *,
-    group_id: str,
-    entry_id: str,
-    dataset_id: str,
-    qa_test: str,
-    signal_source: str,
-    error_source: str,
-    channel_id: str,
-    signal_entry: Any,
-    selected_signal: Any,
-    selected_error: Any,
-) -> None:
-    """Print read-only diagnostics for one channel entry."""
-
-    print()
-    print("    BUNDLE DIAGNOSTIC")
-    print(f"        group: [channel_group:{group_id}]")
-    print(f"        entry: {entry_id!r}")
-    print(f"        dataset: {dataset_id!r}")
-    print(f"        qa_test: {qa_test!r}")
-    print(f"        signal_source: {signal_source!r}")
-    print(f"        error_source: {error_source!r}")
-    print(f"        requested channel: {channel_id!r}")
-
-    try:
-        print(
-            f"        raw signal dims / shape / dtype: "
-            f"{signal_entry.dims} / {signal_entry.shape} / {signal_entry.dtype}"
-        )
-    except Exception:
-        print(f"        raw signal type: {type(signal_entry)!r}")
-
-    try:
-        channel_values = [str(v) for v in signal_entry.coords["channel"].values.tolist()]
-        print(f"        raw signal channel count: {len(channel_values)}")
-        print(f"        requested channel present: {channel_id.lower() in [v.lower() for v in channel_values]}")
-        print(f"        available channels: {', '.join(channel_values[:20])}" + (" ..." if len(channel_values) > 20 else ""))
-    except Exception as exc:
-        print(f"        could not inspect channel coordinate: {exc}")
-
-    signal_count = _diagnostic_finite_count(selected_signal)
-    signal_size = _diagnostic_size(selected_signal)
-    error_count = _diagnostic_finite_count(selected_error)
-    error_size = _diagnostic_size(selected_error)
-
-    try:
-        print(
-            f"        selected signal dims / shape / dtype: "
-            f"{selected_signal.dims} / {selected_signal.shape} / {selected_signal.dtype}"
-        )
-    except Exception:
-        pass
-    print(f"        selected signal finite values: {signal_count}/{signal_size}")
-
-    try:
-        print(
-            f"        selected error dims / shape / dtype: "
-            f"{selected_error.dims} / {selected_error.shape} / {selected_error.dtype}"
-        )
-    except Exception:
-        pass
-    print(f"        selected error finite values: {error_count}/{error_size}")
-
-    try:
-        print(f"        selected signal attrs: {dict(selected_signal.attrs)}")
-    except Exception:
-        pass
-
-
 def _load_optional_metadata(
     stage_store: StageStoreProtocol,
     *,
@@ -464,38 +358,11 @@ def _prepare_channel_groups(
                 ),
             )
 
-            selected_signal = _select_product(
-                signal_entry, channel_id, kind="channel",
-                location=(
-                    f"channel group {group_id!r}, entry {entry_id!r}, dataset {dataset_id!r}, "
-                    f"source {signal_source!r}"
-                ),
-            )
-            selected_error = _select_product(
-                error_entry, channel_id, kind="channel",
-                location=(
-                    f"channel group {group_id!r}, entry {entry_id!r}, dataset {dataset_id!r}, "
-                    f"source {error_source!r}"
-                ),
-            )
-
-            _diagnose_channel_selection(
-                group_id=group_id,
-                entry_id=entry_id,
-                dataset_id=dataset_id,
-                qa_test=qa_test,
-                signal_source=signal_source,
-                error_source=error_source,
-                channel_id=channel_id,
-                signal_entry=signal_entry,
-                selected_signal=selected_signal,
-                selected_error=selected_error,
-            )
-
             entries[entry_id] = {
                 "dataset_id": dataset_id,
                 "entry_label": group_entry.get("label"),
                 "reference": bool(group_entry.get("reference", False)),
+                "color_index": group_entry.get("color_index"),
                 "system_label": dataset_cfg.get("system_label"),
                 "dataset_label": dataset_cfg.get("dataset_label"),
                 "qa_test": qa_test,
@@ -510,8 +377,20 @@ def _prepare_channel_groups(
                     "metadata_source": None,
                     "metadata": None,
                 },
-                "signal": selected_signal,
-                "error": selected_error,
+                "signal": _select_product(
+                    signal_entry, channel_id, kind="channel",
+                    location=(
+                        f"channel group {group_id!r}, entry {entry_id!r}, dataset {dataset_id!r}, "
+                        f"source {signal_source!r}"
+                    ),
+                ),
+                "error": _select_product(
+                    error_entry, channel_id, kind="channel",
+                    location=(
+                        f"channel group {group_id!r}, entry {entry_id!r}, dataset {dataset_id!r}, "
+                        f"source {error_source!r}"
+                    ),
+                ),
             }
 
         if not entries:
@@ -613,6 +492,7 @@ def _prepare_pair_groups(
                 "dataset_id": dataset_id,
                 "entry_label": group_entry.get("label"),
                 "reference": bool(group_entry.get("reference", False)),
+                "color_index": group_entry.get("color_index"),
                 "system_label": dataset_cfg.get("system_label"),
                 "dataset_label": dataset_cfg.get("dataset_label"),
                 "qa_test": qa_test,

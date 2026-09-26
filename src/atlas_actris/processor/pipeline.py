@@ -26,7 +26,7 @@ Fucntions
 """
 
 import copy
-from typing import Any, Dict
+from typing import Any, Dict, Iterable, Optional
 from utils.error_classes import OverwriteError
 from utils.printouts import print_header
 
@@ -86,6 +86,32 @@ from processor.selectors import (
     get_io_map,
     get_source_map
 )
+
+
+def _normalize_key_filter(
+    values: Optional[Iterable[str]],
+) -> Optional[set[str]]:
+    """Normalize an optional key filter, treating one string as one key."""
+
+    if values is None:
+        return None
+
+    if isinstance(values, str):
+        return {values}
+
+    return {str(value) for value in values}
+
+
+def _swap_nested_dict(data: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Swap ``entry -> QA test`` dictionaries to ``QA test -> entry``."""
+
+    swapped = defaultdict(dict)
+
+    for entry, qa_values in data.items():
+        for qa_test, value in qa_values.items():
+            swapped[qa_test][entry] = value
+
+    return dict(swapped)
 
 # Shared, read-only context
 @dataclass(frozen=True)
@@ -415,23 +441,72 @@ class Processor():
         return exported_data
     
 
-    def export_test_from_stage(self, input_id):
+    def export_test_from_stage(
+        self,
+        input_id,
+        qa_tests: Optional[Iterable[str]] = None,
+        entries: Optional[Iterable[str]] = None,
+    ):
+        """Export a stage as ``QA test -> entry -> value``.
+
+        Parameters
+        ----------
+        input_id
+            Registered processor stage to export.
+        qa_tests
+            Optional QA-test keys such as ``"ray"`` or ``["ray", "pcb"]``.
+            If omitted, all QA tests are returned.
+        entries
+            Optional stage-entry keys such as ``"profile"`` or
+            ``["profile", "vertical_scale"]``. If omitted, all entries are
+            returned.
+
+        Notes
+        -----
+        Calling this method with only ``input_id`` preserves its previous
+        behaviour.
+        """
 
         input_map = get_io_map(input_id)
-        
-        # Gather input data
-        exported_data = {s: get_from_selector(self, input_map[s]) 
-                         for s in input_map.keys()}
-        
-        exported_data_swapped = defaultdict(dict)
-        
-        for k1, inner in exported_data.items():
-            for k2, value in inner.items():
-                exported_data_swapped[k2][k1] = value
-        
-        exported_data_swapped = dict(exported_data_swapped)
-        
-        return exported_data_swapped
+        entry_filter = _normalize_key_filter(entries)
+
+        if entry_filter is None:
+            selected_entries = list(input_map)
+        else:
+            missing_entries = sorted(entry_filter.difference(input_map))
+            if missing_entries:
+                raise KeyError(
+                    f"Entries not available in stage {input_id!r}: "
+                    + ", ".join(missing_entries)
+                    + f". Available entries: {sorted(input_map)}"
+                )
+            selected_entries = [
+                entry for entry in input_map if entry in entry_filter
+            ]
+
+        exported_data = {
+            entry: get_from_selector(self, input_map[entry])
+            for entry in selected_entries
+        }
+        exported_by_test = _swap_nested_dict(exported_data)
+
+        qa_filter = _normalize_key_filter(qa_tests)
+        if qa_filter is None:
+            return exported_by_test
+
+        missing_qa_tests = sorted(qa_filter.difference(exported_by_test))
+        if missing_qa_tests:
+            raise KeyError(
+                f"QA tests not available in stage {input_id!r}: "
+                + ", ".join(missing_qa_tests)
+                + f". Available QA tests: {sorted(exported_by_test)}"
+            )
+
+        return {
+            qa_test: exported_by_test[qa_test]
+            for qa_test in exported_by_test
+            if qa_test in qa_filter
+        }
              
     def prepare_output(self, output_id, stage_name):
         output_map = get_io_map(output_id)
@@ -534,15 +609,7 @@ class Processor():
 
         exported_data = combine_QA_pack(input_data)
 
-        exported_data_swapped = defaultdict(dict)
-        
-        for k1, inner in exported_data.items():
-            for k2, value in inner.items():
-                exported_data_swapped[k2][k1] = value
-        
-        exported_data_swapped = dict(exported_data_swapped)
-        
-        return exported_data_swapped
+        return _swap_nested_dict(exported_data)
         
     def checkout(self, output_id, input_id):
     

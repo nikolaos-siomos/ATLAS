@@ -38,8 +38,8 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 | `output_folder` | Folder where intercomparison plots, tables, and cached products are written. Relative paths are resolved against the folder containing this INI file. | `Path` | `analysis` |  | `./analysis` |
 | `overwrite_output` | If True, existing intercomparison outputs with the same names may be overwritten. | `bool` | `False` |  | `False` |
 | `default_qa_test` | Universal fallback QA test. A dataset-specific qa_test takes priority. | `str` | `ray` | ray, drk, pcb, tlc, tlc_rin, ray_pcb, pcb_aux, trg, dtm, cam | `ray` |
-| `default_signal_source` | Universal fallback exported-stage parameter containing channel signals. A dataset-specific signal_source takes priority. | `str` | `profile` |  | `profile` |
-| `default_signal_error_source` | Universal fallback exported-stage parameter containing channel uncertainties. A dataset-specific signal_error_source takes priority. | `str` | `profile_error` |  | `profile_error` |
+| `default_signal_source` | Universal fallback exported-stage parameter containing mean channel signals. A dataset-specific signal_source takes priority. | `str` | `profile_mean` |  | `profile_mean` |
+| `default_signal_error_source` | Universal fallback exported-stage parameter containing uncertainties of the mean channel signals. A dataset-specific signal_error_source takes priority. | `str` | `profile_error_mean` |  | `profile_error_mean` |
 | `default_pair_source` | Universal fallback exported-stage parameter containing channel-pair products. A dataset-specific pair_source takes priority. | `str` | `pol_cal_ratio_mean` |  | `pol_cal_ratio_mean` |
 | `default_pair_error_source` | Universal fallback exported-stage parameter containing channel-pair uncertainties. A dataset-specific pair_error_source takes priority. | `str` | `pol_cal_ratio_error_mean` |  | `pol_cal_ratio_error_mean` |
 | `vertical_scale` | Vertical coordinate used by vertical harmonization and later plotting. Allowed values are bins, range, height_agl, and height_asl. All four coordinates are loaded when available. Default: height_asl. | `str` | `height_asl` | bins, range, height_agl, height_asl | `height_asl` |
@@ -82,6 +82,9 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 | `pair_smooth` | Default smoothing switch for pair-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned values and propagated errors directly. | `bool` | `True` |  | `True` |
 | `pair_smoothing_range` | Default pair smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 10.0` | size=2 | `0.05, 10.0` |
 | `pair_smoothing_window` | Default pair smoothing window. Units follow vertical_scale: km for physical scales, bin units for bins. | `float` | `0.5` | &gt; 0.0 | `0.5` |
+| `near_range_max` | Upper horizontal limit of the second-row near-range comparison. Units follow vertical_scale: km for physical scales, bin units for bins. Default: 2 km for physical scales. | `float` | `2.0` | &gt; 0.0 | `2.0` |
+| `near_range_smooth` | Default smoothing switch for the second-row near-range comparison. This smoothing is independent of the full-range row and is applied even when the harmonized data were conservatively binned. | `bool` | `True` |  | `True` |
+| `near_range_smoothing_window` | Full smoothing window used only by the second-row near-range comparison. Units follow vertical_scale: km for physical scales, bin units for bins. The default 0.1 km corresponds to 100 m. | `float` | `0.1` | &gt; 0.0 | `0.1` |
 
 ## `dataset:<dataset_id>`
 
@@ -92,8 +95,8 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 | `system_label` | Optional label for the physical lidar/system that produced this dataset. Multiple datasets may share the same system_label. | `str` | `` |  | `Lidar A` |
 | `dataset_label` | Optional label describing this particular dataset or processing realization. When empty, later code may fall back to the dataset section ID. | `str` | `` |  | `Rayleigh processing` |
 | `qa_test` | QA test used when reading this dataset. When empty, default_qa_test from [general] is used. | `str` | `` | ray, drk, pcb, tlc, tlc_rin, ray_pcb, pcb_aux, trg, dtm, cam | `ray` |
-| `signal_source` | Exported-stage parameter containing channel signals for this dataset. When empty, default_signal_source is used. | `str` | `` |  | `profile` |
-| `signal_error_source` | Exported-stage parameter containing channel uncertainties for this dataset. When empty, default_signal_error_source is used. | `str` | `` |  | `profile_error` |
+| `signal_source` | Exported-stage parameter containing mean channel signals for this dataset. When empty, default_signal_source is used. | `str` | `` |  | `profile_mean` |
+| `signal_error_source` | Exported-stage parameter containing uncertainties of the mean channel signals for this dataset. When empty, default_signal_error_source is used. | `str` | `` |  | `profile_error_mean` |
 | `pair_source` | Exported-stage parameter containing pair products for this dataset. When empty, default_pair_source is used. | `str` | `` |  | `pol_cal_ratio_mean` |
 | `pair_error_source` | Exported-stage parameter containing pair uncertainties for this dataset. When empty, default_pair_error_source is used. | `str` | `` |  | `pol_cal_ratio_error_mean` |
 
@@ -112,6 +115,9 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 | `smooth` | Optional channel-group plotting smoothing override. Empty inherits channel_smooth from [plotting]. | `bool` | `` |  | `True` |
 | `smoothing_range` | Optional channel-group smoothing-range override. Empty inherits channel_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.05, 35.0` |
 | `smoothing_window` | Optional channel-group smoothing-window override. Empty inherits channel_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.5` |
+| `near_range_max` | Optional group override for the second-row near-range upper limit. Empty inherits near_range_max from [plotting]. Units follow vertical_scale. | `float` | `` | &gt; 0.0 | `2.0` |
+| `near_range_smooth` | Optional group override for second-row near-range smoothing. Empty inherits near_range_smooth from [plotting]. | `bool` | `` |  | `True` |
+| `near_range_smoothing_window` | Optional group override for the full smoothing window used in the second-row near-range comparison. Empty inherits near_range_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.1` |
 | `x_lims` | Optional channel-group x-axis limits. Empty inherits channel_x_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 | `0.0, 20.0` |
 | `x_tick` | Optional channel-group major x-axis tick spacing. Empty inherits x_tick from [plotting]. | `float` | `` | &gt; 0.0 | `2.0` |
 | `y_lims` | Optional channel-group left-panel y limits. Empty inherits channel_y_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 |  |
@@ -139,6 +145,9 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 | `smooth` | Optional pair-group plotting smoothing override. Empty inherits pair_smooth from [plotting]. | `bool` | `` |  | `True` |
 | `smoothing_range` | Optional pair-group smoothing-range override. Empty inherits pair_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.05, 10.0` |
 | `smoothing_window` | Optional pair-group smoothing-window override. Empty inherits pair_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.5` |
+| `near_range_max` | Optional group override for the second-row near-range upper limit. Empty inherits near_range_max from [plotting]. Units follow vertical_scale. | `float` | `` | &gt; 0.0 | `2.0` |
+| `near_range_smooth` | Optional group override for second-row near-range smoothing. Empty inherits near_range_smooth from [plotting]. | `bool` | `` |  | `True` |
+| `near_range_smoothing_window` | Optional group override for the full smoothing window used in the second-row near-range comparison. Empty inherits near_range_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.1` |
 | `x_lims` | Optional pair-group x-axis limits. Empty inherits pair_x_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 | `0.0, 10.0` |
 | `x_tick` | Optional pair-group major x-axis tick spacing. Empty inherits x_tick from [plotting]. | `float` | `` | &gt; 0.0 | `1.0` |
 | `y_lims` | Optional pair-group left-panel y limits. Empty inherits pair_y_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 |  |

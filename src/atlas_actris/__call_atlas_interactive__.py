@@ -58,7 +58,7 @@ from utils.export_processing_stage import (
 cmd_args = call_parser()
 
 # Parse the initialization file
-caller_info = parse_call_atlas_ini(filepath = cmd_args['ini_file'])
+caller_info = parse_call_atlas_ini(cmd_args)
 
 # Export the config file from SCC HOI
 scc_info = export_scc_config(

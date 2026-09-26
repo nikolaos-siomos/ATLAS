@@ -9,6 +9,8 @@ Created on Thu Mar 20 21:44:25 2025
 import argparse, configparser, os, re
 import numpy as np
 
+common_flavor = 'It overrides the corresponding parameter provided in the initialization file'
+
 def call_parser():
         
     """Collects the information included as commandline arguments. 
@@ -22,6 +24,22 @@ def call_parser():
                         type = str, nargs = '?',  default = None,
                         help = 'The path to the initialization file of the calling script')
 
+    parser.add_argument('-o', '--output_folder', metavar = 'output_folder', 
+                        type = str, nargs = '?',  default = None,
+                        help = f'The path to the output folder. {common_flavor}')
+
+    parser.add_argument('-s', '--slice_measurement', metavar = 'slice_measurement', 
+                        type = str, nargs = '+',  default = None,
+                        help = f'Slicing option for the QA tests. {common_flavor}')
+
+    parser.add_argument('-e', '--exclude_measurement', metavar = 'exclude_measurement', 
+                        type = str, nargs = '+',  default = None,
+                        help = f'Exclude option for the QA tests. {common_flavor}')
+
+    parser.add_argument('-q', '--process_qck', metavar = 'process_qck', 
+                        type = str, nargs = '+',  default = ['ray', 'ray_pcb'],
+                        help = f'Select QA test aliases for quicklook generation. {common_flavor}')
+    
     args = vars(parser.parse_args())
 
     if args['ini_file'] == None:

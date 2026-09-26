@@ -11,6 +11,8 @@ metadata are loaded later in the workflow.
 from __future__ import annotations
 
 import configparser
+import os
+import ntpath
 import re
 from copy import deepcopy
 from pathlib import Path
@@ -178,7 +180,7 @@ def _parse_scalar(value: str, dtype: type, *, location: str) -> Any:
         except ValueError as exc:
             raise ValueError(f"{location}: expected a number, got {value!r}") from exc
     if dtype is Path:
-        return Path(value.strip())
+        return Path(_normalize_config_path(value.strip()))
     raise TypeError(f"{location}: unsupported schema dtype {dtype!r}")
 
 
@@ -212,9 +214,23 @@ def _parse_value(raw: str, meta: Mapping[str, Any], *, location: str) -> Any:
     return value
 
 
+def _normalize_config_path(path: str) -> str:
+    """Accept either separator in configuration paths on the current OS."""
+    path = str(path)
+    if os.name != "nt":
+        if ntpath.splitdrive(path)[0]:
+            raise ValueError(
+                f"Windows drive or network path cannot be resolved on this system: {path!r}. "
+                "Use the local mount path or a relative path instead."
+            )
+        path = path.replace("\\", "/")
+    return os.path.expanduser(path)
+
+
 def _resolve_path(path: Path | None, ini_dir: Path) -> Path | None:
     if path is None:
         return None
+    path = Path(_normalize_config_path(path))
     if not path.is_absolute():
         path = ini_dir / path
     return path.expanduser().resolve()
@@ -388,7 +404,7 @@ def _resolve_group_defaults(
 def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
     """Load and resolve an ATLAS intercomparison initialization file."""
 
-    ini_path = Path(filepath).expanduser().resolve()
+    ini_path = Path(_normalize_config_path(filepath)).resolve()
     if not ini_path.exists():
         raise FileNotFoundError(f"Intercomparison initialization file not found: {ini_path}")
 

@@ -57,6 +57,62 @@ def _entry_label(
         return f"{dataset_label} - {product_id}"
     return dataset_label or entry_id
 
+
+def _figure_title(
+    intercomparison_info: Mapping[str, Any],
+    group_id: str,
+    group_kind: str,
+    group: Mapping[str, Any],
+) -> str:
+    """Return a compact, parameter-oriented intercomparison figure title."""
+
+    general = intercomparison_info.get("general", {})
+    label = group.get("label") or group_id
+
+    reference_dataset = intercomparison_info.get("reference_dataset", "reference")
+    reference_entry = group.get("reference_entry")
+    entries = group.get("entries", {})
+    if reference_entry in entries:
+        reference_dataset = entries[reference_entry].get(
+            "dataset_id", reference_dataset
+        )
+
+    dataset = intercomparison_info.get("datasets", {}).get(reference_dataset, {})
+    reference_label = (
+        dataset.get("dataset_label")
+        or dataset.get("system_label")
+        or reference_dataset
+    )
+
+    if group_kind == "channel_group":
+        plot_type = "Channel Intercomparison"
+    elif group_kind == "pair_group":
+        plot_type = "Pair Intercomparison"
+    else:
+        plot_type = "Intercomparison"
+
+    vertical_scale = general.get("vertical_scale", "height_asl")
+    if bool(general.get("plot_native_scale", False)):
+        vertical_part = (
+            f"vertical_scale={vertical_scale} | plot_native_scale=True"
+        )
+    else:
+        method = general.get("vertical_method", "")
+        vertical_part = (
+            f"vertical_scale={vertical_scale} | vertical_method={method}"
+        )
+        if method == "vertical_binning":
+            bin_width = group.get("vertical_bin_width")
+            if bin_width is None:
+                bin_width = general.get("vertical_bin_width")
+            if bin_width is not None:
+                vertical_part += f" | vertical_bin_width={bin_width}"
+
+    return (
+        f"ATLAS {plot_type} - {label}\n"
+        f"Reference: {reference_label} | {vertical_part}"
+    )
+
 def _native_group_arrays(
     group: Mapping[str, Any],
     *,
@@ -271,6 +327,48 @@ def _smooth_molecular(
     return out
 
 
+
+def _slice_profile_dicts(
+    X: Mapping[str, np.ndarray],
+    Y: Mapping[str, np.ndarray],
+    YE: Mapping[str, Optional[np.ndarray]],
+    x_lims,
+):
+    """Slice plotting dictionaries to one horizontal interval."""
+    X_out: Dict[str, np.ndarray] = {}
+    Y_out: Dict[str, np.ndarray] = {}
+    YE_out: Dict[str, Optional[np.ndarray]] = {}
+
+    low, high = float(x_lims[0]), float(x_lims[1])
+    for entry_id, y in Y.items():
+        x = np.asarray(X[entry_id], dtype=float)
+        y = np.asarray(y, dtype=float)
+        mask = np.isfinite(x) & (x >= low) & (x <= high)
+        X_out[entry_id] = x[mask]
+        Y_out[entry_id] = y[mask]
+
+        err = YE.get(entry_id)
+        if err is None:
+            YE_out[entry_id] = None
+        else:
+            err = np.asarray(err, dtype=float)
+            YE_out[entry_id] = err[mask]
+
+    return X_out, Y_out, YE_out
+
+
+def _slice_molecular(molecular, x_lims):
+    if molecular is None:
+        return None
+    x = np.asarray(molecular["x"], dtype=float)
+    y = np.asarray(molecular["y"], dtype=float)
+    low, high = float(x_lims[0]), float(x_lims[1])
+    mask = np.isfinite(x) & (x >= low) & (x <= high)
+    out = dict(molecular)
+    out["x"] = x[mask]
+    out["y"] = y[mask]
+    return out
+
 def _finite_concat(values):
     pieces = []
     for value in values:
@@ -406,6 +504,58 @@ def _auto_y_lims(
             high = max(signal_max * upper_margin_factor, 1.0)
 
     return [low, high]
+
+
+def _nice_tick_spacing(span: float, target_intervals: int = 5) -> float:
+    """Return a readable major-tick spacing for a displayed x interval.
+
+    The value is chosen from 1, 2, 2.5, 5, or 10 times a power of ten,
+    targeting roughly ``target_intervals`` major intervals.
+    """
+    span = float(span)
+    if not np.isfinite(span) or span <= 0.0:
+        return 1.0
+
+    raw = span / max(int(target_intervals), 1)
+    exponent = np.floor(np.log10(raw))
+    scale = 10.0 ** exponent
+    fraction = raw / scale
+
+    for candidate in (1.0, 2.0, 2.5, 5.0, 10.0):
+        if fraction <= candidate:
+            return float(candidate * scale)
+
+    return float(10.0 * scale)
+
+
+def _near_range_y_lims(Y: Mapping[str, np.ndarray]) -> list:
+    """Return linear y limits for the near-range signal panel.
+
+    If every finite measured signal value in the displayed near-range interval
+    is non-negative, anchor the axis at zero and add 10 percent headroom above
+    the maximum.  Otherwise extend both extrema outward by 10 percent of their
+    absolute magnitudes.
+    """
+    vals = _finite_concat(Y.values())
+    if vals.size == 0:
+        return [0.0, 1.0]
+
+    low = float(np.nanmin(vals))
+    high = float(np.nanmax(vals))
+
+    if low >= 0.0:
+        if high <= 0.0 or not np.isfinite(high):
+            return [0.0, 1.0]
+        return [0.0, 1.10 * high]
+
+    low_lim = low - 0.10 * abs(low)
+    high_lim = high + 0.10 * abs(high)
+
+    if not np.isfinite(low_lim) or not np.isfinite(high_lim) or high_lim <= low_lim:
+        extent = max(abs(low), abs(high), 1.0)
+        return [-1.10 * extent, 1.10 * extent]
+
+    return [low_lim, high_lim]
 
 
 def _differences_to_reference(
@@ -595,6 +745,15 @@ def _plot_one_group(
         for key in Y
     }
 
+    # Preserve the processed, unsmoothed plotting arrays.  The near-range row
+    # starts from these arrays and applies its own independent smoothing.
+    X_base = {key: np.asarray(value, dtype=float).copy() for key, value in X.items()}
+    Y_base = {key: np.asarray(value, dtype=float).copy() for key, value in Y.items()}
+    YE_base = {
+        key: None if YE.get(key) is None else np.asarray(YE[key], dtype=float).copy()
+        for key in Y
+    }
+
     # Smoothing/local-STD estimation is only useful when the plotted profiles
     # have not already been conservatively binned. Binning already provides a
     # weighted mean and propagated uncertainty. Native-scale plotting is also
@@ -674,6 +833,11 @@ def _plot_one_group(
         entry_id: _entry_label(intercomparison_info, entry_id, entry)
         for entry_id, entry in group.get("entries", {}).items()
     }
+    entry_color_indices = {
+        entry_id: entry.get("color_index")
+        for entry_id, entry in group.get("entries", {}).items()
+        if entry.get("color_index") is not None
+    }
 
     normalisation_region = None
     if vertical_scale in PHYSICAL_VERTICAL_SCALES and group_settings.get("normalisation"):
@@ -695,8 +859,144 @@ def _plot_one_group(
         # parser, but retain an automatic fallback for robustness.
         difference_lims = [-0.4, 0.4]
 
+    # ------------------------------------------------------------------
+    # Second row: near-range comparison with independent plotting controls.
+    # The near row mirrors the full-range controls (x/y limits, tick spacing,
+    # smoothing, and difference limits) while remaining linear by design.
+    # ------------------------------------------------------------------
+    near_x_lims = list(group_settings.get("near_x_lims") or [0.0, 2.0])
+    if float(near_x_lims[1]) <= float(near_x_lims[0]):
+        raise ValueError(
+            f"[{group_kind}:{group_id}] near_x_lims must be increasing, got {near_x_lims}"
+        )
+
+    near_settings = dict(group_settings)
+    near_smooth = group_settings.get("near_smooth")
+    if near_smooth is None:
+        # Normally resolved by config.py, but keep this fallback explicit.
+        near_smooth = False
+    near_settings["smooth"] = bool(near_smooth)
+    near_settings["smoothing_range"] = list(
+        group_settings.get("near_smoothing_range") or near_x_lims
+    )
+    near_settings["smoothing_window"] = float(
+        group_settings.get("near_smoothing_window", 0.1)
+    )
+
+    # Keep near-range smoothing completely independent from the full-range row.
+    # In particular, pair_near_smooth/channel_near_smooth=False must bypass the
+    # smoothing routine entirely, rather than relying on the helper to inspect
+    # the flag internally.
+    if near_settings["smooth"]:
+        # Smooth before clipping to the displayed near-range interval. If the
+        # smoothing implementation cannot evaluate the full window at an edge,
+        # keep the original finite sample there rather than shortening the line.
+        near_Y_full, near_YE_full = _smooth_profiles(
+            X_base, Y_base, YE_base, near_settings, apply_smoothing=True
+        )
+        for key in near_Y_full:
+            smoothed = np.asarray(near_Y_full[key], dtype=float)
+            original = np.asarray(Y_base[key], dtype=float)
+            missing = ~np.isfinite(smoothed) & np.isfinite(original)
+            if np.any(missing):
+                smoothed = smoothed.copy()
+                smoothed[missing] = original[missing]
+                near_Y_full[key] = smoothed
+
+                smoothed_err = near_YE_full.get(key)
+                original_err = YE_base.get(key)
+                if smoothed_err is not None and original_err is not None:
+                    smoothed_err = np.asarray(smoothed_err, dtype=float).copy()
+                    original_err = np.asarray(original_err, dtype=float)
+                    fill_err = (
+                        missing
+                        & ~np.isfinite(smoothed_err)
+                        & np.isfinite(original_err)
+                    )
+                    smoothed_err[fill_err] = original_err[fill_err]
+                    near_YE_full[key] = smoothed_err
+    else:
+        # No smoothing means exactly the processed unsmoothed arrays and the
+        # stage/preprocessing-propagated errors are used in the near-range row.
+        near_Y_full = {
+            key: np.asarray(value, dtype=float).copy()
+            for key, value in Y_base.items()
+        }
+        near_YE_full = {
+            key: (
+                None
+                if YE_base.get(key) is None
+                else np.asarray(YE_base[key], dtype=float).copy()
+            )
+            for key in Y_base
+        }
+
+    near_X, near_Y, near_YE = _slice_profile_dicts(
+        X_base, near_Y_full, near_YE_full, near_x_lims
+    )
+
+    near_molecular_full = _reference_molecular(
+        group,
+        reference_entry=reference_entry,
+        vertical_scale=vertical_scale,
+        plot_native_scale=plot_native_scale,
+    )
+    if near_settings["smooth"]:
+        near_molecular_full = _smooth_molecular(
+            near_molecular_full, near_settings, apply_smoothing=True
+        )
+    near_molecular = _slice_molecular(near_molecular_full, near_x_lims)
+
+    # The near-range signal panel stays linear, independently of the full-range
+    # channel-group scale.  Empty near_y_lims retains the automatic near-range
+    # rule; explicit limits override it.
+    configured_near_y_lims = group_settings.get("near_y_lims")
+    near_y_lims = (
+        list(configured_near_y_lims)
+        if configured_near_y_lims
+        else _near_range_y_lims(near_Y)
+    )
+
+    if plot_native_scale:
+        near_differences = {}
+        near_difference_error = {}
+    else:
+        near_differences, near_difference_error = _differences_to_reference(
+            near_Y,
+            near_YE,
+            reference_entry=reference_entry,
+            difference_mode=difference_mode,
+        )
+
+    configured_near_difference_lims = group_settings.get("near_difference_y_lims")
+    if configured_near_difference_lims:
+        near_difference_lims = list(configured_near_difference_lims)
+    elif difference_mode == "absolute":
+        near_stage_errors = {}
+        for key in near_Y:
+            if YE_stage.get(key) is None:
+                near_stage_errors[key] = None
+                continue
+            x_base = np.asarray(X_base[key], dtype=float)
+            mask = (
+                np.isfinite(x_base)
+                & (x_base >= near_x_lims[0])
+                & (x_base <= near_x_lims[1])
+            )
+            near_stage_errors[key] = np.asarray(YE_stage[key], dtype=float)[mask]
+        near_difference_lims = _auto_absolute_difference_lims(
+            near_differences,
+            near_Y,
+            near_stage_errors,
+            reference_entry=reference_entry,
+        )
+    else:
+        near_difference_lims = list(difference_lims)
+
     args = {
-        "title": text_generator.make_title(),
+        "title": _figure_title(
+            intercomparison_info, group_id, group_kind, group_settings
+        ),
         "filename": text_generator.make_filename(),
         "plot_folder": str(Path(general["output_folder"]) / "plots"),
         "dpi": general["dpi"],
@@ -710,12 +1010,26 @@ def _plot_one_group(
         "use_log_y_scale": use_log_y_scale,
         "normalisation_region": normalisation_region,
         "entry_labels": entry_labels,
-        "left_y_label": (
-            "Signal"
-            if group_kind == "channel_group"
-            else "Pair ratio"
+        "entry_color_indices": entry_color_indices,
+        "left_y_label": str(
+            group_settings.get("quantity_label")
+            or ("Signal" if group_kind == "channel_group" else "VLDR")
         ),
     }
+
+    near_x_tick = float(
+        group_settings.get("near_x_tick")
+        or _nice_tick_spacing(near_x_lims[1] - near_x_lims[0])
+    )
+
+    near_args = dict(args)
+    near_args.update({
+        "x_lims": near_x_lims,
+        "x_tick": near_x_tick,
+        "y_lims": near_y_lims,
+        "difference_lims": near_difference_lims,
+        "use_log_y_scale": False,
+    })
 
     print(f"    - {group_id}")
     if plotted_data_are_binned:
@@ -732,6 +1046,13 @@ def _plot_one_group(
             )
     print(f"        x limits: {args['x_lims']}")
     print(f"        y limits: {args['y_lims']}")
+    print(
+        f"        near range: {near_x_lims}; x tick: {near_x_tick:g}; "
+        f"smoothing: {'on' if near_settings['smooth'] else 'off'}; "
+        f"range: {near_settings['smoothing_range']}; "
+        f"window: {near_settings['smoothing_window']}; y scale: linear; "
+        f"y limits: {near_y_lims}"
+    )
     if not group_settings.get("y_lims"):
         print(
             "        axis-limit signal basis: "
@@ -758,6 +1079,13 @@ def _plot_one_group(
         difference_error=difference_error,
         molecular=molecular,
         args=args,
+        near_X=near_X,
+        near_Y=near_Y,
+        near_YE=near_YE,
+        near_differences=near_differences,
+        near_difference_error=near_difference_error,
+        near_molecular=near_molecular,
+        near_args=near_args,
     )
 
 

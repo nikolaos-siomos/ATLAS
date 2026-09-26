@@ -45,8 +45,8 @@ GENERAL_SCHEMA: dict[str, dict[str, Any]] = {
     "output_folder": {"dtype": Path, "default": Path("./analysis"), "category": "optional"},
     "overwrite_output": {"dtype": bool, "default": False, "category": "optional"},
     "default_qa_test": {"dtype": str, "default": "ray", "allowed": QA_TESTS, "category": "optional"},
-    "default_signal_source": {"dtype": str, "default": "profile", "category": "optional"},
-    "default_signal_error_source": {"dtype": str, "default": "profile_error", "category": "optional"},
+    "default_signal_source": {"dtype": str, "default": "profile_mean", "category": "optional"},
+    "default_signal_error_source": {"dtype": str, "default": "profile_error_mean", "category": "optional"},
     "default_pair_source": {"dtype": str, "default": "pol_cal_ratio_mean", "category": "optional"},
     "default_pair_error_source": {"dtype": str, "default": "pol_cal_ratio_error_mean", "category": "optional"},
     "vertical_scale": {"dtype": str, "default": "height_asl", "allowed": VERTICAL_SCALES, "category": "optional"},
@@ -74,19 +74,34 @@ GENERAL_SCHEMA: dict[str, dict[str, Any]] = {
 }
 
 PLOTTING_SCHEMA: dict[str, dict[str, Any]] = {
-    "channel_x_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
-    "pair_x_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
+    "channel_x_lims": {"dtype": float, "default": [0.0, 30.0], "is_list": True, "size": 2, "category": "optional"},
+    "pair_x_lims": {"dtype": float, "default": [0.0, 14.0], "is_list": True, "size": 2, "category": "optional"},
     "x_tick": {"dtype": float, "default": 2.0, "min": 0.0, "category": "optional"},
     "channel_difference_y_lims": {"dtype": float, "default": [-0.4, 0.4], "is_list": True, "size": 2, "category": "optional"},
     "pair_difference_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
     "channel_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
     "channel_smooth": {"dtype": bool, "default": True, "category": "optional"},
-    "channel_smoothing_range": {"dtype": float, "default": [0.05, 35.0], "is_list": True, "size": 2, "category": "optional"},
+    "channel_smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "channel_smoothing_window": {"dtype": float, "default": 0.5, "min": 0.0, "category": "optional"},
     "pair_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
     "pair_smooth": {"dtype": bool, "default": True, "category": "optional"},
-    "pair_smoothing_range": {"dtype": float, "default": [0.05, 10.0], "is_list": True, "size": 2, "category": "optional"},
+    "pair_smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "pair_smoothing_window": {"dtype": float, "default": 0.5, "min": 0.0, "category": "optional"},
+    "channel_quantity_label": {"dtype": str, "default": "Signal", "category": "optional"},
+    "pair_quantity_label": {"dtype": str, "default": "VLDR", "category": "optional"},
+    "channel_near_x_lims": {"dtype": float, "default": [0.0, 2.0], "is_list": True, "size": 2, "category": "optional"},
+    "pair_near_x_lims": {"dtype": float, "default": [0.0, 2.0], "is_list": True, "size": 2, "category": "optional"},
+    "near_x_tick": {"dtype": float, "default": 0.5, "min": 0.0, "category": "optional"},
+    "channel_near_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
+    "pair_near_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
+    "channel_near_difference_y_lims": {"dtype": float, "default": [-0.4, 0.4], "is_list": True, "size": 2, "category": "optional"},
+    "pair_near_difference_y_lims": {"dtype": float, "default": [], "is_list": True, "size": 2, "category": "optional"},
+    "channel_near_smooth": {"dtype": bool, "default": True, "category": "optional"},
+    "channel_near_smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "channel_near_smoothing_window": {"dtype": float, "default": 0.1, "min": 0.0, "category": "optional"},
+    "pair_near_smooth": {"dtype": bool, "default": True, "category": "optional"},
+    "pair_near_smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "pair_near_smoothing_window": {"dtype": float, "default": 0.1, "min": 0.0, "category": "optional"},
 }
 
 DATASET_SCHEMA: dict[str, dict[str, Any]] = {
@@ -113,6 +128,14 @@ CHANNEL_GROUP_SCHEMA: dict[str, dict[str, Any]] = {
     "smooth": {"dtype": bool, "default": None, "category": "optional"},
     "smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "smoothing_window": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "near_x_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "near_x_tick": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "near_y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "near_difference_y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "near_smooth": {"dtype": bool, "default": None, "category": "optional"},
+    "near_smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "near_smoothing_window": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "quantity_label": {"dtype": str, "default": None, "category": "optional"},
     "x_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "x_tick": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
     "y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
@@ -131,6 +154,14 @@ PAIR_GROUP_SCHEMA: dict[str, dict[str, Any]] = {
     "smooth": {"dtype": bool, "default": None, "category": "optional"},
     "smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "smoothing_window": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "near_x_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "near_x_tick": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "near_y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "near_difference_y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "near_smooth": {"dtype": bool, "default": None, "category": "optional"},
+    "near_smoothing_range": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
+    "near_smoothing_window": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
+    "quantity_label": {"dtype": str, "default": None, "category": "optional"},
     "x_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
     "x_tick": {"dtype": float, "default": None, "min": 0.0, "category": "optional"},
     "y_lims": {"dtype": float, "default": None, "is_list": True, "size": 2, "category": "optional"},
@@ -277,14 +308,14 @@ def _parse_group_section(
     """Parse fixed group settings plus named comparison entries.
 
     Dynamic entry keys use the form ``<entry_id>.<parameter>`` where parameter
-    is one of ``dataset``, ``label``, ``reference`` and the group-specific
+    is one of ``dataset``, ``label``, ``reference``, ``color_index`` and the group-specific
     ``atlas_channel_id`` / ``atlas_pair_id``.
     """
 
     raw = parser[section]
     fixed_raw: dict[str, str] = {}
     entries_raw: dict[str, dict[str, str]] = {}
-    allowed_entry_parameters = {"dataset", id_key, "label", "reference"}
+    allowed_entry_parameters = {"dataset", id_key, "label", "reference", "color_index"}
 
     for key, value in raw.items():
         if key in schema:
@@ -295,7 +326,7 @@ def _parse_group_section(
             raise ValueError(
                 f"[{section}]: unknown parameter {key!r}. Named entries must use "
                 f"'<entry_id>.dataset', '<entry_id>.{id_key}', "
-                "'<entry_id>.label', or '<entry_id>.reference'"
+                "'<entry_id>.label', '<entry_id>.reference', or '<entry_id>.color_index'"
             )
 
         entry_id, parameter = key.split(".", 1)
@@ -346,11 +377,28 @@ def _parse_group_section(
             if reference_raw else False
         )
 
+        color_index_raw = (mapping.get("color_index") or "").strip()
+        if color_index_raw:
+            try:
+                color_index = int(color_index_raw)
+            except ValueError as exc:
+                raise ValueError(
+                    f"[{section}] {entry_id}.color_index: expected a positive integer, "
+                    f"got {color_index_raw!r}"
+                ) from exc
+            if color_index < 1:
+                raise ValueError(
+                    f"[{section}] {entry_id}.color_index: value must be at least 1"
+                )
+        else:
+            color_index = None
+
         entries[entry_id] = {
             "dataset_id": dataset_id,
             id_key: product_id,
             "label": label,
             "reference": reference,
+            "color_index": color_index,
         }
 
     return values, entries
@@ -363,27 +411,62 @@ def _validate_group_reference_entry(
     reference_dataset: str,
     id_key: str,
 ) -> tuple[str, str]:
-    """Return ``(reference_entry, reference_product_id)`` after validation."""
+    """Resolve the reference entry for one comparison group.
 
-    references = [
+    Resolution rules
+    ----------------
+    1. If exactly one named entry explicitly sets ``reference=True``, that
+       entry is the local reference for this group. It may belong to any
+       configured dataset and therefore may override the global reference
+       dataset for this comparison only.
+    2. If no entry explicitly sets ``reference=True``, fall back to the
+       global reference dataset. The fallback is valid only when exactly one
+       entry in the group belongs to that dataset.
+    3. More than one explicit reference is always an error. Likewise, if the
+       global-reference fallback is absent or ambiguous, the user must select
+       one local reference explicitly.
+    """
+
+    explicit_references = [
         entry_id for entry_id, entry in entries.items() if entry.get("reference")
     ]
-    if len(references) != 1:
+
+    if len(explicit_references) > 1:
         raise ValueError(
-            f"[{section}]: exactly one named entry must set reference=True; "
-            f"found {references}"
+            f"[{section}]: at most one named entry may set reference=True; "
+            f"found {explicit_references}"
         )
 
-    reference_entry = references[0]
-    entry = entries[reference_entry]
-    if entry["dataset_id"] != reference_dataset:
+    if len(explicit_references) == 1:
+        reference_entry = explicit_references[0]
+        entry = entries[reference_entry]
+        return reference_entry, str(entry[id_key])
+
+    fallback_entries = [
+        entry_id
+        for entry_id, entry in entries.items()
+        if entry.get("dataset_id") == reference_dataset
+    ]
+
+    if len(fallback_entries) == 1:
+        reference_entry = fallback_entries[0]
+        entry = entries[reference_entry]
+        return reference_entry, str(entry[id_key])
+
+    if len(fallback_entries) == 0:
         raise ValueError(
-            f"[{section}] {reference_entry}.reference: the reference entry must point "
-            f"to the global reference dataset {reference_dataset!r}, got "
-            f"{entry['dataset_id']!r}"
+            f"[{section}]: no local reference was selected and the global reference "
+            f"dataset {reference_dataset!r} is not represented in this group. Set "
+            "<entry_id>.reference = True on the entry that should be used as the "
+            "reference for this comparison."
         )
 
-    return reference_entry, str(entry[id_key])
+    raise ValueError(
+        f"[{section}]: no local reference was selected, but {len(fallback_entries)} "
+        f"entries belong to the global reference dataset {reference_dataset!r}: "
+        f"{fallback_entries}. Set <entry_id>.reference = True on exactly one of "
+        "them to disambiguate the reference for this comparison."
+    )
 
 def _resolve_dataset_defaults(
     dataset: dict[str, Any],
@@ -435,10 +518,36 @@ def _resolve_group_defaults(
         "smooth": f"{kind}_smooth",
         "smoothing_range": f"{kind}_smoothing_range",
         "smoothing_window": f"{kind}_smoothing_window",
+        "near_x_lims": f"{kind}_near_x_lims",
+        "near_x_tick": "near_x_tick",
+        "near_y_lims": f"{kind}_near_y_lims",
+        "near_difference_y_lims": f"{kind}_near_difference_y_lims",
+        "near_smooth": f"{kind}_near_smooth",
+        "near_smoothing_range": f"{kind}_near_smoothing_range",
+        "near_smoothing_window": f"{kind}_near_smoothing_window",
+        "quantity_label": f"{kind}_quantity_label",
     }
+    # Resolve all simple group -> global plotting inheritance first. Smoothing
+    # ranges are handled separately below because an empty global smoothing
+    # range means "follow this group's resolved x limits".
+    dependent_range_keys = {"smoothing_range", "near_smoothing_range"}
     for key, plotting_key in plotting_map.items():
+        if key in dependent_range_keys:
+            continue
         if values.get(key) is None:
             values[key] = deepcopy(plotting[plotting_key])
+
+    if values.get("smoothing_range") is None:
+        global_range = plotting[f"{kind}_smoothing_range"]
+        values["smoothing_range"] = deepcopy(
+            global_range if global_range is not None else values["x_lims"]
+        )
+
+    if values.get("near_smoothing_range") is None:
+        global_near_range = plotting[f"{kind}_near_smoothing_range"]
+        values["near_smoothing_range"] = deepcopy(
+            global_near_range if global_near_range is not None else values["near_x_lims"]
+        )
 
     # use_log_y_scale intentionally comes only from the group schema:
     # True by default for channel groups, False by default for pair groups.
@@ -495,6 +604,12 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
         plotting = _parse_fixed_section(parser, "plotting", PLOTTING_SCHEMA)
     else:
         plotting = {key: deepcopy(meta.get("default")) for key, meta in PLOTTING_SCHEMA.items()}
+
+    # Keep empty global smoothing ranges unresolved here. They are resolved per
+    # group in _resolve_group_defaults() *after* that group's x limits have been
+    # resolved. This matters when a group overrides x_lims/near_x_lims but leaves
+    # its smoothing range empty: the smoothing range must then follow the local
+    # displayed interval, not the global x limits.
 
     general["output_folder"] = _resolve_path(general["output_folder"], ini_dir)
     general["slice_measurement"] = _validate_time_ranges(
@@ -569,6 +684,14 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
             "smooth": values["smooth"],
             "smoothing_range": values["smoothing_range"],
             "smoothing_window": values["smoothing_window"],
+            "near_x_lims": values["near_x_lims"],
+            "near_x_tick": values["near_x_tick"],
+            "near_y_lims": values["near_y_lims"],
+            "near_difference_y_lims": values["near_difference_y_lims"],
+            "near_smooth": values["near_smooth"],
+            "near_smoothing_range": values["near_smoothing_range"],
+            "near_smoothing_window": values["near_smoothing_window"],
+            "quantity_label": values["quantity_label"],
             "x_lims": values["x_lims"],
             "x_tick": values["x_tick"],
             "y_lims": values["y_lims"],
@@ -614,6 +737,14 @@ def parse_intercomparison_ini(filepath: str | Path) -> dict[str, Any]:
             "smooth": values["smooth"],
             "smoothing_range": values["smoothing_range"],
             "smoothing_window": values["smoothing_window"],
+            "near_x_lims": values["near_x_lims"],
+            "near_x_tick": values["near_x_tick"],
+            "near_y_lims": values["near_y_lims"],
+            "near_difference_y_lims": values["near_difference_y_lims"],
+            "near_smooth": values["near_smooth"],
+            "near_smoothing_range": values["near_smoothing_range"],
+            "near_smoothing_window": values["near_smoothing_window"],
+            "quantity_label": values["quantity_label"],
             "x_lims": values["x_lims"],
             "x_tick": values["x_tick"],
             "y_lims": values["y_lims"],

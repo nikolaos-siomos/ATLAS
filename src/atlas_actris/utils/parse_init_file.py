@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Updated: 2026-09-23 12:42:06 UTC — Print command-line overrides as a list.
 """
 Created on Thu Aug 14 15:16:34 2025
 
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import re
 import os
+import ntpath
 import numpy as np
 import configparser
 from pathlib import Path
@@ -519,16 +521,29 @@ def _is_empty_scalar(v: Any) -> bool:
     return v is None or (isinstance(v, str) and v.strip() == "")
 
 
+def _normalize_config_path(path: str) -> str:
+    """Accept either separator in configuration paths on the current OS."""
+    path = str(path)
+    if os.name != "nt":
+        if ntpath.splitdrive(path)[0]:
+            raise ConfigError(
+                f"Windows drive or network path cannot be resolved on this system: {path!r}. "
+                "Use the local mount path or a relative path instead."
+            )
+        path = path.replace("\\", "/")
+    return os.path.expanduser(path)
+
+
 def _ini_root(filepath: str) -> str:
     """Return the absolute folder containing the call_atlas INI file."""
 
-    return os.path.normpath(os.path.dirname(os.path.abspath(filepath)))
+    return os.path.normpath(os.path.dirname(os.path.abspath(_normalize_config_path(filepath))))
 
 
 def _path_relative_to_ini_root(path: str, filepath: str) -> str:
     """Resolve a path relative to the call_atlas INI folder if needed."""
 
-    path = os.path.expanduser(str(path))
+    path = _normalize_config_path(path)
 
     if not os.path.isabs(path):
         path = os.path.join(_ini_root(filepath), path)
@@ -571,7 +586,7 @@ def _base_folder_from_parent_folder(parent_folder: str) -> str:
     /my_drive/station_id/input_data -> /my_drive/station_id
     """
 
-    parent_folder = os.path.normpath(os.path.abspath(os.path.expanduser(str(parent_folder))))
+    parent_folder = os.path.normpath(os.path.abspath(_normalize_config_path(parent_folder)))
     return os.path.normpath(os.path.dirname(parent_folder))
 
 
@@ -1220,7 +1235,7 @@ def _absolute_paths_exist_check(parser_args: Dict[str, Any]) -> Dict[str, Any]:
         path = parser_args.get(key)
 
         if meta.get("check_path") in ["dir", "file"] and path is not None:
-            path = os.path.normpath(os.path.expanduser(str(path)))
+            path = os.path.normpath(_normalize_config_path(path))
 
             if key == "radiosonde_folder":
                 if os.path.exists(path) and not os.path.isdir(path):
@@ -1278,6 +1293,8 @@ def _relative_paths_exist_check(parser_args: Dict[str, Any]) -> Dict[str, Any]:
                 parser_args[f"abs_drk_{key}"] = None
 
             if rel_path is not None:
+                rel_path = os.path.normpath(_normalize_config_path(rel_path))
+                parser_args[key] = rel_path
                 path = os.path.normpath(os.path.join(parent_folder, rel_path))
                 path_drk = os.path.normpath(os.path.join(parent_folder, f"drk_{rel_path}"))
 
@@ -1766,13 +1783,16 @@ def assert_pairs_unique(recorder_channel_id, laser_id):
         )
 
 
-def read_ini_file(filepath: str) -> Dict[str, Any]:
+def read_ini_file(
+    filepath: str, cmd_args: Optional[Mapping[str, Any]] = None
+) -> Dict[str, Any]:
 
-    """Read, convert, expand from scalar defaults, compute simple defaults, validate, and return dict."""
+    """Read INI values, apply CLI overrides, then convert using the schema."""
 
     config = configparser.ConfigParser(allow_no_value=True, strict=True)
     config.optionxform = str
 
+    filepath = _normalize_config_path(filepath)
     read_files = config.read(filepath, encoding="utf-8")
 
     if not read_files:
@@ -1783,26 +1803,24 @@ def read_ini_file(filepath: str) -> Dict[str, Any]:
 
     _raise_init_section_and_parameter_errors(config)
 
-    parser_args: Dict[str, Any] = {}
-
-    for key, meta in SCHEMA.items():
-        found = False
-
-        for section in config.sections():
+    raw_args: Dict[str, Any] = {}
+    for section in config.sections():
+        for key in SCHEMA:
             if key in config[section]:
-                found = True
-                raw = config[section][key]
+                raw_args[key] = config[section][key]
 
-                if meta["is_list"]:
-                    parser_args[key] = _convert_list(raw, meta, key)
-                else:
-                    parser_args[key] = _convert_scalar(raw, meta["dtype"], key)
+    raw_args = override_from_cmd(cmd_args or {}, raw_args)
 
-        if not found:
+    parser_args: Dict[str, Any] = {}
+    for key, meta in SCHEMA.items():
+        if key in raw_args:
+            raw = raw_args[key]
             if meta["is_list"]:
-                parser_args[key] = []
+                parser_args[key] = _convert_list(raw, meta, key)
             else:
-                parser_args[key] = meta["default"]
+                parser_args[key] = _convert_scalar(raw, meta["dtype"], key)
+        else:
+            parser_args[key] = [] if meta["is_list"] else meta["default"]
 
     return parser_args
 
@@ -1977,16 +1995,48 @@ def _scc_configuration_id_check(parser_args: Dict[str, Any]) -> None:
         )
 
 
+def override_from_cmd(
+    cmd_args: Mapping[str, Any], caller_info: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Merge CLI overrides into raw INI values, before conversion/validation.
+
+    None means the option was omitted. Non-schema arguments (such as
+    ini_file) are ignored. Lists replace the complete INI value.
+    """
+    overridden = []
+    for key, value in cmd_args.items():
+        if key not in SCHEMA or value is None:
+            continue
+
+        if SCHEMA[key]["is_list"]:
+            # Accept both nargs lists and comma/semicolon-separated text.
+            if isinstance(value, (list, tuple)):
+                value = ",".join(str(item) for item in value)
+        elif isinstance(value, (list, tuple)):
+            raise ConfigError(f"{key}: expected a single value, got {value!r}")
+
+        caller_info[key] = str(value)
+        overridden.append(key)
+
+    if overridden:
+        print("Command-line overrides:")
+        for key in overridden:
+            print(f"  - {key}")
+
+    return caller_info
+
 # -------------------------------------------------------------------
 # Public API
 # -------------------------------------------------------------------
 
-def parse_call_atlas_ini(filepath: str, debug: bool = False) -> Dict[str, Any]:
+def parse_call_atlas_ini(cmd: Mapping[str, Any], debug: bool = False) -> Dict[str, Any]:
 
+    filepath = _normalize_config_path(cmd['ini_file'])
+                   
     print_header(f"Parsing the ATLAS initialization file\n{filepath}")
 
-    # 1) Parse & convert
-    parser_args = read_ini_file(filepath)
+    # 1) Merge CLI overrides before conversion and all value checks.
+    parser_args = read_ini_file(filepath, cmd_args=cmd)
 
     # 2) Enforce mandatory/recommended
     _enforce_mandatory_and_recommended(parser_args)

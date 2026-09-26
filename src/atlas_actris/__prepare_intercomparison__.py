@@ -11,10 +11,11 @@ from utils.filtering import filter_channels
 from utils.find_radiosonde import find_radiosonde
 from utils.get_scc_config import export_scc_config
 from utils.parse_init_file import parse_call_atlas_ini
-from visualizer.signal_viewer import generate_line_plots
 from utils.parse_config_file import parse_atlas_config_file
-from utils.cleaners import ask_clean_cache, ask_clean_viewer
 from utils.parse_settings_file import parse_atlas_settings_file
+
+from visualizer.qa_test_quicklook import generate_quicklooks
+from visualizer.qa_test_quicklook_vldr import generate_vldr_quicklooks
 
 from utils.parse_caller_args import call_parser
 from processor.pipeline import Context, Processor
@@ -39,6 +40,9 @@ from processor.modify import (
     store_updated_metadata,
     )
 
+from utils.export_processing_stage import (
+    export_processor_stages,
+)
 
 # Get the input .ini file path of the ATLAS caller
 cmd_args = call_parser()
@@ -117,16 +121,32 @@ for key, recipe in recipes.items():
         checkout_id = checkout_stages[key],
         )
 
-if 'off' not in caller_info['view_mean_signal_stages']:
-    for view_stage in caller_info['view_mean_signal_stages']:
-        generate_line_plots(processor, stage = view_stage, db = 'profile_mean')
+# Package measurements for quicklooks
+processor.package(
+    output_id = 'preprocessing_complete_qck', 
+    input_id = 'preprocessing_complete'
+    )
 
-if 'off' not in caller_info['view_signal_stages']:
-    for view_stage in caller_info['view_signal_stages']:
-        generate_line_plots(processor, stage = view_stage, db = 'profile')
+# Quicklooks
+generate_quicklooks(
+    data_pack = processor.export_test_from_stage('preprocessing_complete_qck'),
+    caller_info = processor.processing_info['caller_info'],
+    settings_info = settings_info['qck'],
+    )
 
-# Commandline promt to clean cache or not
-ask_clean_cache(caller_info)
+generate_vldr_quicklooks(
+    data_pack = processor.export_test_from_stage('pol_cal_complete'),
+    caller_info = processor.processing_info['caller_info'],
+    settings_info = settings_info['qck_vldr'],
+    )
 
-# Commandline promt to clean signal_viewer output or not
-ask_clean_viewer(caller_info)
+export_processor_stages(
+    processor=processor,
+    stage_names = caller_info['export_stages'],
+    output_folder = caller_info['output_folder'],
+    overwrite=True,
+    ask=False,
+    default_answer=False,
+    print_estimated_size=True,
+)
+
