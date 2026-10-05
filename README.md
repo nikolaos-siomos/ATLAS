@@ -1,5 +1,7 @@
 # ATLAS ACTRIS
 
+**[Read the ATLAS documentation](https://nikolaos-siomos.github.io/ATLAS/)** — installation, command-line tools, and INI file references.
+
 [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![PyPI version](https://img.shields.io/pypi/v/atlas-actris.svg)](https://pypi.org/project/atlas-actris/)
 [![Development status](https://img.shields.io/badge/status-development-orange)](https://github.com/nikolaos-siomos/atlas_dev)
@@ -168,7 +170,7 @@ The workflow installs ATLAS, checks dependencies with `pip check`, and runs the 
 
 ## Local documentation
 
-The documentation can be checked completely locally. This is currently the recommended way to view the documentation while the repository is private and GitHub Pages is not enabled.
+The documentation is published at [nikolaos-siomos.github.io/ATLAS](https://nikolaos-siomos.github.io/ATLAS/). You can also preview changes locally with the same MkDocs configuration used by the deployment workflow.
 
 The documentation source files are in:
 
@@ -271,7 +273,22 @@ docs/generated/configuration_reference.md
 docs/generated/settings_reference.md
 ```
 
-### GitHub Pages note
+### Publishing documentation to GitHub Pages
 
-GitHub Pages deployment is optional for local testing. If the repository is private and GitHub Pages is not available for the current plan/settings, colleagues can still use `mkdocs serve` to view the full documentation locally.
+The `.github/workflows/docs.yml` workflow builds the MkDocs site and publishes the generated `site/` directory. The documentation homepage is `docs/index.md`; the repository README is not used as the documentation homepage.
 
+Configure the repository once:
+
+1. Open **Settings → Pages**.
+2. Under **Build and deployment → Source**, select **GitHub Actions**.
+3. Commit the documentation files, `mkdocs.yml`, and `.github/workflows/docs.yml` to `main`.
+4. In **Actions → Deploy documentation**, wait for the build and deployment jobs to succeed. You can also choose **Run workflow** on `main`.
+5. Open the URL shown by the deployment: [https://nikolaos-siomos.github.io/ATLAS/](https://nikolaos-siomos.github.io/ATLAS/).
+
+Do not select the repository root or the Markdown `docs/` folder as a branch-based publishing source for this workflow. GitHub Actions publishes the HTML built by MkDocs.
+
+All Markdown pages referenced by `mkdocs.yml`, including `docs/generated/`, must be committed. This deployment workflow builds the committed documentation; it does not run the ATLAS schema-reference generator. After schema changes, regenerate and commit the reference pages before pushing.
+
+The workflow uses `mkdocs build --strict`. If it fails, inspect the **Build MkDocs site** log for missing pages, broken links, or other warnings. A failed build does not publish the new documentation. Keep strict checking enabled and fix the reported issues.
+
+You do not need to commit `site/` or create a `gh-pages` branch. To preview the same content locally, use `mkdocs serve` from the same checkout with the documentation dependencies installed.

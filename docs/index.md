@@ -20,5 +20,9 @@ These pages are generated from the ATLAS parser schemas and template flavor file
 
 ## Extra tools
 
-- [Get config files from SCC HOI](get_config_files_from_scc_hoi/README.md)
-- [Get T/P profiles from Cloudnet](get_T_P_profiles_from_cloudnet/README_Cloudnet_Profile_Library_v11.txt)
+- [Intercomparison (`atlas-intercomparison`)](atlas_intercomparison.md)
+- [Signal viewer (`atlas-signal-viewer`)](atlas_signal_viewer.md)
+- [ATLAS smoke test (`atlas-smoke-test`)](atlas_smoke_test.md)
+- [Signal-viewer smoke test (`atlas-signal-viewer-smoke-test`)](atlas_signal_viewer_smoke_test.md)
+- [Generate INI templates (`atlas-generate-templates`)](atlas_generate_templates.md)
+- [SCC configuration (`get_scc_config`)](get_scc_config.md)

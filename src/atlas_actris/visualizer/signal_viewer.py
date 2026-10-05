@@ -772,7 +772,7 @@ def _save_hvplot_html(plot, output_folder, filename):
             
 def generate_line_plots(processor, stage, db):
     
-    allowed_dbs = {"profile", "profile_mean"}
+    allowed_dbs = {"profile", "profile_mean", "profile_high_res", "profile_low_res"}
 
     if db not in allowed_dbs:
         print()

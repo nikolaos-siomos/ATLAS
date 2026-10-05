@@ -472,7 +472,8 @@ def read_dataset(dir_meas, meas_type=None, lazy=True, chunks=None):
         if channel_info.loc[ch, "laser_id"] == "3" and system_info["laser_C_repetition_rate"] is not None:
             channel_info.loc[ch, "laser_repetition_rate"] = system_info["laser_C_repetition_rate"]
 
-    bins_arr = np.arange(1, max(bins) + 1, 1)
+    # bins_arr = np.arange(1, max(bins) + 1, 1)
+    bins_arr = np.arange(0, max(bins))
 
     start_time_arr = np.nan * np.zeros(len(mfiles), dtype=object)
     end_time_arr = np.nan * np.zeros(len(mfiles), dtype=object)

@@ -100,7 +100,7 @@ def read_dataset(dir_meas, meas_type = None):
                 if channel_info.loc[ch,"laser_id"] == "3" and system_info["laser_C_repetition_rate"] != None:
                     channel_info.loc[ch,"laser_repetition_rate"]  = system_info["laser_C_repetition_rate"]
 
-            # bins_arr = np.arange(1., channel_info.bins.max() + 1.)
+            # bins_arr = np.arange(1, channel_info.bins.max() + 1)
             bins_arr = np.arange(0., channel_info.bins.max())
 
             # Creating empty signal, shots, and time arrays

@@ -321,7 +321,7 @@ def _split_list(raw: Optional[str]) -> List[str]:
     s = raw.strip()
     if s == "":
         return []
-    return [x.strip() for x in s.replace(";", ", ").split(", ") if x.strip() != ""]
+    return [x.strip() for x in s.replace(";", ",").split(",") if x.strip() != ""]
 
 def _convert_list(raw: Optional[str], meta: Dict[str, Any], name: str) -> List[Any]:
     items = _split_list(raw)

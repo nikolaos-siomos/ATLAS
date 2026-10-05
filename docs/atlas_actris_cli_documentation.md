@@ -1,6 +1,6 @@
 # ATLAS ACTRIS Command-Line Interface
 
-This page describes the current command-line interface exposed by the `atlas_actris` package during local developer installation.
+This page describes the main `atlas` command during local developer installation.
 
 The package is currently intended to be installed from the local repository with:
 
@@ -8,7 +8,7 @@ The package is currently intended to be installed from the local repository with
 python -m pip install -e .
 ```
 
-After installation, the main workflow is available through `atlas`. Additional installed commands provide the signal viewer and smoke tests, as documented below.
+After installation, the main workflow is available through `atlas`. Additional commands are documented separately under [Extra tools](index.md#extra-tools).
 
 The main command expects an initialization file path:
 
@@ -66,323 +66,171 @@ Equivalent long-option form:
 atlas --ini_file /path/to/call_atlas.ini
 ```
 
-### Help output
-
-The current help output is:
-
-```text
-usage: __call_atlas_interactive__.py [-h] [-i [ini_file]]
-
-arguments
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i [ini_file], --ini_file [ini_file]
-                        The path to the initialization file of the calling
-                        script
-```
-
-### Arguments
-
-- `-i`, `--ini_file`
-
-  Path to the initialization file of the calling script.
-
-  Example:
-
-  ```bash
-  atlas -i ./path/to/call_atlas.ini
-  ```
-
-  The current argparse help displays this option as optional because of the `[-i [ini_file]]` form. However, the ATLAS workflow expects an initialization file path for normal execution.
-
-### Examples
-
-Run ATLAS with an initialization file:
-
-```bash
-atlas -i ./docs/templates/call_atlas.ini
-```
-
-or:
-
-```bash
-atlas --ini_file ./docs/templates/call_atlas.ini
-```
-
-Use an absolute path if the initialization file is outside the repository:
-
-```bash
-atlas -i /home/user/atlas_runs/call_atlas.ini
-```
-
-On Windows:
-
-```powershell
-atlas -i C:\Users\YourUser\atlas_runs\call_atlas.ini
-```
-
-Check help:
-
-```bash
-atlas -h
-```
-
-or:
+### Help
 
 ```bash
 atlas --help
 ```
 
-
-## Additional installed commands
-
-The package also exposes commands for the signal viewer and for automated smoke testing:
-
-```toml
-[project.scripts]
-atlas = "atlas_actris.cli:main"
-atlas-signal-viewer = "atlas_actris.cli_viewer:main"
-atlas-intercomparison = "atlas_actris.cli_intercomparison:main"
-atlas-smoke-test = "atlas_actris.testing.smoke_test:main"
-atlas-signal-viewer-smoke-test = "atlas_actris.testing.signal_viewer_smoke_test:main"
-```
-
-After changing `[project.scripts]`, reinstall the package in editable mode so the new commands are created in the active environment:
-
-```bash
-python -m pip install -e .
-```
-
-
-## Command: `atlas-intercomparison`
-
-Runs the ATLAS exported-stage intercomparison workflow. The command expects one intercomparison initialization file.
-
-### Usage
-
-```bash
-atlas-intercomparison -i /path/to/intercomparison.ini
-```
-
-Equivalent long-option form:
-
-```bash
-atlas-intercomparison --ini_file /path/to/intercomparison.ini
-```
-
-The command dispatches through:
+The parser exposes the following options (the displayed program name and wrapping can vary by launcher and Python version):
 
 ```text
-src/atlas_actris/cli_intercomparison.py
+usage: atlas [-h] [-i [ini_file]] [-o [output_folder]]
+             [-s slice_measurement [slice_measurement ...]]
+             [-e exclude_measurement [exclude_measurement ...]]
+             [-q process_qck [process_qck ...]]
+
+arguments
+
+options:
+  -h, --help            show this help message and exit
+  -i [ini_file], --ini_file [ini_file]
+                        The path to the initialization file of the calling
+                        script
+  -o [output_folder], --output_folder [output_folder]
+                        The path to the output folder. It overrides the
+                        corresponding parameter provided in the initialization
+                        file
+  -s slice_measurement [slice_measurement ...], --slice_measurement slice_measurement [slice_measurement ...]
+                        Slicing option for the QA tests. It overrides the
+                        corresponding parameter provided in the initialization
+                        file
+  -e exclude_measurement [exclude_measurement ...], --exclude_measurement exclude_measurement [exclude_measurement ...]
+                        Exclude option for the QA tests. It overrides the
+                        corresponding parameter provided in the initialization
+                        file
+  -q process_qck [process_qck ...], --process_qck process_qck [process_qck ...]
+                        Select QA test aliases for quicklook generation. It
+                        overrides the corresponding parameter provided in the
+                        initialization file
 ```
 
-and runs the main interactive script:
+### Arguments
 
-```text
-src/atlas_actris/__intercomparison_interactive__.py
-```
+| Option | Value | Purpose |
+| --- | --- | --- |
+| `-i`, `--ini_file` | One file path | Initialization file. Required for execution; the path must exist. |
+| `-o`, `--output_folder` | One folder path | Override `output_folder`. |
+| `-s`, `--slice_measurement` | One or more `measurement start stop` triplets | Override the time windows selected for processing. |
+| `-e`, `--exclude_measurement` | One or more `measurement start stop` triplets | Override the time windows excluded from processing. |
+| `-q`, `--process_qck` | One or more quicklook aliases | Override the quicklook selection. |
+| `-h`, `--help` | No value | Show help and exit. |
 
-The same main script can be opened and run directly in Spyder. Configure the Spyder run arguments with:
+Although argparse displays `-i` as optional, the parser checks that an initialization file was supplied. Always supply a value with `-i` and `-o`; do not use them as bare switches.
 
-```text
--i /path/to/intercomparison.ini
-```
+Only the options listed here are exposed by `parse_caller_args.py`. Other initialization-schema parameters must still be set in the INI file; schema membership alone does not create a CLI option.
 
-The parsed initialization dictionary remains available in the Spyder namespace as `intercomparison_info`.
+### Override precedence
 
-### Intercomparison templates
+ATLAS reads the initialization file, applies supplied CLI overrides, then performs schema conversion and validation. An omitted option leaves the INI setting in effect, subject to the usual defaults and processing rules. The initialization file itself is not modified.
 
-The generated full and bare templates are:
+List overrides **replace the entire INI value**, rather than append to it. For example, `-q drk ray` replaces the INI's `process_qck` list. The same replacement rule applies to `-s` and `-e`. Supplied overrides are listed in the terminal under `Command-line overrides:`.
 
-```text
-src/atlas_actris/templates/intercomparison.ini
-src/atlas_actris/templates/intercomparison_bare.ini
-```
+Pass multiple values after a single option. Repeating an option keeps only its last occurrence. Space-separated values are easiest to read; quoted comma- or semicolon-separated lists are also accepted by the initialization parser.
 
-The full template contains parameter descriptions, defaults, allowed values, and examples, but all assignments are intentionally empty. The bare template contains the same section and parameter structure without per-parameter flavor comments.
-
-The generated reference page is:
-
-```text
-docs/generated/intercomparison_reference.md
-```
-
-## Command: `atlas-signal-viewer`
-
-Runs the ATLAS signal-viewer workflow using the same initialization-file interface as the main ATLAS command.
-
-### Usage
+### Output folder
 
 ```bash
-atlas-signal-viewer -i /path/to/call_atlas.ini
+atlas -i ./call_atlas.ini -o ./analysis_run
 ```
 
-Equivalent long-option form:
+This overrides the main workflow's `output_folder` setting; it does not change any other initialization parameters.
+
+Quote paths containing spaces, including on Windows:
+
+```powershell
+atlas -i "C:\ATLAS runs\call_atlas.ini" -o "C:\ATLAS runs\analysis"
+```
+
+### Select or exclude time windows
+
+Each entry consists of three values: a measurement identifier, a start time, and a stop time.
+
+Select a Rayleigh measurement window:
 
 ```bash
-atlas-signal-viewer --ini_file /path/to/call_atlas.ini
+atlas -i ./call_atlas.ini -s ray 1200 1300
 ```
 
-The signal viewer reads and processes the configured test data, generates the requested interactive viewer outputs, and stores them under the case output folder in:
-
-```text
-analysis/<case-name>/signal_viewer/
-```
-
-The command is interactive during normal use. At the end it may ask whether temporary cache files and generated signal-viewer files should be deleted.
-
-## Command: `atlas-smoke-test`
-
-Runs the packaged ATLAS smoke-test dataset through the main `atlas` CLI and validates that the expected plots, reports, and ASCII products are created.
-
-### Usage
-
-From the repository root:
+Select windows for multiple measurements with one `-s` option:
 
 ```bash
-atlas-smoke-test
+atlas -i ./call_atlas.ini -s ray 1200 1300 pcb 1400 1430
 ```
 
-The command can also be run from another directory, provided the package is installed in the active environment. The test first looks for `./testing_pack`; if that folder is not present, it falls back to the repository-level `testing_pack` associated with the editable installation.
-
-An explicit testing-pack path can also be supplied:
+Exclude a time window:
 
 ```bash
-atlas-smoke-test /path/to/testing_pack
+atlas -i ./call_atlas.ini -e ray 1210 1215
 ```
 
-Useful options include:
-
-```text
---ini FILE
---case-name NAME
---timeout SECONDS
---keep-output
-```
-
-By default, the smoke test removes generated analysis files when it finishes. This keeps repeated local and CI test runs from accumulating large output folders. Cleanup also occurs after a failed run where possible.
-
-### Keeping generated outputs
-
-Use `--keep-output` when debugging or manually inspecting the generated files:
+Selection and exclusion can be used together:
 
 ```bash
-atlas-smoke-test --keep-output
+atlas -i ./call_atlas.ini -s ray 1200 1300 -e ray 1210 1215
 ```
 
-With this option, existing outputs are not removed before the test and newly generated outputs are retained afterwards. This is useful when checking plots, reports, cache contents, or a failing intermediate result. Because these files can be large, omit `--keep-output` during routine testing and continuous integration.
-
-## Command: `atlas-signal-viewer-smoke-test`
-
-Runs the signal-viewer workflow through the installed `atlas-signal-viewer` CLI and verifies that signal-viewer output files are created.
-
-### Usage
+For an interval crossing midnight, explicit dates make the intended interval clear:
 
 ```bash
-atlas-signal-viewer-smoke-test
+atlas -i ./call_atlas.ini -s ray 20261005_2330 20261006_0100
 ```
 
-An explicit testing-pack path can be supplied in the same way:
+Accepted time formats are `HHMM`, `YYYYMMDD`, `YYYYMMDD_HH`, `YYYYMMDD_HHMM`, and `YYYYMMDD_HHMMSS`. Date-only values denote midnight; omitted minutes and seconds are zero. With `HHMM`, the measurement date is assigned later in processing.
+
+Both slicing and exclusion accept individual measurement identifiers:
+
+- `ray`, `ray_pcb`, `trg`, `dtm`, `drk`;
+- `pcb_p45`, `pcb_m45`, `pcb_aux_p45`, `pcb_aux_m45`;
+- `tlc_north`, `tlc_east`, `tlc_south`, `tlc_west`, `tlc_inner`, `tlc_outer`;
+- `drk_ray`, `drk_pcb`, `drk_tlc`, `drk_tlc_rin`, `drk_trg`, `drk_dtm`, `drk_ray_pcb`, `drk_pcb_aux`.
+
+The following bundle aliases apply the same interval to each listed measurement:
+
+| Alias | Measurements |
+| --- | --- |
+| `pcb` | `pcb_p45`, `pcb_m45` |
+| `pcb_aux` | `pcb_aux_p45`, `pcb_aux_m45` |
+| `tlc` | `tlc_north`, `tlc_east`, `tlc_south`, `tlc_west` |
+| `tlc_rin` | `tlc_inner`, `tlc_outer` |
+
+For example, `-s tlc 1200 1300` applies that interval to all four telecover sectors. Bundle expansion here is specific to slicing and exclusion.
+
+### Select quicklooks
 
 ```bash
-atlas-signal-viewer-smoke-test /path/to/testing_pack
+atlas -i ./call_atlas.ini -q drk ray
 ```
 
-Useful options include:
-
-```text
---ini FILE
---case-name NAME
---timeout SECONDS
---keep-output
-```
-
-By default, the signal-viewer smoke test deletes the generated `signal_viewer` and temporary `cache` folders after validation. Other ATLAS analysis products are left untouched.
-
-To retain the generated viewer files for manual inspection, use:
+Equivalent comma-separated form:
 
 ```bash
-atlas-signal-viewer-smoke-test --keep-output
+atlas -i ./call_atlas.ini --process_qck "drk, ray"
 ```
 
-This is particularly useful when checking generated HTML files, interactive plots, or viewer-specific failures. As with the main smoke test, retained outputs may consume significant disk space.
+Accepted aliases are `ray`, `pcb`, `tlc`, `tlc_rin`, `ray_pcb`, `pcb_aux`, `trg`, `dtm`, `drk`, `drk_ray`, `drk_pcb`, `drk_tlc`, `drk_tlc_rin`, `drk_ray_pcb`, `drk_pcb_aux`, `drk_trg`, and `drk_dtm`.
 
-## Smoke-test examples
-
-Run both smoke tests with automatic cleanup:
+To disable quicklooks explicitly:
 
 ```bash
-atlas-smoke-test
-atlas-signal-viewer-smoke-test
+atlas -i ./call_atlas.ini -q off
 ```
 
-Retain outputs from the main test:
+Use `off` alone. `-q` changes `process_qck`; it does not replace the `process` selection for the other QA tests. `ray` and `ray_pcb` are distinct aliases.
+
+### Combine overrides
 
 ```bash
-atlas-smoke-test --keep-output
+atlas -i ./call_atlas.ini -o ./analysis_run -s ray 1200 1300 -e ray 1210 1215 -q drk ray
 ```
 
-Retain signal-viewer outputs:
+The long-option equivalent is:
 
 ```bash
-atlas-signal-viewer-smoke-test --keep-output
+atlas --ini_file ./call_atlas.ini --output_folder ./analysis_run --slice_measurement ray 1200 1300 --exclude_measurement ray 1210 1215 --process_qck drk ray
 ```
 
-Use a longer timeout on a slower machine or CI runner:
-
-```bash
-atlas-smoke-test --timeout 3600
-atlas-signal-viewer-smoke-test --timeout 3600
-```
-
-
-## Generating INI templates and reference pages
-
-Generate all full, bare, and beginner ATLAS templates together with the generated documentation pages:
-
-```bash
-atlas-generate-templates
-```
-
-The intercomparison generator participates in the same command. With the default `--profile all`, the command writes both:
-
-```text
-src/atlas_actris/templates/intercomparison.ini
-src/atlas_actris/templates/intercomparison_bare.ini
-```
-
-and:
-
-```text
-docs/generated/intercomparison_reference.md
-```
-
-Generate only full templates:
-
-```bash
-atlas-generate-templates --target ini --profile full
-```
-
-Generate only bare templates:
-
-```bash
-atlas-generate-templates --target ini --profile bare
-```
-
-Generate only the documentation pages:
-
-```bash
-atlas-generate-templates --target docs
-```
-
-Check whether committed generated files are current without rewriting them:
-
-```bash
-atlas-generate-templates --check
-```
-
-After changing parser schemas or flavor files, rerun the generator from the repository root. Editable reinstallation is only required when console-script definitions in `pyproject.toml` change.
+See the [initialization file reference](generated/initialization_reference.md) for the corresponding schema parameters.
 
 ## Developer execution from Python
 
@@ -443,28 +291,6 @@ atlas -i /path/to/call_atlas.ini
 ```
 
 is passed through to `__call_atlas_interactive__.py` as the script's command-line input.
-
-## Legacy or planned commands
-
-Older documentation mentioned additional commands:
-
-- `get_config`
-- `get_T_P`
-
-These commands are not currently exposed as installed console scripts unless they are added to `[project.scripts]` in `pyproject.toml`.
-
-If these tools should become installed commands again, add suitable callable functions in the package and expose them explicitly. For example:
-
-```toml
-[project.scripts]
-atlas = "atlas_actris.cli:main"
-get_config = "atlas_actris.__get_config_file_from_scc_hoi__:main"
-get_T_P = "atlas_actris.__get_T_P_profiles_from_cloudnet__:main"
-```
-
-Only add entries like these if the target modules actually define a callable `main()` function and are ready to be used as stable command-line tools.
-
-Until then, treat `get_config` and `get_T_P` as legacy or internal developer scripts, not as part of the current installed CLI.
 
 ## Verifying the CLI after installation
 

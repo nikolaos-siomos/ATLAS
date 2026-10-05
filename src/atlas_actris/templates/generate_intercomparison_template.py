@@ -259,7 +259,22 @@ def render_ini(*, include_flavor: bool = True) -> str:
                 f"{entry_id}.reference =", "",
             ])
 
-    return "\n".join(lines).rstrip() + "\n"
+    text = "\n".join(lines)
+    if not include_flavor:
+        # Keep entries compact, with one empty line between INI sections.
+        compact = []
+        seen_section = False
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            if line.lstrip().startswith("["):
+                if seen_section:
+                    compact.append("")
+                seen_section = True
+            compact.append(line)
+        text = "\n".join(compact)
+    return text.rstrip() + "\n"
+
 
 
 def render_bare_ini() -> str:

@@ -528,7 +528,22 @@ def _render_flat_ini_template(
             lines.append("")
         lines.append("")
 
-    return "\n".join(lines).rstrip() + "\n"
+    text = "\n".join(lines)
+    if not include_flavor:
+        # Keep entries compact, with one empty line between INI sections.
+        compact = []
+        seen_section = False
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            if line.lstrip().startswith("["):
+                if seen_section:
+                    compact.append("")
+                seen_section = True
+            compact.append(line)
+        text = "\n".join(compact)
+    return text.rstrip() + "\n"
+
 
 
 def _render_settings_ini_template(
@@ -558,7 +573,22 @@ def _render_settings_ini_template(
             lines.append("")
         lines.append("")
 
-    return "\n".join(lines).rstrip() + "\n"
+    text = "\n".join(lines)
+    if not include_flavor:
+        # Keep entries compact, with one empty line between INI sections.
+        compact = []
+        seen_section = False
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            if line.lstrip().startswith("["):
+                if seen_section:
+                    compact.append("")
+                seen_section = True
+            compact.append(line)
+        text = "\n".join(compact)
+    return text.rstrip() + "\n"
+
 
 
 # ---------------------------------------------------------------------------
@@ -923,6 +953,7 @@ def build_outputs(
     repo_root: str | Path | None = None,
     target: str = "all",
     profile: str = "all",
+    output_folder: str | Path | None = None,
 ) -> dict[Path, str]:
     if target not in ALLOWED_TARGETS:
         raise ValueError(f"target must be one of {ALLOWED_TARGETS}, got {target!r}")
@@ -930,7 +961,9 @@ def build_outputs(
     validate_all()
 
     root = Path(repo_root).resolve() if repo_root is not None else _repo_root_from_this_file()
-    template_dir = root / GENERATED_TEMPLATES_DIRECTORY
+    template_dir = (Path(output_folder).expanduser().resolve()
+                    if output_folder is not None
+                    else root / GENERATED_TEMPLATES_DIRECTORY)
     docs_dir = root / "docs" / "generated"
 
     outputs: dict[Path, str] = {}
@@ -991,15 +1024,17 @@ def generate(
     target: str = "all",
     profile: str = "all",
     check: bool = False,
+    output_folder: str | Path | None = None,
 ) -> dict[Path, str]:
     root = Path(repo_root).resolve() if repo_root is not None else _repo_root_from_this_file()
-    outputs = build_outputs(repo_root=root, target=target, profile=profile)
+    outputs = build_outputs(repo_root=root, target=target, profile=profile,
+                            output_folder=output_folder)
 
     if check:
         changed: list[str] = []
         for path, content in outputs.items():
             if not path.exists() or path.read_text(encoding="utf-8") != content:
-                changed.append(str(path.relative_to(root)))
+                changed.append(str(path))
 
         if changed:
             raise SystemExit(
@@ -1028,8 +1063,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--target",
         choices=ALLOWED_TARGETS,
-        default="all",
-        help="What to generate: all, ini, or docs. Default: all.",
+        default=None,
+        help="What to generate: all, ini, or docs. Default: ini with -o, otherwise all.",
+    )
+    parser.add_argument(
+        "-o", "--output_folder", default=None,
+        help="Destination for generated INI files. Created if needed. Defaults to repository templates/.",
     )
     parser.add_argument(
         "--profile",
@@ -1046,13 +1085,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.output_folder is not None and not args.output_folder.strip():
+        parser.error("--output_folder must not be empty")
+    if args.output_folder is not None and args.target == "docs":
+        parser.error("--output_folder applies to INI files; use --target ini or all")
+    args.target = args.target or ("ini" if args.output_folder is not None else "all")
     root = Path(args.repo_root).resolve() if args.repo_root else _repo_root_from_this_file()
     outputs = generate(
         repo_root=root,
         target=args.target,
         profile=args.profile,
         check=args.check,
+        output_folder=args.output_folder,
     )
 
     if args.check:
@@ -1060,7 +1106,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"Generated ATLAS {args.target} files:")
         for path in outputs:
-            print(f"  - {path.relative_to(root)}")
+            print(f"  - {path}")
 
     return 0
 

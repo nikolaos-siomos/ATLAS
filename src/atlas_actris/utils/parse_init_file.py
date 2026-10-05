@@ -92,7 +92,6 @@ allowed_background = [
 ]
 
 default_quicklooks = [
-    "drk",
     "ray",
     "pcb",
     "tlc",
@@ -784,7 +783,6 @@ def _resolve_processing_defaults(parser_args: Dict[str, Any]) -> Dict[str, Any]:
     dedicated_dark = parser_args.get("process_dedicated_dark")
     if dedicated_dark is None:
         dedicated_dark = True
-    parser_args["process_dedicated_dark"] = bool(dedicated_dark)
 
     if process:
         derived = _derive_plot_process(
@@ -1446,19 +1444,10 @@ def _special_path_handling(parser_args: Dict[str, Any]) -> Dict[str, Any]:
         version_warning=version_warning_nrm,
     )
 
-    # ray and ray_pcb measurements will be the same if only one of them is provided.
+    # Keep ray and ray_pcb as independent physical measurements. Likewise,
+    # their dedicated dark measurements must not be propagated between them.
+    # A common drk measurement may still be used as a fallback below.
     path_drk = parser_args.get("abs_drk")
-    path_ray = parser_args.get("abs_ray")
-    path_ray_pcb = parser_args.get("abs_ray_pcb")
-    path_pcb = parser_args.get("abs_pcb")
-
-    if path_ray is None and path_ray_pcb is not None:
-        parser_args["abs_ray"] = path_ray_pcb
-        parser_args["abs_drk_ray"] = parser_args.get("abs_drk_ray_pcb")
-
-    if path_ray_pcb is None and path_ray is not None:
-        parser_args["abs_ray_pcb"] = path_ray
-        parser_args["abs_drk_ray_pcb"] = parser_args.get("abs_drk_ray")
 
     # Use common drk measurement if not provided explicitly for a QA test.
     for key in qa_tests:
@@ -1924,7 +1913,6 @@ def _build_path_registry(parser_args: Dict[str, Any]) -> Dict[str, Any]:
             physical measurement keys as values.
 
     Examples:
-        loading_map["ray_pcb"] = "ray"
         loading_map["drk_ray"] = "drk"
         loading_map["drk_tlc"] = "drk"
     """

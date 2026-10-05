@@ -427,7 +427,8 @@ def plot_normalized_sm_deviation(
         alpha=0.8,
     )
     ax.set_xlim(xlims_bins)
-    ax.set_ylim(-2.0 * relative_limit, 2.0 * relative_limit)
+#    ax.set_ylim(-2.0 * relative_limit, 2.0 * relative_limit)
+    ax.set_ylim(-10.0 * relative_limit, 10.0 * relative_limit)
     ax.xaxis.set_minor_locator(AutoMinorLocator())
     ax.yaxis.set_minor_locator(AutoMinorLocator(2))
     ax.tick_params(axis="x", which="minor", length=3)

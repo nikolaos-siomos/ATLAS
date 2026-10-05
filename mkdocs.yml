@@ -33,8 +33,12 @@ nav:
   - Settings file: generated/settings_reference.md
   - Intercomparison file: generated/intercomparison_reference.md
 - Extra tools:
-  - Get config files from SCC HOI: get_config_files_from_scc_hoi/README.md
-  - Get T/P profiles from Cloudnet: get_T_P_profiles_from_cloudnet/README_Cloudnet_Profile_Library_v11.txt
+  - atlas-intercomparison: atlas_intercomparison.md
+  - atlas-signal-viewer: atlas_signal_viewer.md
+  - atlas-smoke-test: atlas_smoke_test.md
+  - atlas-signal-viewer-smoke-test: atlas_signal_viewer_smoke_test.md
+  - atlas-generate-templates: atlas_generate_templates.md
+  - get_scc_config: get_scc_config.md
 plugins:
 - search
 markdown_extensions:

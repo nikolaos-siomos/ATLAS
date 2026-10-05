@@ -37,7 +37,7 @@ def call_parser():
                         help = f'Exclude option for the QA tests. {common_flavor}')
 
     parser.add_argument('-q', '--process_qck', metavar = 'process_qck', 
-                        type = str, nargs = '+',  default = ['ray', 'ray_pcb'],
+                        type = str, nargs = '+',  default = None,
                         help = f'Select QA test aliases for quicklook generation. {common_flavor}')
     
     args = vars(parser.parse_args())

@@ -14,9 +14,9 @@ from datetime import datetime
 import numpy as np
 import argparse
 import requests
-from utils.printouts import print_header
+from .printouts import print_header
 from pprint import pprint
-from utils.error_classes import ConfigError, CustomWarning
+from .error_classes import ConfigError, CustomWarning
 
 sections_map = {
     "System": {
@@ -73,72 +73,34 @@ internal_map = {
 }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    """Parse options for the standalone SCC configuration CLI."""
     parser = argparse.ArgumentParser(
-        description="Process optional lists of IDs"
-    )
-
-    parser.add_argument(
-        "-c",
-        "--scc_configuration_id",
-        type=str,
-        nargs="?",          # one or more strings if provided
-        default=None,       # None if not given
-        help="The SCC configuration ID"
+        description="Download an SCC configuration and generate an ATLAS configuration."
     )
     parser.add_argument(
-        "-o",
-        "--atlas_configuration_file",
-        type=str,
-        nargs="?",          # one or more strings if provided
-        default=None,       # None if not given
-        help="The path to the atlas configuration file"
+        "-c", "--scc_configuration_id", required=True,
+        help="The SCC configuration ID",
     )
     parser.add_argument(
-        "-e",
-        "--export_hoi_cfg",
-        type=str,
-        nargs="?",          # one or more strings if provided
-        default="1",       # None if not given
-        help="The path to the exported ini file"
+        "-o", "--output_folder", required=True,
+        help="Destination folder for the ATLAS INI file and downloaded SCC CSV",
     )
     parser.add_argument(
-        "-f",
-        "--output_folder",
-        type=str,
-        nargs="?",          # one or more strings if provided
-        default="./scc_hoi",       # None if not given
-        help="The path to the exported ini file"
-    )
-    parser.add_argument(
-        "--scc_compatible_format",
-        "--scc_format",
+        "-s", "--scc_compatible_format", "--scc_format",
         action="store_true",
-        default=False,
-        help=(
-            "If provided, use the SCC channel IDs directly as recorder_channel_id "
-            "values and skip the interactive recorder_channel_id prompt."
-        ),
+        help="Use SCC channel IDs as recorder_channel_id without prompting.",
     )
-        
-    args = parser.parse_args()
-    scc_configuration_id = args.scc_configuration_id
-    atlas_configuration_file = args.atlas_configuration_file
-    export_hoi_cfg = args.export_hoi_cfg
-    output_folder = args.output_folder
-    
-    validate_string(scc_configuration_id, var_name = "scc_configuration_id")
-    
-    if atlas_configuration_file == None:
-        atlas_configuration_file = f"./configurations/config_file_{scc_configuration_id}.ini"
-        args.atlas_configuration_file = atlas_configuration_file
-        Path(atlas_configuration_file).parent.mkdir(exist_ok=True)
-        CustomWarning(f"The scc_config_file_path was not provided. The following path was selected by default: {atlas_configuration_file}")
-    
-    validate_string(atlas_configuration_file, var_name = "atlas_configuration_file")
-    validate_string(export_hoi_cfg, var_name = "export_hoi_cfg", allowed_values = ["0", "1", "2"])
-    validate_string(output_folder, var_name = "output_folder")
-
+    args = parser.parse_args(argv)
+    for name in ("scc_configuration_id", "output_folder"):
+        if not getattr(args, name).strip():
+            parser.error(f"--{name} must not be empty")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    args.atlas_configuration_file = str(
+        Path(args.output_folder)
+        / f"config_file_{args.scc_configuration_id}_{timestamp}.ini"
+    )
+    args.export_hoi_cfg = "1"
     return args
 
 
@@ -215,10 +177,12 @@ def download_with_auth(url: str, folder: str, username: str, password: str, file
     return str(file_path)
 
     
-def _get_scc_file(output_folder: str, scc_configuration_id: str) -> str:
+def _get_scc_file(output_folder: str, scc_configuration_id: str,
+                  csv_output_folder: Optional[str] = None) -> str:
 
-    output_folder = Path(output_folder) / "scc_hoi"
-    output_folder.mkdir(exist_ok=True)
+    output_folder = (Path(csv_output_folder) if csv_output_folder is not None
+                     else Path(output_folder) / "scc_hoi")
+    output_folder.mkdir(parents=True, exist_ok=True)
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
@@ -726,6 +690,7 @@ def export_selected_to_ini(
     # ConfigParser lowercases option names by default, which would turn
     # schema keys like G and H into g and h.
     cfg.optionxform = str
+    list_values = {}
 
     for new_section, mapping in sections_map.items():
         if not cfg.has_section(new_section):
@@ -738,11 +703,47 @@ def export_selected_to_ini(
             values = data[src_sec][src_key]
             val_str = joiner.join(str(v) for v in values) if isinstance(values, list) else str(values)
             cfg.set(new_section, target_key, val_str)
+            if isinstance(values, list) and joiner == ",":
+                list_values[(new_section, target_key)] = [str(v) for v in values]
+
+    # SCC does not currently supply polarization calibration values.
+    # Keep these placeholders empty (eta is intentionally omitted), while
+    # preserving any values supplied by a future sections_map extension.
+    section = "polarization_calibration"
+    if not cfg.has_section(section):
+        cfg.add_section(section)
+    for key in ("ch_r", "ch_t", "K", "R_to_T_transmission_ratio"):
+        if not cfg.has_option(section, key):
+            cfg.set(section, key, "")
 
     ensure_file(filename)
-    
+
     with open(Path(filename), "w", encoding="utf-8") as f:
-        cfg.write(f)
+        f.write(
+            "# Fill in the empty [polarization_calibration] fields manually "
+            "when applicable; these values are not currently retrieved from SCC.\n\n"
+        )
+        for section in cfg.sections():
+            rows = list(cfg.items(section, raw=True))
+            key_width = (0 if section == "System" else
+                         max((len(key) for key, _ in rows), default=0))
+            widths = []
+            for key, _ in rows:
+                for i, value in enumerate(list_values.get((section, key), [])):
+                    if i == len(widths):
+                        widths.append(0)
+                    widths[i] = max(widths[i], len(value))
+            f.write(f"[{section}]\n")
+            for key, value in rows:
+                values = list_values.get((section, key))
+                if values is not None and section != "System":
+                    value = ", ".join(
+                        item.rjust(widths[i]) for i, item in enumerate(values)
+                    )
+                # Preserve ConfigParser's indentation for multiline values.
+                value = value.replace("\n", "\n\t")
+                f.write(f"{key.ljust(key_width)} = {value}\n")
+            f.write("\n")
 
 
 def read_sectioned_csv(path: str) -> Dict[str, Dict[str, List[str]]]:
@@ -909,7 +910,8 @@ def export_scc_config(scc_configuration_id: str,
                       export_hoi_cfg: str, 
                       output_folder: str,
                       scc_compatible_format: bool = False,
-                      debug: bool = False) -> Dict[str, Dict[str, List[str]]]:
+                      debug: bool = False,
+                      csv_output_folder: Optional[str] = None) -> Dict[str, Dict[str, List[str]]]:
     
     if scc_configuration_id != None:
         validate_string(atlas_configuration_file, var_name = "atlas_configuration_file")
@@ -926,7 +928,8 @@ def export_scc_config(scc_configuration_id: str,
             print_header(f"Exporting SCC HOI - Config ID:{scc_configuration_id}\nto: {atlas_configuration_file}")
             
             scc_file_path = _get_scc_file(output_folder = output_folder, 
-                                          scc_configuration_id = scc_configuration_id)
+                                          scc_configuration_id = scc_configuration_id,
+                                          csv_output_folder = csv_output_folder)
         
             data = read_sectioned_csv(scc_file_path)
             

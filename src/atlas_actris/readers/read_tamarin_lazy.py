@@ -257,7 +257,8 @@ def read_signals(raw_data, time, channels, meas_type):
 
     sig_arr = sig_arr.where(sig_arr < 9.96e+36)
 
-    bins = 1. + np.arange(0, sig_arr.shape[-1])
+    # bins = np.arange(1, sig_arr.shape[-1] + 1)
+    bins = np.arange(0, sig_arr.shape[-1])
 
     sig_raw = xr.DataArray(sig_arr.data,
                            coords=[time, channels, bins], #range_sig

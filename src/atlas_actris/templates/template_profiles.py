@@ -458,10 +458,6 @@ INTERCOMPARISON_TEMPLATE_KEYS = {
 # Keys must exist in parse_init_file.SCHEMA.
 
 BEGINNER_INIT_TEMPLATE_SECTIONS = {
-    "configuration": [
-        "scc_configuration_id",
-        "export_hoi_cfg",
-    ],
     "explicit_paths": [
         "parent_folder",
         "atlas_configuration_file",
@@ -475,7 +471,6 @@ BEGINNER_INIT_TEMPLATE_SECTIONS = {
         "process_qck",
         "process_bgd",
         "process_vldr",
-        "process_dedicated_dark",
     ],
     "trimming_options": [
         "max_height_agl",
@@ -499,8 +494,10 @@ BEGINNER_INIT_TEMPLATE_SECTIONS = {
 BEGINNER_CONFIG_TEMPLATE_SECTIONS = {
     "System": [
         "station_id",
-        "lidar_name",
         "station_name",
+        "lidar_name",
+        "configuration_id",
+        "configuration_name",
         "station_altitude",
         "station_latitude",
         "station_longitude",
@@ -512,12 +509,12 @@ BEGINNER_CONFIG_TEMPLATE_SECTIONS = {
         "scc_channel_id",
         "telescope_type",
         "channel_type",
+        "acquisition_mode",
         "channel_subtype",
         "zero_bin",
         "dead_time",
         "background_low_bin",
         "background_high_bin",
-        "acquisition_mode",
         "detected_wavelength",
         "emitted_wavelength",
         "channel_bandwidth",
@@ -532,23 +529,6 @@ BEGINNER_CONFIG_TEMPLATE_SECTIONS = {
         "ch_t",
         "K",
         "R_to_T_transmission_ratio",
-        "eta",
-    ],
-    "gluing": [
-        "ch_n",
-        "ch_f",
-    ],
-    "water_vapour": [
-        "ch_w",
-        "ch_v",
-        "wv_calibration_factor",
-    ],
-    "temperature": [
-        "ch_h",
-        "ch_l",
-        "alpha_prime",
-        "beta_prime",
-        "gamma_prime",
     ],
 }
 

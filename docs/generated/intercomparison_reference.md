@@ -9,7 +9,7 @@ The file contains one `[general]` section, one optional `[plotting]` section, re
 
 Dataset sections define where and how exported data are read. Group sections do not map datasets directly anymore; instead they contain **named entries**. Each named entry points to a dataset and selects one ATLAS channel or pair. Several entries may point to the same dataset, so multiple channels or pairs from one dataset can be compared in the same plot.
 
-Exactly one dataset must still set `reference = True`. In every active channel or pair group, exactly one named entry must also set `<entry_id>.reference = True`, and that entry must point to the global reference dataset. This identifies the exact channel/pair used as the normalization and difference reference.
+Exactly one dataset must still set `reference = True`; this defines the global fallback reference dataset. A channel or pair group may override that fallback by setting `<entry_id>.reference = True` on exactly one named entry, even when that entry belongs to another dataset. If no entry sets `.reference = True`, ATLAS uses the sole entry belonging to the global reference dataset; if that fallback is absent or ambiguous, the group must select a local reference explicitly.
 
 ### Named-entry syntax
 
@@ -69,29 +69,41 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 
 | Parameter | Description | Type | Default | Allowed / limits | Example |
 | --- | --- | --- | --- | --- | --- |
-| `channel_x_lims` | Default horizontal limits for channel-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `` | size=2 | `0.0, 20.0` |
-| `pair_x_lims` | Default horizontal limits for pair-group intercomparison plots. Empty means determine them automatically from the plotted vertical data. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `` | size=2 | `0.0, 10.0` |
+| `channel_x_lims` | Default horizontal limits for channel-group intercomparison plots. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.0, 30.0` | size=2 | `0.0, 30.0` |
+| `pair_x_lims` | Default horizontal limits for pair-group intercomparison plots. Units follow vertical_scale: km for physical scales, bin units for bins. Default upper limit is 14 km for physical scales. | `list[float]` | `0.0, 14.0` | size=2 | `0.0, 14.0` |
 | `x_tick` | Default major horizontal-axis tick spacing for intercomparison plots. Units follow vertical_scale. | `float` | `2.0` | &gt; 0.0 | `1.0` |
 | `channel_difference_y_lims` | Default right-panel y-axis limits for channel-group relative differences. Group-specific difference_y_lims can override these values. | `list[float]` | `-0.4, 0.4` | size=2 | `-0.4, 0.4` |
 | `pair_difference_y_lims` | Default right-panel y-axis limits for pair-group absolute differences. Empty means determine them automatically from the SNR-filtered absolute differences. Group-specific difference_y_lims can override these values. | `list[float]` | `` | size=2 | `-0.1, 0.1` |
 | `channel_y_lims` | Default left-panel y limits for channel-group plots. Empty means determine them automatically from all plotted channel signals and, when enabled, the reference molecular profile. | `list[float]` | `` | size=2 |  |
 | `channel_smooth` | Default smoothing switch for channel-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned signal and propagated error directly. | `bool` | `True` |  | `True` |
-| `channel_smoothing_range` | Default channel smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 35.0` | size=2 | `0.05, 35.0` |
+| `channel_smoothing_range` | Default channel smoothing range. When empty, it follows channel_x_lims so the complete displayed interval is smoothed. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `` | size=2 | `0.0, 30.0` |
 | `channel_smoothing_window` | Default channel smoothing window. Units follow vertical_scale: km for physical scales, bin units for bins. | `float` | `0.5` | &gt; 0.0 | `0.5` |
 | `pair_y_lims` | Default left-panel y limits for pair-group plots. Empty means determine them automatically. | `list[float]` | `` | size=2 |  |
 | `pair_smooth` | Default smoothing switch for pair-group plots. Smoothing/local-STD estimation is used only for data that are not conservatively binned. Harmonized vertical_binning plots use the binned values and propagated errors directly. | `bool` | `True` |  | `True` |
-| `pair_smoothing_range` | Default pair smoothing range. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `0.05, 10.0` | size=2 | `0.05, 10.0` |
+| `pair_smoothing_range` | Default pair smoothing range. When empty, it follows pair_x_lims so the complete displayed interval is smoothed. Units follow vertical_scale: km for physical scales, bin units for bins. | `list[float]` | `` | size=2 | `0.0, 14.0` |
 | `pair_smoothing_window` | Default pair smoothing window. Units follow vertical_scale: km for physical scales, bin units for bins. | `float` | `0.5` | &gt; 0.0 | `0.5` |
-| `near_range_max` | Upper horizontal limit of the second-row near-range comparison. Units follow vertical_scale: km for physical scales, bin units for bins. Default: 2 km for physical scales. | `float` | `2.0` | &gt; 0.0 | `2.0` |
-| `near_range_smooth` | Default smoothing switch for the second-row near-range comparison. This smoothing is independent of the full-range row and is applied even when the harmonized data were conservatively binned. | `bool` | `True` |  | `True` |
-| `near_range_smoothing_window` | Full smoothing window used only by the second-row near-range comparison. Units follow vertical_scale: km for physical scales, bin units for bins. The default 0.1 km corresponds to 100 m. | `float` | `0.1` | &gt; 0.0 | `0.1` |
+| `channel_quantity_label` | Text used for the channel quantity in the left-panel y-axis label and in the individual full/near-range panel titles. | `str` | `Signal` |  | `Signal` |
+| `pair_quantity_label` | Text used for the pair quantity in the left-panel y-axis label and in the individual full/near-range panel titles. | `str` | `VLDR` |  | `VLDR` |
+| `channel_near_x_lims` | Default horizontal limits for the near-range channel plots (third and fourth panels). Units follow vertical_scale. | `list[float]` | `0.0, 2.0` | size=2 | `0.0, 2.0` |
+| `pair_near_x_lims` | Default horizontal limits for the near-range pair plots (third and fourth panels). Units follow vertical_scale. | `list[float]` | `0.0, 2.0` | size=2 | `0.0, 2.0` |
+| `near_x_tick` | Default major horizontal-axis tick spacing for the near-range row. Units follow vertical_scale. | `float` | `0.5` | &gt; 0.0 | `0.5` |
+| `channel_near_y_lims` | Default y-axis limits for the near-range channel signal panel (third plot). Empty keeps the automatic near-range limits. | `list[float]` | `` | size=2 |  |
+| `pair_near_y_lims` | Default y-axis limits for the near-range pair/VLDR panel (third plot). Empty keeps the automatic near-range limits. | `list[float]` | `` | size=2 |  |
+| `channel_near_difference_y_lims` | Default y-axis limits for the near-range channel relative-difference panel (fourth plot). | `list[float]` | `-0.4, 0.4` | size=2 | `-0.4, 0.4` |
+| `pair_near_difference_y_lims` | Default y-axis limits for the near-range pair absolute-difference panel (fourth plot). Empty determines them automatically. | `list[float]` | `` | size=2 |  |
+| `channel_near_smooth` | Independent smoothing switch for the near-range channel row. | `bool` | `True` |  | `True` |
+| `channel_near_smoothing_range` | Near-range channel smoothing interval. When empty, it follows channel_near_x_lims. | `list[float]` | `` | size=2 | `0.0, 2.0` |
+| `channel_near_smoothing_window` | Full smoothing window for near-range channel plots. For physical scales the default 0.1 km is 100 m. | `float` | `0.1` | &gt; 0.0 | `0.1` |
+| `pair_near_smooth` | Independent smoothing switch for the near-range pair/VLDR row. | `bool` | `True` |  | `True` |
+| `pair_near_smoothing_range` | Near-range pair/VLDR smoothing interval. When empty, it follows pair_near_x_lims. | `list[float]` | `` | size=2 | `0.0, 2.0` |
+| `pair_near_smoothing_window` | Full smoothing window for near-range pair/VLDR plots. For physical scales the default 0.1 km is 100 m. | `float` | `0.1` | &gt; 0.0 | `0.1` |
 
 ## `dataset:<dataset_id>`
 
 | Parameter | Description | Type | Default | Allowed / limits | Example |
 | --- | --- | --- | --- | --- | --- |
 | `stage_path` | Absolute or relative path to one exported ATLAS stage directory. Different datasets may point to different stage paths, or multiple datasets may intentionally point to the same stage path with different QA/source selections. | `Path` | `` |  | `../dataset_a/exported/preprocessing_complete` |
-| `reference` | Set True for exactly one dataset. This defines the global reference dataset; every active comparison group must choose exactly one reference entry that points to it. | `bool` | `False` |  | `True` |
+| `reference` | Set True for exactly one dataset. This defines the global fallback reference dataset. A comparison group may override it by setting reference=True on one named entry. | `bool` | `False` |  | `True` |
 | `system_label` | Optional label for the physical lidar/system that produced this dataset. Multiple datasets may share the same system_label. | `str` | `` |  | `Lidar A` |
 | `dataset_label` | Optional label describing this particular dataset or processing realization. When empty, later code may fall back to the dataset section ID. | `str` | `` |  | `Rayleigh processing` |
 | `qa_test` | QA test used when reading this dataset. When empty, default_qa_test from [general] is used. | `str` | `` | ray, drk, pcb, tlc, tlc_rin, ray_pcb, pcb_aux, trg, dtm, cam | `ray` |
@@ -113,12 +125,17 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 | `plot_molecular` | Optional channel-group override controlling whether the reference molecular profile is plotted. Empty inherits default_channel_plot_molecular from [general]. | `bool` | `` |  | `True` |
 | `vertical_bin_width` | Optional channel-group conservative bin-width override. Empty uses [general] vertical_bin_width. If the requested width is smaller than the coarsest nominal native step in this group, ATLAS warns and uses the coarsest native step instead. | `float` | `` | &gt; 0.0 | `0.03` |
 | `smooth` | Optional channel-group plotting smoothing override. Empty inherits channel_smooth from [plotting]. | `bool` | `` |  | `True` |
-| `smoothing_range` | Optional channel-group smoothing-range override. Empty inherits channel_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.05, 35.0` |
+| `smoothing_range` | Optional channel-group smoothing-range override. Empty inherits channel_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.0, 30.0` |
 | `smoothing_window` | Optional channel-group smoothing-window override. Empty inherits channel_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.5` |
-| `near_range_max` | Optional group override for the second-row near-range upper limit. Empty inherits near_range_max from [plotting]. Units follow vertical_scale. | `float` | `` | &gt; 0.0 | `2.0` |
-| `near_range_smooth` | Optional group override for second-row near-range smoothing. Empty inherits near_range_smooth from [plotting]. | `bool` | `` |  | `True` |
-| `near_range_smoothing_window` | Optional group override for the full smoothing window used in the second-row near-range comparison. Empty inherits near_range_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.1` |
-| `x_lims` | Optional channel-group x-axis limits. Empty inherits channel_x_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 | `0.0, 20.0` |
+| `near_x_lims` | Optional group override for the near-range x-axis limits. Empty inherits the channel/pair near_x_lims from [plotting]. | `list[float]` | `` | size=2 | `0.0, 2.0` |
+| `near_x_tick` | Optional group override for the near-range major x-axis tick spacing. Empty inherits near_x_tick from [plotting]. | `float` | `` | &gt; 0.0 | `0.5` |
+| `near_y_lims` | Optional group override for the third-panel y-axis limits. Empty inherits the channel/pair near_y_lims from [plotting]; an empty resolved value uses automatic limits. | `list[float]` | `` | size=2 |  |
+| `near_difference_y_lims` | Optional group override for the fourth-panel difference y-axis limits. Empty inherits the channel/pair near_difference_y_lims from [plotting]. | `list[float]` | `` | size=2 |  |
+| `near_smooth` | Optional group override for near-range smoothing. Empty inherits the channel/pair near_smooth from [plotting]. | `bool` | `` |  | `True` |
+| `near_smoothing_range` | Optional group override for the near-range smoothing interval. Empty inherits the channel/pair near_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.0, 2.0` |
+| `near_smoothing_window` | Optional group override for the near-range full smoothing window. Empty inherits the channel/pair near_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.1` |
+| `quantity_label` | Optional channel-group override for the quantity text used in the left-panel y-axis label and panel titles. Empty inherits channel_quantity_label from [plotting]. | `str` | `` |  | `RCS` |
+| `x_lims` | Optional channel-group x-axis limits. Empty inherits channel_x_lims from [plotting]. | `list[float]` | `` | size=2 | `0.0, 30.0` |
 | `x_tick` | Optional channel-group major x-axis tick spacing. Empty inherits x_tick from [plotting]. | `float` | `` | &gt; 0.0 | `2.0` |
 | `y_lims` | Optional channel-group left-panel y limits. Empty inherits channel_y_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 |  |
 | `difference_y_lims` | Optional channel-group right-panel y-axis limits for relative differences. Empty inherits channel_difference_y_lims from [plotting]. | `list[float]` | `` | size=2 | `-0.4, 0.4` |
@@ -129,7 +146,7 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 - `<entry_id>.dataset = <dataset_id>` selects the source dataset.
 - `<entry_id>.atlas_channel_id = <atlas_channel_id>` selects one channel from that dataset.
 - `<entry_id>.label = ...` is optional and controls the legend label.
-- `<entry_id>.reference = True` must appear on exactly one entry in each active group.
+- `<entry_id>.reference = True` optionally selects a local reference for this group. At most one entry may set it. If none does, ATLAS falls back to the sole entry belonging to the global reference dataset.
 
 ## `pair_group:<group_id>`
 
@@ -143,12 +160,17 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 | `plot_molecular` | Optional pair-group override controlling whether the reference molecular ratio is plotted. Empty inherits default_pair_plot_molecular from [general]. | `bool` | `` |  | `True` |
 | `vertical_bin_width` | Optional pair-group conservative bin-width override. Empty uses [general] vertical_bin_width. If the requested width is smaller than the coarsest nominal native step in this group, ATLAS warns and uses the coarsest native step instead. | `float` | `` | &gt; 0.0 | `0.03` |
 | `smooth` | Optional pair-group plotting smoothing override. Empty inherits pair_smooth from [plotting]. | `bool` | `` |  | `True` |
-| `smoothing_range` | Optional pair-group smoothing-range override. Empty inherits pair_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.05, 10.0` |
+| `smoothing_range` | Optional pair-group smoothing-range override. Empty inherits pair_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.0, 14.0` |
 | `smoothing_window` | Optional pair-group smoothing-window override. Empty inherits pair_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.5` |
-| `near_range_max` | Optional group override for the second-row near-range upper limit. Empty inherits near_range_max from [plotting]. Units follow vertical_scale. | `float` | `` | &gt; 0.0 | `2.0` |
-| `near_range_smooth` | Optional group override for second-row near-range smoothing. Empty inherits near_range_smooth from [plotting]. | `bool` | `` |  | `True` |
-| `near_range_smoothing_window` | Optional group override for the full smoothing window used in the second-row near-range comparison. Empty inherits near_range_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.1` |
-| `x_lims` | Optional pair-group x-axis limits. Empty inherits pair_x_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 | `0.0, 10.0` |
+| `near_x_lims` | Optional group override for the near-range x-axis limits. Empty inherits the channel/pair near_x_lims from [plotting]. | `list[float]` | `` | size=2 | `0.0, 2.0` |
+| `near_x_tick` | Optional group override for the near-range major x-axis tick spacing. Empty inherits near_x_tick from [plotting]. | `float` | `` | &gt; 0.0 | `0.5` |
+| `near_y_lims` | Optional group override for the third-panel y-axis limits. Empty inherits the channel/pair near_y_lims from [plotting]; an empty resolved value uses automatic limits. | `list[float]` | `` | size=2 |  |
+| `near_difference_y_lims` | Optional group override for the fourth-panel difference y-axis limits. Empty inherits the channel/pair near_difference_y_lims from [plotting]. | `list[float]` | `` | size=2 |  |
+| `near_smooth` | Optional group override for near-range smoothing. Empty inherits the channel/pair near_smooth from [plotting]. | `bool` | `` |  | `True` |
+| `near_smoothing_range` | Optional group override for the near-range smoothing interval. Empty inherits the channel/pair near_smoothing_range from [plotting]. | `list[float]` | `` | size=2 | `0.0, 2.0` |
+| `near_smoothing_window` | Optional group override for the near-range full smoothing window. Empty inherits the channel/pair near_smoothing_window from [plotting]. | `float` | `` | &gt; 0.0 | `0.1` |
+| `quantity_label` | Optional pair-group override for the quantity text used in the left-panel y-axis label and panel titles. Empty inherits pair_quantity_label from [plotting]. | `str` | `` |  | `VLDR` |
+| `x_lims` | Optional pair-group x-axis limits. Empty inherits pair_x_lims from [plotting]. | `list[float]` | `` | size=2 | `0.0, 14.0` |
 | `x_tick` | Optional pair-group major x-axis tick spacing. Empty inherits x_tick from [plotting]. | `float` | `` | &gt; 0.0 | `1.0` |
 | `y_lims` | Optional pair-group left-panel y limits. Empty inherits pair_y_lims from [plotting]; an empty resolved value triggers automatic limits. | `list[float]` | `` | size=2 |  |
 | `difference_y_lims` | Optional pair-group right-panel y-axis limits for absolute differences. Empty inherits pair_difference_y_lims from [plotting]; if both are empty, limits are calculated automatically. | `list[float]` | `` | size=2 | `-0.1, 0.1` |
@@ -159,7 +181,7 @@ The prefix (`a_parallel`, `a_analog`, `b_parallel`) is the entry ID. Entry IDs o
 - `<entry_id>.dataset = <dataset_id>` selects the source dataset.
 - `<entry_id>.atlas_pair_id = <atlas_pair_id>` selects one pair from that dataset.
 - `<entry_id>.label = ...` is optional and controls the legend label.
-- `<entry_id>.reference = True` must appear on exactly one entry in each active group.
+- `<entry_id>.reference = True` optionally selects a local reference for this group. At most one entry may set it. If none does, ATLAS falls back to the sole entry belonging to the global reference dataset.
 
 ## Internal group representation
 

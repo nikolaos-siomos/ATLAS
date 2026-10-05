@@ -106,11 +106,17 @@ def read_dataset(dir_meas, meas_type = None):
                 raw_shots = raw_data.measurement_shots.data
                 
                 # Convert the time to npdatetime format and mask them
-                start_time = raw_data.measurement_time
+                # start_time = raw_data.measurement_time
 
-                start_time_arr = convert_time_to_npdatetime(start_time) 
+                # start_time_arr = convert_time_to_npdatetime(start_time) 
                 
-                end_time_arr = start_time_arr + (start_time_arr[1] - start_time_arr[0])
+                # end_time_arr = start_time_arr + (start_time_arr[1] - start_time_arr[0])
+            
+                end_time = raw_data.measurement_time
+
+                end_time_arr = convert_time_to_npdatetime(end_time) 
+                
+                start_time_arr = end_time_arr + (end_time_arr[1] - end_time_arr[0])
             
                 # Define signal xarray
                 sig_f = xr.DataArray(raw_signal.data, 

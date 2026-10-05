@@ -1,6 +1,6 @@
 [project]
 name = "atlas_actris"
-version = "1.2.0.rc2"
+version = "1.2.0.rc3"
 
 authors = [
     { name = "Nikolaos Siomos", email = "nikolaos.siomos@lmu.de" },
@@ -46,7 +46,10 @@ dependencies = [
     # Plotting
     "matplotlib>=3.8.0,<4",
     "Pillow>=10.0.0,<12",
-
+    
+    # Layering
+    "ltool>=2.0.6",
+    
     # Interactive plotting / signal viewer
     # Current HoloViz releases require Python >=3.10, so keep
     # Python 3.9 on the last compatible release lines.
@@ -90,6 +93,7 @@ Issues = "https://github.com/nikolaos-siomos/ATLAS/issues"
 # CLI commands provided by your package
 # ----------------------------------------------------------
 [project.scripts]
+get_scc_config = "atlas_actris.__get_config_file_from_scc_hoi__:main"
 atlas = "atlas_actris.cli:main"
 atlas-prepare-intercomparison = "atlas_actris.cli:prepare_intercomparison"
 atlas-signal-viewer = "atlas_actris.cli_viewer:main"
