@@ -209,6 +209,7 @@ def smooth_arrays(x_dict, y_dict, settings):
         x_vals=x_dict["sm"],
         y_vals=y_dict["sm"],
         err_type="std",
+        require_full_window=True,
     )
 
     # RC smoothing is intentionally disabled because RC is no longer used by

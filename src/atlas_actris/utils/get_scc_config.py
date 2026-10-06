@@ -394,10 +394,29 @@ def _get_channel_types(data:Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[s
                     if data.get("PRODUCSTCHANNELS") not in [None,{}]:
                         channel_id_list = data["PRODUCSTCHANNELS"]["channelID"]
                         channel_stype_list = data["PRODUCSTCHANNELS"]["signalTypeID"]
-                        ch_stype_ids = set([ch_tp for ch_id, ch_tp in zip(channel_id_list, channel_stype_list) if ch_id == channel_id[i]])
-                        if np.any([ch_id in ['6', '10', '11'] for ch_id in ch_stype_ids]):
+                        current_channel_id = str(channel_id[i]).strip()
+                        ch_stype_ids = {
+                            str(ch_tp).strip()
+                            for ch_id, ch_tp in zip(channel_id_list, channel_stype_list)
+                            if str(ch_id).strip() == current_channel_id
+                        }
+                        reflected_codes = ch_stype_ids & {"6", "10", "11"}
+                        transmitted_codes = ch_stype_ids & {"7", "12", "13"}
+                        if reflected_codes and transmitted_codes:
+                            CustomWarning(
+                                f"Ambiguous polarization subtype for SCC channel "
+                                f"{current_channel_id}: PRODUCSTCHANNELS contains "
+                                f"both reflected SignalTypeID codes "
+                                f"{sorted(reflected_codes)} and transmitted codes "
+                                f"{sorted(transmitted_codes)}. Cannot determine "
+                                f"channel_subtype 'r' or 't' from these rows. "
+                                f"Leaving channel_subtype empty for this channel; "
+                                f"fill it in manually in the exported configuration."
+                            )
+                            channel_subtype.append("")
+                        elif reflected_codes:
                             channel_subtype.append("r")
-                        elif np.any([ch_id in ['7', '12', '13'] for ch_id in ch_stype_ids]):
+                        elif transmitted_codes:
                             channel_subtype.append("t")
                         else:
                             channel_subtype.append("x") 

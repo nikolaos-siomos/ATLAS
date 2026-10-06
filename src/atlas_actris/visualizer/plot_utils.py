@@ -221,8 +221,9 @@ def smoothing(args, x_vals, y_vals, err_type = "std",
 def smoothing_2D(args, x_vals, y_vals, 
                  err_type = "std", range_alias = "smoothing_range",
                  window_alias = "smoothing_window", smooth_alias = "smooth",
-                 expo_alias = "smooth_exponential"):
+                 expo_alias = "smooth_exponential", require_full_window=False):
     
+    """Optionally mask windows lacking all finite bins; defaults to legacy behavior."""
     if args[smooth_alias] and args[window_alias]:
         
         if isinstance(args[window_alias],list):
@@ -235,12 +236,16 @@ def smoothing_2D(args, x_vals, y_vals,
         else:
             expo = False
             
+        # Preserve legacy callers, including their existing error-statistic default.
+        options = ({"require_full_window": True, "err_type": err_type}
+                   if require_full_window else {})
         y_vals_sm, y_errs = smooth_2D(
             z_vals = y_vals, 
             y_vals = x_vals,
             y_sm_lims = args[range_alias],
             y_sm_win = args[window_alias],
-            expo = expo
+            expo = expo,
+            **options,
             )
 
     else:

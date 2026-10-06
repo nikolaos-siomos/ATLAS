@@ -285,7 +285,7 @@ def sliding_average_1D_fast(
 
 def sliding_average_2D_fast(
         z_vals, y_vals, y_sm_lims, y_sm_win,
-        expo=None, err_type="sem"):
+        expo=None, err_type="sem", require_full_window=False):
 
     _check_err_type(err_type)
 
@@ -293,6 +293,10 @@ def sliding_average_2D_fast(
 
     z_vals = _to_numpy_copy(z_vals, "z_vals").astype(float)
     y_vals = _to_numpy_copy(y_vals, "y_vals")
+
+    # Strict mode also treats missing vertical coordinates as unavailable bins.
+    if require_full_window:
+        z_vals[:, ~np.isfinite(y_vals)] = np.nan
 
     dy = _coord_step(y_vals)
 
@@ -313,6 +317,11 @@ def sliding_average_2D_fast(
         z_vals,
         win=win,
     )
+
+    if require_full_window:
+        incomplete = count_all != win
+        avg_all[incomplete] = np.nan
+        std_all[incomplete] = np.nan
 
     z_avg[:, s_bin:e_bin] = avg_all[:, s_bin:e_bin]
 
@@ -464,7 +473,7 @@ def sliding_average_1D(
 
 def sliding_average_2D(
         z_vals, y_vals, y_sm_lims, y_sm_win,
-        expo=False, err_type="sem"):
+        expo=False, err_type="sem", require_full_window=False):
 
     _check_err_type(err_type)
 
@@ -472,6 +481,10 @@ def sliding_average_2D(
 
     z_vals = _to_numpy_copy(z_vals, "z_vals").astype(float)
     y_vals = _to_numpy_copy(y_vals, "y_vals")
+
+    # Strict mode also treats missing vertical coordinates as unavailable bins.
+    if require_full_window:
+        z_vals[:, ~np.isfinite(y_vals)] = np.nan
 
     dy = _coord_step(y_vals)
 
@@ -519,7 +532,7 @@ def sliding_average_2D(
         hi = i + ihwin + 1
 
         # Upper side must be complete.
-        if hi > n_bins:
+        if hi > n_bins or (require_full_window and i - ihwin < 0):
             z_vals_sm[:, i] = np.nan
             z_vals_err[:, i] = np.nan
             continue
@@ -527,7 +540,7 @@ def sliding_average_2D(
         window = z_vals[:, lo:hi]
 
         finite_count = np.sum(np.isfinite(window), axis=1)
-        valid = finite_count > 0
+        valid = (finite_count == 2 * ihwin + 1) if require_full_window else (finite_count > 0)
 
         z_vals_sm[:, i] = np.nan
         z_vals_err[:, i] = np.nan
@@ -545,4 +558,9 @@ def sliding_average_2D(
         elif err_type == "std":
             z_vals_err[valid, i] = np.nanstd(window[valid, :], axis=1)
 
+    if require_full_window:
+        return (
+            _restore_dataarray(z_vals_sm, output_template),
+            _restore_dataarray(z_vals_err, output_template),
+        )
     return z_vals_sm, z_vals_err

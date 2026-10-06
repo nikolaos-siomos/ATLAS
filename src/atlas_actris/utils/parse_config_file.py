@@ -320,13 +320,14 @@ def _split_list(raw: Optional[str]) -> List[str]:
     s = raw.strip()
     if s == "":
         return []
-    return [x.strip() for x in s.replace(";", ",").split(",") if x.strip() != ""]
+    # Preserve positional gaps: each comma-separated slot belongs to a channel.
+    return [x.strip() for x in s.replace(";", ",").split(",")]
 
 def _convert_list(raw: Optional[str], meta: Dict[str, Any], name: str) -> List[Any]:
     items = _split_list(raw)
     out: List[Any] = items
     for i in range(len(items)):
-        if items[i] in blank_tokens:
+        if items[i] == "" or items[i] in blank_tokens:
             items[i] = None
         else:
             items[i] = _convert_scalar(items[i], str, name)
@@ -601,6 +602,24 @@ def _enforce_mandatory_and_recommended(parser_args: Dict[str, Any]) -> None:
             is_empty = _is_empty_scalar(val)
         if cat == "mandatory" and is_empty:
             raise ConfigError(f"{name} is mandatory and was not provided.")
+        if cat == "mandatory" and meta.get("is_list", False) and not is_empty:
+            missing = [i for i, item in enumerate(val) if _is_empty_scalar(item)]
+            if missing:
+                positions = ", ".join(str(i + 1) for i in missing)
+                details = ""
+                channel_ids = parser_args.get("recorder_channel_id") or []
+                if name in CHANNEL_KEYS and name != "recorder_channel_id" and len(val) == len(channel_ids):
+                    labels = [
+                        f"{i + 1} ({channel_ids[i]})" for i in missing
+                        if not _is_empty_scalar(channel_ids[i])
+                    ]
+                    if labels:
+                        details = " Corresponding recorder channels: " + ", ".join(labels) + "."
+                raise ConfigError(
+                    f"{name}: mandatory values are empty at list positions "
+                    f"{positions} (1-based). Provide a value for every entry; "
+                    f"do not leave comma-separated gaps." + details
+                )
         if cat == "recommended" and is_empty:
             _warn_recommended(name, "--Warning: Recomended configuration parameters not provided:", recommended_first_time)
             recommended_first_time = False
