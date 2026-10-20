@@ -66,6 +66,10 @@ from processor.signal_gluing import (
     compute_gluing,
     )
 
+# from processor.cloud_screening import (
+#     compute_cloud_screening, 
+#     )
+
 from processor.pol_cal_calculations import (
     compute_gain_ratio,
     compute_calibration_factor,
@@ -222,6 +226,10 @@ class Processor():
                 "function":compute_gluing,
                 "header":"Gluing signals"
                 },
+            # "cloud_screening":{
+            #     "function":compute_cloud_screening,
+            #     "header":"Cloud screening"
+            #     },
             "computing_mean":{
                 "function":compute_mean_arrays,
                 "header":"Compute mean arrays"

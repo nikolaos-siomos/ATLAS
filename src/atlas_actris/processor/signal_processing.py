@@ -274,6 +274,30 @@ def compute_background_calculation(
     print_entry("Background calculated sucessfully")
     return output_data
                     
+def _mean_with_time_coordinate(da: xr.DataArray) -> xr.DataArray:
+    """Average over time while retaining one explicitly labelled time entry.
+
+    keepdims=True preserves the axis but does not guarantee preservation of
+    its coordinate. Label the mean with the mean input timestamp for consistent
+    one-profile and multi-profile behavior. Only time metadata is evaluated.
+    """
+
+    if "time" not in da.dims or "time" not in da.coords:
+        raise ValueError("Temporal averaging requires a labelled time dimension.")
+    if da.coords["time"].dims != ("time",) or da.sizes["time"] == 0:
+        raise ValueError("Temporal averaging requires a non-empty 1D time coordinate.")
+
+    times = da.coords["time"]
+    mean_time = times.mean(dim="time", skipna=True).values
+    if not bool(np.isfinite(mean_time)):
+        raise ValueError("Temporal averaging requires at least one finite timestamp.")
+
+    averaged = da.mean(dim="time", keepdims=True)
+    averaged = averaged.assign_coords(time=[mean_time])
+    averaged.coords["time"].attrs = dict(times.attrs)
+    return averaged
+
+
 def compute_averaging_by_time_single(
     processing_info: Dict[str, Any],
     input_data: Dict[str, Dict[str, Any]],
@@ -292,14 +316,14 @@ def compute_averaging_by_time_single(
     for key in qa_tests:
         
         sig = profile[key]            
-        sig_avg = sig.mean(dim="time", keepdims = True)
+        sig_avg = _mean_with_time_coordinate(sig)
         
         output_data['profile_mean'][key] = sig_avg
         
         if key in background:
             bgd = background[key]
             
-            bgd_avg = bgd.mean(dim="time", keepdims = True)
+            bgd_avg = _mean_with_time_coordinate(bgd)
 
             output_data['background_mean'][key] = bgd_avg
         
@@ -307,7 +331,7 @@ def compute_averaging_by_time_single(
             sig_err = profile_error[key]
 
             N = sig_err.notnull().sum(dim="time")
-            sig_avg_err = sig_err.mean(dim="time", keepdims = True) / np.sqrt(N) 
+            sig_avg_err = _mean_with_time_coordinate(sig_err) / np.sqrt(N) 
 
             output_data['profile_error_mean'][key] = sig_avg_err
 
@@ -315,7 +339,7 @@ def compute_averaging_by_time_single(
             bgd_err = background_error[key]
 
             N = bgd_err.notnull().sum(dim="time")
-            bgd_avg_err = bgd_err.mean(dim="time", keepdims = True) / np.sqrt(N) 
+            bgd_avg_err = _mean_with_time_coordinate(bgd_err) / np.sqrt(N) 
 
             output_data['background_error_mean'][key] = bgd_avg_err 
 
@@ -506,43 +530,40 @@ def compute_averaging_by_time_high_res(
                 if key in background:
                     bgd = background[key]
 
-                    if bgd:
-                        bgd_avg, bgd_avg_mask = temporal_averaging(
-                            sig = bgd, 
-                            averaging_period = high_res_averaging_period, 
-                            averaging_threshold = high_res_averaging_threshold
-                            )
-                        
-                        if bgd_avg is not None:
-                            output_data['background_high_res'][key] = bgd_avg
+                    bgd_avg, bgd_avg_mask = temporal_averaging(
+                        sig = bgd, 
+                        averaging_period = high_res_averaging_period, 
+                        averaging_threshold = high_res_averaging_threshold
+                        )
+                    
+                    if bgd_avg is not None:
+                        output_data['background_high_res'][key] = bgd_avg
                 
                 if key in profile_error:
                     sig_err = profile_error[key]
 
-                    if sig_err:
-                        sig_avg_err, _ = temporal_averaging_error(
-                            sig_err = sig_err, 
-                            averaging_period = high_res_averaging_period, 
-                            averaging_threshold = high_res_averaging_threshold
-                            )
+                    sig_avg_err, _ = temporal_averaging_error(
+                        sig_err = sig_err, 
+                        averaging_period = high_res_averaging_period, 
+                        averaging_threshold = high_res_averaging_threshold
+                        )
 
-                        if sig_avg_err is not None:
-                            output_data['profile_error_high_res'][key] = sig_avg_err
+                    if sig_avg_err is not None:
+                        output_data['profile_error_high_res'][key] = sig_avg_err
                 
 
                 if key in background_error:
                     bgd_err = background_error[key]
 
-                    if bgd_err:
-                        bgd_avg_err, _ = temporal_averaging_error(
-                            sig_err = bgd_err, 
-                            averaging_period = high_res_averaging_period, 
-                            averaging_threshold = high_res_averaging_threshold
-                            )
+                    bgd_avg_err, _ = temporal_averaging_error(
+                        sig_err = bgd_err, 
+                        averaging_period = high_res_averaging_period, 
+                        averaging_threshold = high_res_averaging_threshold
+                        )
                
                 
-                        if bgd_avg_err is not None:
-                            output_data['background_error_high_res'][key] = bgd_avg_err
+                    if bgd_avg_err is not None:
+                        output_data['background_error_high_res'][key] = bgd_avg_err
                 
                 if key in profile_mask:    
                     output_data['profile_mask_high_res'][key] = sig_avg_mask

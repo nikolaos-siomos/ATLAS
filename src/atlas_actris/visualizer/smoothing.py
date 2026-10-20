@@ -2,6 +2,72 @@ import numpy as np
 import xarray as xr
 
 
+def quicklook_normalization_max(y_vals, x_vals, settings):
+    """Maximum full-window spatial mean in y_max_zone, across all times.
+
+    Accept only the selected NumPy plotting slice, never a lazy signal. Match
+    the existing scalar/variable smoothing-window conventions. Prefix sums
+    cover only the reference zone plus its required margins; no error array
+    or full-sized smoothed signal is allocated.
+    """
+    if not isinstance(y_vals, np.ndarray) or not isinstance(x_vals, np.ndarray):
+        raise TypeError("Quicklook normalization requires the selected NumPy plotting slice.")
+    if y_vals.ndim != 2 or x_vals.ndim != 1 or y_vals.shape[1] != x_vals.size:
+        raise ValueError("Expected quicklook signal (time, bins) and coordinate (bins,).")
+
+    zone = settings["y_max_zone"]
+    if zone is None or len(zone) != 2 or zone[1] < zone[0]:
+        raise ValueError("y_max_zone must contain ordered lower and upper bounds.")
+    window = settings.get("smoothing_window")
+    widths = np.atleast_1d(window).astype(float)
+    if not np.all(np.isfinite(widths)) or np.any(widths <= 0):
+        raise ValueError("A positive finite smoothing_window is required for quicklook normalization.")
+
+    dy = _coord_step(x_vals)
+    start, stop = _limits_to_slice(x_vals, settings.get("smoothing_range"))
+    centers = np.arange(start, stop)
+    in_zone = np.isfinite(x_vals[centers]) & (x_vals[centers] >= zone[0]) & (x_vals[centers] <= zone[1])
+
+    if isinstance(window, list):
+        # Same interpolation and truncation rules as sliding_average_2D.
+        first = max(int(window[0] / (2.0 * dy)), 0)
+        last = max(int(window[-1] / (2.0 * dy)), 0)
+        if settings.get("smooth_exponential", False):
+            half = np.logspace(np.log2(max(first, 1)), np.log2(max(last, 1)), stop - start, base=2).astype(int)
+        else:
+            half = np.linspace(first, last, stop - start).astype(int)
+    else:
+        half = np.full(stop - start, _as_odd_window(float(window) / dy) // 2, dtype=int)
+
+    centers, half = centers[in_zone], half[in_zone]
+    left, right = centers - half, centers + half + 1
+    complete = (left >= 0) & (right <= x_vals.size)
+    left, right = left[complete], right[complete]
+    if left.size == 0:
+        return 1.0
+
+    lo, hi = int(left.min()), int(right.max())
+    values = y_vals[:, lo:hi]
+    finite = np.isfinite(values) & np.isfinite(x_vals[None, lo:hi])
+    sums = np.empty((values.shape[0], values.shape[1] + 1), dtype=float)
+    counts = np.empty(sums.shape, dtype=np.int64)
+    sums[:, 0] = 0.0
+    counts[:, 0] = 0
+    np.cumsum(np.where(finite, values, 0.0), axis=1, out=sums[:, 1:])
+    np.cumsum(finite, axis=1, dtype=np.int64, out=counts[:, 1:])
+
+    left, right = left - lo, right - lo
+    widths = right - left
+    valid = counts[:, right] - counts[:, left] == widths
+    means = (sums[:, right] - sums[:, left]) / widths
+    means[~valid] = np.nan
+    valid_values = means[np.isfinite(means)]
+    if valid_values.size == 0:
+        return 1.0
+    maximum = float(valid_values.max())
+    return maximum if maximum > 0.0 else 1.0
+
+
 def _dataarray_template(value):
     """Return xarray metadata needed to rebuild an output, or None."""
     if not isinstance(value, xr.DataArray):

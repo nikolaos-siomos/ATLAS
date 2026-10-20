@@ -473,6 +473,9 @@ def check_reflected_transmitted_pairs(r_channels, t_channels):
     pairs : list[dict]
         Valid pairs, in the same style as find_reflected_transmitted_pairs.
 
+    valid_indices : list[int]
+        Original list positions of the retained pairs.
+
     warnings : list[str]
         Warnings for skipped or suspicious pairs.
     """
@@ -481,6 +484,7 @@ def check_reflected_transmitted_pairs(r_channels, t_channels):
 
     pairs = []
     warnings = []
+    valid_indices = []
 
     if len(r_channels) != len(t_channels):
         warnings.append(
@@ -562,6 +566,7 @@ def check_reflected_transmitted_pairs(r_channels, t_channels):
                 f"'{ch_r[6]}' != '{ch_t[6]}'."
             )
 
+        valid_indices.append(i)
         pairs.append(
             {
                 "numerator_channel": ch_r,
@@ -573,11 +578,16 @@ def check_reflected_transmitted_pairs(r_channels, t_channels):
     return {
         "pairs": pairs,
         "warnings": warnings,
+        "valid_indices": valid_indices,
     }
 
 def load_pol_cal_defaults(config_info):
     """
     Fill polarization calibration channel pairs and defaults.
+
+    Explicit pairs are authoritative. Automatic discovery is used only when
+    both input pair lists are empty. If an invalid explicit pair is skipped,
+    its calibration-parameter values are skipped at the same positions.
 
     Final config_info["ch_r"] and config_info["ch_t"] are always
     atlas_channel_id.
@@ -632,31 +642,15 @@ def load_pol_cal_defaults(config_info):
         for pair in checked_manual["pairs"]
     ]
 
-    manual_pairs = set(zip(ch_r_manual, ch_t_manual))
+    manual_selection = len(ch_r_manual_raw) > 0
 
-    # ------------------------------------------------------------------
-    # 3. Find all automatic pairs from atlas_channel_id
-    # ------------------------------------------------------------------
-    ch_r_auto, ch_t_auto = find_reflected_transmitted_pairs(atlas_channel_id)
-
-    # ------------------------------------------------------------------
-    # 4. Remove automatic pairs already provided manually
-    # ------------------------------------------------------------------
-    ch_r_auto_new = []
-    ch_t_auto_new = []
-
-    for r, t in zip(ch_r_auto, ch_t_auto):
-        if (r, t) in manual_pairs:
-            continue
-
-        ch_r_auto_new.append(r)
-        ch_t_auto_new.append(t)
-
-    # ------------------------------------------------------------------
-    # 5. Combine manual + automatic pairs
-    # ------------------------------------------------------------------
-    ch_r_all = ch_r_manual + ch_r_auto_new
-    ch_t_all = ch_t_manual + ch_t_auto_new
+    # Explicit pairs define the complete selection; do not append discovered
+    # analog or other pairs. Invalid explicit selections never trigger discovery.
+    if manual_selection:
+        ch_r_all = ch_r_manual
+        ch_t_all = ch_t_manual
+    else:
+        ch_r_all, ch_t_all = find_reflected_transmitted_pairs(atlas_channel_id)
 
     n_pairs = len(ch_r_all)
 
@@ -664,7 +658,7 @@ def load_pol_cal_defaults(config_info):
     config_info["ch_t"] = ch_t_all
 
     # ------------------------------------------------------------------
-    # 6. Fill the rest of the POL_CAL keys
+    # Fill the remaining POL_CAL keys for the selected pairs
     # ------------------------------------------------------------------
     for key in POL_CAL_KEYS:
 
@@ -674,11 +668,16 @@ def load_pol_cal_defaults(config_info):
         meta = SCHEMA[key]
 
         if meta["is_list"]:
-            config_info[key] = extend_or_default_pol_cal_list(
+            # Fill against the original pair list before filtering so a
+            # rejected pair cannot shift K/eta/transmission values onto another.
+            values = extend_or_default_pol_cal_list(
                 existing=config_info.get(key, []),
                 default=meta["default"],
-                n_target=n_pairs,
+                n_target=len(ch_r_manual_raw) if manual_selection else n_pairs,
             )
+            if manual_selection:
+                values = [values[i] for i in checked_manual["valid_indices"]]
+            config_info[key] = values
         else:
             value = config_info.get(key)
 

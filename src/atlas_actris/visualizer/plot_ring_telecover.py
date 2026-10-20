@@ -207,7 +207,7 @@ def get_extra_sector_data(sectors, raw, norm, ranges, use_raw, iters):
     Find and prepare the optional extra profile from one sector.
     """
 
-    for sector_id in ["N", "E", "S", "W"]:
+    for sector_id in ["O", "I"]:
         if sector_id not in sectors:
             continue
 

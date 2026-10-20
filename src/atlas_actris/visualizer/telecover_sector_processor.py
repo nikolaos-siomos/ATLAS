@@ -26,6 +26,49 @@ from visualizer.smoothing import (
 )
 
 
+def find_sector_visits(sector_profiles, dim="time"):
+    """Group original profile positions into sector visits on a shared timeline.
+
+    A visit ends when acquisition moves to a different sector. This works for
+    one or many files per visit without treating the full cycle as a sampling
+    interval. Equal timestamps belonging to different sectors are ambiguous.
+    Only coordinates are read; profile data are not materialized here.
+    """
+
+    visits = {sector: [] for sector in sector_profiles}
+    events = []
+    owners = {}
+    for sector, da in sector_profiles.items():
+        if dim not in da.dims or dim not in da.coords:
+            raise ValueError(f"Sector {sector} needs a labelled {dim} dimension.")
+        if da.coords[dim].dims != (dim,):
+            raise ValueError(f"Sector {sector} needs a one-dimensional {dim} coordinate.")
+        raw_times = np.asarray(da.coords[dim].values)
+        if raw_times.dtype.kind not in ("M", "O", "U", "S"):
+            raise ValueError(f"Sector {sector} needs datetime timestamps, not numeric indices.")
+        times = raw_times.astype("datetime64[ns]")
+        if times.size == 0 or np.any(np.isnat(times)):
+            raise ValueError(f"Sector {sector} has empty or invalid timestamps.")
+        for index, timestamp in enumerate(times.astype("int64")):
+            timestamp = int(timestamp)
+            if timestamp in owners and owners[timestamp] != sector:
+                raise ValueError(
+                    "Cannot determine sector order: different sectors share "
+                    f"timestamp {np.datetime64(timestamp, 'ns')}."
+                )
+            owners[timestamp] = sector
+            events.append((timestamp, sector, index))
+
+    events.sort(key=lambda event: event[0])
+    previous_sector = None
+    for _, sector, index in events:
+        if sector != previous_sector:
+            visits[sector].append([])
+        visits[sector][-1].append(index)
+        previous_sector = sector
+    return visits
+
+
 @dataclass
 class TelecoverSectorResult:
     """Container for one processed telecover sector."""
@@ -62,7 +105,8 @@ class TelecoverSectorProcessor:
     Process one telecover sector.
 
     This mirrors the relevant parts of the old sector.process(...) procedure:
-    - average the first ``iters`` profiles;
+    - average files within each supplied visit, then the first ``iters`` visits;
+    - preserve legacy profile-based behavior when visit indices are omitted;
     - optionally smooth the averaged and unaveraged profiles;
     - use near smoothing inside ``nr_ulim``;
     - use far smoothing from ``nr_ulim`` to 20 km;
@@ -87,6 +131,7 @@ class TelecoverSectorProcessor:
         nr_ulim: float = 2.5,
         iters: Optional[int] = None,
         region: Optional[Sequence[float]] = None,
+        visit_indices: Optional[Sequence[Sequence[int]]] = None,
     ) -> Dict[str, Any]:
         """
         Process one sector signal array.
@@ -99,10 +144,15 @@ class TelecoverSectorProcessor:
             Sector signal. Expected shape is (time, bins). A 1D array is
             accepted and internally treated as one profile.
         iters : int or None
-            Number of profiles used for the common sector mean. If None, all
-            available profiles are used.
+            Number of visits used for the common sector mean when visit_indices
+            is supplied, or profiles otherwise. If None, all are used.
         region : list or tuple or None
             Normalization region. If None, settings['normalization_region'] is used.
+
+        visit_indices : sequence of sequences of int, optional
+            Original row indices for every visit, in chronological visit order.
+            Each visit is averaged first; visits then have equal weight in the
+            sector mean and define the min/max variability envelope.
 
         Returns
         -------
@@ -123,6 +173,22 @@ class TelecoverSectorProcessor:
             raise ValueError(
                 f"The bins dimension of y ({y.shape[1]}) must match x size ({x.size})."
             )
+
+        if visit_indices is not None:
+            groups = []
+            for indices in visit_indices:
+                indices = np.asarray(indices)
+                if indices.ndim != 1 or indices.size == 0 or indices.dtype.kind not in "iu":
+                    raise ValueError("Each visit must contain a non-empty list of integer row indices.")
+                if np.any(indices < 0) or np.any(indices >= y.shape[0]):
+                    raise ValueError("Visit indices fall outside the available sector profiles.")
+                groups.append(indices)
+            if not groups:
+                raise ValueError("At least one sector visit is required.")
+            all_indices = np.concatenate(groups)
+            if not np.array_equal(np.sort(all_indices), np.arange(y.shape[0])):
+                raise ValueError("Visits must cover every sector profile exactly once.")
+            y = np.stack([np.nanmean(y[indices, :], axis=0) for indices in groups])
 
         if iters is None:
             iters = y.shape[0]

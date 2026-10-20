@@ -7,7 +7,6 @@ Created on Sat May 16 13:10:34 2026
 """
 
 import numpy as np
-from utils.toolbox import round_it
 
 def get_quicklook_x_limits(x_vals, x_lims):
 
@@ -89,10 +88,11 @@ def get_quicklook_y_limits(y_vals, x_vals, y_lims, use_log):
 
     return [y_llim, y_ulim]
 
-def normalize_quicklook_y(y_vals, x_vals, y_max_zone):
+def normalize_quicklook_y(y_vals, x_vals, y_max_zone, y_max=None):
     """
-    Normalize quicklook signal using the maximum mean signal
-    inside a selected x-zone.
+    Normalize display data using a supplied smoothed reference maximum.
+
+    If no factor is supplied, retain the legacy time-resolved maximum behavior.
 
     Parameters
     ----------
@@ -102,24 +102,17 @@ def normalize_quicklook_y(y_vals, x_vals, y_max_zone):
         Range/height values with shape usually (bins,).
     y_max_zone : list or tuple
         Zone [x_min, x_max] used to estimate the normalization maximum.
+    y_max : float, optional
+        Precomputed reference maximum; skips recalculation when provided.
 
     Returns
     -------
     y_vals_nrm : array-like
         Normalized signal.
-    y_max : float
-        Normalization factor.
     """
 
-    mask_max_zone = (x_vals >= y_max_zone[0]) & (x_vals <= y_max_zone[1])
-
-    y_vals_sm = np.nanmean(y_vals[:, mask_max_zone], axis=0)
-
-    y_max = round_it(np.nanmax(y_vals_sm), 1)
-
-    # Avoid division by zero or invalid normalization
-    if y_max == 0 or np.isnan(y_max):
-        y_max = 1.0
+    if y_max is None:
+        y_max = max_quicklook_y(y_vals, x_vals, y_max_zone)
 
     y_vals_nrm = y_vals / y_max
 
@@ -127,7 +120,7 @@ def normalize_quicklook_y(y_vals, x_vals, y_max_zone):
 
 def max_quicklook_y(y_vals, x_vals, y_max_zone):
     """
-    Normalize quicklook signal using the maximum mean signal
+    Return the maximum time-resolved signal
     inside a selected x-zone.
 
     Parameters
@@ -141,20 +134,37 @@ def max_quicklook_y(y_vals, x_vals, y_max_zone):
 
     Returns
     -------
-    y_vals_nrm : array-like
-        Normalized signal.
     y_max : float
         Normalization factor.
     """
 
     mask_max_zone = (x_vals >= y_max_zone[0]) & (x_vals <= y_max_zone[1])
 
-    y_vals_sm = np.nanmean(y_vals[:, mask_max_zone], axis=0)
-
-    y_max = round_it(np.nanmax(y_vals_sm), 1)
+    # Use one maximum over all times and selected bins. Do not round it:
+    # rounding downward could make the normalized maximum exceed one.
+    y_max = np.nanmax(y_vals[:, mask_max_zone])
 
     # Avoid division by zero or invalid normalization
     if y_max == 0 or np.isnan(y_max):
         y_max = 1.0
 
     return y_max
+
+
+def prepare_quicklook_signal(y_vals, x_vals, settings):
+    """Return display data and an independently smoothed reference maximum.
+
+    Call only after selecting and materializing the plotting slice. Settings
+    control display smoothing; reference smoothing is always enabled.
+    """
+    from visualizer.smoothing import quicklook_normalization_max
+    from visualizer.plot_utils import smoothing_2D
+
+    maximum = quicklook_normalization_max(y_vals, x_vals, settings)
+    if settings.get("smooth", False):
+        displayed, _ = smoothing_2D(
+            args=settings, x_vals=x_vals, y_vals=y_vals, err_type="std",
+        )
+    else:
+        displayed = y_vals
+    return displayed, maximum

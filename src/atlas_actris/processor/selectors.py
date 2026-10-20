@@ -115,6 +115,7 @@ def get_source_map(io_id):
                 
         'radiosonde_info': {'db': 'radiosonde_info_db', 'item_id': io_id},
         'gluing_info': {'db': 'gluing_info_db', 'item_id': io_id},
+        'cloud_screening_info': {'db': 'cloudscreening_info', 'item_id': io_id},
         'shots': {'db': 'shots_db', 'item_id': io_id},
     }
 

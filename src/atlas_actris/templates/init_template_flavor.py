@@ -45,8 +45,10 @@ locations = {
     'settings_file': 'settings_file'
     }
 
-rel_path_note = 'Relative paths are provided with respect'
-'to the root folder of the initialization file used to run ATLAS.'
+rel_path_note = (
+    'Relative paths are resolved from the directory containing the '
+    'initialization file used to run ATLAS.'
+)
 
 legacy_atlas = '<=0.5.0'
 last_legacy_atlas = '0.6.6'
@@ -124,15 +126,14 @@ INIT_FLAVOR = {
         },
     
     'parent_folder': {
-        'description': 
-            'Absolute or relative path of the parent folder which contains '
-            'the input lidar data. ' + rel_path_note
-            ,
-         'example': 
-             './179_199_665_20231221 - ATLAS will look for a folder named '
-             '179_199_665_20231221 placed in the same directory as the '
-             'call_atlas.ini file which was used to run ATLAS',
-         'legacy': {
+        'description': (
+            'Absolute or relative path to the folder containing the input lidar data. '
+            'If empty, defaults to the directory containing the initialization file. '
+            'Measurement folder aliases are resolved relative to parent_folder. '
+            + rel_path_note
+        ),
+        'example': '.',
+        'legacy': {
              'status': 'unchanged',
              'introduced': legacy_atlas,
              'old_names': [],
@@ -143,13 +144,17 @@ INIT_FLAVOR = {
          },
     
     'atlas_configuration_file': {
-        'description': 
-            'Absolute or relative path of the atlas configuration file which '
-            'contains all system-, channel-, and channel-pair-related '
-            'metadata. ' + rel_path_note,
-         'example': 
-             'my_drive/configurations/config_file_665_20231221',
-         'legacy': {
+        'description': (
+            'Absolute or relative path to the ATLAS configuration file containing '
+            'system, channel, and channel-pair metadata. If empty and export_hoi_cfg '
+            'is 0, uses config_file.ini beside the initialization file; this file '
+            'must exist. For export_hoi_cfg 1 or 2, leave this entry empty: ATLAS '
+            'prepares config_file_<scc_configuration_id>.ini in the initialization '
+            'directory for SCC HOI export or download. '
+            + rel_path_note
+        ),
+        'example': './config_file.ini',
+        'legacy': {
              'status': 'unchanged',
              'introduced': legacy_atlas,
              'old_names': [],
@@ -160,13 +165,15 @@ INIT_FLAVOR = {
          },
         
     'atlas_settings_file': {
-        'description': 
-            'Absolute or relative path of the atlas settings file which '
-            'contains all system-, channel-, and channel-pair-related '
-            'metadata. ' + rel_path_note,
-         'example': 
-             'my_drive/settings/config_file_665_20231221',
-         'legacy': {
+        'description': (
+            'Absolute or relative path to the optional ATLAS settings file containing '
+            'QA test and plotting settings. If empty, uses settings_file.ini beside '
+            'the initialization file when present; otherwise uses the built-in '
+            'settings defaults. An explicitly provided file must exist. '
+            + rel_path_note
+        ),
+        'example': './settings_file.ini',
+        'legacy': {
              'status': 'unchanged',
              'introduced': legacy_atlas,
              'old_names': [],
@@ -177,13 +184,15 @@ INIT_FLAVOR = {
          },
     
     'radiosonde_folder': {
-        'description': 
-            'Absolute or relative path of the folder where the radiosonde '
-            'files are placed. It will be ignored if radiosonde_file option '
-            'is provided.' + rel_path_note,
-         'example': 
-             'my_drive/radiosondes/',
-         'legacy': {
+        'description': (
+            'Absolute or relative path to the folder containing radiosonde files. If '
+            'empty, defaults to the radiosondes subfolder beside the initialization '
+            'file, which is created if needed. Ignored when radiosonde_file is '
+            'provided. '
+            + rel_path_note
+        ),
+        'example': './radiosondes/',
+        'legacy': {
              'status': 'unchanged',
              'introduced': legacy_atlas,
              'old_names': [],
@@ -194,12 +203,13 @@ INIT_FLAVOR = {
          },
 
     'radiosonde_file': {
-        'description': 
-            'Absolute or relative path to the radiosonde file.'
-            'files are placed. ' + rel_path_note,
-         'example': 
-             'my_drive/radiosondes/20231221_1527_ecmwf_bucharest.nc',
-         'legacy': {
+        'description': (
+            'Absolute or relative path to a specific radiosonde file. If provided, '
+            'takes precedence over radiosonde_folder. '
+            + rel_path_note
+        ),
+        'example': './radiosondes/20231221_1527_ecmwf_bucharest.nc',
+        'legacy': {
              'status': 'new',
              'introduced': '1.0.0',
              'old_names': [],
@@ -390,12 +400,14 @@ INIT_FLAVOR = {
         },
 
     'output_folder': {
-        'description': 
-            'Path to the folder where ATLAS output files are exported '
-            '(plots, ascci, cached, and exported stage files).'
-            'The files are placed under a subfolder with the same name as the '
-            'parent folder.',
-        'example': '/my_data/brc_analysis',
+        'description': (
+            'Absolute or relative path for ATLAS outputs (plots, ASCII, cached data, '
+            'and exported stages). If empty, outputs go to the analysis subfolder '
+            'beside the initialization file. If explicitly provided, outputs go to a '
+            'subfolder named after parent_folder inside the specified directory. '
+            + rel_path_note
+        ),
+        'example': './results',
         'legacy': {
             'status': 'new',
             'introduced': '1.0.0',
@@ -414,7 +426,7 @@ INIT_FLAVOR = {
             "If set to False, ATLAS creates new timestamped subfolders "
             "for each run ('plots_<timestamp>' and 'ascii_<timestamp>') "
             "and writes the new outputs there.",
-        'example': '/my_data/brc_analysis',
+        'example': 'False',
         'legacy': {
             'status': 'new',
             'introduced': '1.0.0',

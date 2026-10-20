@@ -15,8 +15,9 @@ from visualizer.check import check_channels
 from processor.packaging import collect_metadata
 from visualizer.plot_quicklook import generate_plot
 from visualizer.make_text import GenerateText, Libraries
+from visualizer.generate_quicklook_axis import prepare_quicklook_signal
 from visualizer.plot_utils import (
-    prepare_folder, smoothing_2D,
+    prepare_folder,
     convert_m_to_km, perform_color_reduction, 
     add_plot_metadata, insert_nan_time_gaps, slice_time
     )
@@ -174,13 +175,11 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
                 y_vals = _to_numpy_selected(sig_ch)
                 x_vals = np.asarray(vertical_scale_ch.values)
 
-                # Smoothing
-                y_vals_sm, _ = smoothing_2D(
-                    args = settings, 
-                    x_vals = x_vals, 
-                    y_vals = y_vals, 
-                    err_type = "std"
-                    )
+                # Use settings-based smoothing for the scale reference even when
+                # the displayed signal is unsmoothed. No additional lazy reads.
+                y_vals_sm, reference_max = prepare_quicklook_signal(
+                    y_vals=y_vals, x_vals=x_vals, settings=settings,
+                )
 
                 # Gather the metadata that are common for all QA tests in a dictonary
                 metadata = collect_metadata(data_pack[key], atlas_channel_id = ch)
@@ -231,6 +230,7 @@ def generate_quicklooks(data_pack, caller_info, settings_info):
                     X = x_vals,
                     Y = y_vals_sm,
                     args = settings | qa_test_info[key][ch] | caller_info
+                    | {"_quicklook_y_max": reference_max}
                     )  
             
                 # Perform color reduction        

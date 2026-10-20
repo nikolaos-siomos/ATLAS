@@ -68,7 +68,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "bins":                        {"dtype": int,   "default": None, "is_list": True, "category": "optional", "min": 512,  "max": 32768},
     "data_acquisition_range":      {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 0.},
     "range_resolution":            {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 1.,  "max": 30.},
-    "laser_repetition_rate":       {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 10., "max": 200.},
+    "laser_repetition_rate":       {"dtype": float, "default": None, "is_list": True, "category": "optional", "min": 10., "max": 10000.},
     # "analog_noise_per_bin":        {"dtype": float, "default": 0.22, "is_list": True, "category": "optional", "min": 0.},
     # "analog_noise_scaling_factor": {"dtype": float, "default": 0.7,  "is_list": True, "category": "optional", "min": 0.},
     # "analog_to_digital_resolution": {"dtype": int, "default": None, "is_list": True, "category": "optional", "allowed": [12, 14, 16]},
@@ -170,7 +170,8 @@ recognized_sections = [
     "System", "Channels", "polarization_calibration", "gluing", "water_vapour", "temperature"
     ]
 
-blank_tokens = ["_"]
+# Explicit missing-value markers, accepted for scalar and list entries.
+blank_tokens = ["_", "None"]
 
 RENAMED_CONFIG_KEYS = {
     "daq_trigger_offset": "zero_bin",
@@ -239,14 +240,19 @@ def _raise_unknown_config_parameter_errors(config: configparser.ConfigParser) ->
 # -------------------------------------------------------------------
 
 def _is_empty_scalar(v: Any) -> bool:
-    return v is None or (isinstance(v, str) and v.strip() == "")
+    return v is None or (
+        isinstance(v, str) and (v.strip() == "" or v.strip() in blank_tokens)
+    )
 
 def _convert_scalar(raw: Optional[str], expected: type, name: str) -> Optional[Union[str, int, float]]:
-    """Convert a single value, allowing int-like floats for int. Empty -> None."""
+    """Convert a value; blanks, underscores, and literal None mean missing.
+
+    Integer fields continue to accept integer-valued floats such as 123.0.
+    """
     if raw is None:
         return None
     s = raw.strip()
-    if s == "":
+    if _is_empty_scalar(s):
         return None
     if expected == int:
         try:
@@ -531,20 +537,22 @@ def _compute_background_bins_if_missing(parser_args: Dict[str, Any]) -> None:
     return parser_args
 
 def exceeding_limits_error(var1, var2, label1, label2):
-    
+    """Compare limits only where both corresponding values are provided."""
+
     errors = []
     for i, (a, b) in enumerate(zip(var1, var2)):
-        if b is not None and a > b:
-            errors.append(f"index {i}: {a} < {b}")
-    
+        if a is not None and b is not None and a > b:
+            errors.append(f"index {i}: {a} > {b}")
+
     if errors:
         raise ConfigError(
-            "{label1} values must be smaller than the corresponding {label2}:\n" + \
-                "{label1} = {var1}\n" + \
-                    "{label2} = {var2}"
+            f"{label1} values must not exceed the corresponding {label2}:\n"
+            f"{label1} = {var1}\n"
+            f"{label2} = {var2}\n"
+            + "\n".join(errors)
         )
-    
-    
+
+
 def _check_background_limits(parser_args: Dict[str, Any]) -> None:
     
     low_bin = parser_args['background_low_bin']

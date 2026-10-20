@@ -1107,25 +1107,13 @@ def _enforce_mandatory_and_recommended(parser_args: Dict[str, Any]) -> None:
 
 
 def _resolve_default_base_paths(parser_args: Dict[str, Any], filepath: str) -> Dict[str, Any]:
-    """
-    Resolve default folders.
+    """Resolve defaults relative to the initialization file's directory.
 
-    Explicit paths may be absolute or relative to the folder containing the
-    call_atlas INI file.  The old user-facing ``main_data_folder`` parameter has
-    been retired.  Internally, keep ``main_data_folder`` equal to the INI folder
-    for compatibility with downstream helpers.
-
-    Defaults
-    --------
-    parent_folder:
-        <ini_folder>/input_data
-
-    radiosonde_folder:
-        <base_folder>/radiosondes
-
-    where <base_folder> is the folder one level above parent_folder.  For
-    example, if parent_folder is /my_drive/station_id/input_data, then
-    radiosonde_folder becomes /my_drive/station_id/radiosondes.
+    parent_folder defaults to the INI directory; radiosonde_folder defaults to
+    its radiosondes subfolder unless a radiosonde file was supplied. Use the
+    optional settings_file.ini beside the INI when present. Explicit paths
+    have already been resolved and take precedence over these defaults.
+    main_data_folder is retained internally for downstream compatibility.
     """
 
     init_folder = _ini_root(filepath)
@@ -1135,14 +1123,17 @@ def _resolve_default_base_paths(parser_args: Dict[str, Any], filepath: str) -> D
     parser_args["main_data_folder"] = init_folder
 
     if parser_args.get("parent_folder") is None:
-        parser_args["parent_folder"] = os.path.join(init_folder, "input_data")
+        parser_args["parent_folder"] = init_folder
     else:
         parser_args["parent_folder"] = os.path.normpath(parser_args["parent_folder"])
 
-    base_folder = _base_folder_from_parent_folder(parser_args["parent_folder"])
-
     if parser_args.get("radiosonde_folder") is None and parser_args.get("radiosonde_file") is None:
-        parser_args["radiosonde_folder"] = os.path.join(base_folder, "radiosondes")
+        parser_args["radiosonde_folder"] = os.path.join(init_folder, "radiosondes")
+
+    if parser_args.get("atlas_settings_file") is None:
+        default_settings = os.path.join(init_folder, "settings_file.ini")
+        if os.path.isfile(default_settings):
+            parser_args["atlas_settings_file"] = default_settings
 
     return parser_args
 
@@ -1153,32 +1144,16 @@ def _resolve_default_configuration_file(
     require_existing_local_config: bool = True,
     resolve_remote_target: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Resolve the default ATLAS configuration file.
+    """Resolve the configuration file beside the initialization file.
 
-    The default configuration folder is placed next to parent_folder, not next
-    to the call_atlas INI file.  For example:
-
-        parent_folder = /my_drive/station_id/input_data
-        cfg_folder    = /my_drive/station_id/configurations
-
-    For export_hoi_cfg == "0", the local default must already exist:
-        <cfg_folder>/config_file.ini
-
-    For export_hoi_cfg == "1" or "2", the configuration file is expected to be
-    downloaded/exported later, so only the target filename is prepared here:
-        <cfg_folder>/config_file_{scc_configuration_id}.ini
+    Local mode uses <ini_folder>/config_file.ini, which must exist. HOI
+    export/download modes prepare <ini_folder>/config_file_{id}.ini for later
+    generation. An explicit configuration path takes precedence.
     """
 
     export_hoi_cfg = parser_args.get("export_hoi_cfg")
     atlas_configuration_file = parser_args.get("atlas_configuration_file")
-
-    parent_folder = parser_args.get("parent_folder")
-    if parent_folder is None:
-        parent_folder = os.path.join(_ini_root(filepath), "input_data")
-
-    base_folder = _base_folder_from_parent_folder(parent_folder)
-    cfg_folder = os.path.join(base_folder, "configurations")
+    cfg_folder = _ini_root(filepath)
 
     if export_hoi_cfg == "0" and atlas_configuration_file is None:
         default_cfg = os.path.join(cfg_folder, "config_file.ini")
@@ -1468,15 +1443,12 @@ def _special_path_handling(parser_args: Dict[str, Any]) -> Dict[str, Any]:
     parent_folder_name = os.path.basename(parent_folder)
 
     if parser_args.get("output_folder") is None:
+        # main_data_folder stores the directory containing the init file.
         base_folder = parser_args.get("main_data_folder")
         if base_folder is None:
-            base_folder = os.path.dirname(parent_folder)
+            base_folder = parent_folder
 
-        parser_args["output_folder"] = os.path.join(
-            base_folder,
-            "analysis",
-            parent_folder_name,
-        )
+        parser_args["output_folder"] = os.path.join(base_folder, "analysis")
 
     else:
         parser_args["output_folder"] = os.path.join(
@@ -2053,7 +2025,7 @@ def parse_call_atlas_ini(cmd: Mapping[str, Any], debug: bool = False) -> Dict[st
     _scc_configuration_id_check(parser_args)
 
     # 5c) If no configuration file was provided and local config export is used,
-    # fall back to <parent_folder_parent>/configurations/config_file.ini.
+    # fall back to <ini_folder>/config_file.ini.
     parser_args = _resolve_default_configuration_file(
         parser_args,
         filepath,

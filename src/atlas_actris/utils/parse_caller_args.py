@@ -36,6 +36,10 @@ def call_parser():
                         type = str, nargs = '+',  default = None,
                         help = f'Exclude option for the QA tests. {common_flavor}')
 
+    parser.add_argument('-p', '--process', metavar = 'process', 
+                        type = str, nargs = '+',  default = None,
+                        help = f'Select QA test aliases for QA test generation. {common_flavor}')
+    
     parser.add_argument('-q', '--process_qck', metavar = 'process_qck', 
                         type = str, nargs = '+',  default = None,
                         help = f'Select QA test aliases for quicklook generation. {common_flavor}')

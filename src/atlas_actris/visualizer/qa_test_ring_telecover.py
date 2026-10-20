@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Modern ATLAS telecover-quadrants driver.
+Modern ATLAS telecover-ring driver.
 
 Expected input data_pack keys are sector-specific:
 
     tlc_outer, tlc_inner
 
-There is no parent ``tlc`` data_pack entry. Missing sector keys are allowed.
-The function treats telecover as one QA test, returned under qa_test_info['tlc'].
+There is no parent ``tlc_rin`` data_pack entry. Missing sector keys are allowed.
+The function treats telecover as one QA test, returned under qa_test_info['tlc_rin'].
 
 This module intentionally keeps the high-level workflow here, while delegating
 low-level operations such as axis creation, sector processing, text creation,
@@ -27,7 +27,9 @@ from utils.printouts import print_header
 from visualizer.check import check_channels
 from processor.packaging import collect_metadata
 from visualizer.make_text import GenerateText, Libraries
-from visualizer.telecover_sector_processor import TelecoverSectorProcessor
+from visualizer.telecover_sector_processor import (
+    TelecoverSectorProcessor, find_sector_visits,
+)
 from visualizer.plot_utils import (
     prepare_folder,
     collect_dict,
@@ -54,7 +56,7 @@ SECTOR_NAMES = {
 
 
 def _available_sector_keys(data_pack):
-    """Return mapping like {'O': 'tlc_inner'} for sectors present in data_pack."""
+    """Return mapping like {'O': 'tlc_outer'} for sectors present in data_pack."""
 
     return {
         sector_id: data_key
@@ -186,7 +188,7 @@ def _sampling_times_per_sector(sector_profiles_ch, ref_sector):
     )
 def generate_ring_telecover(data_pack, caller_info, settings_info):
     """
-    Generate telecover quadrant QA outputs.
+    Generate telecover ring QA outputs.
 
     Parameters
     ----------
@@ -227,7 +229,7 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
     settings = settings_info.copy()
 
     # Load common arrays
-    tlc_common_key = next(iter(data_pack))
+    tlc_common_key = next(iter(available_sectors.values()))
     system_info = data_pack[tlc_common_key]["system_info"]
     channel_info = data_pack[tlc_common_key]["channel_info"]
           
@@ -245,7 +247,7 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
         for sector_id, data_key in available_sectors.items()
     }
     
-    ranges = {
+    sector_ranges = {
         sector_id: convert_m_to_km(
             data_pack[data_key]['range']
         )
@@ -255,6 +257,34 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
     # Use the first available sector as reference for metadata and bin geometry.
     ref_sector = next(iter(available_sectors.keys()))
     ref_key = available_sectors[ref_sector]
+
+    # Detect returns to each sector using the combined acquisition order.
+    # Per-sector gaps alone cannot identify one-file-per-visit iterations.
+    sector_visits = find_sector_visits(sector_profiles)
+    sector_timing = {}
+    for sector_id, da in sector_profiles.items():
+        durations = [
+            find_time_blocks(da.isel(time=indices))[1]
+            for indices in sector_visits[sector_id]
+        ]
+        known = [value for value in durations if np.isfinite(value) and value > 0]
+        sector_timing[sector_id] = (
+            len(sector_visits[sector_id]),
+            float(np.mean(known)) if known else 0.0,
+        )
+    empty_sectors = [sector for sector, (count, _) in sector_timing.items() if count == 0]
+    if empty_sectors:
+        raise ValueError(
+            f"Cannot process {QA_KEY}: sectors have no valid timestamps: {empty_sectors}."
+        )
+
+    common_iters = int(min(count for count, _ in sector_timing.values()))
+    known_durations = [
+        duration for _, duration in sector_timing.values()
+        if np.isfinite(duration) and duration > 0
+    ]
+    # Retain the numeric metadata format; 0 denotes unavailable duration.
+    common_sampling = float(np.round(np.mean(known_durations))) if known_durations else 0.0
 
     # Check if the parsed channels exist and apply exclusion options
     channels = check_channels(
@@ -283,27 +313,19 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
         }
 
         x_vals = vertical_scales[ref_sector].sel(ch_d)
-        ranges = vertical_scales[ref_sector].sel(ch_d)
+        ranges = sector_ranges[ref_sector].sel(ch_d)
 
         # Keep channel-specific modifications local.
         channel_settings = settings.copy()
         channel_settings["available_sectors"] = list(sector_profiles_ch.keys())
         
-        sector_iters = [
-            find_time_blocks(da)[0]
-            for sector_id, da in sector_profiles.items()
-        ]
-        
-        sector_sampling = [
-            find_time_blocks(da)[1]
-            for sector_id, da in sector_profiles.items()
-        ]
-        
-        
-        iters = np.min(sector_iters)
-        sampling_per_sector_per_iter = np.round(np.mean(sector_sampling))
+        # Timing depends on timestamps, not on the selected channel.
+        # A zero helper duration means unknown (e.g. a singleton without a
+        # known interval); it must not lower the mean of known durations.
+        iters = common_iters
+        sampling_per_sector_per_iter = common_sampling
         sampling_per_sector = sampling_per_sector_per_iter * iters
-        
+
         sector_processor = TelecoverSectorProcessor(
             settings=channel_settings,
         )
@@ -317,6 +339,7 @@ def generate_ring_telecover(data_pack, caller_info, settings_info):
                 y=da.values.copy(),
                 iters=iters,
                 region=channel_settings["normalization_region"],
+                visit_indices=sector_visits[sector_id],
             )
 
             extra_sec[sector_id] = processed[sector_id]["has_extra"]

@@ -537,17 +537,29 @@ def add_fitting_suptitle(
     return title_obj
 
 def find_time_blocks(da, dim="time", expected_freq=None, gap_factor=1.5):
-    time = pd.DatetimeIndex(da[dim].values).sort_values()
+    """Return [block_count, mean_duration_seconds] from valid timestamps.
 
+    A singleton is one block. Without a known sample interval its duration
+    cannot be inferred, so return 0 seconds rather than inventing an interval.
+    NaT timestamps are excluded; zero intervals do not define a sampling rate.
+    """
+
+    time = pd.DatetimeIndex(da[dim].values).dropna().sort_values()
     if len(time) == 0:
         return [0, 0]
 
     dt = pd.Series(time[1:] - time[:-1])
+    positive_dt = dt[dt > pd.Timedelta(0)]
 
     if expected_freq is None:
-        expected_freq = dt.median() if len(dt) else pd.NaT
+        expected_freq = positive_dt.median() if len(positive_dt) else pd.NaT
     else:
         expected_freq = pd.Timedelta(expected_freq)
+        if pd.isna(expected_freq) or expected_freq <= pd.Timedelta(0):
+            raise ValueError("expected_freq must be a positive, finite time interval.")
+
+    if pd.isna(expected_freq):
+        return [1, 0]
 
     if len(time) == 1:
         return [1, round(expected_freq.total_seconds())]
@@ -559,7 +571,9 @@ def find_time_blocks(da, dim="time", expected_freq=None, gap_factor=1.5):
     durations = []
     for i0, i1 in zip(starts, stops):
         t = time[i0:i1 + 1]
-        res = pd.Series(t[1:] - t[:-1]).median() if len(t) > 1 else expected_freq
+        block_dt = pd.Series(t[1:] - t[:-1])
+        block_dt = block_dt[block_dt > pd.Timedelta(0)]
+        res = block_dt.median() if len(block_dt) else expected_freq
         durations.append(len(t) * res.total_seconds())
 
     return [len(durations), round(sum(durations) / len(durations))]
