@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Display update: 2026-10-31T15:08:38+01:00
+# Smooth R/T signals before ratios; retain original ratio STD bands and scalars.
 """
 New-style polarization calibration visualizer.
 
@@ -37,6 +39,7 @@ from version import __version__
 from utils.printouts import print_header
 from utils.error_classes import CustomWarning
 from processor.packaging import collect_metadata
+from processor.pol_cal_calculations import simple_ratio, _GH_correct_values
 from visualizer.make_text import GenerateText, Libraries
 from visualizer.plot_utils import (
     prepare_folder,
@@ -202,6 +205,14 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
             ("pcb_m45", pcb_m45_pack, z_m45_all),
         ]
 
+        smooth_signals = bool(pair_settings["smooth"] and pair_settings["smoothing_window"])
+        if smooth_signals and any("profile_mean" not in pack for _, pack, _ in signal_sources):
+            CustomWarning(
+                f"Skipping {eta_id}: profile_mean is required to smooth R/T "
+                "signals before calculating the display profiles."
+            )
+            continue
+
         for source_key, source_pack, source_z_all in signal_sources:
             if "profile_mean" not in source_pack:
                 continue
@@ -296,6 +307,16 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
 
             Y_ray[key] = y_sm
             E_ray[key] = y_err
+
+        if smooth_signals:
+            # Change display curves only. E_cal/E_ray remain the local STD
+            # of the original ratio profiles, centered on the new curves.
+            # Stored products, regional statistics, and scalar eta are untouched.
+            Y_cal, Y_ray = _profiles_from_smoothed_signals(
+                Y_sig, pcb_p45_pack, pcb_m45_pack, ray_pack,
+                pcb_info, ray_info, ch_r, ch_t, eta_id,
+                gain_ratio_id, calibrated_ratio_id, vldr_id,
+            )
 
         # Optional MLDR
         if molecular_ratio is not None and _all_pairs_exist(molecular_ratio, [mldr_id]):
@@ -416,6 +437,8 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
                 "ATLAS_version": __version__,
                 "QA_test_ID": "pcb",
                 "calibration_vertical_scale_source": "pcb_m45",
+                "profile_smoothing_order": "signals_then_ratios" if smooth_signals else "none",
+                "profile_shading": "local STD of original ratio profiles",
             }
         )
         
@@ -429,6 +452,62 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         )
         
     return qa_test_info
+
+
+def _smoothed_signal_ratio(source_profile, signals, source_key, ch_r, ch_t, info):
+    """Reuse the processor's pair mapping and zero-denominator handling."""
+    smoothed = []
+    for suffix, channel in [("r", ch_r), ("t", ch_t)]:
+        template = _time_mean(source_profile.sel(channel=[channel])).transpose("channel", "bins")
+        values = np.asarray(signals[f"{source_key}_{suffix}"])
+        smoothed.append(template.copy(data=values[np.newaxis, :]))
+    return simple_ratio(smoothed[0], smoothed[1], info)
+
+
+def _profiles_from_smoothed_signals(
+    signals, p45_pack, m45_pack, ray_pack, pcb_info, ray_info,
+    ch_r, ch_t, eta_id, gain_ratio_id, calibrated_ratio_id, vldr_id,
+):
+    """Calculate display curves without updating any processor products or scalars.
+
+    The caller keeps STD bands from smoothing the original ratio profiles.
+    Scalar eta and the ideal/actual G/H coefficients come from processor metadata.
+    """
+    gain_info = pcb_info.sel(pair=[gain_ratio_id])
+    p45 = _smoothed_signal_ratio(
+        p45_pack["profile_mean"], signals, "pcb_p45", ch_r, ch_t, gain_info,
+    )
+    m45 = _smoothed_signal_ratio(
+        m45_pack["profile_mean"], signals, "pcb_m45", ch_r, ch_t, gain_info,
+    )
+    product = p45 * m45
+    combined = np.sqrt(product.where(product >= 0))
+    calibration = {
+        "gain_ratio": combined.sel(pair=gain_ratio_id).values,
+        "gain_ratio_p45": p45.sel(pair=gain_ratio_id).values,
+        "gain_ratio_m45": m45.sel(pair=gain_ratio_id).values,
+    }
+
+    ratio = _smoothed_signal_ratio(
+        ray_pack["profile_mean"], signals, "ray", ch_r, ch_t,
+        ray_info.sel(pair=[calibrated_ratio_id]),
+    ).sel(pair=calibrated_ratio_id, drop=True)
+    # Never derive calibration eta from the smoothed display profiles.
+    eta = float(_info_value(pcb_info, eta_id, "mean"))
+    if not np.isfinite(eta):
+        raise ValueError(f"Missing finite scalar eta for display pair {eta_id}.")
+    ratio = ratio / eta
+
+    rayleigh = {}
+    for key, pair_id in [("calibrated_ratio", calibrated_ratio_id), ("vldr", vldr_id)]:
+        gh = {
+            name: float(_info_value(ray_info, pair_id, name))
+            for name in ("G_R", "G_T", "H_R", "H_T")
+        }
+        if not all(np.isfinite(value) for value in gh.values()):
+            raise ValueError(f"Missing finite G/H metadata for display pair {pair_id}.")
+        rayleigh[key] = _GH_correct_values(ratio=ratio, **gh).values
+    return calibration, rayleigh
 
 
 def replace_ratio_id_type(pair_id, new_type):
