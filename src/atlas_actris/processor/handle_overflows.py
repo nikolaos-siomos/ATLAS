@@ -56,11 +56,12 @@ def apply_time_mask(qa_tests, mask_time, output_data):
                 f"{key} measurement will not be processed because masking "
                 "removes all profiles"
             )
-            del output_data["profile"][key]
-            if key in output_data["time_mask"]:
-                del output_data["time_mask"][key]
-            del output_data["time_info"][key]
-            del output_data["shots"][key]
+            # Downstream stages also discover QA tests through metadata and
+            # derived arrays (e.g. channel_info, range and background). Remove
+            # the measurement everywhere so none of those entries goes stale.
+            for subdict in output_data.values():
+                if isinstance(subdict, dict):
+                    subdict.pop(key, None)
 
         else:
             output_data["profile"][key] = (

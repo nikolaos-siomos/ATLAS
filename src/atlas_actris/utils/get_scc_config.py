@@ -23,12 +23,16 @@ sections_map = {
         "station_id": ("atlas_system", "station_id"),
         "version_id": ("atlas_system", "version_id"),
         "lidar_name": ("atlas_system", "lidar_name"),
+        "station_name": ("atlas_system", "station_name"),
+        "lidar_id": ("atlas_system", "lidar_id"),
+        "version_name": ("atlas_system", "version_name"),
         "configuration_name": ("atlas_system", "configuration_name"),
         "configuration_id": ("atlas_system", "configuration_id"),
         "station_altitude": ("atlas_system", "station_altitude"),
         "station_latitude": ("atlas_system", "station_latitude"),
         "station_longitude": ("atlas_system", "station_longitude"),
         "zenith_angle": ("atlas_system", "zenith_angle"),
+        "azimuth_angle": ("atlas_system", "azimuth_angle"),
     },
     "Channels": {
         "scc_channel_id": ("atlas_channels", "scc_channel_id"),
@@ -39,12 +43,16 @@ sections_map = {
         "acquisition_mode": ("atlas_channels", "acquisition_mode"),
         "zero_bin": ("atlas_channels", "zero_bin"),
         "dead_time": ("atlas_channels", "dead_time"),
+        "background_low_bin": ("atlas_channels", "background_low_bin"),
+        "background_high_bin": ("atlas_channels", "background_high_bin"),
         "detected_wavelength": ("atlas_channels", "detected_wavelength"),
         "emitted_wavelength": ("atlas_channels", "emitted_wavelength"),
         "channel_bandwidth": ("atlas_channels", "channel_bandwidth"),
         "G": ("atlas_channels", "G"),
         "H": ("atlas_channels", "H"),
         "range_resolution": ("atlas_channels", "range_resolution"),
+        "bins": ("atlas_channels", "bins"),
+        "data_acquisition_range": ("atlas_channels", "data_acquisition_range"),
         "laser_repetition_rate": ("atlas_channels", "laser_repetition_rate"),
         # "laser_id": ("atlas_channels", "laser_id")
     },
@@ -680,7 +688,6 @@ def ensure_file(path_str: str):
     # make sure file exists
     if not path.exists():
         path.touch()
-        print(f"Configuration file does not exist, creating empty file: {path}")
         
 def export_selected_to_ini(
     data: Dict[str, Dict[str, List]],
@@ -716,10 +723,18 @@ def export_selected_to_ini(
             cfg.add_section(new_section)
 
         for target_key, (src_sec, src_key) in mapping.items():
-            # Skip quietly if missing
+            # Keep every mapped System/Channels parameter available for manual
+            # editing, even when SCC does not supply a value.
             if src_sec not in data or src_key not in data[src_sec]:
-                continue
-            values = data[src_sec][src_key]
+                if new_section not in ("System", "Channels"):
+                    continue
+                values = ""
+            else:
+                values = data[src_sec][src_key]
+            if values is None:
+                values = ""
+            elif isinstance(values, list):
+                values = ["" if v is None else v for v in values]
             val_str = joiner.join(str(v) for v in values) if isinstance(values, list) else str(values)
             cfg.set(new_section, target_key, val_str)
             if isinstance(values, list) and joiner == ",":
@@ -737,6 +752,22 @@ def export_selected_to_ini(
 
     ensure_file(filename)
 
+    # Categories match parse_config_file.SCHEMA. Filled fields come first,
+    # followed by partially filled fields, then empty fields by category.
+    mandatory_keys = {
+        "System": {"station_id"},
+        "Channels": {
+            "recorder_channel_id", "telescope_type", "channel_type",
+            "channel_subtype",
+        },
+    }
+    recommended_keys = {
+        "System": set(),
+        "Channels": {
+            "zero_bin", "dead_time", "background_low_bin",
+            "background_high_bin", "channel_bandwidth", "G", "H",
+        },
+    }
     with open(Path(filename), "w", encoding="utf-8") as f:
         f.write(
             "# Fill in the empty [polarization_calibration] fields manually "
@@ -744,6 +775,27 @@ def export_selected_to_ini(
         )
         for section in cfg.sections():
             rows = list(cfg.items(section, raw=True))
+            parameter_groups = {}
+            if section in mandatory_keys:
+                for key, value in rows:
+                    values = list_values.get((section, key), value.split(joiner))
+                    # Explicit placeholders such as '_' are filled entries.
+                    # Only genuinely blank entries affect export grouping.
+                    missing = [item.strip() == "" for item in values]
+                    if all(missing):
+                        parameter_groups[key] = (
+                            "mandatory" if key in mandatory_keys[section] else
+                            "recommended" if key in recommended_keys[section] else
+                            "optional"
+                        )
+                    elif any(missing):
+                        parameter_groups[key] = "partial"
+                # Stable sorting preserves the original order within each group.
+                group_order = {
+                    None: 0, "partial": 1, "mandatory": 2,
+                    "recommended": 3, "optional": 4,
+                }
+                rows.sort(key=lambda row: group_order[parameter_groups.get(row[0])])
             key_width = (0 if section == "System" else
                          max((len(key) for key, _ in rows), default=0))
             widths = []
@@ -753,7 +805,16 @@ def export_selected_to_ini(
                         widths.append(0)
                     widths[i] = max(widths[i], len(value))
             f.write(f"[{section}]\n")
+            previous_category = None
             for key, value in rows:
+                category = parameter_groups.get(key)
+                if category is not None and category != previous_category:
+                    heading = (
+                        "Partially filled parameters" if category == "partial"
+                        else f"Empty {category} parameters"
+                    )
+                    f.write(f"\n# {heading}\n")
+                previous_category = category
                 values = list_values.get((section, key))
                 if values is not None and section != "System":
                     value = ", ".join(
@@ -763,6 +824,8 @@ def export_selected_to_ini(
                 value = value.replace("\n", "\n\t")
                 f.write(f"{key.ljust(key_width)} = {value}\n")
             f.write("\n")
+
+    print(f"-- Created configuration file: {Path(filename)}")
 
 
 def read_sectioned_csv(path: str) -> Dict[str, Dict[str, List[str]]]:

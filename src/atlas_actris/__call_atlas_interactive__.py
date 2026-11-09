@@ -15,6 +15,7 @@ from utils.find_radiosonde import find_radiosonde
 from utils.get_scc_config import export_scc_config
 from utils.parse_init_file import parse_call_atlas_ini
 from utils.parse_config_file import parse_atlas_config_file
+from utils.parse_init_file import fill_meteorological_defaults
 from utils.parse_settings_file import parse_atlas_settings_file
 
 from visualizer.qa_test_dark import generate_dark
@@ -71,6 +72,9 @@ scc_info = export_scc_config(
 
 # Parse the configuration file
 config_info = parse_atlas_config_file(caller_info['atlas_configuration_file'])
+
+# Fill only empty meteorological init entries using the configured station ID.
+caller_info = fill_meteorological_defaults(caller_info, config_info)
 
 # Parse the settings file
 settings_info = parse_atlas_settings_file(caller_info['atlas_settings_file'])

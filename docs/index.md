@@ -2,12 +2,15 @@
 
 ATLAS ACTRIS is a Python package and command-line tool for lidar data processing, visualization, and related ACTRIS workflows.
 
+**New to ATLAS?** Start with the [Quick guide](quick_guide.md) to prepare your data, install ATLAS, configure your first run, and process a measurement.
+
 ## Start here
 
 - [Installation](installation.md)
 - [Command line interface](atlas_actris_cli_documentation.md)
 - [Exported processing stages](exported_processing_stages.md)
-- [Radiosonde selection and downloading](radiosonde_selection.md)
+- [Meteorological profile selection and downloading](radiosonde_selection.md), including database defaults for empty initialization settings
+- [Meteorological station database](meteorological_database.md)
 
 ## INI file references
 

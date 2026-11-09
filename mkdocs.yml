@@ -22,11 +22,13 @@ theme:
 nav:
 - Home: index.md
 - Getting started:
+  - Quick guide: quick_guide.md
   - Installation: installation.md
   - Command line interface: atlas_actris_cli_documentation.md
 - User guide:
   - Exported processing stages: exported_processing_stages.md
-  - Radiosonde selection and downloading: radiosonde_selection.md
+  - Meteorological profile selection and downloading: radiosonde_selection.md
+  - Meteorological station database: meteorological_database.md
 - INI file reference:
   - Initialization file: generated/initialization_reference.md
   - Configuration file: generated/configuration_reference.md

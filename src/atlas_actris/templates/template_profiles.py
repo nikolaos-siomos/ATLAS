@@ -458,22 +458,7 @@ INTERCOMPARISON_TEMPLATE_KEYS = {
 # Keys must exist in parse_init_file.SCHEMA.
 
 BEGINNER_INIT_TEMPLATE_SECTIONS = {
-    "explicit_paths": [
-        "parent_folder",
-        "atlas_configuration_file",
-        "atlas_settings_file",
-        "radiosonde_folder",
-        "radiosonde_file",
-        "output_folder",
-    ],
-    "general_options": [
-        "process",
-        "process_qck",
-        "process_bgd",
-        "process_vldr",
-    ],
     "trimming_options": [
-        "max_height_agl",
         "slice_measurement",
         "exclude_measurement",
     ],
@@ -540,67 +525,14 @@ BEGINNER_CONFIG_TEMPLATE_SECTIONS = {
 # Values are lists of keys inside each settings schema group.
 
 BEGINNER_SETTINGS_TEMPLATE_KEYS = {
-    "qck": [
-        "x_lims",
-        "x_tick",
-        "y_lims",
-        "use_log_y_scale",
-        "smooth",
-        "smoothing_window",
-        "select_channels",
-        "exclude_wavelength",
-    ],
-    "qck_vldr": [
-        "x_lims",
-        "x_tick",
-        "y_lims",
-        "use_log_y_scale",
-        "smooth",
-        "smoothing_window",
-        "include_pairs",
-        "exclude_wavelength",
-    ],
-    "ray": [
-        "x_lims",
-        "x_tick",
-        "y_lims",
-        "normalization_region",
-        "molecular_mask_region",
-        "smooth",
-        "smoothing_window",
-        "select_channels",
-        "exclude_wavelength",
-    ],
     "tlc": [
-        "plot_raw_signals",
-        "use_last_sector",
         "normalization_region",
-        "relative_deviation_limit",
-        "near_range_upper_limit",
-        "smooth",
-        "smoothing_window",
-        "select_channels",
-        "exclude_wavelength",
     ],
     "tlc_rin": [
-        "plot_raw_signals",
-        "use_last_sector",
         "normalization_region",
-        "relative_deviation_limit",
-        "near_range_upper_limit",
-        "smooth",
-        "smoothing_window",
-        "select_channels",
-        "exclude_wavelength",
     ],
     "pcb": [
-        "x_lims_signals",
-        "x_lims_calibration",
-        "x_lims_rayleigh",
         "calibration_region",
         "rayleigh_region",
-        "pldr_error_threshold",
-        "smooth",
-        "smoothing_window",
     ],
 }

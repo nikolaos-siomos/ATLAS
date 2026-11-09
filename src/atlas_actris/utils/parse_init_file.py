@@ -10,6 +10,8 @@ Created on Thu Aug 14 15:16:34 2025
 from __future__ import annotations
 
 import re
+import csv
+import math
 import os
 import ntpath
 import numpy as np
@@ -23,6 +25,101 @@ from typing import Any, Dict, List, Optional, Union, Mapping, Iterable, Sequence
 from utils.cookbook import collect_stages
 
 Number = Union[int, float]
+
+# Maximum distance for database-provided Wyoming station defaults, in km.
+# Explicit init/CLI values are never restricted by this fallback limit.
+MAX_RADIOSONDE_DISTANCE_KM = 100.0
+
+
+def fill_meteorological_defaults(
+    caller_info: Dict[str, Any],
+    config_info: Mapping[str, Any],
+    *,
+    database_path: Optional[Union[str, Path]] = None,
+    max_radiosonde_distance_km: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Fill empty init fields from the row matching config_info['station_id'].
+
+    Updates caller_info in place and returns it. Non-empty user values always
+    win. Empty database cells and unmatched stations leave values unchanged.
+    Wyoming defaults require a known distance within the configured limit;
+    Cloudnet defaults are independent of distance. Values are converted and
+    checked using this parser's existing schema before any updates are made.
+    """
+    keys = (
+        "cloudnet_station_name", "rsonde_station_wmo_id",
+        "rsonde_station_name", "rsonde_station_altitude",
+    )
+    missing = [key for key in keys if _is_empty_scalar(caller_info.get(key))]
+    station_id = str(config_info.get("station_id") or "").strip().casefold()
+    if not missing or not station_id:
+        return caller_info
+
+    limit = (MAX_RADIOSONDE_DISTANCE_KM if max_radiosonde_distance_km is None
+             else max_radiosonde_distance_km)
+    try:
+        limit = float(limit)
+    except (TypeError, ValueError):
+        raise ConfigError("max_radiosonde_distance_km must be a finite, non-negative number")
+    if not math.isfinite(limit) or limit < 0:
+        raise ConfigError("max_radiosonde_distance_km must be a finite, non-negative number")
+
+    path = (Path(database_path) if database_path is not None else
+            Path(__file__).resolve().parents[1] / "molecular" / "meteorological_database.csv")
+    try:
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            required = {"station_id", "radiosonde_distance_km", *keys}
+            absent = required.difference(reader.fieldnames or [])
+            if absent:
+                raise ConfigError(
+                    f"Meteorological database {path} is missing columns: {sorted(absent)}"
+                )
+            matches = [row for row in reader
+                       if (row.get("station_id") or "").strip().casefold() == station_id]
+    except FileNotFoundError:
+        CustomWarning(f"Meteorological database not found: {path}. Keeping init values unchanged.")
+        return caller_info
+
+    if not matches:
+        return caller_info
+    if len(matches) > 1:
+        raise ConfigError(f"Duplicate station_id {station_id!r} in meteorological database {path}")
+    row = matches[0]
+
+    use_radiosonde = False
+    if any(key.startswith("rsonde_") for key in missing):
+        raw_distance = (row.get("radiosonde_distance_km") or "").strip()
+        if raw_distance:
+            try:
+                distance = float(raw_distance)
+            except ValueError:
+                raise ConfigError(
+                    f"Invalid radiosonde_distance_km for station {station_id!r} in {path}: {raw_distance!r}"
+                )
+            if not math.isfinite(distance) or distance < 0:
+                raise ConfigError(
+                    f"radiosonde_distance_km for station {station_id!r} in {path} must be finite and non-negative"
+                )
+            use_radiosonde = distance <= limit
+
+    updates = {}
+    for key in missing:
+        if key.startswith("rsonde_") and not use_radiosonde:
+            continue
+        raw = row.get(key)
+        if _is_empty_scalar(raw):
+            continue
+        meta = SCHEMA[key]
+        value = _convert_scalar(raw, meta["dtype"], key)
+        if isinstance(value, (int, float)) and not math.isfinite(value):
+            raise ConfigError(f"{key}: database value must be finite for station {station_id!r}")
+        _check_limits(key, value, meta)
+        _check_allowed(key, value, meta)
+        updates[key] = value
+
+    caller_info.update(updates)
+    return caller_info
 
 # -------------------------------------------------------------------
 # SCHEMA

@@ -1,0 +1,47 @@
+station_id,station_name,cloudnet_station_name,rsonde_station_wmo_id,rsonde_station_name,radiosonde_distance_km,rsonde_station_altitude
+aat,"Venice, Italy",,16037,AVIANO,80,113.0
+aky,"Antikythera, Greece",antikythera,16754,HERAKLEION (AIRPORT),179,35.0
+atz,"Athens, Greece",athens,16716,ATHINAI HELLINIKON,9,43.1
+bgd,"Belgrade, Serbia",belgrade,13275,BEOGRAD/KOŠUTNJAK,10,203.0
+brc,"Barcelona, Spain",barcelona,08190,BARCELONA SERVEI,1,95.0
+buj,"Burjassot, Spain",burjassot,08430,MURCIA,179,61.0
+cbn,"Chilboton, United Kingdom",chilbolton,03743,LARKHILL,26,132.0
+cbw,"Cabauw, Netherlands",cabauw,06260,DE BILT,23,2.0
+clj,"Cluj-Napoca, Romania",cluj,15120,CLUJ-NAPOCA,2,410.0
+cog,"Belsk, Poland",belsk,12375,WARSZAWA,41,65.0
+ctn,"Astrophysical Laboratory Catania, Italy",catania,,CATANIA,,142.0
+cvo,"Mindelo, Capo Verde",mindelo,08594,SAL,218,54.1
+cyc,"Limassol, Cyprus",limassol,17601,AKROTIRI,12,23.0
+dus,"Dushanbe, Tajikistan",dushanbe,38836,DUSHANBE,6,800.0
+evo,"Evora, Portugal",evora,08535,LISBOA/GEOFISICO,109,95.4
+gap,"Garmisch-Partenkirchen-Zugspitze, Germany",schneefernerhaus,11120,INNSBRUCK-FLUGHAFEN,32,581.0
+gar,"Garmisch-Partenkirchen, Germany",garmish,11120,INNSBRUCK-FLUGHAFEN,32,581.0
+gra,"Granada, Spain",granada,08495,GIBRALTAR,192,3.0
+hpb,"Observatory Hohenpeissenberg, Germany",hohenpeissenberg,10962,HOHENPEISSENBERG,0,977.2
+ino,"Bucharest, Romania",bucharest,15420,BUCURESTI BANEASA,18,90.0
+ipr,"Ispra, Italy",ispra,16064,NOVARA/CAMERI,32,178.0
+kuo,"Kuopio, Finland",vehmasmaki,02935,JYVASKYLA AIRPORT,103,139.0
+laq,"L’Aquila, Italy",laquila,16245,PRATICA DI MARE,106,12.3
+lei,"Leipzig, Germany",leipzig,10468,OPPIN,34,106.0
+lim,"Limassol, Cyprus",limassol,17601,AKROTIRI,12,23.0
+lle,"Lille, France",lille,06400,KOKSIJDE,63,9.0
+lmp,"Lampedusa, Italy",lampedusa,60740,MONASTIR-SKANES,172,2.0
+mai,"Observatoire de Physique de l’Atmosphère de La Réunion (OPAR), Saint-Paul Maido site, La Reunion, France",maido,61980,SAINT-DENIS/GILLOT (REUNION),26,20.0
+mdr,"Madrid, Spain",madrid,08221,MADRID/BARAJAS,14,609.0
+nak,"Kosetice, Czechia",kosetice,11520,PRAHA-LIBUS,66,302.0
+nap,"Naples, Italy",napoli,16245,PRATICA DI MARE,171,12.3
+ncl,"Nicolosi, Serra La Nave Observatory, Italy",nicolosi,,CATANIA,,142.0
+ncs,"Cyprus CAO Nicosia, Cyprus",nicosia,17607,ATHALASSA,1,162.0
+pay,"Payerne, Switzerland",payerne,06610,PAYERNE,1,490.0
+pot,"Potenza, Italy",potenza,16320,BRINDISI,188,14.5
+puy,"Clermont-Ferrand, France",clermont-ferrand,07480,LYON-BRON,143,200.0
+rme,"Roma-Tor Vergata, Italy",rome,16245,PRATICA DI MARE,26,12.3
+run,"Observatoire de Physique de l’Atmosphère de La Réunion (OPAR), Saint-Denis site, La Reunion, France",moufia,61980,SAINT-DENIS/GILLOT (REUNION),5,20.0
+sal,"Lecce, Italy",lecce,16332,LECCE,11,49.0
+sir,"Palaiseau, France",palaiseau,07145,TRAPPES,16,167.0
+sof,"Sofia, Bulgaria",sofia,15614,SOFIA (OBSERV.),1,595.0
+sos,"Sosnowiec, Poland",,12575,TARNOW,135,209.1
+spc,"San Pietro Capofiume, Italy",san-pietro-capofiume,16144,S. PIETRO CAPOFIUME RDS,0,10.0
+the,"Thessaloniki, Greece",thessaloniki,16622,THESSALONIKI (AIRPORT),11,1.7
+waw,"Warsaw, Poland",warsaw,12375,WARSZAWA,3,65.0
+wrc,"Wroclaw, Poland",,,WROCLAW,,118.0

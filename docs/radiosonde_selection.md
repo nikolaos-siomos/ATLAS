@@ -1,15 +1,14 @@
-# Radiosonde selection and downloading
+# Meteorological profile selection and downloading
 
-ATLAS ACTRIS uses radiosonde profiles for processing steps that require molecular atmospheric profiles. In the interactive workflow, radiosonde handling happens after lidar data and metadata have been loaded and normalized, and before the radiosonde files are read into the meteorological dataset.
+ATLAS ACTRIS uses measured radiosondes and Cloudnet/ECMWF meteorological profiles for processing steps that require molecular atmospheric profiles. In the interactive workflow, station defaults are resolved after the initialization and configuration files have been parsed. Profile selection then happens after lidar data and metadata have been loaded and normalized, and before the selected files are read into the meteorological dataset.
 
-```text
-parse initialization file
-read lidar files
-update metadata
-find or select radiosonde
-load radiosonde
-continue processing
-```
+The workflow is:
+
+1. Parse the initialization file, including command-line overrides.
+2. Parse the configuration file and obtain its mandatory `station_id`.
+3. Fill empty meteorological initialization settings from the matching database row.
+4. Read lidar files and update metadata.
+5. Find or select the meteorological profile, load it, and continue processing.
 
 In the main interactive script this corresponds to:
 
@@ -30,7 +29,63 @@ Radiosonde behavior is controlled from the initialization file through `caller_i
 | `radiosonde_folder` | Folder used for automatic downloads and automatic radiosonde file selection. Ignored when `radiosonde_file` is provided. |
 | `rsonde_station_wmo_id` | Optional WMO station identifier used to download a radiosonde from Wyoming. |
 | `cloudnet_station_name` | Optional Cloudnet station name used to download ECMWF/Cloudnet meteorological profiles. |
+| `rsonde_station_name` | Radiosonde station name; also the expected identifier for automatic custom ASCII selection. |
+| `rsonde_station_altitude` | Radiosonde site altitude in metres above sea level, used when converting custom ASCII heights given above ground level. |
 | `rsonde_*` ASCII settings | Column, delimiter, header, footer, and unit settings used later when loading manually provided custom ASCII radiosondes. |
+
+## Station defaults from the meteorological database
+
+ATLAS can fill empty station settings using the bundled file:
+
+```text
+src/atlas_actris/molecular/meteorological_database.csv
+```
+
+The lookup uses `config_info["station_id"]`, parsed from the configuration file, and matches the CSV `station_id` without regard to case or surrounding whitespace. The database column names match the initialization keys that can be filled:
+
+| Initialization key and CSV column | Value supplied |
+| --- | --- |
+| `cloudnet_station_name` | Cloudnet site identifier, such as `antikythera`. |
+| `rsonde_station_wmo_id` | WMO identifier for the radiosonde site. |
+| `rsonde_station_name` | Name of the radiosonde site. |
+| `rsonde_station_altitude` | Radiosonde site altitude in metres above sea level. |
+
+### Precedence and empty values
+
+User-provided initialization values, including command-line overrides, take precedence. ATLAS fills each of the four keys only when its parsed value is `None`, an empty string, or whitespace. A numeric zero is a supplied value and is preserved.
+
+An empty database cell leaves the corresponding initialization value unchanged. A station with no matching row also leaves all values unchanged. The lookup updates `caller_info` in memory; it does not rewrite the initialization file. ASCII column, delimiter, header, footer, and unit settings keep their existing behavior.
+
+### Radiosonde distance limit
+
+Database-provided radiosonde defaults are used only when `radiosonde_distance_km` is present and is **at most 100 km**. Exactly 100 km is accepted. A larger or missing distance prevents all three `rsonde_station_*` defaults from being filled. Cloudnet defaults are independent of this distance check.
+
+The limit applies to database defaults. Explicitly supplied radiosonde settings are preserved even when the database distance exceeds the limit.
+
+For example, the database row for `aky` supplies the Cloudnet ID `antikythera`, but its radiosonde distance is 179 km. If all four init settings are empty, only `cloudnet_station_name` is filled. An explicitly supplied `rsonde_station_wmo_id` remains in use.
+
+The limit is configured near the top of `utils/parse_init_file.py`:
+
+```python
+MAX_RADIOSONDE_DISTANCE_KM = 100.0
+```
+
+The comparison uses the distance stored in the CSV. In the simplified database this is rounded to the nearest kilometre. Rows without a WMO ID have a blank distance, so they do not supply radiosonde defaults.
+
+### How defaults enter profile selection
+
+The interactive caller resolves the defaults immediately after parsing the configuration file:
+
+```python
+config_info = parse_atlas_config_file(caller_info["atlas_configuration_file"])
+caller_info = fill_meteorological_defaults(caller_info, config_info)
+```
+
+The existing download and file-selection rules then use the resolved settings. In automatic mode, this can enable Wyoming or Cloudnet downloads and provide the expected station identifiers for filename matching. A database entry does not guarantee that a profile is available from either service.
+
+When `radiosonde_file` is supplied, manual mode continues to use that file and skips automatic discovery and downloads.
+
+See the [meteorological station database](meteorological_database.md) for the complete table. The documentation table is generated from the same CSV when the site is built, so the database stays at its current location.
 
 ## Manual radiosonde mode
 
@@ -88,8 +143,8 @@ For each supported test, ATLAS computes the midpoint of the measurement time ran
 Automatic mode follows this sequence:
 
 1. Compute the measurement midpoint.
-2. Try to download a Wyoming radiosonde if `rsonde_station_wmo_id` is provided.
-3. Try to download a Cloudnet/ECMWF profile if `cloudnet_station_name` is provided.
+2. Try to download a Wyoming radiosonde if `rsonde_station_wmo_id` is set, either explicitly or by the database fallback.
+3. Try to download a Cloudnet/ECMWF profile if `cloudnet_station_name` is set, either explicitly or by the database fallback.
 4. Search `radiosonde_folder` for supported radiosonde files.
 5. Reject supported-looking filenames whose station identifier does not match the expected identifier for that format.
 6. Prefer the closest Wyoming file within the priority time window.
@@ -410,7 +465,7 @@ If no radiosonde can be selected, processing steps that require molecular profil
 
 Use `radiosonde_file` when reproducibility is more important than automatic selection, or when the correct radiosonde file is known beforehand.
 
-Use `radiosonde_folder` with `rsonde_station_wmo_id` and/or `cloudnet_station_name` when ATLAS should download and select the best available profile automatically. Make sure the configured station identifiers match the identifiers used in supported filenames.
+Use `radiosonde_folder` when ATLAS should download and select the best available profile automatically. Supply `rsonde_station_wmo_id` and/or `cloudnet_station_name` explicitly, or leave them empty to use eligible defaults for the configuration's `station_id`. Make sure the resolved identifiers match the identifiers used in supported filenames.
 
 Avoid mixing unrelated campaigns, stations, or dates in the same `radiosonde_folder`. The selector ignores unsupported names and supported-looking names with mismatching identifiers, but all supported filenames with matching identifiers are candidates for automatic selection.
 
@@ -426,6 +481,14 @@ The molecular-dependent quicklooks are protected against this situation:
 ATLAS prints a warning explaining that no molecular products were found and that this usually means no usable radiosonde was selected. This prevents errors from title generation, molecular overlays, or Rayleigh-fit normalization when radiosonde-dependent data do not exist.
 
 ## Troubleshooting
+
+### A database default was not applied
+
+Check the configuration file's `station_id` against the [database table](meteorological_database.md). A fallback is skipped when the initialization key already has a value, the station has no matching database row, or the corresponding database cell is empty.
+
+For radiosonde defaults, also check that the database distance is present and no greater than `MAX_RADIOSONDE_DISTANCE_KM`. Cloudnet defaults do not depend on this limit. The simplified database leaves the distance blank when the radiosonde has no WMO ID.
+
+If the database file is missing, ATLAS prints a warning and keeps the parsed initialization values. Invalid database headers, duplicate matching station rows, and invalid values raise a configuration error.
 
 ### A downloaded file was not selected
 
