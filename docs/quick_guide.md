@@ -33,7 +33,7 @@ ATLAS must be installed in a Python environment. This guide covers Python versio
 3. Install ATLAS in `atlas_box`:
 
    ```bash
-   pip install --pre atlas-actris
+   pip install atlas-actris
    ```
 
 4. Check the installation:

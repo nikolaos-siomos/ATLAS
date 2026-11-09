@@ -18,8 +18,21 @@ ATLAS currently supports Python **3.9, 3.10, 3.11, 3.12, and 3.13**.
 
 The package is tested with a bundled smoke-test dataset through `pytest` and GitHub Actions. The test suite checks that the command-line workflow can run to completion and produce the expected plots, reports, and ASCII outputs.
 
-## Installation
+## Installation for users
+Create and activate a Python environment. For example, using conda or miniforge:
 
+```bash
+conda create -n atlas_box python=3.13 pip
+conda activate atlas_box
+```
+
+Install ATLAS through PyPI by typing the following command inside the active environment:
+
+```bash
+pip install atlas-actris
+```
+
+## Installation for developers
 Create and activate a Python environment. For example, using conda or miniforge:
 
 ```bash
@@ -45,34 +58,6 @@ python -m pip install -e .
 ```
 
 This installs the package and exposes the `atlas` command in the active environment. Using the -e option keeps the source tree editable while working with ATLAS locally.
-
-## Developer installation
-
-For development and testing, install ATLAS with the optional development dependencies:
-
-```bash
-python -m pip install -e ".[dev]"
-```
-
-This installs the package in editable mode and adds the tools needed to run the test suite, including `pytest`.
-
-To include the documentation tools as well, install the optional documentation dependencies:
-
-```bash
-python -m pip install -e ".[docs]"
-```
-
-To install both development and documentation tools:
-
-```bash
-python -m pip install -e ".[dev,docs]"
-```
-
-After installation, it is useful to check that the environment has no dependency conflicts:
-
-```bash
-python -m pip check
-```
 
 ## Minimal usage
 Activate the Python environment where ATLAS is installed. For example, using conda or miniforge:
@@ -158,16 +143,6 @@ python -m pytest -q tests/test_atlas_integration.py
 
 The pytest integration test calls the smoke-test command and verifies that the expected output files are produced.
 
-## GitHub Actions
-
-The repository can run the smoke test automatically on GitHub Actions using the workflow in:
-
-```text
-.github/workflows/tests.yml
-```
-
-The workflow installs ATLAS, checks dependencies with `pip check`, and runs the smoke test across the supported Python versions.
-
 ## Local documentation
 
 The documentation is published at [nikolaos-siomos.github.io/ATLAS](https://nikolaos-siomos.github.io/ATLAS/). You can also preview changes locally with the same MkDocs configuration used by the deployment workflow.
@@ -227,68 +202,3 @@ Stop the documentation server with:
 Ctrl+C
 ```
 
-### Strict documentation check
-
-Before sharing documentation changes, run:
-
-```bash
-mkdocs build --strict
-```
-
-This checks that the documentation can be built as a static website. The `--strict` option treats warnings as errors, so broken links and missing pages are easier to catch.
-
-A successful build ends with a message similar to:
-
-```text
-Documentation built in ... seconds
-```
-
-The generated static website is written to:
-
-```text
-site/
-```
-
-The `site/` folder is only a local build output and should not be committed to Git.
-
-### Regenerate the automatic reference pages
-
-If the parser schemas or template flavor files change, regenerate the INI reference pages before checking the documentation:
-
-```bash
-atlas-generate-templates --target docs
-```
-
-Then run:
-
-```bash
-mkdocs build --strict
-```
-
-The generated files that should be committed are:
-
-```text
-docs/generated/initialization_reference.md
-docs/generated/configuration_reference.md
-docs/generated/settings_reference.md
-```
-
-### Publishing documentation to GitHub Pages
-
-The `.github/workflows/docs.yml` workflow builds the MkDocs site and publishes the generated `site/` directory. The documentation homepage is `docs/index.md`; the repository README is not used as the documentation homepage.
-
-Configure the repository once:
-
-1. Open **Settings → Pages**.
-2. Under **Build and deployment → Source**, select **GitHub Actions**.
-3. Commit the documentation files, `mkdocs.yml`, and `.github/workflows/docs.yml` to `main`.
-4. In **Actions → Deploy documentation**, wait for the build and deployment jobs to succeed. You can also choose **Run workflow** on `main`.
-5. Open the URL shown by the deployment: [https://nikolaos-siomos.github.io/ATLAS/](https://nikolaos-siomos.github.io/ATLAS/).
-
-Do not select the repository root or the Markdown `docs/` folder as a branch-based publishing source for this workflow. GitHub Actions publishes the HTML built by MkDocs.
-
-All Markdown pages referenced by `mkdocs.yml`, including `docs/generated/`, must be committed. This deployment workflow builds the committed documentation; it does not run the ATLAS schema-reference generator. After schema changes, regenerate and commit the reference pages before pushing.
-
-The workflow uses `mkdocs build --strict`. If it fails, inspect the **Build MkDocs site** log for missing pages, broken links, or other warnings. A failed build does not publish the new documentation. Keep strict checking enabled and fix the reported issues.
-
-You do not need to commit `site/` or create a `gh-pages` branch. To preview the same content locally, use `mkdocs serve` from the same checkout with the documentation dependencies installed.
