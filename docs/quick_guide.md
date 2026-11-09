@@ -42,7 +42,7 @@ ATLAS must be installed in a Python environment. This guide covers Python versio
    atlas-smoke-test
    ```
 
-The installation command installs the latest pre-release version. At the time this guide was written, that version was **1.2.0.rc5**.
+The installation command installs the latest pre-release version. At the time this guide was written, that version was **{{ atlas_version }}**.
 
 The `atlas-smoke-test` command can be executed from any directory.
 
@@ -118,7 +118,7 @@ The configuration file is generated using the SCC channel IDs for `recorder_chan
 
 #### Review the generated configuration
 
-**The automatically generated configuration must be reviewed.** As of ATLAS **1.2.0.rc5**, automatic generation is incomplete because:
+**The automatically generated configuration must be reviewed.** As of ATLAS **{{ atlas_version }}**, automatic generation is incomplete because:
 
 - The link between a normal configuration and a calibration configuration is not fully exposed by the SCC HoI. Fill in the `polarization_calibration` section of `config_file.ini` manually.
 - Mistakes in an SCC configuration can go unnoticed.

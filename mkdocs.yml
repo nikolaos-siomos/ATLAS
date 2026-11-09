@@ -43,6 +43,8 @@ nav:
   - get_scc_config: get_scc_config.md
 plugins:
 - search
+hooks:
+  - tools/mkdocs_version.py
 markdown_extensions:
 - admonition
 - attr_list
