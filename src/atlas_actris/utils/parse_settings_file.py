@@ -71,7 +71,7 @@ SCHEMA_QCK_VLDR: Dict[str, Dict[str, Any]] = {
     "x_lims":      {"dtype": float, "default": [0., 14.],  "is_list": True,  "min": 0., "max": 100., "size": 2},
     "x_tick":      {"dtype": float, "default": 1.,         "is_list": False, "min": 0., "max": 10},   
     "y_lims":      {"dtype": float, "default": [],         "is_list": True,  "size": 2}, 
-    "y_max_zone":  {"dtype": float, "default": [0.2, 2.5], "is_list": True,  "min": 0., "max": 30., "size": 2},
+    "y_max_zone":  {"dtype": float, "default": [0.1, 1.], "is_list": True,  "min": 0., "max": 30., "size": 2},
 
     "use_log_y_scale":          {"dtype": bool,  "default": False,     "is_list": False},
 

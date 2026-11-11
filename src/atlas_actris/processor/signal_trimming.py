@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 from utils.printouts import endpoint
 from utils.error_classes import CustomWarning
 from utils.dataarray_utils import shallow_copy
+from processor.time_selection_logging import print_time_selections
 from utils.time_conversions import iso_to_datetimes
 
 from utils.printouts import print_header, print_subsection, print_entry
@@ -333,6 +334,9 @@ def compute_slice_and_exclude(
         for key in qa_tests
     }
 
+    reports = processing_info["caller_info"].get("_time_selection_requests", {})
+    slice_events = []
+    exclude_events = []
     slicer = processing_info["caller_info"]["slice_measurement"]
 
     if slicer is not None:
@@ -344,7 +348,7 @@ def compute_slice_and_exclude(
         # Mentioned keys may be direct output_data keys or loading-map aliases.
         for key in slice_meas:
             resolved_key = _resolve_loading_map_key(
-                key, qa_tests, loading_map, context="slice_measurement"
+                key, qa_tests, loading_map, context="slice_measurement", warn=False
             )
 
             if resolved_key is not None:
@@ -355,9 +359,12 @@ def compute_slice_and_exclude(
 
         for i, key in enumerate(slice_meas):
             resolved_key = _resolve_loading_map_key(
-                key, qa_tests, loading_map, context="slice_measurement"
+                key, qa_tests, loading_map, context="slice_measurement", warn=False
             )
 
+            event = {"key": key, "start_text": slice_start_time[i],
+                     "stop_text": slice_stop_time[i], "source": resolved_key}
+            slice_events.append(event)
             if resolved_key is None:
                 continue
 
@@ -375,6 +382,8 @@ def compute_slice_and_exclude(
 
             mask_interval = (time >= start_dt) & (time <= stop_dt)
 
+            event.update(start=start_dt, stop=stop_dt, total=time.size,
+                         matched=int(np.count_nonzero(mask_interval.values)))
             mask_time[resolved_key] = mask_time[resolved_key] | mask_interval
 
     slicer = processing_info["caller_info"]["exclude_measurement"]
@@ -386,9 +395,12 @@ def compute_slice_and_exclude(
 
         for i, key in enumerate(slice_meas):
             resolved_key = _resolve_loading_map_key(
-                key, qa_tests, loading_map, context="exclude_measurement"
+                key, qa_tests, loading_map, context="exclude_measurement", warn=False
             )
 
+            event = {"key": key, "start_text": slice_start_time[i],
+                     "stop_text": slice_stop_time[i], "source": resolved_key}
+            exclude_events.append(event)
             if resolved_key is None:
                 continue
 
@@ -406,8 +418,12 @@ def compute_slice_and_exclude(
 
             mask_interval = (time < start_dt) | (time > stop_dt)
 
+            event.update(start=start_dt, stop=stop_dt, total=time.size,
+                         removed=int(np.count_nonzero((mask_time[resolved_key] & ~mask_interval).values)))
             mask_time[resolved_key] = mask_time[resolved_key] & mask_interval
 
+    print_time_selections("Slice", slice_events, reports.get("slice_measurement"))
+    print_time_selections("Exclude", exclude_events, reports.get("exclude_measurement"))
     output_data = select_by_time_mask(qa_tests, mask_time, output_data)
 
     if "profile" in output_data and not output_data["profile"]:
@@ -581,7 +597,7 @@ def compute_asign_dark_blocks(
 
             output_data[db_key][drk_key_alias] = arr
 
-    print_entry("Dark measurement blocks successfully assigned!")
+    print_entry("Dark measurements successfully assigned!")
 
     return output_data
 

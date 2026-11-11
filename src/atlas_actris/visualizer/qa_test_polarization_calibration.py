@@ -24,7 +24,7 @@ Main assumptions
     pol_cal_ratio, pol_cal_ratio_error, pol_cal_info
 - data_pack["pcb_p45"] and data_pack["pcb_m45"] contain source calibration
   products and metadata/vertical scale.
-- data_pack["ray_pcb"] contains Rayleigh-side calibration products and metadata.
+- data_pack["ray"] contains Rayleigh-side calibration products and metadata.
 - The left/calibration panel plots gain_ratio products, not eta products:
     gain_ratio, gain_ratio_p45, gain_ratio_m45
 - eta entries are used only as the valid pair basis.
@@ -73,7 +73,7 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
         pol_cal_ratio
         vertical scale and metadata
 
-    data_pack["ray_pcb"]:
+    data_pack["ray"]:
         pol_cal_ratio
         pol_cal_ratio_error
         pol_cal_info
@@ -81,8 +81,8 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
 
     Optional
     --------
-    data_pack["ray_pcb"]["molecular_ratio"]
-    data_pack["ray_pcb"]["molecular_info"]
+    data_pack["ray"]["molecular_ratio"]
+    data_pack["ray"]["molecular_info"]
 
     Returns
     -------
@@ -189,7 +189,7 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
             continue
 
         if not _all_pairs_exist(ray_ratio, [calibrated_ratio_id, vldr_id]):
-            print(f"   Skipping {eta_id}: missing ray_pcb calibration products.")
+            print(f"   Skipping {eta_id}: missing ray calibration products.")
             continue
 
         # ------------------------------------------------------------------
@@ -274,7 +274,7 @@ def generate_polarization_calibration(data_pack, caller_info, settings_info):
             E_cal[key] = y_err
 
         # ------------------------------------------------------------------
-        # Rayleigh panel: time-resolved ray_pcb products -> mean over time
+        # Rayleigh panel: time-resolved ray products -> mean over time
         # ------------------------------------------------------------------
         x_ray = z_ray_all.sel(channel=ch_r).values
 

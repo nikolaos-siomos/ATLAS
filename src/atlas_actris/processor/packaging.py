@@ -23,43 +23,46 @@ packing_map = {
         "tlc_outer",
         "tlc_inner",
     ],
+    "pcb_aux": ["pcb_aux_p45", "pcb_aux_m45"],
     "pcb": [
         "pcb_p45",
         "pcb_m45",
     ],
 }
 
+def _combine_channel_metadata(arrays):
+    """Take each channel's static metadata/geometry from its first source."""
+    channels = list(dict.fromkeys(ch for arr in arrays for ch in arr.channel.values.tolist()))
+    pieces = [
+        next(arr for arr in arrays if ch in arr.channel.values).sel(channel=[ch])
+        for ch in channels
+    ]
+    return xr.concat(pieces, dim="channel", join="outer", combine_attrs="override")
+
+
 def combine_QA_pack(input_data):
-    
+    """Combine diagnostic time series without requiring shared channels.
+
+    Missing channel/time combinations remain NaN. Metadata and vertical grids
+    include channels unique to any source. Original measurement entries remain.
+    """
     output_data = shallow_copy(input_data)
-
-    source_map = get_source_map("dummy")
-
     for new_key, pack in packing_map.items():
-        
-        for source in source_map.keys():
-    
-            da = input_data[source]
-    
-            pack_list = []
-    
-            for key in pack:
-                if key in da:
-                    pack_list.append(da[key])
-    
-            if len(pack_list) > 0:
-                
-                if type(pack_list[0]) is type(xr.DataArray()):
-                    if "time" in pack_list[0].dims:
-                        output_data[source][new_key] = xr.concat(
-                            pack_list,
-                            dim="time",
-                        ).sortby("time")
-                    else:
-                        output_data[source][new_key] = pack_list[0]
-                  
+        for source in get_source_map("dummy"):
+            store = input_data.get(source, {})
+            arrays = [store[key] for key in pack if isinstance(store.get(key), xr.DataArray)]
+            if not arrays:
+                continue
+            if "time" in arrays[0].dims:
+                combined = xr.concat(
+                    arrays, dim="time", join="outer", combine_attrs="override"
+                ).sortby("time")
+            elif "channel" in arrays[0].dims:
+                combined = _combine_channel_metadata(arrays)
+            else:
+                combined = arrays[0]
+            output_data.setdefault(source, {})[new_key] = combined
     print_entry("Packaging complete")
-
     return output_data
 
 def to_plain_value(x):

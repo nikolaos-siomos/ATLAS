@@ -26,6 +26,7 @@ from collections import defaultdict
 from utils.printouts import print_header
 from visualizer.check import check_channels
 from processor.packaging import collect_metadata
+from processor.channel_validation import telecover_test_allowed
 from visualizer.make_text import GenerateText, Libraries
 from visualizer import export_ascii, plot_quadrant_telecover
 from visualizer.telecover_sector_processor import (
@@ -116,6 +117,13 @@ def generate_quadrant_telecover(data_pack, caller_info, settings_info):
     available_sectors = _available_sector_keys(data_pack)
 
     if len(available_sectors) == 0:
+        return qa_test_info
+
+    profiles_for_check = {
+        key: data_pack[key]["profile"]
+        for key in SECTOR_KEYS.values() if key in data_pack
+    }
+    if not telecover_test_allowed(QA_KEY, profiles_for_check, caller_info):
         return qa_test_info
 
     print_header("Initializing the quadrant Telecover test")

@@ -29,6 +29,7 @@ from visualizer.qa_test_polarization_calibration import generate_polarization_ca
 
 from utils.parse_caller_args import call_parser
 from processor.pipeline import Context, Processor
+from processor.channel_validation import validate_channels
 from readers.reader_utils import special_path_rules
 from readers.read_radiosondes import load_radiosonde
 from readers.read_raw_lidar_files_cache import infer_format, flexible_reader
@@ -88,14 +89,18 @@ caller_info = special_path_rules(caller_info)
 # Reading the files
 profiles, metadata = flexible_reader(caller_info)
 
+# Remove unconfigured channels and empty measurements before loading metadata.
+profiles, metadata = remove_unrecognised_channels(caller_info, config_info, profiles, metadata)
+
 # Transfer metadata from the raw file header to config_info
 config_info = load_metadata(config_info, metadata)
 
 # Special config checks related to parameters not provided with the config file nor the raw file header
-config_info = special_config_checks(config_info)
+config_info = special_config_checks(
+    config_info,
+    recorder_channel_ids={ch for arr in profiles.values() for ch in arr.channel.values},
+)
 
-# Remove all profiles corresponding to channels not provided in the config file
-remove_unrecognised_channels(caller_info, config_info, profiles, metadata)
 
 # Create the altas_channel_id now that all channel metadata are loaded and channels are screened
 config_info = get_atlas_channel_id(config_info, profiles, metadata)
@@ -107,7 +112,11 @@ config_info = load_pol_cal_defaults(config_info)
 config_info = bring_to_correct_type(config_info)
 
 # Replace all system_info, channel_info, and pol_cal_info metadata with the common updated ones
-metadata = store_updated_metadata(config_info, metadata)
+metadata = store_updated_metadata(config_info, metadata, profiles)
+
+# Filter and validate actual channel sets. Diagnostic outputs stay enabled.
+profiles, metadata = filter_channels(caller_info, profiles, metadata)
+caller_info = validate_channels(caller_info, profiles, metadata)
 
 # Find radiosonde - Download if file does not exist
 metadata = find_radiosonde(caller_info, metadata)
@@ -115,8 +124,6 @@ metadata = find_radiosonde(caller_info, metadata)
 # Load radiosonde files
 meteo, metadata = load_radiosonde(caller_info, metadata)
 
-# Filter out channels
-profiles, meatadata = filter_channels(caller_info, profiles, metadata)     
 
 # Load all data needed for processing in a data class
 ctx = Context(

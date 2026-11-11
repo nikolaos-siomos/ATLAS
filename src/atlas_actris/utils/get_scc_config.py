@@ -7,6 +7,7 @@ Created on Tue Aug 19 18:16:24 2025
 """
 
 import csv
+import math
 from pathlib import Path
 import configparser
 from typing import Sequence, Hashable, Tuple, List, Dict, Any, Optional
@@ -328,9 +329,57 @@ def _get_zero_bin(data:Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[str, L
 
     return(data)
 
+def _elastic_type_from_H(label, H, channel_id, default_type, *, atlas_channel_id=None, warn=None):
+    """Check elastic SCC labels against H; Raman types pass through."""
+    if not label.startswith(("elT", "elPP", "elCP")):
+        return default_type
+    try:
+        value = float(H)
+        valid = math.isfinite(value)
+    except (TypeError, ValueError, OverflowError):
+        valid = False
+
+    if not valid:
+        if label.startswith("elT"):
+            return "t"
+        reason = "has no valid H"
+    elif label.startswith("elT"):
+        if abs(value) < 0.3:
+            return "t"
+        reason = f"conflicts with H={value:g}"
+    elif label.startswith("elPP"):
+        if value >= 0.3:
+            return "p"
+        reason = f"conflicts with H={value:g}"
+    else:
+        if value < -0.3:
+            return "c"
+        reason = f"conflicts with H={value:g}"
+
+    if label.startswith("elT"):
+        expected = "abs(H) < 0.3 for total channels"
+    elif label.startswith("elPP"):
+        expected = "H >= 0.3 for parallel channels"
+    else:
+        expected = "H < -0.3 for cross channels"
+    message = f"{label} {reason}; expected {expected}; channel_type left empty."
+    if warn is not None:
+        warn(message)
+    else:
+        CustomWarning(
+            f"SCC channel {channel_id} [{atlas_channel_id or '????????'}]: {message} "
+            "Please revise the SCC configuration."
+        )
+    return ""
+
+
 def _get_channel_types(data:Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[str, List[str]]]:
     
     n_channels = len(data["HoiChannels"]["id"])
+    data["_pending_channel_warnings"] = []
+    if "H" not in data["atlas_channels"]:
+        data = _get_GH(data)
+    H_values = data["atlas_channels"]["H"]
     scat_mechanism = data["HoiChannels"].get("_scat_mechanism_id_id")
     emitted_wavelength = data["HoiChannels"]["emission_wavelength"]
     detected_wavelength = data["HoiChannels"]["if_center"]
@@ -387,7 +436,11 @@ def _get_channel_types(data:Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[s
             ch_type = scat_map[scat_mechanism[i]]["channel_type"]
             ch_stype = scat_map[scat_mechanism[i]]["channel_subtype"]
             if not isinstance(ch_type, list):
-                channel_type.append(ch_type)
+                H = H_values[i] if isinstance(H_values, list) and i < len(H_values) else None
+                channel_type.append(_elastic_type_from_H(
+                    scat_mechanism[i], H, channel_id[i], ch_type,
+                    warn=lambda message, index=i: data["_pending_channel_warnings"].append((index, message)),
+                ))
             else:
                 if ch_type == ["v","r"]:
                     if np.abs(float(detected_wavelength[i]) - float(emitted_wavelength[i])) > 10:
@@ -411,16 +464,11 @@ def _get_channel_types(data:Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[s
                         reflected_codes = ch_stype_ids & {"6", "10", "11"}
                         transmitted_codes = ch_stype_ids & {"7", "12", "13"}
                         if reflected_codes and transmitted_codes:
-                            CustomWarning(
-                                f"Ambiguous polarization subtype for SCC channel "
-                                f"{current_channel_id}: PRODUCSTCHANNELS contains "
-                                f"both reflected SignalTypeID codes "
-                                f"{sorted(reflected_codes)} and transmitted codes "
-                                f"{sorted(transmitted_codes)}. Cannot determine "
-                                f"channel_subtype 'r' or 't' from these rows. "
-                                f"Leaving channel_subtype empty for this channel; "
-                                f"fill it in manually in the exported configuration."
-                            )
+                            data["_pending_channel_warnings"].append((i,
+                                f"ambiguous subtype: reflected codes {sorted(reflected_codes)} "
+                                f"and transmitted codes {sorted(transmitted_codes)}; "
+                                "expected one reflected/transmitted assignment; channel_subtype left empty."
+                            ))
                             channel_subtype.append("")
                         elif reflected_codes:
                             channel_subtype.append("r")
@@ -489,38 +537,23 @@ def _get_laser_parameters(data:Dict[str, Dict[str, List[str]]]) -> Dict[str, Dic
     return(data)    
 
 def _get_GH(data:Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[str, List[str]]]:
-    channel_id = data["HoiChannels"]["id"]
-    if data["PolarizationCrosstalkParameter"] != {}:
-        pol_ch_ids = data["PolarizationCrosstalkParameter"]["channel_id"]
-        G_list = data["PolarizationCrosstalkParameter"]["g"]
-        H_list = data["PolarizationCrosstalkParameter"]["h"]
-        if pol_ch_ids != []:
-            G = []
-            H = []
-            for ch in channel_id:
-                if ch in pol_ch_ids:
-                    p_index = len(pol_ch_ids) - 1 - pol_ch_ids[::-1].index(ch)
-                    if G_list[p_index] == "0E-8":
-                        G.append("0.")
-                    else:
-                        G.append(G_list[p_index])
-                        
-                    if H_list[p_index] == "0E-8":
-                        H.append("0.")
-                    else:
-                        H.append(H_list[p_index])
-                        
-                else:
-                    G.append("_")
-                    H.append("_")
-            data["atlas_channels"]["G"] = G
-            data["atlas_channels"]["H"] = H
-        else:
-            data["atlas_channels"]["G"] = "_"
-            data["atlas_channels"]["H"] = "_"
-        
-            
-    return(data)
+    channel_ids = data["HoiChannels"]["id"]
+    parameters = data.get("PolarizationCrosstalkParameter") or {}
+    # Last record wins, matching the existing SCC export behaviour.
+    rows = {
+        str(ch).strip(): i
+        for i, ch in enumerate(parameters.get("channel_id") or [])
+    }
+    for source_key, output_key in (("g", "G"), ("h", "H")):
+        source_values = parameters.get(source_key) or []
+        values = []
+        for channel_id in channel_ids:
+            i = rows.get(str(channel_id).strip())
+            value = source_values[i] if i is not None and i < len(source_values) else "_"
+            values.append("0." if value == "0E-8" else value)
+        data["atlas_channels"][output_key] = values
+    return data
+
 
 def _get_atlas_channel_id(data: Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[str, List[str]]]:
     
@@ -530,9 +563,26 @@ def _get_atlas_channel_id(data: Dict[str, Dict[str, List[str]]]) -> Dict[str, Di
     acquisition_mode = data["atlas_channels"]["acquisition_mode"]
     channel_subtype = data["atlas_channels"]["channel_subtype"]
     
-    atlas_channel_id = [ai + bi + ci + di + ei for ai, bi, ci, di, ei in zip(detected_wavelength, telescope_type, channel_type, acquisition_mode, channel_subtype)]
+    # Keep positional IDs intact when a component is empty or undefined.
+    # Placeholders belong to the inferred ID only, never to exported parameters.
+    atlas_channel_id = [
+        ai + "".join("?" if part in (None, "", "_") else str(part)
+                     for part in (bi, ci, di, ei))
+        for ai, bi, ci, di, ei in zip(
+            detected_wavelength, telescope_type, channel_type, acquisition_mode, channel_subtype
+        )
+    ]
     
     data["atlas_channels"]["atlas_channel_id"] = atlas_channel_id
+
+    # Emit after all ID components are known, using exactly the ID shown by
+    # recorder-channel selection, including any genuinely empty components.
+    for i, message in data.pop("_pending_channel_warnings", []):
+        channel_id = data["HoiChannels"]["id"][i]
+        CustomWarning(
+            f"SCC channel {channel_id} [{atlas_channel_id[i]}]: {message} "
+            "Please revise the SCC configuration."
+        )
 
     return(data)
 
@@ -595,7 +645,17 @@ def _get_dead_time(data: Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[str,
 def _exclude_undifined_scc_channels(data: Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[str, List[str]]]:
     atlas_channel_id = data["atlas_channels"]["atlas_channel_id"]
     scc_channel_id = data["atlas_channels"]["scc_channel_id"]
-    mask = ["_" in ch for ch in atlas_channel_id]
+    # Retain the existing exclusion policy for explicit '_' parameters even
+    # though inferred IDs now render these positions as '?'. Empty fields from
+    # consistency checks remain in the configuration for manual correction.
+    parameters = data["atlas_channels"]
+    mask = [
+        "_" in ch or any(
+            isinstance(parameters.get(key), list) and parameters[key][i] == "_"
+            for key in ("telescope_type", "channel_type", "acquisition_mode", "channel_subtype")
+        )
+        for i, ch in enumerate(atlas_channel_id)
+    ]
     
     if any(mask):
         unidentified_scc_channels = [val for val, reject in zip(scc_channel_id, mask) if reject]
@@ -642,38 +702,29 @@ def _get_recorder_channel_id(
         return data
 
     recorder_channel_id = []
-    print("--Input: Provide recorder_channel_id values for each scc_channel_d: (leave empty and press Enter to exclude a channel): ")
+    print("-- Provide recorder_channel_id values. Press Enter to skip an ID and fill it manually later:")
     for scc_id, atlas_id in zip(scc_channel_id, atlas_channel_id):
-        print(f"    -- {scc_id} [{atlas_id}]:", end = "", flush = True)
-        rec_id = input()
-        recorder_channel_id.append(rec_id)  # could be "" if the user just presses Enter
+        print(f"    -- {scc_id} [{atlas_id}]:", end="", flush=True)
+        recorder_channel_id.append(input().strip())
 
-    if all(v == "" for v in recorder_channel_id):
-        CustomWarning("No recorder_channel_id was provided. Please fill in the recorder_channel_id manually in the config exported file")
-    else:
-        data["atlas_channels"]["recorder_channel_id"] = recorder_channel_id
+    # Blank responses skip only ID entry, not the channel or its metadata.
+    data["atlas_channels"]["recorder_channel_id"] = recorder_channel_id
+    filled = [value for value in recorder_channel_id if value != ""]
+    if len(filled) != len(set(filled)):
+        raise ConfigError(
+            f"Duplicates detected in the provided recorder_channel_id values: {filled}"
+        )
+    if not filled:
+        CustomWarning("recorder_channel_id is empty; complete it manually in the exported configuration.")
+    elif len(filled) < len(recorder_channel_id):
+        CustomWarning("recorder_channel_id is partially filled; complete empty entries manually in the exported configuration.")
 
-        mask = [ch != "" for ch in recorder_channel_id]
+    print("Final channel list:")
+    for scc_id, atlas_id, rec_id in zip(scc_channel_id, atlas_channel_id, recorder_channel_id):
+        print(f"    -- {scc_id} [{atlas_id}] --> {rec_id or 'Skipped (fill manually)'}")
+    return data
 
-        for key in data["atlas_channels"].keys():
-            values = data["atlas_channels"][key]
-            data["atlas_channels"][key] = [val for val, keep in zip(values, mask) if keep]
 
-        print("Final channel list:")
-        for scc_id, atlas_id, rec_id in zip(scc_channel_id, atlas_channel_id, recorder_channel_id):
-            if rec_id != "":
-                print(f"    -- {scc_id} [{atlas_id}] --> {rec_id}")
-            else:
-                print(f"    -- {scc_id} [{atlas_id}] --> Excluded!")
-
-        rec_ch_id = recorder_channel_id.copy()
-        if "" in rec_ch_id:
-            rec_ch_id.remove("")
-            if len(rec_ch_id) != len(set(rec_ch_id)):
-                raise ConfigError(f"Duplicates detected in the provided recorder_channel_id values: {recorder_channel_id}")
-
-    return(data)
-    
 def ensure_file(path_str: str):
     """
     Ensure that the given file path exists.
@@ -1020,6 +1071,8 @@ def export_scc_config(scc_configuration_id: str,
                 
             data = _get_zero_bin(data)
             
+            data = _get_GH(data)
+
             data = _get_channel_types(data)
         
             data = _get_telescope_type(data)
@@ -1034,7 +1087,6 @@ def export_scc_config(scc_configuration_id: str,
         
             data = _exclude_undifined_scc_channels(data)
         
-            data = _get_GH(data)    
         
             data = _get_recorder_channel_id(
                 data,

@@ -51,6 +51,7 @@ from utils.signal_utils import (
 
 from utils.error_classes import CustomWarning
 from utils.dataarray_utils import shallow_copy
+from processor.channel_validation import resolve_measurement, warn_once
 
 def _drop_or_mean_time(da: xr.DataArray) -> xr.DataArray:
     if "time" not in da.dims:
@@ -895,58 +896,42 @@ def compute_dark_correction(
     input_data: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
     
-    loading_map = processing_info['caller_info']['loading_map']
-    
-    # output_data = copy.deepcopy(input_data)
     output_data = shallow_copy(input_data)
+    caller_info = processing_info["caller_info"]
+    dark_profiles = output_data["profile_mean"]
+    channel_info = output_data["channel_info"]
 
-    channel_info = output_data['channel_info']
-    
-    dark_profiles = output_data['profile_mean']
-            
-    for key, drk_key_alias in assign_drk.items():
-        for prof_key in profile_instances:
-            profiles = output_data[prof_key]
-            if profiles:
+    for key, dark_alias in assign_drk.items():
+        dark_key = resolve_measurement(dark_alias, dark_profiles, caller_info)
+        if dark_key is None:
+            if key in output_data["profile"]:
+                modes = channel_info[key].sel(parameters="acquisition_mode")
+                if bool((modes == "a").any()):
+                    warn_once(caller_info, f"{key}: no {dark_alias}; dark correction skipped.")
+            continue
+        drk = dark_profiles[dark_key].squeeze("time", drop=True)
+        for profile_key in profile_instances:
+            profiles = output_data[profile_key]
+            if key not in profiles:
+                continue
+            sig = profiles[key]
+            modes = channel_info[key].sel(
+                parameters="acquisition_mode", channel=sig.channel
+            ).reset_coords(drop=True)
+            analog = modes == "a"
+            if not bool(analog.any()):
+                continue
+            available = sig.channel.isin(drk.channel)
+            missing = sig.channel.where(analog & ~available, drop=True).values.tolist()
+            if missing:
+                warn_once(caller_info, f"{key}: no dark for {', '.join(missing)}; left uncorrected.")
+            correction = drk.reindex(channel=sig.channel, fill_value=0.0)
+            if "bins" in correction.dims:
+                correction = correction.reindex(bins=sig.bins)
+            correction = xr.where(analog & available, correction, 0.0)
+            profiles[key] = (sig - correction).transpose(*sig.dims)
 
-                if key not in profiles:
-                    continue
-        
-                if drk_key_alias in dark_profiles:
-                    drk_key = drk_key_alias
-                
-                elif drk_key_alias in loading_map:
-                    candidate = loading_map[drk_key_alias]
-                
-                    if candidate not in dark_profiles:
-                        print_entry(
-                            f"Dark measurement {candidate!r} was configured but "
-                            "no dark profiles were successfully read. Skipping correction."
-                        )
-                        continue
-                
-                    drk_key = candidate
-                
-                else:
-                    continue
-                
-                drk = dark_profiles[drk_key]
-            
-                drk = dark_profiles[drk_key]                   
-                
-                acquisition_mode = channel_info[key].sel(parameters="acquisition_mode")
-                                
-                mask_a = acquisition_mode == "a"
-
-                # Apply only to analog channels.
-                drk = xr.where(mask_a, drk, 0.0)
-            
-                sig_drc = profiles[key] - drk.squeeze("time", drop=True)
-                
-                output_data[prof_key][key] = sig_drc
-
-    print_entry('Dark correction succesfully performed!')
-
+    print_entry("Dark correction complete!")
     return output_data
 
 def compute_signal_noise(

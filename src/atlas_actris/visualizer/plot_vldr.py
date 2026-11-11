@@ -11,7 +11,9 @@ import numpy as np
 import matplotlib.dates as mdates
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
-from matplotlib.ticker import MaxNLocator, AutoMinorLocator
+from matplotlib.ticker import MaxNLocator, AutoMinorLocator, LogFormatterSciNotation
+from visualizer.compact_tick_formatter import CompactScalarFormatter
+from visualizer.smoothing import quicklook_normalization_max
 
 from visualizer.plot_utils import export_plot
 from visualizer import color_lib, make_colormap
@@ -279,45 +281,39 @@ def _safe_positive_vmin(y_vals, y_max):
     return vmin
 
 
-def _safe_vldr_color_limits(y_vals, x_vals, args):
-    """Compute robust VLDR color limits.
+def vldr_reference_max(y_vals, x_vals, settings):
+    """Smoothed zone maximum from the selected raw NumPy plotting slice.
 
-    If args['y_lims'] is provided and valid, it is used directly.  Otherwise
-    vmax is estimated from args['y_max_zone'] via max_quicklook_y().  If this
-    fails or returns a non-positive/non-finite value, the full plotted data are
-    used as a fallback.
+    Share ordinary quicklook reference smoothing, independent of display
+    smoothing. Invalid or nonpositive references fall back directly to 1.0.
     """
+    try:
+        maximum = float(quicklook_normalization_max(y_vals, x_vals, settings))
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return 1.0
+    return maximum if np.isfinite(maximum) and maximum > 0.0 else 1.0
 
+
+def _safe_vldr_color_limits(y_vals, x_vals, args):
+    """Prefer explicit limits; otherwise use the smoothed zone reference."""
     manual_limits = _manual_y_lims(args)
     if manual_limits is not None:
         y_min, y_max = manual_limits
         source = "y_lims"
     else:
-        try:
-            y_max = max_quicklook_y(
-                y_vals=y_vals,
-                x_vals=x_vals,
-                y_max_zone=args.get("y_max_zone", []),
-            )
-        except Exception:
-            y_max = np.nan
-
-        finite = np.asarray(y_vals)[np.isfinite(y_vals)]
-
-        if not np.isfinite(y_max) or y_max <= 0.:
-            if finite.size > 0:
-                y_max = float(np.nanpercentile(finite, 99.0))
-                source = "full-data 99th percentile fallback"
-            else:
-                y_max = 1.0
-                source = "default fallback"
+        # The driver computes this before optional display smoothing. Reusing
+        # it avoids smoothing an already-smoothed display array a second time.
+        if "_vldr_reference_max" in args:
+            try:
+                y_max = float(args["_vldr_reference_max"])
+            except (TypeError, ValueError, OverflowError):
+                y_max = np.nan
         else:
-            source = "y_max_zone"
-
-        if not np.isfinite(y_max) or y_max <= 0.:
+            y_max = vldr_reference_max(y_vals, x_vals, args)
+        source = "smoothed reference"
+        if not np.isfinite(y_max) or y_max <= 0.0:
             y_max = 1.0
             source = "default fallback"
-
         y_min = 0.0
 
     if args.get("use_log_y_scale", False):
@@ -342,9 +338,8 @@ def add_quicklook_mesh(ax, T, X, Y, args):
 
     my_cmap = get_quicklook_colormap()
 
-    # pcolormesh expects C as (len(X), len(T)).  Keep a time-height copy for
-    # the y_max_zone calculation, because max_quicklook_y expects y_vals to be
-    # aligned with x_vals along the second axis.
+    # pcolormesh expects C as (len(X), len(T)); keep a time-height view for
+    # reference estimation when this plotter is called without a cached maximum.
     if Y.shape == (len(T), len(X)):
         Y_time_height = Y
         Y_plot = Y.T
@@ -399,10 +394,15 @@ def get_quicklook_colormap():
 
 
 def add_colorbar(fig, qck):
-
+    # Match the right polarization panel's typographic width threshold.
+    # Colorbar ticks face outwards, so the inter-panel gutter check is irrelevant.
+    formatter = (LogFormatterSciNotation() if isinstance(qck.norm, LogNorm)
+                 else CompactScalarFormatter(max_label="-0.001", check_panel_gap=False,
+                                             max_plain_magnitude=1000.0))
     fig.colorbar(
         qck,
         label="Volume Linear Depolarization Ratio",
+        format=formatter,
         extend="both",
         pad=0.02,
     )

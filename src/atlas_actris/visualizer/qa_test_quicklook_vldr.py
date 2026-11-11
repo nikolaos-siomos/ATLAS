@@ -13,7 +13,7 @@ from collections import defaultdict
 from utils.printouts import print_header
 from processor.packaging import collect_metadata
 from visualizer.check import check_vldr_pairs
-from visualizer.plot_vldr import generate_plot
+from visualizer.plot_vldr import generate_plot, vldr_reference_max
 from visualizer.make_text import GenerateText, Libraries
 from visualizer.plot_utils import (
     prepare_folder, smoothing_2D,
@@ -233,6 +233,10 @@ def generate_vldr_quicklooks(data_pack, caller_info, settings_info):
         y_vals = _to_numpy_selected(ratio_pair)
         x_vals = np.asarray(vertical_scale_pair.values)
 
+        # Estimate color scaling from raw profiles, independently of whether
+        # smoothing is enabled for the displayed VLDR quicklook.
+        reference_max = vldr_reference_max(y_vals, x_vals, settings)
+
         y_vals_sm, _ = smoothing_2D(
             args=settings,
             x_vals=x_vals,
@@ -302,7 +306,8 @@ def generate_vldr_quicklooks(data_pack, caller_info, settings_info):
             T=time,
             X=x_vals,
             Y=y_vals_sm,
-            args=settings | qa_test_info[ray_key][pair] | caller_info,
+            args=settings | qa_test_info[ray_key][pair] | caller_info
+            | {"_vldr_reference_max": reference_max},
         )
 
         perform_color_reduction(

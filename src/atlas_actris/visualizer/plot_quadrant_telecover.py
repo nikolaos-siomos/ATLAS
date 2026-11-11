@@ -569,11 +569,8 @@ def get_raw_ulim(raw, X, x_llim, x_ulim):
 
 def get_x_ticks(x_llim, x_ulim, args):
     
-    # Set the x_tick depending on the telescope_type
-    if args['atlas_channel_id'][4] in ['l', 'm', 'n', 'x', 'y', 'z']:
-        x_tick = 0.5
-    else:
-        x_tick = 1.
+    # Uniform near-range ticks for every telescope type.
+    x_tick = 0.5
         
     x_ticks = np.arange(
         x_tick * np.ceil(x_llim / x_tick),
@@ -595,17 +592,8 @@ def get_x_ticks(x_llim, x_ulim, args):
 
 
 def get_x_lims(args):
-    
-    # Set the lower x limit
-    x_llim = 0.
-        
-    # Set the upper x limit depending on the telescope_type
-    if args['atlas_channel_id'][4] in ['l', 'm', 'n', 'x', 'y', 'z']:
-        x_ulim = 2.5
-    else:
-        x_ulim = 5.
-    
-    return x_llim, x_ulim
+    """Use the same 2.5 km near/far plotting boundary for every telescope."""
+    return 0., 2.5
 
 
 def get_y_lims(X, Y, args):

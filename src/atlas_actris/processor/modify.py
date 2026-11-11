@@ -19,6 +19,7 @@ from utils.parse_config_file import (
     SCHEMA, SYSTEM_KEYS, CHANNEL_KEYS, POL_CAL_KEYS, WV_KEYS, TEMP_KEYS
     )
 from utils.error_classes import ConfigError, CustomWarning
+from processor.channel_validation import drop_measurement
 
 def unique_cross_key_pairs(d1: Dict[str, Any], d2: Dict[str, Any]):
     keys = d1.keys()  # same as d2.keys()
@@ -29,7 +30,7 @@ def assert_metadata(d: Dict[str, Any], key1: str, key2: str):
     v1 = d[key1]
     v2 = d[key2]
     if not v1.equals(v2):
-        CustomWarning(f"{key1} and {key2} files have diferent metadata.")
+        CustomWarning(f"{key1}/{key2}: different raw metadata.")
 
 def load_metadata(config_info: Dict[str, Any], 
                   metadata: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
@@ -45,95 +46,32 @@ def load_metadata(config_info: Dict[str, Any],
     for (key1, key2) in unique_channel_info:
         assert_metadata(metadata["channel_info"], key1=key1, key2=key2)
 
-    cfg = {}
-
-    for meas_key in metadata["time_info"].keys():
-
-        cfg[meas_key] = config_info.copy()
-
+    # Keep the full configuration. Fill channel values by recorder ID, never
+    # by a measurement's position (different measurements may have subsets).
+    config_info = {
+        key: value.copy() if isinstance(value, list) else value
+        for key, value in config_info.items()
+    }
+    recorder_ids = config_info["recorder_channel_id"]
+    measurement_keys = sorted(
+        metadata["time_info"],
+        key=lambda key: len(metadata["channel_info"][key].index),
+        reverse=True,
+    )
+    for meas_key in measurement_keys:
         src_sys = metadata["system_info"][meas_key]
         src_chs = metadata["channel_info"][meas_key]
-
-        ext_ids = cfg[meas_key]["recorder_channel_id"]
-        int_ids = src_chs.index.values
-
-        print(f"Dataset: {meas_key}")
-
-        if not set(ext_ids).issubset(int_ids):
-            missing_ind = [i for i, v in enumerate(ext_ids) if v not in int_ids]
-            missing_ids = [ext_ids[i] for i, x in enumerate(ext_ids) if i in missing_ind]
-
-            CustomWarning(
-                "The provided recorder_channel_id is not a subset of the raw file header IDs. "
-                "Unrecognised channels will be excluded: \n"
-                f"-- unrecognised recorder_channel_id \n{missing_ids}\n"
-                f"--header_channel_id \n{int_ids}\n"
-            )
-
-            available_ids = [ext_ids[i] for i, x in enumerate(ext_ids) if i not in missing_ind]
-
-            if len(available_ids) == 0:
-                endpoint(2)
-
-        else:
-            missing_ind = []
-            available_ids = ext_ids
-
-        for key in config_info.keys():
-
-            val = config_info[key]
-
-            if val is None and not src_sys.empty:
-                if key in src_sys.index:
-                    if src_sys.loc[key] is not None:
-                        print(f"Loading: {key}")
-                        cfg[meas_key][key] = str(src_sys.loc[key])
-
-            if isinstance(val, list):
-                cfg[meas_key][key] = [
-                    v for i, v in enumerate(val)
-                    if i not in missing_ind
-                ]
-
-                if (
-                    all([x is None for x in val])
-                    and not src_chs.empty
-                    and key in src_chs.columns
-                ):
-                    print(f"Loading: {key}")
-                    cfg[meas_key][key] = [
-                        str(src) if src is not None else None
-                        for src in src_chs.loc[available_ids, key].values
-                    ]
-
-    valid_cfg_keys = [key for key, value in cfg.items() if value != {}]
-
-    if len(valid_cfg_keys) == 1:
-        return cfg[valid_cfg_keys[0]]
-
-    rec = config_info["recorder_channel_id"].copy()
-
-    for (key1, key2) in list(unique_cross_key_pairs(cfg, cfg)):
-        if cfg[key1] != {} and cfg[key2] != {}:
-            rec1 = cfg[key1]["recorder_channel_id"]
-            rec2 = cfg[key2]["recorder_channel_id"]
-
-            if rec1 != rec2:
-                CustomWarning(
-                    f"Datasets {key1} and {key2} contain a different number of channels. "
-                    "The configuration parameters will be taken from the dataset with the most channels:\n"
-                    f"--{key1}: {rec1}\n"
-                    f"--{key2}: {rec2}"
-                )
-
-                if (len(rec1) > len(rec2)) and (len(rec1) >= len(rec)):
-                    config_info = cfg[key1]
-                elif (len(rec2) > len(rec1)) and (len(rec2) >= len(rec)):
-                    config_info = cfg[key2]
-
-            if rec1 == rec2:
-                config_info = cfg[key2]
-
+        for key, value in config_info.items():
+            if key in SYSTEM_KEYS and value is None and key in src_sys.index:
+                source = src_sys.loc[key]
+                if source is not None and not pd.isna(source):
+                    config_info[key] = str(source)
+            elif key in CHANNEL_KEYS and isinstance(value, list) and key in src_chs.columns:
+                for i, recorder_id in enumerate(recorder_ids):
+                    if value[i] is None and recorder_id in src_chs.index:
+                        source = src_chs.loc[recorder_id, key]
+                        if source is not None and not pd.isna(source):
+                            value[i] = str(source)
     return config_info
 
 def find_reflected_transmitted_pairs(channels):
@@ -348,15 +286,23 @@ def remove_unrecognised_channels(caller_info: Dict[str, Any], config_info: Dict[
     
     print_header("Removing unrecognised recorder channel IDs")
 
-    recorder_channel_id = config_info["recorder_channel_id"]
-            
-    for key in profiles.keys():
-
-        profiles[key] = profiles[key].loc[dict(channel = recorder_channel_id)]
-        
-        metadata["shots"][key] = metadata["shots"][key].loc[dict(channel = recorder_channel_id)]
-            
-    return(profiles, metadata)
+    recorder_ids = config_info["recorder_channel_id"]
+    for key in list(profiles):
+        available = set(profiles[key].channel.values.tolist())
+        channels = [ch for ch in recorder_ids if ch in available]
+        if not channels:
+            CustomWarning(f"{key}: no recognised channels; measurement skipped.")
+            drop_measurement(key, profiles, metadata, caller_info)
+            continue
+        shots = metadata["shots"][key]
+        missing_shots = [ch for ch in channels if ch not in shots.channel.values]
+        if missing_shots:
+            raise ConfigError(f"{key}: missing shots for {missing_shots}.")
+        profiles[key] = profiles[key].sel(channel=channels)
+        metadata["shots"][key] = shots.sel(channel=channels)
+    if not profiles:
+        endpoint(2)
+    return profiles, metadata
 
 def get_atlas_channel_id(config_info: Dict[str, Any], profiles: Dict[str, Any], 
                          metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -369,19 +315,20 @@ def get_atlas_channel_id(config_info: Dict[str, Any], profiles: Dict[str, Any],
     ch_stype = config_info["channel_subtype"]
     acq_mode = config_info["acquisition_mode"]
     
-    wvl = [str(round(float(w))).zfill(4) for w in dtw]
+    wvl = [str(round(float(w))).zfill(4) if w is not None else None for w in dtw]
     
-    atlas_channel_id = [f"{w}{t}{c}{a}{s}" for w, t, c, a, s in 
+    atlas_channel_id = [f"{w}{t}{c}{a}{s}" if w is not None else None for w, t, c, a, s in 
                         zip(wvl, tel_type, ch_type, acq_mode, ch_stype)]
     
     config_info["atlas_channel_id"] = atlas_channel_id
     
+    channel_map = dict(zip(config_info["recorder_channel_id"], atlas_channel_id))
     for key in profiles.keys():
         signals = profiles[key].copy()
         shots = metadata["shots"][key].copy()
         
-        signals = signals.assign_coords(channel = atlas_channel_id)
-        shots = shots.assign_coords(channel = atlas_channel_id)
+        signals = signals.assign_coords(channel=[channel_map[ch] for ch in signals.channel.values])
+        shots = shots.assign_coords(channel=[channel_map[ch] for ch in shots.channel.values])
         
         profiles[key] = signals.copy()
         metadata["shots"][key] = shots.copy()
@@ -410,10 +357,15 @@ def resolve_to_atlas_channel_id(ch, config_info):
         return ch
 
     if ch in recorder_ids:
-        return atlas_ids[recorder_ids.index(ch)]
+        return atlas_ids[recorder_ids.index(ch)] or str(ch)
 
     if scc_ids and ch in scc_ids:
-        return atlas_ids[scc_ids.index(ch)]
+        return atlas_ids[scc_ids.index(ch)] or str(ch)
+
+    # An explicit ATLAS ID can describe a channel absent from every raw
+    # measurement. Keep its definition for availability validation to reject.
+    if isinstance(ch, str) and len(ch) == 8 and ch[:4].isdigit():
+        return ch
 
     raise ConfigError(
         f"Provided channel '{ch}' was not found in atlas_channel_id, "
@@ -650,7 +602,7 @@ def load_pol_cal_defaults(config_info):
         ch_r_all = ch_r_manual
         ch_t_all = ch_t_manual
     else:
-        ch_r_all, ch_t_all = find_reflected_transmitted_pairs(atlas_channel_id)
+        ch_r_all, ch_t_all = find_reflected_transmitted_pairs([ch for ch in atlas_channel_id if ch is not None])
 
     n_pairs = len(ch_r_all)
 
@@ -690,7 +642,27 @@ def load_pol_cal_defaults(config_info):
 
     return config_info
 
-def special_config_checks(config_info):
+def special_config_checks(config_info, recorder_channel_ids=None):
+    # Missing instrument channels need no raw-file parameters. Compute defaults
+    # only for channels actually read, then restore the full configuration.
+    if recorder_channel_ids is not None:
+        active = set(recorder_channel_ids)
+        indices = [i for i, ch in enumerate(config_info["recorder_channel_id"]) if ch in active]
+        selected = dict(config_info)
+        for key in CHANNEL_KEYS:
+            if isinstance(config_info.get(key), list):
+                selected[key] = [config_info[key][i] for i in indices]
+        selected = special_config_checks(selected)
+        result = dict(config_info)
+        for key, value in selected.items():
+            if key in CHANNEL_KEYS and isinstance(value, list):
+                merged = list(config_info[key])
+                for i, v in zip(indices, value):
+                    merged[i] = v
+                result[key] = merged
+            else:
+                result[key] = value
+        return result
     
     necesary_channel_parameters = [
         "recorder_channel_id", 
@@ -765,6 +737,7 @@ def bring_to_correct_type(config_info):
 def store_updated_metadata(
     config_info: Dict[str, Any],
     metadata: Dict[str, Any],
+    profiles=None,
 ) -> Dict[str, Any]:
 
     system_info = {}
@@ -815,12 +788,17 @@ def store_updated_metadata(
             coords={"parameters": system_parameters},
         )
 
+        channels = (
+            profiles[key].channel.values.tolist() if profiles is not None
+            else metadata["shots"][key].channel.values.tolist()
+        )
+        measurement_channel_info = channel_info.loc[channels]
         metadata["channel_info"][key] = xr.DataArray(
-            channel_info.T.values,
+            measurement_channel_info.T.values,
             dims=["parameters", "channel"],
             coords={
                 "parameters": channel_info.columns.values,
-                "channel": channel_info.index.values,
+                "channel": measurement_channel_info.index.values,
             },
         )
 

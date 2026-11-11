@@ -9,6 +9,7 @@ Created on Sun May 24 15:36:58 2026
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MultipleLocator
+from visualizer.compact_tick_formatter import CompactScalarFormatter
 
 from utils.toolbox import round_it
 from visualizer.plot_utils import export_plot, get_vertical_axis_label, add_fitting_suptitle
@@ -236,6 +237,7 @@ def left_panel(fig, coords, X, Y, E, args):
     )
 
     ax.set_ylim(y_lims)
+    ax.yaxis.set_major_formatter(CompactScalarFormatter(max_label="0.275"))
     ax.set_ylabel(r"Gain ratio $\eta^{\star}_{f}$")
 
     ax.grid(which="both")
@@ -286,6 +288,7 @@ def right_panel(fig, coords, X, Y, E, args):
     )
 
     ax.set_ylim(y_lims)
+    ax.yaxis.set_major_formatter(CompactScalarFormatter(max_label="-0.001"))
     ax.set_ylabel("Linear dep. ratio")
 
     ax.grid(which="both")

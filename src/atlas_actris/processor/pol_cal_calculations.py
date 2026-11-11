@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from utils.dataarray_utils import shallow_copy
 from utils.printouts import print_entry
 from utils.error_classes import CustomWarning
+from processor.channel_validation import calibration_pair_ids, resolve_measurement
 
 
 def make_ratio_id(ch_r, ch_t, type_index):
@@ -976,11 +977,11 @@ def _find_eta_for_pairs(
     ch_t: Sequence[str],
     calibrated_pair_ids: Sequence[str],
 ) -> Tuple[xr.DataArray, xr.DataArray]:
-    """Find scalar pcb/pcb_aux eta values and align to calibrated_pair_ids.
+    """Find primary pcb scalar eta values and align to calibrated_pair_ids.
 
     The calibration-factor stage stores the calibration-region eta value and
     its SEM in output_data["pol_cal_info"] under the combined calibration keys
-    ("pcb" and "pcb_aux") as ratio_type="eta" entries.  These scalar values
+    ("pcb") as ratio_type="eta" entries. Auxiliary factors are never applied.  These scalar values
     are the calibration factors that ray signal ratios should be divided
     by.  The eta profiles stored in pol_cal_ratio are intentionally not used
     here, because ray must not be calibrated by a bin-resolved eta profile.
@@ -992,7 +993,7 @@ def _find_eta_for_pairs(
     ]
 
     info_store = output_data.get("pol_cal_info", {})
-    eta_sources = ["pcb", "pcb_aux"]
+    eta_sources = ["pcb"]
     eta_values = []
     eta_errors = []
 
@@ -1049,7 +1050,7 @@ def _find_eta_for_pairs(
 
     if not eta_values:
         raise KeyError(
-            "No matching scalar eta entries found in pcb/pcb_aux pol_cal_info "
+            "No matching scalar eta entries found in pcb pol_cal_info "
             "for ray channel pairs. Run compute_calibration_factor first."
         )
 
@@ -1065,7 +1066,7 @@ def _find_eta_for_pairs(
 def _collect_eta_pairs_from_pcb(
     output_data: Dict[str, Dict[str, Any]],
 ) -> Tuple[List[str], List[str], List[str], xr.DataArray]:
-    """Collect eta channel combinations from pcb/pcb_aux pol_cal_info.
+    """Collect primary pcb eta channel combinations for Rayleigh calibration.
 
     Returns ch_r, ch_t, eta_pair_ids, eta_info.  These eta entries are the
     authoritative source of the channel combinations used by ray calibrated
@@ -1075,7 +1076,7 @@ def _collect_eta_pairs_from_pcb(
     info_store = output_data.get("pol_cal_info", {})
     eta_infos = []
 
-    for source in ["pcb", "pcb_aux"]:
+    for source in ["pcb"]:
         if source not in info_store:
             continue
 
@@ -1391,6 +1392,11 @@ def mean_gain_ratio_from_profiles(
 
     pci_base = _base_pol_cal_pairs(pol_cal_info[qa_test])
     ch_r, ch_t = _read_channels_from_info(pci_base)
+    available = set(profiles[qa_test].channel.values.tolist())
+    keep = [i for i, (r, t) in enumerate(zip(ch_r, ch_t)) if r in available and t in available]
+    pci_base = pci_base.isel(pair=keep)
+    ch_r = [ch_r[i] for i in keep]
+    ch_t = [ch_t[i] for i in keep]
 
     if len(ch_r) == 0:
         return None
@@ -1664,10 +1670,28 @@ def compute_gain_ratio(
     vertical_scale = output_data[processing_info["caller_info"]["vertical_scale"]]
     averaging_range = processing_info["settings_info"]["pcb"]["calibration_region"]
 
+    caller_info = processing_info["caller_info"]
+    active_pairs = calibration_pair_ids(
+        output_data["profile_mean"], output_data["pol_cal_info"], caller_info
+    )
+    caller_info.setdefault("_channel_validation", {})["calibration_pairs"] = active_pairs
     individual_tests = ["pcb_p45", "pcb_m45", "pcb_aux_p45", "pcb_aux_m45"]
     combined_tests = {"pcb": ("pcb_p45", "pcb_m45"), "pcb_aux": ("pcb_aux_p45", "pcb_aux_m45")}
 
     for qa_test in individual_tests:
+        group = "pcb_aux" if qa_test.startswith("pcb_aux") else "pcb"
+        if not active_pairs[group]:
+            continue
+        source = resolve_measurement(qa_test, output_data["profile_mean"], caller_info)
+        if source is None:
+            continue
+        # Materialize logical aliases only as dictionary references, not data.
+        for store in output_data.values():
+            if isinstance(store, dict) and qa_test not in store and source in store:
+                store[qa_test] = store[source]
+        info = _base_pol_cal_pairs(output_data["pol_cal_info"][qa_test])
+        keep = [pair for pair in active_pairs[group] if pair in info.pair.values]
+        output_data["pol_cal_info"][qa_test] = info.sel(pair=keep)
         product = mean_gain_ratio_from_profiles(
             qa_test=qa_test,
             profiles=output_data["profile_mean"],
@@ -2186,7 +2210,7 @@ def compute_mean_calibrated_ratio(
 
     eta_inputs = collect_ray_eta_inputs(output_data, sig)
     if eta_inputs is None:
-        print_entry("Mean calibrated ratio calculation skipped: no usable pcb/pcb_aux eta pairs found.")
+        print_entry("Mean calibrated ratio calculation skipped: no usable pcb eta pairs found.")
         return output_data
 
     ch_r, ch_t, eta_ids, eta_info = eta_inputs
@@ -2243,7 +2267,7 @@ def compute_calibrated_ratio(
 
     eta_inputs = collect_ray_eta_inputs(output_data, sig)
     if eta_inputs is None:
-        print_entry("Calibrated ratio calculation skipped: no usable pcb/pcb_aux eta pairs found.")
+        print_entry("Calibrated ratio calculation skipped: no usable pcb eta pairs found.")
         return output_data
 
     ch_r, ch_t, eta_ids, eta_info = eta_inputs
@@ -2298,7 +2322,7 @@ def compute_mean_vldr(
 
     eta_inputs = collect_ray_eta_inputs(output_data, sig)
     if eta_inputs is None:
-        print_entry("Mean VLDR calculation skipped: no usable pcb/pcb_aux eta pairs found.")
+        print_entry("Mean VLDR calculation skipped: no usable pcb eta pairs found.")
         return output_data
 
     ch_r, ch_t, eta_ids, eta_info = eta_inputs
@@ -2370,7 +2394,7 @@ def compute_vldr(
 
     eta_inputs = collect_ray_eta_inputs(output_data, sig)
     if eta_inputs is None:
-        print_entry("VLDR calculation skipped: no usable pcb/pcb_aux eta pairs found.")
+        print_entry("VLDR calculation skipped: no usable pcb eta pairs found.")
         return output_data
 
     ch_r, ch_t, eta_ids, eta_info = eta_inputs

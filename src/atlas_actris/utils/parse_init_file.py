@@ -908,7 +908,7 @@ def _fill_with_defaults(parser_args: Dict[str, Any]) -> Dict[str, Any]:
     return parser_args
 
 
-def _expand_slice_exclude_bundles(values: Any) -> Any:
+def _expand_slice_exclude_bundles(values: Any, *, request_log=None) -> Any:
     """Expand slice/exclude bundle aliases to concrete measurement keys.
 
     Explicit concrete keys always win over bundle aliases within the same
@@ -953,6 +953,11 @@ def _expand_slice_exclude_bundles(values: Any) -> Any:
         else:
             keys = [key]
 
+        if request_log is not None:
+            request_log.append({
+                "key": key, "start": start_time, "stop": stop_time,
+                "members": list(keys),
+            })
         for expanded_key in keys:
             expanded.extend([expanded_key, start_time, stop_time])
 
@@ -1049,12 +1054,14 @@ def _special_checks(parser_args: Dict[str, Any]) -> None:
 
     # Expand user-facing bundle aliases before validation so downstream code
     # receives only concrete measurement keys.
+    request_log = {"slice_measurement": [], "exclude_measurement": []}
     parser_args["slice_measurement"] = _expand_slice_exclude_bundles(
-        parser_args.get("slice_measurement")
+        parser_args.get("slice_measurement"), request_log=request_log["slice_measurement"]
     )
     parser_args["exclude_measurement"] = _expand_slice_exclude_bundles(
-        parser_args.get("exclude_measurement")
+        parser_args.get("exclude_measurement"), request_log=request_log["exclude_measurement"]
     )
+    parser_args["_time_selection_requests"] = request_log
 
     slice_measurement = parser_args.get("slice_measurement")
     exclude_measurement = parser_args.get("exclude_measurement")
