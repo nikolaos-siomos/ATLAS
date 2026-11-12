@@ -38,6 +38,7 @@ nav:
   - atlas-intercomparison: atlas_intercomparison.md
   - atlas-signal-viewer: atlas_signal_viewer.md
   - atlas-smoke-test: atlas_smoke_test.md
+  - atlas-test: atlas_test.md
   - atlas-signal-viewer-smoke-test: atlas_signal_viewer_smoke_test.md
   - atlas-generate-templates: atlas_generate_templates.md
   - get_scc_config: get_scc_config.md

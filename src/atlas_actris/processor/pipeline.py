@@ -164,7 +164,7 @@ class Processor():
                 },
             "assign_dark":{
                 "function":compute_asign_dark_blocks,
-                "header":"Assign dark measurement blocks"
+                "header":"Assign corresponding dark measurements"
                 },
             "photon_units_conversion":{
                 "function":compute_unit_conv_counts_to_MHz,

@@ -98,6 +98,7 @@ atlas = "atlas_actris.cli:main"
 atlas-prepare-intercomparison = "atlas_actris.cli:prepare_intercomparison"
 atlas-signal-viewer = "atlas_actris.cli_viewer:main"
 atlas-smoke-test = "atlas_actris.testing.smoke_test:main"
+atlas-test = "atlas_actris.testing.test_runner:main"
 atlas-signal-viewer-smoke-test = "atlas_actris.testing.signal_viewer_smoke_test:main"
 atlas-generate-templates = "atlas_actris.templates.generator:main"
 atlas-intercomparison = "atlas_actris.cli_intercomparison:main"
@@ -113,7 +114,7 @@ namespaces = false
 # Runtime-owned intercomparison defaults remain package data. Generated user
 # templates are written to the repository-root templates directory instead.
 [tool.setuptools.package-data]
-atlas_actris = ["intercomparison/*.ini"]
+atlas_actris = ["intercomparison/*.ini", "molecular/meteorological_database.csv"]
 
 [build-system]
 requires = ["setuptools>=64", "wheel"]
