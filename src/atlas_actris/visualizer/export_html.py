@@ -640,6 +640,8 @@ def _index_plot_metadata(plots_folder: str):
         f"drk_{qa}" for qa in qa_tests if qa != "drk"
     )
     valid_ids.update(f"qck_{qa}" for qa in allowed_quicklooks)
+    # VLDR is a derived channel-pair quicklook, not an init QA-test name.
+    valid_ids.add("qck_vldr")
     valid_ids.update(f"bgd_{qa}" for qa in qa_tests)
 
     indexed = {qa_id: [] for qa_id in valid_ids}
