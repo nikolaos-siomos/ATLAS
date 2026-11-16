@@ -12,7 +12,7 @@ Typical use:
 
 Notes:
     - If stage_name = None, the import utility can ask you to select a saved
-      stage interactively, depending on your export_processing_stage.py version.
+      stage interactively. Supply a stage name in noninteractive runs.
     - Zarr-backed xarray arrays are opened lazily. They are not fully loaded
       into RAM until you explicitly compute/load/use their values.
 """
@@ -36,11 +36,11 @@ from atlas_actris.utils.export_processing_stage import (
 # Folder that contains the ATLAS exported/ folder.
 # Example:
 # output_folder = "/home/nikos/Big_Data/atlas_testing_dataset/analysis/179_199_665_20231221"
-output_folder = "/home/nikos/Big_Data/atlas_testing_dataset/analysis/brc/123_202_1069_20251203"
+output_folder = "/path/to/ATLAS_output"
 
 # Name of the saved stage to import.
-# Use None to select interactively if your module version supports it.
-# Example: "preprocessing_complete", "pol_cal_complete", "rayleigh_fit_complete"
+# Use None to select interactively; supply a name in noninteractive runs.
+# Example: "preprocessing_complete", "pol_cal_complete"
 stage_name = None
 
 # Optional QA-test filter.

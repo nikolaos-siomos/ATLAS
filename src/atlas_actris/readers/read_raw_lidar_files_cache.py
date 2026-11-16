@@ -2,15 +2,18 @@
 @author: Nikos Siomos
 """
 import re
+from pathlib import Path
 import numpy as np
 import xarray as xr
 from datetime import datetime
-import io, os, glob, contextlib, pickle, shutil
+import io, os, glob, contextlib, shutil
 
 from typing import Callable
 from typing import Any, Dict, List, Tuple
 
 from utils.error_classes import FileReaderError
+from utils.safe_serialization import (read_metadata, write_metadata, read_json, write_json,
+                                      validate_zarr_store, checked_reference, SerializationError)
 from utils.printouts import print_header, print_subsection, endpoint
 
 from readers.read_scc_lazy import read_dataset as reader_scc
@@ -135,16 +138,22 @@ def _raw_cache_root(d: Dict[str, Any]) -> str:
             "caller_info['output_folder'] is required for raw-lidar caching"
         )
 
-    return os.path.join(output_folder, "cache")
+    root = os.path.join(output_folder, "cache")
+    if os.path.islink(root) or Path(root).resolve() != Path(output_folder).resolve() / "cache":
+        raise FileReaderError("The raw cache directory must not be a symbolic link or junction")
+    return root
 
 def _safe_cache_key(meas_key: str) -> str:
     """Convert a measurement key into a filesystem-safe cache key."""
 
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(meas_key))
+    text = str(meas_key)
+    if not text or text in (".", "..") or "/" in text or "\\" in text:
+        raise FileReaderError("Unsafe raw-cache measurement key")
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", text)
 
 
 def _cache_entry_dir(cache_root: str, meas_key: str) -> str:
-    return os.path.join(cache_root, _safe_cache_key(meas_key))
+    return os.fspath(checked_reference(cache_root, _safe_cache_key(meas_key)))
 
 
 def _cache_signal_path(cache_root: str, meas_key: str) -> str:
@@ -152,13 +161,13 @@ def _cache_signal_path(cache_root: str, meas_key: str) -> str:
 
 
 def _cache_metadata_path(cache_root: str, meas_key: str) -> str:
-    return os.path.join(_cache_entry_dir(cache_root, meas_key), "metadata.pkl")
+    return os.path.join(_cache_entry_dir(cache_root, meas_key), "metadata.json")
 
 
 def _cache_manifest_path(cache_root: str) -> str:
     """Return the path of the source-folder manifest stored with the cache."""
 
-    return os.path.join(cache_root, "source_manifest.pkl")
+    return os.path.join(cache_root, "source_manifest.json")
 
 
 def _folder_snapshot(filepath: str) -> Dict[str, Any]:
@@ -175,7 +184,7 @@ def _folder_snapshot(filepath: str) -> Dict[str, Any]:
         return {
             "path": absolute_path,
             "kind": "missing",
-            "files": (),
+            "files": [],
         }
 
     if os.path.isfile(absolute_path):
@@ -183,7 +192,7 @@ def _folder_snapshot(filepath: str) -> Dict[str, Any]:
         return {
             "path": absolute_path,
             "kind": "file",
-            "files": ((os.path.basename(absolute_path), stat.st_size, stat.st_mtime_ns),),
+            "files": [[os.path.basename(absolute_path), stat.st_size, stat.st_mtime_ns]],
         }
 
     files = []
@@ -213,7 +222,7 @@ def _folder_snapshot(filepath: str) -> Dict[str, Any]:
     return {
         "path": absolute_path,
         "kind": "directory",
-        "files": tuple(files),
+        "files": [list(item) for item in files],
     }
 
 
@@ -229,8 +238,9 @@ def _source_manifest(physical_paths: List[Tuple[str, str]]) -> Dict[str, Any]:
 def _write_source_manifest(cache_root: str, manifest: Dict[str, Any]) -> None:
     """Store the source state corresponding to a completed cache build."""
 
-    with open(_cache_manifest_path(cache_root), "wb") as f:
-        pickle.dump(manifest, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # JSON arrays replace the snapshot tuples, so normalize the manifest at
+    # the source boundary rather than deserializing Python tuple objects.
+    write_json({"format": "atlas_raw_cache_v2", "sources": manifest}, _cache_manifest_path(cache_root))
 
 
 def _source_manifest_matches(cache_root: str, current_manifest: Dict[str, Any]) -> bool:
@@ -242,12 +252,12 @@ def _source_manifest_matches(cache_root: str, current_manifest: Dict[str, Any]) 
         return False
 
     try:
-        with open(manifest_path, "rb") as f:
-            cached_manifest = pickle.load(f)
-    except (OSError, EOFError, pickle.PickleError):
+        cached_manifest = read_json(checked_reference(cache_root, "source_manifest.json"))
+    except (OSError, ValueError, TypeError):
         return False
 
-    return cached_manifest == current_manifest
+    return (isinstance(cached_manifest, dict) and cached_manifest.get("format") == "atlas_raw_cache_v2"
+            and cached_manifest.get("sources") == current_manifest)
 
 
 def _cache_entry_exists(cache_root: str, meas_key: str) -> bool:
@@ -301,7 +311,7 @@ def _write_cache_entry(
 
     The signal and shots are stored in Zarr. If sig_raw is Dask-backed, this
     computes chunk-by-chunk and does not assemble the full raw signal in RAM.
-    Small metadata objects are stored in pickle next to the Zarr store.
+    Small metadata objects are stored in typed JSON next to the Zarr store.
     """
 
     entry_dir = _cache_entry_dir(cache_root, meas_key)
@@ -327,20 +337,22 @@ def _write_cache_entry(
         "mtype": meas_type,
     }
 
-    with open(_cache_metadata_path(cache_root, meas_key), "wb") as f:
-        pickle.dump(metadata, f, protocol=pickle.HIGHEST_PROTOCOL)
+    write_metadata(metadata, _cache_metadata_path(cache_root, meas_key))
 
 
 def _read_cache_entry(cache_root: str, meas_key: str) -> Tuple[Any, Any, Any, xr.DataArray, xr.DataArray, str]:
-    """Read one cached measurement lazily from Zarr plus its pickled metadata."""
+    """Read one cached measurement lazily from Zarr plus typed JSON metadata."""
 
     if not _cache_entry_exists(cache_root, meas_key):
         raise FileReaderError(f"Raw lidar cache entry is missing or incomplete for {meas_key}")
 
-    ds = xr.open_zarr(_cache_signal_path(cache_root, meas_key))
-
-    with open(_cache_metadata_path(cache_root, meas_key), "rb") as f:
-        metadata = pickle.load(f)
+    signal_path = checked_reference(cache_root, os.path.relpath(_cache_signal_path(cache_root, meas_key), cache_root))
+    metadata_path = checked_reference(cache_root, os.path.relpath(_cache_metadata_path(cache_root, meas_key), cache_root))
+    validate_zarr_store(signal_path)
+    metadata = read_metadata(metadata_path)
+    if not isinstance(metadata, dict) or not {"system_info", "channel_info", "time_info", "mtype"}.issubset(metadata):
+        raise FileReaderError(f"Invalid raw-cache metadata for {meas_key}; rebuild the cache")
+    ds = xr.open_zarr(signal_path, consolidated=False)
 
     return (
         metadata["system_info"],
@@ -428,7 +440,7 @@ def flexible_reader(
         Read raw files normally and write a fresh cache.
 
     The cache stores signals and shots as Zarr, so reopening from cache remains
-    lazy and RAM-safe. Metadata are stored as small pickle files.
+    lazy and RAM-safe. Metadata are stored as small JSON files.
     """
 
     print_header("Reading lidar signals...")
@@ -488,6 +500,11 @@ def flexible_reader(
 
     # For missing/incomplete cache, rebuild the cache so that future runs are
     # consistent and complete.
+    missing_sources = [path for _, path in physical_paths if not os.path.exists(path)]
+    if missing_sources:
+        raise FileReaderError("Cannot rebuild raw cache: original measurement path is missing: " + str(missing_sources[0]))
+    if os.path.isfile(os.path.join(cache_root, "source_manifest.pkl")):
+        print("-- Legacy pickle cache detected. Rebuilding from original measurements without opening pickle files.")
     _clear_raw_cache(cache_root)
 
     for meas_key, filepath in physical_paths:

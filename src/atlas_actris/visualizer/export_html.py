@@ -21,6 +21,7 @@ import tempfile
 import re
 from pathlib import Path
 from utils.parse_init_file import qa_tests, allowed_quicklooks
+from utils.png_images import open_png
 
 qck_text_map = {
     'qck_ray': 'Rayleigh measurement', 
@@ -511,7 +512,8 @@ def _select_quicklook_images(plots_folder: str, qa):
             continue
 
         try:
-            meta = Image.open(im).text
+            with open_png(im) as image:
+                meta = dict(image.text)
             atlas_channel_id = meta.get('atlas_channel_id', '')
         except Exception:
             atlas_channel_id = ''
@@ -644,7 +646,7 @@ def _index_plot_metadata(plots_folder: str):
 
     for path_png in sorted(glob.glob(os.path.join(plots_folder, "*.png"))):
         try:
-            with Image.open(path_png) as image:
+            with open_png(path_png) as image:
                 meta = dict(image.text)
         except Exception:
             continue
@@ -813,7 +815,7 @@ def _combine_qck_and_bgd_images(
     if not qck_path or not bgd_path:
         raise ValueError("Both quicklook and background image paths are required.")
 
-    with Image.open(qck_path) as qck_source, Image.open(bgd_path) as bgd_source:
+    with open_png(qck_path) as qck_source, open_png(bgd_path) as bgd_source:
         qck_image = qck_source.convert("RGB")
         bgd_image = bgd_source.convert("RGB")
 
@@ -1058,7 +1060,7 @@ def _QA_report_impl(
     data = _collect_report_data(plots_folder)
 
     # 2) Write HTML (tables can now be placed at the beginning)
-    with open(html_filepath, 'w') as f:
+    with open(html_filepath, 'w', encoding='utf-8') as f:
         # write html header
         f.write('<!DOCTYPE html><html><head>')
         f.write(f'<style>{REPORT_CSS} #t1 {{ -moz-tab-size: 4; tab-size: 4; }} </style>')
@@ -1068,7 +1070,7 @@ def _QA_report_impl(
         # write the body of the file
         # Add a Title to the document
         # f.write('<p style="font-family: Helvetica,Arial,sans-serif; font-size: xx-large; font-weight: normal;">')
-        f.write(f'<h1>{os.path.basename(html_filepath)}</h1>')
+        f.write(f'<h1>{html.escape(os.path.basename(html_filepath))}</h1>')
 
         write_page_break(f)
 
@@ -1090,10 +1092,10 @@ def _QA_report_impl(
             f.write('\n')
             qck_list = ['qck_ray', 'qck_ray_pcb', 'qck_tlc', 'qck_tlc_rin', 'qck_pcb', 'qck_drk']
             for ch in _quicklook_channel_keys(data, qck_list):
-                f.write(f'<h2>{ch}</h2>')
+                f.write(f'<h2>{html.escape(str(ch))}</h2>')
                 for key in qck_list:
                     if ch in data[key]:
-                        f.write(f'<h3>{qck_text_map[key]}</h3>')
+                        f.write(f'<h3>{html.escape(qck_text_map[key])}</h3>')
                         f.write('<br>\n')
                         _write_html_quicklook_with_background(
                             f, data, key, ch, plot_width
@@ -1104,7 +1106,7 @@ def _QA_report_impl(
             f.write('<h1>Dark Test</h1>')
             f.write('\n')
             for ch in sorted(data["drk"].keys(), key=_channel_sort_key):
-                f.write(f'<h2>{ch}</h2>')
+                f.write(f'<h2>{html.escape(str(ch))}</h2>')
                 channel_entry(f, data["drk"][ch], plot_width)
 
             write_page_break(f)
@@ -1115,7 +1117,7 @@ def _QA_report_impl(
             f.write('\n')
             for ch in sorted(data["vldr"].keys(), key=_channel_sort_key):
                 meta = data["vldr"][ch]
-                f.write(f'<h2>{ch.upper()}</h2>')
+                f.write(f'<h2>{html.escape(str(ch).upper())}</h2>')
                 channel_entry(f, meta, plot_width)
             
         # Rayleigh-Fit plots
@@ -1124,7 +1126,7 @@ def _QA_report_impl(
         #     f.write('\n')
         #     for ch in _select_preferred_channel_keys(data["ray"].keys(), preferred_mode="p", export_all=export_all):
         #         meta = data["ray"][ch]
-        #         f.write(f'<h2>{ch}</h2>')
+        #         f.write(f'<h2>{html.escape(str(ch))}</h2>')
         #         channel_entry(f, meta, plot_width)
                     
         #     write_page_break(f)
@@ -1136,7 +1138,7 @@ def _QA_report_impl(
 
             rayfit_channels = data["ray"].keys() | data["ray_pcb"].keys()
             for ch in _select_preferred_channel_keys(rayfit_channels, preferred_mode="p", export_all=export_all):
-                f.write(f'<h2>{ch}</h2>')
+                f.write(f'<h2>{html.escape(str(ch))}</h2>')
                 if ch in data["ray"]:
                     channel_entry(f, data["ray"][ch], plot_width)                    
                 if ch in data["ray"] and ch in data["ray_pcb"]:
@@ -1153,7 +1155,7 @@ def _QA_report_impl(
 
             telecover_channels = data["tlc"].keys() | data["tlc_rin"].keys()
             for ch in _select_preferred_channel_keys(telecover_channels, preferred_mode="a", export_all=export_all):
-                f.write(f'<h2>{ch}</h2>')
+                f.write(f'<h2>{html.escape(str(ch))}</h2>')
                 if ch in data["tlc"]:
                     channel_entry(f, data["tlc"][ch], plot_width)                    
                 if ch in data["tlc"] and ch in data["tlc_rin"]:
@@ -1177,7 +1179,7 @@ def _QA_report_impl(
                 meta = pcb_entries[ch]
                 ch_r = meta['atlas_channel_id_r']
                 ch_t = meta['atlas_channel_id_t']
-                f.write(f'<h2>{ch_r} to {ch_t}</h2>')
+                f.write(f'<h2>{html.escape(str(ch_r))} to {html.escape(str(ch_t))}</h2>')
 
                 if ch in data["pcb"]:
                     channel_entry(f, data["pcb"][ch], plot_width)

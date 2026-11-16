@@ -70,6 +70,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-t", "--test", action="append", default=[], metavar="TEST",
                         help="Module name, test-file path or pytest node ID; repeat to select several.")
     parser.add_argument("--list", action="store_true", help="List available test modules and exit.")
+    parser.add_argument("--gui", action="store_true",
+                        help="Also enable desktop GUI checks (opens test windows; requires a display).")
     parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
                         help="Additional pytest arguments after --, e.g. -- -x -vv or -- -m 'not integration'.")
     return parser
@@ -106,6 +108,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         command.extend(["-c", str(repo / "pytest.ini")])
     command.extend(targets + extra)
     env = os.environ.copy()
+    # Opening desktop windows must always be an explicit CLI choice.
+    env["ATLAS_RUN_GUI_TESTS"] = "1" if args.gui else "0"
     # Tests use both package-qualified and legacy internal imports. Also pass
     # the source paths to integration-test children so all use this checkout.
     source_paths = [str(repo / "src"), str(repo / "src" / "atlas_actris")]

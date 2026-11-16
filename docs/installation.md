@@ -1,310 +1,186 @@
 # ATLAS Installation
 
-This page describes the current developer installation procedure for ATLAS.
+ATLAS is available from PyPI for users and from a source checkout for developers.
+The version documented here is **{{ atlas_version }}**. The current package
+supports **Python 3.9–3.13** (`>=3.9,<3.14`).
 
-ATLAS is currently intended to be installed from a local Git checkout. The recommended installation mode is an editable pip installation:
+## Create a Python environment
 
-```bash
-python -m pip install -e .
-```
-
-Editable mode keeps the installed package connected to the source code in your local working tree. When you edit files under `src/atlas_actris/`, the changes are immediately used by Python without reinstalling the package.
-
-## Current package status
-
-The Python distribution/package name is:
-
-```text
-atlas_actris
-```
-
-The current project version is:
-
-```text
-1.0.0
-```
-
-The project requires:
-
-```text
-Python >= 3.9
-```
-
-The source code uses the `src` package layout:
-
-```text
-ATLAS/
-├── pyproject.toml
-├── README.md
-├── docs/
-├── tests/
-├── tools/
-└── src/
-    └── atlas_actris/
-        ├── __init__.py
-        ├── cli.py
-        ├── __call_atlas_interactive__.py
-        ├── helper_functions/
-        ├── processor/
-        ├── readers/
-        ├── templates/
-        └── ...
-```
-
-The main installed command-line command is:
+Use an environment dedicated to ATLAS. With Conda or Miniforge, for example:
 
 ```bash
-atlas
-```
-
-The command expects an initialization file argument:
-
-```bash
-atlas -i /path/to/call_atlas.ini
-```
-
-or equivalently:
-
-```bash
-atlas --ini_file /path/to/call_atlas.ini
-```
-
-The command is configured in `pyproject.toml` as an entry point to the package CLI wrapper. The wrapper runs the main interactive ATLAS script while still allowing developers to open and run `src/atlas_actris/__call_atlas_interactive__.py` directly in Spyder.
-
-## Runtime dependencies
-
-The runtime dependencies are installed automatically from `pyproject.toml` when running `python -m pip install -e .`.
-
-Current runtime dependencies include:
-
-- `numpy>=2.0.0`
-- `pandas>=2.2.3`
-- `xarray>=2023.6.0`
-- `netCDF4>=1.6.3`
-- `scipy>=1.13.0`
-- `matplotlib>=3.8.0`
-- `bokeh>=3.4.3`
-- `Pillow>=11.1.0`
-- `dask>=2024.8.0`
-- `requests>=2.0.0`
-
-## Recommended installation with conda or miniforge
-
-Using conda or miniforge is recommended because it makes it easy to create a clean environment with a specific Python version.
-
-Users with an existing conda, miniconda, anaconda, or miniforge installation can skip directly to [Create a new environment](#create-a-new-environment).
-
-### Step 1: Download miniforge
-
-Download the installer for your operating system from:
-
-https://conda-forge.org/download/
-
-### Step 2: Install miniforge
-
-Follow the installation instructions from the miniforge webpage.
-
-On Linux, the installer may ask whether the base environment should be activated automatically when opening a new terminal. Selecting yes is convenient for most users. If you already have another conda installation, be aware that enabling this option may make the new miniforge base environment the default one in your terminal.
-
-On Windows, open the **Miniforge Prompt** from the Start Menu after installation. This opens a terminal with the base environment activated.
-
-### Step 3: Activate the base environment
-
-If your base environment is not already active, activate it manually.
-
-Example on Linux:
-
-```bash
-source /home/your_user/miniforge3/bin/activate
-```
-
-You should see something like this at the beginning of your terminal prompt:
-
-```text
-(base)
-```
-
-To verify that the expected conda installation is being used, run:
-
-```bash
-conda info
-```
-
-or on Linux/macOS:
-
-```bash
-which conda
-```
-
-The returned path should point to your expected conda or miniforge installation.
-
-## Create a new environment
-
-From the base environment, create a dedicated ATLAS development environment:
-
-```bash
-conda create -n atlas_box python=3.9 pip
-```
-
-Activate it:
-
-```bash
+conda create -n atlas_box python=3.13 pip
 conda activate atlas_box
 ```
 
-You can choose a different environment name if you prefer.
+Any supported Python version can be used. With an existing virtual environment,
+activate it using that environment's usual command instead.
 
-## Get the source code
+If you need Conda, the [Miniforge download page](https://conda-forge.org/download/)
+provides installers. On Windows, open Miniforge Prompt after installation. Use
+`conda info` to check which Conda installation is active.
 
-Clone the repository, or use your existing local checkout.
-
-Example:
+## Install for normal use
 
 ```bash
-git clone <repository-url>
+python -m pip install atlas-actris
+```
+
+This installs ATLAS, its GUI launcher, and the runtime dependencies declared in
+`pyproject.toml`. Tkinter itself must be available in your Python environment;
+see the [GUI requirements](atlas_gui.md#tkinter-requirements).
+
+To update an installed release:
+
+```bash
+python -m pip install --upgrade atlas-actris
+```
+
+Add `--pre` if you want to allow pre-release versions. The distribution names
+`atlas-actris` and `atlas_actris` are equivalent for pip; the Python import name
+is `atlas_actris`.
+
+## Install for development
+
+Clone the repository and enter its root, where `pyproject.toml` is located:
+
+```bash
+git clone https://github.com/nikolaos-siomos/ATLAS.git
 cd ATLAS
+python -m pip install -e ".[dev]"
 ```
 
-If you already have the repository locally, go to the project root, where `pyproject.toml` is located:
+If you already have a checkout, activate your environment and run the last
+command from that checkout. Editable mode uses your source files on the next
+run. Restart an open GUI or Python session to pick up changed imported modules.
+Reinstall after changing package metadata, dependencies or console entry points.
+
+The `dev` extra installs pytest. Run all repository tests with:
 
 ```bash
-cd path/to/ATLAS
+atlas-test
 ```
 
-The project root should contain files and folders similar to:
+For selected tests and optional desktop checks, see [the test-suite guide](atlas_test.md).
 
-```text
-pyproject.toml
-README.md
-docs/
-src/
-tests/
-tools/
-```
+## Pillow versions and plot safety
 
-## Install ATLAS in editable mode
+ATLAS selects a compatible Pillow release for each Python version:
 
-From the project root, with the `atlas_box` environment activated, run:
+| Python | Pillow requirement |
+| --- | --- |
+| 3.9 | `>=11.3,<12` |
+| 3.10 | `>=12.2,<13` |
+| 3.11–3.13 | `>=13,<14` |
+
+All ATLAS plot readers explicitly accept static PNG only. Renaming a different
+image format to `.png` does not make it acceptable. Animated PNGs are rejected
+before Pillow opens them, protecting older Pillow versions from an APNG
+allocation issue. Valid ATLAS plots, embedded PNG
+metadata, report generation and colour reduction continue to work as before.
+
+Pillow 11 and 12 remain necessary for the older Python versions, but do not
+contain every security fix available in Pillow 13. Restricting decoding to PNG
+avoids the unused PSD/JPEG 2000 decoder paths identified in the security review;
+it does not patch those older dependencies or make every image safe. For new
+environments, prefer Python 3.11 or newer so current Pillow security releases
+can be installed. See Pillow's [Python support table](https://pillow.readthedocs.io/en/stable/installation/python-support.html).
+
+After applying these dependency changes to an editable checkout, reinstall with:
 
 ```bash
-python -m pip install -e .
+python -m pip install -e ".[dev]"
 ```
-
-This installs ATLAS and its runtime dependencies from `pyproject.toml`.
-
-Editable mode is important for development: changes made in the local source files are used immediately without reinstalling the package.
 
 ## Verify the installation
 
-Check that the package can be imported:
-
 ```bash
 python -c "import atlas_actris; print(atlas_actris.__file__)"
+atlas --help
+atlas-gui --help
 ```
 
-The printed path should point to your local repository, typically somewhere under:
+An editable installation should report a package under your checkout's
+`src/atlas_actris/`; a normal pip installation reports the environment's installed
+package directory. The help commands do not start processing or open the editor.
 
-```text
-src/atlas_actris/
-```
-
-Check that the command-line entry point is available:
+To start the GUI:
 
 ```bash
-atlas -h
+atlas-gui
 ```
 
-The help output should look similar to:
-
-```text
-usage: __call_atlas_interactive__.py [-h] [-i [ini_file]]
-
-arguments
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i [ini_file], --ini_file [ini_file]
-                        The path to the initialization file of the calling
-                        script
-```
-
-To run ATLAS, provide the initialization file:
+Or run ATLAS from the terminal using your prepared initialization file:
 
 ```bash
 atlas -i /path/to/call_atlas.ini
 ```
 
-or:
+The equivalent long option is `--ini_file`. See the [quick guide](quick_guide.md)
+for preparing data and INIs, and the [CLI guide](atlas_actris_cli_documentation.md)
+for available overrides.
+
+The smoke-test dataset and repository tests are not bundled in a PyPI wheel.
+To run the full smoke test, use a source checkout containing `testing_pack/`:
 
 ```bash
-atlas --ini_file /path/to/call_atlas.ini
+atlas-smoke-test /path/to/ATLAS/testing_pack
 ```
 
-Example:
+The installed command can run from any directory when that dataset is available.
+See [smoke testing](atlas_smoke_test.md) for its cleanup behavior.
 
-```bash
-atlas -i ./docs/templates/call_atlas.ini
-```
+## Runtime dependencies
 
-Adjust the example path to point to an existing initialization file in your local checkout.
+Pip installs the numerical, file-reading, download, plotting, report and viewer
+dependencies specified by `pyproject.toml`. Some constraints vary by Python
+version, including the NumPy, SciPy and interactive-viewer packages. Use that
+file as the source of truth rather than a second, manually maintained list of
+version constraints here.
 
-> **Note:** The current help output displays the `-i/--ini_file` option as optional because of the argparse configuration. In practice, the main workflow expects an initialization file path to run correctly.
+## Build or preview the documentation
 
-## Install documentation dependencies
-
-The documentation dependencies are optional and are defined in `pyproject.toml` under the `docs` extra.
-
-To install ATLAS together with the documentation tools, run:
+From the repository root:
 
 ```bash
 python -m pip install -e ".[docs]"
+mkdocs serve --config-file mkdocs.yml
 ```
 
-Then serve the documentation locally:
+Open the address printed by MkDocs. To build without starting a local server:
 
 ```bash
-mkdocs serve
+mkdocs build --strict --config-file mkdocs.yml
 ```
+
+The root `mkdocs.yml` controls the sidebar, hooks and navigation. When applying
+a documentation update, copy that file as well as `docs/`. Restart the server
+if the sidebar still shows older entries. For example, **Importing stages**
+should appear immediately below **Exporting stages** under **User guide**.
+
+The documentation hooks substitute the version placeholder from
+`src/atlas_actris/version.py` and render the station table from
+`src/atlas_actris/molecular/meteorological_database.csv`. Generated INI reference
+pages are updated with `atlas-generate-templates`, not by editing their Markdown.
 
 ## Spyder development workflow
 
-For development, it is useful to run the main script directly in Spyder so that variables remain visible in Spyder's Variable Explorer.
-
-Install Spyder in the same environment if needed:
+Install and start Spyder in the same environment if you want to inspect ATLAS
+variables while developing:
 
 ```bash
 python -m pip install spyder
-```
-
-Start Spyder from the activated ATLAS environment:
-
-```bash
-conda activate atlas_box
 spyder
 ```
 
-Open and run:
+Open `src/atlas_actris/__call_atlas_interactive__.py` and set its run arguments
+to `-i /path/to/call_atlas.ini`. The terminal entry point runs that same script.
+The `atlas` CLI defaults to the noninteractive Matplotlib `Agg` backend unless
+`MPLBACKEND` is already set; running the file directly in an IDE keeps the IDE's
+backend setup.
 
-```text
-src/atlas_actris/__call_atlas_interactive__.py
-```
+## Older manuals
 
-When running from Spyder, configure the script arguments to provide the initialization file, for example:
-
-```text
--i /path/to/call_atlas.ini
-```
-
-This keeps the terminal workflow and the Spyder workflow aligned:
-
-```bash
-atlas -i /path/to/call_atlas.ini
-```
-
-and:
-
-```text
-Spyder run arguments: -i /path/to/call_atlas.ini
-```
-
-should execute the same underlying script.
+The PDF/ODT manuals are historical and contain earlier commands and parameter
+names. Use the current pages linked above for installation and configuration;
+see [the older-manuals note](legacy_manuals.md) before following an archived example.

@@ -26,9 +26,11 @@ nav:
   - Installation: installation.md
   - Command line interface: atlas_actris_cli_documentation.md
 - User guide:
-  - Exported processing stages: exported_processing_stages.md
+  - Exporting stages: exported_processing_stages.md
+  - Importing stages: importing_processing_stages.md
   - Meteorological profile selection and downloading: radiosonde_selection.md
   - Meteorological station database: meteorological_database.md
+  - Older PDF and ODT manuals: legacy_manuals.md
 - INI file reference:
   - Initialization file: generated/initialization_reference.md
   - Configuration file: generated/configuration_reference.md
@@ -39,6 +41,7 @@ nav:
   - atlas-signal-viewer: atlas_signal_viewer.md
   - atlas-smoke-test: atlas_smoke_test.md
   - atlas-test: atlas_test.md
+  - atlas-gui: atlas_gui.md
   - atlas-signal-viewer-smoke-test: atlas_signal_viewer_smoke_test.md
   - atlas-generate-templates: atlas_generate_templates.md
   - get_scc_config: get_scc_config.md
@@ -46,6 +49,7 @@ plugins:
 - search
 hooks:
   - tools/mkdocs_version.py
+  - tools/mkdocs_meteorological_database.py
 markdown_extensions:
 - admonition
 - attr_list

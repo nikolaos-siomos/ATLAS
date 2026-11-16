@@ -12,6 +12,38 @@ get_scc_config -c 665 -o ./configurations
 
 Replace `665` with your SCC configuration ID. Both `-c` and `-o` are required. The output folder is created automatically, including missing parent folders. Downloading requires access to the SCC service.
 
+## SCC login
+
+Whenever a configuration download is needed, the command prompts in the terminal:
+
+```text
+SCC username:
+SCC password (hidden):
+```
+
+The password is not displayed. Neither value is saved or reused across invocations. There are no username/password command-line arguments or INI settings, and no OS password-manager application or new Python dependency is required.
+
+Use the credentials accepted by the SCC export service; these may differ from your personal SCC website login. If authentication is rejected, the command exits with an explanatory error. Run it again to retry. It does not repeatedly prompt or silently use a built-in account.
+
+Run this CLI in an interactive terminal. If hidden password entry is unavailable, the command stops rather than falling back to visible password input. Ctrl+C cancels the export. Existing local configuration reuse through the internal helper does not trigger a prompt; the standalone CLI itself requests a fresh export on every invocation.
+
+Downloads use certificate-verified HTTPS to the fixed SCC export endpoint, with
+a 10-second connection timeout and a 60-second read timeout. ATLAS checks
+redirects itself: up to three redirects are allowed only to the same
+configuration export on the same HTTPS host, including addition/removal of a
+trailing slash. A different host, non-default port, HTTP destination, configuration
+ID, login page or URL containing user information/query/fragment is refused before
+credentials are forwarded. Failed or interrupted transfers remove their temporary
+file without replacing an existing completed CSV. These timeouts apply to
+connecting and individual reads, not the total duration of a download.
+
+A redirect error alone does not establish that a password is wrong. A trailing-
+slash redirect is handled automatically. If SCC instead redirects to a login
+page, the export may require a web/admin login or additional permission beyond
+the community HTTP login; this downloader does not automate that separate login.
+An HTTP downgrade requires a working HTTPS export endpoint. Error messages
+identify these cases without displaying redirect URLs, cookies or tokens.
+
 By default, the exporter prompts for recorder channel IDs. Follow the terminal instructions and provide the IDs used by your raw measurement files.
 
 For SCC-compatible input, use `-s` to use SCC channel IDs directly as recorder channel IDs and skip that prompt:
@@ -36,7 +68,7 @@ python -m pip install -e .
 
 | Option | Required | Description |
 | --- | --- | --- |
-| `-c`, `--scc_configuration_id` | Yes | SCC configuration ID to download. |
+| `-c`, `--scc_configuration_id` | Yes | Positive integer SCC configuration ID to download. |
 | `-o`, `--output_folder` | Yes | Destination folder for both the generated INI and downloaded CSV. Quote paths containing spaces. |
 | `-s`, `--scc_compatible_format`, `--scc_format` | No | Use SCC channel IDs as recorder channel IDs, without prompting. Disabled by default. |
 | `-h`, `--help` | No | Display help and exit. |
@@ -76,6 +108,6 @@ The `[System]` section uses simple `name = value` formatting. In `[Channels]` an
 
 ## Use the generated configuration with ATLAS
 
-Set `atlas_configuration_file` in your ATLAS initialization file to the generated INI path. To retain your manual edits, set `export_hoi_cfg = 0` for subsequent processing runs, so ATLAS uses the prepared file without exporting it again.
+Set `atlas_configuration_file` in your ATLAS initialization file to the generated INI path, or place it beside the initialization file as `config_file.ini`. Internal SCC export during `atlas` processing is disabled: `export_hoi_cfg` is not a user-facing setting and is fixed internally to `"0"`. Entries retained in older initialization files are ignored with a warning. Run `get_scc_config` separately whenever a new export is needed.
 
-The standalone CLI does not change the arguments accepted by `call_atlas`. Its existing export modes and CSV subfolder behavior remain available. Files generated through either workflow receive the empty polarization calibration fields and the updated formatting; automatic INI filename timestamps are specific to the standalone CLI.
+The standalone CLI does not change the arguments accepted by `atlas`. Internal export helpers are retained for future development, but are not enabled by initialization-file values. The existing CSV output-location behavior and generated configuration formatting are retained.

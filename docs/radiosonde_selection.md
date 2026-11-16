@@ -52,7 +52,8 @@ The lookup uses `config_info["station_id"]`, parsed from the configuration file,
 
 ### Precedence and empty values
 
-User-provided initialization values, including command-line overrides, take precedence. ATLAS fills each of the four keys only when its parsed value is `None`, an empty string, or whitespace. A numeric zero is a supplied value and is preserved.
+User-provided initialization values take precedence. The main CLI exposes no
+meteorological station-ID options, so provide these overrides in the INI or GUI. ATLAS fills each of the four keys only when its parsed value is `None`, an empty string, or whitespace. A numeric zero is a supplied value and is preserved.
 
 An empty database cell leaves the corresponding initialization value unchanged. A station with no matching row also leaves all values unchanged. The lookup updates `caller_info` in memory; it does not rewrite the initialization file. ASCII column, delimiter, header, footer, and unit settings keep their existing behavior.
 
@@ -106,7 +107,7 @@ If both `radiosonde_file` and `radiosonde_folder` are provided, `radiosonde_file
 Example initialization entry:
 
 ```ini
-[System]
+[explicit_paths]
 radiosonde_file = /data/campaign/radiosondes/20240428_1200_wyoming_bufr_16716.txt
 ```
 
@@ -232,6 +233,14 @@ Automatic selection only considers files whose names match a supported pattern. 
 | SCC | `rs_YYYYMMDD<site>HH.nc` | `rs_20240428aky12.nc` |
 | Custom ASCII | `YYYYMMDD_HHMM_custom_ascii_<identifier>.<txt|dat|csv|asc>` | `20240428_1200_custom_ascii_athens.txt` |
 
+The current downloader can also produce `_wyoming_fm35_`, `_wyoming_temp_`
+and `_wyoming_old_` text filenames. The current automatic selector's regular
+expression accepts legacy names and `_wyoming_bufr_` only, so those additional
+names are not automatically selected. This is an implementation mismatch,
+not an instruction to rename unrelated files. If affected, provide the file
+explicitly through `radiosonde_file` and check the detected format; aligning
+the downloader and selector requires a code fix.
+
 The timestamp encoded in the filename is used to compare each radiosonde file against the measurement midpoint.
 
 ### Identifier matching in automatic mode
@@ -345,7 +354,7 @@ If the height unit is `m_agl` or `km_agl`, `rsonde_station_altitude` must also b
 Example custom ASCII configuration:
 
 ```ini
-[System]
+[parsing_options]
 rsonde_skip_header = 1
 rsonde_skip_footer = 0
 rsonde_delimiter = S

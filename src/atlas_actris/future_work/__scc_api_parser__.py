@@ -213,7 +213,7 @@ def _get_scc_file(hoi_output_folder: str, scc_configuration_id: str) -> str:
     
     url = f"https://scc.imaa.cnr.it/admin/database/hoisystems/export/{scc_configuration_id}"
     
-    scc_file_path = download_with_auth(url = url, folder = hoi_output_folder, filename = filename, username = "scc_user", password = "sccforever!")
+    raise RuntimeError("SCC download disabled in this draft: supply authentication explicitly before enabling it.")
 
     return(scc_file_path)
 

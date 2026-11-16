@@ -39,6 +39,7 @@ class TestRunnerTests(unittest.TestCase):
         args, kwargs = run.call_args
         self.assertEqual(args[0], [sys.executable, "-m", "pytest", "-c", str(self.repo / "pytest.ini"), "tests"])
         self.assertEqual(kwargs["cwd"], self.repo)
+        self.assertEqual(kwargs["env"]["ATLAS_RUN_GUI_TESTS"], "0")
         self.assertEqual(kwargs["env"]["PYTHONPATH"].split(os.pathsep)[:2],
                          [str(self.repo / "src"), str(self.repo / "src/atlas_actris")])
 
@@ -99,6 +100,15 @@ class TestRunnerTests(unittest.TestCase):
             self.assertEqual(env["MPLBACKEND"], "custom-backend")
             self.assertTrue(env["PYTHONPATH"].endswith(os.pathsep + "custom-path"))
             self.assertEqual(os.environ["PYTHONPATH"], "custom-path")
+
+    def test_desktop_windows_require_explicit_gui_flag(self):
+        with patch.dict(os.environ, {"ATLAS_RUN_GUI_TESTS": "1"}):
+            _, run = self.invoke()
+            self.assertEqual(run.call_args.kwargs["env"]["ATLAS_RUN_GUI_TESTS"], "0")
+            _, run = self.invoke(["--gui", "--test", "alpha"])
+            self.assertEqual(run.call_args.kwargs["env"]["ATLAS_RUN_GUI_TESTS"], "1")
+            self.assertNotIn("--gui", run.call_args.args[0])
+            self.assertEqual(os.environ["ATLAS_RUN_GUI_TESTS"], "1")
 
 
 if __name__ == "__main__":

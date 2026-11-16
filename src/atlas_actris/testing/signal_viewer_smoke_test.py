@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Union
+if __package__:
+    from ._paths import case_output_root, remove_test_outputs
+else:
+    from _paths import case_output_root, remove_test_outputs
 
 
 DEFAULT_CASE_NAME = "179_199_665_20231221"
@@ -85,6 +88,14 @@ def run_smoke_test(
     keep_output: bool = False,
     timeout: int = 1800,
 ) -> int:
+    try:
+        return _run_smoke_test(testing_pack, ini, case_name, keep_output, timeout)
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"ERROR: Signal-viewer smoke test stopped: {error}", file=sys.stderr)
+        return 1
+
+
+def _run_smoke_test(testing_pack, ini, case_name, keep_output, timeout):
     pack_dir = resolve_testing_pack(testing_pack)
     ini_path = pack_dir / ini
 
@@ -96,18 +107,11 @@ def run_smoke_test(
         print(f"ERROR: Missing INI file: {ini_path}", file=sys.stderr)
         return 1
 
-    output_root = pack_dir / "analysis" / case_name
+    output_root = case_output_root(pack_dir, case_name)
     viewer_dir = output_root / "signal_viewer"
-    cache_dir = output_root / "cache"
 
     if not keep_output:
-        if viewer_dir.exists():
-            print(f"Removing old signal_viewer folder: {viewer_dir}")
-            shutil.rmtree(viewer_dir)
-
-        if cache_dir.exists():
-            print(f"Removing old cache folder: {cache_dir}")
-            shutil.rmtree(cache_dir)
+        remove_test_outputs(pack_dir, case_name, children=("signal_viewer", "cache"), phase="old")
 
     env = os.environ.copy()
     env.setdefault("MPLBACKEND", "Agg")
@@ -135,6 +139,8 @@ def run_smoke_test(
             )
             return result.returncode
 
+        output_root = case_output_root(pack_dir, case_name)
+        viewer_dir = output_root / "signal_viewer"
         if not viewer_dir.is_dir():
             print(
                 f"ERROR: Signal-viewer output folder was not created: {viewer_dir}",
@@ -155,13 +161,7 @@ def run_smoke_test(
         return 0
     finally:
         if not keep_output:
-            if viewer_dir.exists():
-                print(f"Removing generated signal_viewer folder: {viewer_dir}")
-                shutil.rmtree(viewer_dir)
-
-            if cache_dir.exists():
-                print(f"Removing generated cache folder: {cache_dir}")
-                shutil.rmtree(cache_dir)
+            remove_test_outputs(pack_dir, case_name, children=("signal_viewer", "cache"))
 
 
 def main(argv: Union[list[str], None] = None) -> int:

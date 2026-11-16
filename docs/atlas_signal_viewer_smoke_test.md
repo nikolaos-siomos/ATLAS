@@ -2,6 +2,9 @@
 
 Runs the signal-viewer workflow through the installed `atlas-signal-viewer` CLI and verifies that signal-viewer output files are created.
 
+The dataset must be available in a source checkout or supplied testing-pack
+folder; it is not bundled in the installed PyPI wheel.
+
 ## Usage
 
 ```bash
@@ -25,11 +28,20 @@ Useful options include:
 
 By default, the signal-viewer smoke test deletes the generated `signal_viewer` and temporary `cache` folders after validation. Other ATLAS analysis products are left untouched.
 
+`--case-name` must be a single directory name under `analysis/`, rather than an
+absolute or relative path. Cleanup rejects symbolic links and directory
+junctions beneath the selected testing pack and checks its targets again after
+the subprocess finishes.
+
 To retain the generated viewer files for manual inspection, use:
 
 ```bash
 atlas-signal-viewer-smoke-test --keep-output
 ```
+
+`--keep-output` preserves viewer outputs, but the ATLAS subprocess still
+receives **Yes** for cache cleanup, so it can delete the cache during the run.
+The flag does not guarantee cache retention.
 
 This is particularly useful when checking generated HTML files, interactive plots, or viewer-specific failures. As with the main smoke test, retained outputs may consume significant disk space.
 

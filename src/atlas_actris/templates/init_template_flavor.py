@@ -72,10 +72,10 @@ INIT_FLAVOR = {
     
     'scc_compatible_format': {
         'description': 
-            'Set to True if the data are in scc format and '
-            'export_hoi_cfg is 1 or 3 to generate the config file by '
-            'automatically connecting the scc_channel_ids and'
-            'the recorder_channel_ids.',
+            'SCC-compatible format flag. Internal SCC HOI export during atlas '
+            'processing is disabled. To generate a configuration using SCC '
+            'channel IDs as recorder_channel_id, run get_scc_config separately '
+            'with its -s option.',
         'example': 'True',
         'legacy': {
             'status': 'new',
@@ -87,33 +87,11 @@ INIT_FLAVOR = {
             }
         },
     
-    'export_hoi_cfg': {
-        'description': 
-            'Controls exporting the config_file from the SCC HOI '
-            'for the provided scc_configuration_id. Select among 0, 1, or 2 | '
-            '0: A local, manually created, configuration ini file will be used, '
-            '1: The config_file file will be automatically created from '
-            'the SCC HOI overwritting any exported config_file '
-            'for the same configuration, '
-            'prepared file, 1: export from HOI and overwrite existing, '
-            '2: The config_file file will be automatically created from '
-            'the SCC HOI if no file has already be exported for the same '
-            'configuration.',
-        'example': '0',
-        'legacy': {
-            'status': 'unchanged',
-            'introduced': legacy_atlas,
-            'old_names': [],
-            'old_location': '',
-            'old_names_removed_in': '',
-            'note': ''
-            }
-        },
-    
     'scc_configuration_id': {
         'description': 
-            'The SCC configuration ID. It is used only if  '
-            'export_hoi_cfg is set to 1 or 2 to connect with the SCC HOI.',
+            'SCC configuration identifier retained for compatibility. It does '
+            'not trigger a download during atlas processing; internal SCC HOI '
+            'export is disabled. Use get_scc_config separately when needed.',
         'example': '665',
         'legacy': {
             'status': 'unchanged',
@@ -146,11 +124,9 @@ INIT_FLAVOR = {
     'atlas_configuration_file': {
         'description': (
             'Absolute or relative path to the ATLAS configuration file containing '
-            'system, channel, and channel-pair metadata. If empty and export_hoi_cfg '
-            'is 0, uses config_file.ini beside the initialization file; this file '
-            'must exist. For export_hoi_cfg 1 or 2, leave this entry empty: ATLAS '
-            'prepares config_file_<scc_configuration_id>.ini in the initialization '
-            'directory for SCC HOI export or download. '
+            'system, channel, and channel-pair metadata. If empty, uses '
+            'config_file.ini beside the initialization file; this file must '
+            'exist. ATLAS does not generate or download it internally. '
             + rel_path_note
         ),
         'example': './config_file.ini',
@@ -455,12 +431,13 @@ INIT_FLAVOR = {
          },
 
     'export_stages': {
-        'description': 
-            'At the end of ATLAS excecution, the user'
-            'is asked to export all export_stages. A rough '
-            'calculation of the size of the data to be exported '
-            'is provided. Exporting can take a while, depending '
-            'on the volume of data and number of stages.',
+        'description':
+            'Processing stages to save after a successful run. The terminal workflow '
+            'asks before exporting; in the GUI, choose Export stages in the Run tab '
+            'before starting. The GUI default exports nothing. Exported stages use '
+            'JSON metadata and Zarr arrays under the resolved output folder. A rough '
+            'size estimate is printed; export time depends on the data volume. '
+            'A blank value uses the default stage selection.',
         'example': 'preprocessing_complete',
         'legacy': {
             'status': 'new',

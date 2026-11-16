@@ -52,3 +52,20 @@ docs/generated/intercomparison_reference.md
 ```
 
 Generate these templates using [atlas-generate-templates](atlas_generate_templates.md).
+
+## Prepare exported inputs
+
+A separate installed command prepares data using a regular ATLAS init file:
+
+```bash
+atlas-prepare-intercomparison -i /path/to/call_atlas.ini
+```
+
+It runs processing and quicklook generation, then exports the stages selected by
+`export_stages` without a confirmation prompt, replacing exports with matching
+names. It does not run the comparison itself. Run `atlas-intercomparison` with
+an `intercomparison.ini` referencing those exported stages to compare them.
+
+You can also prepare the exports through a normal ATLAS run using the
+[stage-export controls](exported_processing_stages.md). See the separate
+[importing guide](importing_processing_stages.md) to inspect them in Python.

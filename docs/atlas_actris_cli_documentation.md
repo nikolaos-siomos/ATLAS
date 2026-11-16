@@ -1,12 +1,7 @@
 # ATLAS ACTRIS Command-Line Interface
 
-This page describes the main `atlas` command during local developer installation.
-
-The package is currently intended to be installed from the local repository with:
-
-```bash
-python -m pip install -e .
-```
+This page describes the main `atlas` command for both PyPI and editable source
+installations. See [installation](installation.md) for either workflow.
 
 After installation, the main workflow is available through `atlas`. Additional commands are documented separately under [Extra tools](index.md#extra-tools).
 
@@ -78,7 +73,7 @@ The parser exposes the following options (the displayed program name and wrappin
 usage: atlas [-h] [-i [ini_file]] [-o [output_folder]]
              [-s slice_measurement [slice_measurement ...]]
              [-e exclude_measurement [exclude_measurement ...]]
-             [-q process_qck [process_qck ...]]
+             [-p process [process ...]] [-q process_qck [process_qck ...]]
 
 arguments
 
@@ -99,6 +94,10 @@ options:
                         Exclude option for the QA tests. It overrides the
                         corresponding parameter provided in the initialization
                         file
+  -p process [process ...], --process process [process ...]
+                        Select QA test aliases for QA test generation. It
+                        overrides the corresponding parameter provided in the
+                        initialization file
   -q process_qck [process_qck ...], --process_qck process_qck [process_qck ...]
                         Select QA test aliases for quicklook generation. It
                         overrides the corresponding parameter provided in the
@@ -113,6 +112,7 @@ options:
 | `-o`, `--output_folder` | One folder path | Override `output_folder`. |
 | `-s`, `--slice_measurement` | One or more `measurement start stop` triplets | Override the time windows selected for processing. |
 | `-e`, `--exclude_measurement` | One or more `measurement start stop` triplets | Override the time windows excluded from processing. |
+| `-p`, `--process` | One or more QA-test aliases | Override the main QA-test selection. |
 | `-q`, `--process_qck` | One or more quicklook aliases | Override the quicklook selection. |
 | `-h`, `--help` | No value | Show help and exit. |
 
@@ -124,7 +124,7 @@ Only the options listed here are exposed by `parse_caller_args.py`. Other initia
 
 ATLAS reads the initialization file, applies supplied CLI overrides, then performs schema conversion and validation. An omitted option leaves the INI setting in effect, subject to the usual defaults and processing rules. The initialization file itself is not modified.
 
-List overrides **replace the entire INI value**, rather than append to it. For example, `-q drk ray` replaces the INI's `process_qck` list. The same replacement rule applies to `-s` and `-e`. Supplied overrides are listed in the terminal under `Command-line overrides:`.
+List overrides **replace the entire INI value**, rather than append to it. For example, `-q drk ray` replaces the INI's `process_qck` list. The same replacement rule applies to `-p`, `-s` and `-e`. Supplied overrides are listed in the terminal under `Command-line overrides:`.
 
 Pass multiple values after a single option. Repeating an option keeps only its last occurrence. Space-separated values are easiest to read; quoted comma- or semicolon-separated lists are also accepted by the initialization parser.
 
@@ -134,7 +134,17 @@ Pass multiple values after a single option. Repeating an option keeps only its l
 atlas -i ./call_atlas.ini -o ./analysis_run
 ```
 
-This overrides the main workflow's `output_folder` setting; it does not change any other initialization parameters.
+This overrides the `output_folder` base directory. Relative paths are resolved
+against the directory containing `call_atlas.ini`. ATLAS appends the input
+`parent_folder` basename when an output directory is explicitly provided:
+
+```text
+<provided_output_folder>/<parent_folder_name>/
+```
+
+With no output setting, the default is `<init_directory>/analysis/`, without that
+extra case subfolder. Use the resolved output directory (the value printed/used
+by ATLAS) when importing exported stages.
 
 Quote paths containing spaces, including on Windows:
 
@@ -195,6 +205,22 @@ The following bundle aliases apply the same interval to each listed measurement:
 | `tlc_rin` | `tlc_inner`, `tlc_outer` |
 
 For example, `-s tlc 1200 1300` applies that interval to all four telecover sectors. Bundle expansion here is specific to slicing and exclusion.
+
+### Select QA tests
+
+```bash
+atlas -i ./call_atlas.ini -p ray
+```
+
+`-p` / `--process` replaces the init's `process` list. Supported main-test aliases
+are `ray`, `pcb`, `tlc`, `tlc_rin`, `ray_pcb`, `pcb_aux`, `trg`, `dtm`, `drk`,
+and `cam`.
+Use `off` alone to disable this selection.
+
+When `process` is supplied, omitted/blank `process_qck` and `process_bgd` are
+derived from it. Explicit init settings or `-q` still take precedence for
+quicklooks. Dedicated-dark companions depend on `process_dedicated_dark`.
+`process_vldr` is independent, so `-p` alone does not disable VLDR quicklooks.
 
 ### Select quicklooks
 
@@ -262,35 +288,13 @@ python src/atlas_actris/__call_atlas_interactive__.py -i /path/to/call_atlas.ini
 
 The recommended terminal command is still `atlas -i ...`, because it tests the installed package entry point.
 
-## Current `cli.py` wrapper
+## Plotting backend and script dispatch
 
-The current CLI wrapper can be written as:
-
-```python
-from pathlib import Path
-import runpy
-import sys
-
-
-def main():
-    script_path = Path(__file__).with_name("__call_atlas_interactive__.py")
-    script_dir = str(script_path.parent.resolve())
-
-    if script_dir not in sys.path:
-        sys.path.insert(0, script_dir)
-
-    runpy.run_path(str(script_path), run_name="__main__")
-```
-
-This wrapper exists only to provide a callable target for the installed console script. The main workflow itself remains in `__call_atlas_interactive__.py`.
-
-Because the wrapper uses `runpy.run_path(..., run_name="__main__")`, command-line arguments passed to `atlas` remain available to the underlying script through `sys.argv`. Therefore:
-
-```bash
-atlas -i /path/to/call_atlas.ini
-```
-
-is passed through to `__call_atlas_interactive__.py` as the script's command-line input.
+The installed wrapper runs `__call_atlas_interactive__.py` with the supplied
+arguments and defaults `MPLBACKEND` to `Agg` only if it is unset. This avoids
+interactive plotting windows in terminal/batch runs. The processing command
+still has its end-of-run terminal prompts. Direct IDE execution retains the
+IDE's configured plotting backend.
 
 ## Verifying the CLI after installation
 

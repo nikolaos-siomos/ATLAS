@@ -13,6 +13,8 @@ atlas-test
 
 Use the environment containing ATLAS and its dependencies. The command invokes pytest through that environment's Python interpreter and returns its exit status, so failures also fail CI jobs.
 
+Desktop GUI checks that create windows are skipped by default, even when a display is available. The remaining GUI/model checks still run.
+
 The `tests/` directory and smoke-test dataset remain in the repository. A PyPI-only installation does not include them. When running elsewhere, point to the checkout:
 
 ```bash
@@ -51,6 +53,25 @@ Use pytest collection to see individual test IDs without executing them:
 atlas-test -- --collect-only -q
 ```
 
+## Optional desktop GUI checks
+
+A normal `atlas-test` run does not open the ATLAS editor or folder browser for
+testing. To explicitly run the checks that create real desktop windows:
+
+```bash
+atlas-test --gui --test gui_compatibility
+```
+
+These checks require a working graphical display, open test windows, and close
+them automatically. Their startup-folder prompt is disabled, so no interactive
+file selection is required. Other GUI tests continue to run in the default suite.
+
+`--gui` belongs to `atlas-test`, so put it before the `--` separator. The CLI
+passes `ATLAS_RUN_GUI_TESTS=1` to pytest only for this explicit flag; without it,
+it sets the child value to `0` even if the parent has a different value. When
+invoking pytest directly, set that environment variable before collection to
+opt into the desktop tests. No pytest plugin is required.
+
 ## Additional pytest options
 
 Pass pytest options after `--`:
@@ -65,6 +86,12 @@ The last example skips tests marked `integration`, including the full smoke test
 
 ## GitHub Actions
 
-The test workflow installs `.[dev]` and runs `atlas-test` on Python 3.9–3.13 using Ubuntu 24.04. The full suite includes the existing smoke/integration test, so the workflow does not launch a second separate smoke run. The documentation-deployment workflow is unchanged.
+The checked-in `.github/workflows/tests.yml` invokes `atlas-test` on
+Python 3.9–3.13 using Ubuntu 24.04. This runs the repository's `tests/` suite,
+including the smoke integration test, PNG safety checks, HTML escaping checks,
+cleanup-path checks, and the GUI compatibility checks that do not need windows.
+Desktop checks remain skipped unless explicitly enabled with `--gui`.
 
-The integration smoke test removes its generated analysis output after checking it, following the existing smoke-runner behavior. Its testing dataset must be present in the checkout.
+The integration smoke test removes only its selected case's analysis output
+after checking it. Other cases and caches in the measurement folders are left
+untouched. Its testing dataset must be present in the checkout.

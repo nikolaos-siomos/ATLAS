@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Union
+if __package__:
+    from ._paths import case_output_root, remove_test_outputs
+else:  # Retain direct execution of this script from its installed/source path.
+    from _paths import case_output_root, remove_test_outputs
 
 
 DEFAULT_CASE_NAME = "179_199_665_20231221"
@@ -103,6 +106,16 @@ def run_smoke_test(
     yes_clean_cache: str = "y",
     yes_export_stage: str = "N",
 ) -> int:
+    try:
+        return _run_smoke_test(testing_pack, ini, case_name, keep_output, timeout,
+                               yes_clean_cache, yes_export_stage)
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"ERROR: Smoke test stopped: {error}", file=sys.stderr)
+        return 1
+
+
+def _run_smoke_test(testing_pack, ini, case_name, keep_output, timeout,
+                    yes_clean_cache, yes_export_stage):
     pack_dir = resolve_testing_pack(testing_pack)
     ini_path = pack_dir / ini
 
@@ -114,17 +127,9 @@ def run_smoke_test(
         print(f"ERROR: Missing INI file: {ini_path}", file=sys.stderr)
         return 1
 
-    analysis_dir = pack_dir / "analysis"
-
-    if analysis_dir.exists() and not keep_output:
-        print(f"Removing old analysis folder: {analysis_dir}")
-        shutil.rmtree(analysis_dir)
-
+    output_root = case_output_root(pack_dir, case_name)
     if not keep_output:
-        for cache_dir in pack_dir.rglob("cache"):
-            if cache_dir.is_dir():
-                print(f"Removing old cache folder: {cache_dir}")
-                shutil.rmtree(cache_dir)
+        remove_test_outputs(pack_dir, case_name, phase="old")
 
     env = os.environ.copy()
     env.setdefault("MPLBACKEND", "Agg")
@@ -151,7 +156,7 @@ def run_smoke_test(
             print(f"ERROR: ATLAS failed with return code {result.returncode}", file=sys.stderr)
             return result.returncode
 
-        output_root = analysis_dir / case_name
+        output_root = case_output_root(pack_dir, case_name)
 
         plots = list((output_root / "plots").glob("*.png"))
         html_reports = list((output_root / "reports").glob("*.html"))
@@ -183,9 +188,8 @@ def run_smoke_test(
         print("\nATLAS smoke test completed successfully.")
         return 0
     finally:
-        if not keep_output and analysis_dir.exists():
-            print(f"Removing generated analysis folder: {analysis_dir}")
-            shutil.rmtree(analysis_dir)
+        if not keep_output:
+            remove_test_outputs(pack_dir, case_name)
 
 
 def main(argv: Union[list[str], None] = None) -> int:

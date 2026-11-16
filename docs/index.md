@@ -8,7 +8,8 @@ ATLAS ACTRIS is a Python package and command-line tool for lidar data processing
 
 - [Installation](installation.md)
 - [Command line interface](atlas_actris_cli_documentation.md)
-- [Exported processing stages](exported_processing_stages.md)
+- [Exporting stages](exported_processing_stages.md)
+- [Importing stages](importing_processing_stages.md)
 - [Meteorological profile selection and downloading](radiosonde_selection.md), including database defaults for empty initialization settings
 - [Meteorological station database](meteorological_database.md)
 
@@ -27,6 +28,12 @@ These pages are generated from the ATLAS parser schemas and template flavor file
 - [Signal viewer (`atlas-signal-viewer`)](atlas_signal_viewer.md)
 - [ATLAS smoke test (`atlas-smoke-test`)](atlas_smoke_test.md)
 - [ATLAS test suite (`atlas-test`)](atlas_test.md)
+- [ATLAS GUI (`atlas-gui`)](atlas_gui.md)
 - [Signal-viewer smoke test (`atlas-signal-viewer-smoke-test`)](atlas_signal_viewer_smoke_test.md)
 - [Generate INI templates (`atlas-generate-templates`)](atlas_generate_templates.md)
 - [SCC configuration (`get_scc_config`)](get_scc_config.md)
+
+## Older manuals
+
+The [older PDF and ODT manuals](legacy_manuals.md) contain earlier commands,
+parameter names and GUI screenshots. Use the pages above for current workflows.

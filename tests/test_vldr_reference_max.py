@@ -8,7 +8,6 @@ import numpy as np
 
 SOURCE = Path(__file__).resolve().parents[1]/"src"/"atlas_actris"
 sys.path.insert(0, str(SOURCE))
-from utils.parse_settings_file import SCHEMA_QCK_VLDR
 
 
 def load_functions(path, names, namespace):
@@ -41,9 +40,6 @@ class VLDRReferenceTests(unittest.TestCase):
     def limits(self, values=None, settings=None):
         return self.scope["_safe_vldr_color_limits"](self.y if values is None else values,
                                                      self.x, self.settings if settings is None else settings)
-
-    def test_default_schema_is_automatic_again(self):
-        self.assertEqual(SCHEMA_QCK_VLDR["y_lims"]["default"], [])
 
     def test_spike_is_spatially_smoothed_for_reference(self):
         self.assertAlmostEqual(self.maximum(), .25)

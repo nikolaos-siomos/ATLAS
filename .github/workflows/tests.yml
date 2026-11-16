@@ -1,4 +1,4 @@
-name: ATLAS smoke test
+name: ATLAS tests
 
 on:
   push:
@@ -32,9 +32,9 @@ jobs:
         run: |
           pip check
 
-      - name: Run smoke test
+      - name: Run ATLAS test suite
         env:
           MPLBACKEND: Agg
           HDF5_USE_FILE_LOCKING: "FALSE"
         run: |
-          atlas-smoke-test testing_pack
+          atlas-test

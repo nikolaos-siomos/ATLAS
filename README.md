@@ -4,8 +4,8 @@
 
 [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![PyPI version](https://img.shields.io/pypi/v/atlas-actris.svg)](https://pypi.org/project/atlas-actris/)
-[![Development status](https://img.shields.io/badge/status-development-orange)](https://github.com/nikolaos-siomos/atlas_dev)
-[![Tests](https://github.com/nikolaos-siomos/atlas_dev/actions/workflows/tests.yml/badge.svg)](https://github.com/nikolaos-siomos/atlas_dev/actions/workflows/tests.yml)
+[![Development status](https://img.shields.io/badge/status-development-orange)](https://github.com/nikolaos-siomos/ATLAS)
+[![Tests](https://github.com/nikolaos-siomos/ATLAS/actions/workflows/tests.yml/badge.svg)](https://github.com/nikolaos-siomos/ATLAS/actions/workflows/tests.yml)
 [![License](https://img.shields.io/badge/license-see%20LICENSE-lightgrey)](LICENSE)
 Automated Lidar Analysis Software (ATLAS) for lidar data processing, visualization, and quality-assurance workflows.
 
@@ -16,7 +16,10 @@ ATLAS is intended for users involved in ACTRIS aerosol high-power lidar (AHL) qu
 
 ATLAS currently supports Python **3.9, 3.10, 3.11, 3.12, and 3.13**.
 
-The package is tested with a bundled smoke-test dataset through `pytest` and GitHub Actions. The test suite checks that the command-line workflow can run to completion and produce the expected plots, reports, and ASCII outputs.
+The repository contains unit tests and a full smoke/integration dataset.
+`atlas-test` runs the repository suite by default. The checked-in GitHub Actions
+workflow currently runs the smoke test only; it checks the command-line workflow
+and generated plots, reports, and ASCII outputs.
 
 ## Installation for users
 Create and activate a Python environment. For example, using conda or miniforge:
@@ -43,12 +46,12 @@ conda activate atlas_box
 Clone or just download and extract the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/nikolaos-siomos/ATLAS.git
 ```
 
 Enter the top level of the cloned/extracted project folder (the folder name can be different than in the example).
 ```bash
-cd atlas_dev
+cd ATLAS
 ```
 
 Install ATLAS locally by typing the following command inside the project folder:
@@ -84,7 +87,18 @@ To check the available command-line options type:
 atlas -h
 ```
 
-ATLAS expects an initialization file that points to the parent folder (input lidar data), configuration file (channel/system configuration), settings file (QA test options), radiosonde or atmospheric input, and output folder where files are exported. Detailed configuration and settings documentation is provided in the MkDocs documentation.
+ATLAS requires an initialization file and a valid configuration. With empty init
+paths, input data and `config_file.ini` are taken from beside the init; an optional
+`settings_file.ini` is used there when present. Otherwise settings use built-in
+defaults. Outputs default to `analysis/` beside the init. Explicit paths override
+these defaults; an explicit output base gets a subfolder named after the input
+parent folder. See the [quick guide](docs/quick_guide.md) for details.
+
+To use the GUI in the same environment:
+
+```bash
+atlas-gui
+```
 
 For command-line execution, the `atlas` entry point uses a non-interactive plotting backend by default, which is suitable for terminal runs and automated tests. IDE workflows can still use the plotting backend configured in the active environment.
 
@@ -98,7 +112,8 @@ Please make sure the IDE uses the same Python environment where ATLAS was instal
 
 ## Smoke testing
 
-The repository includes a bundled smoke-test dataset in `testing_pack/`. This test is intended to confirm that the complete ATLAS command-line workflow still works after code, configuration, or dependency changes.
+The repository includes a smoke-test dataset in `testing_pack/`; the PyPI wheel
+does not bundle this dataset. This test is intended to confirm that the complete ATLAS command-line workflow still works after code, configuration, or dependency changes.
 
 Run the smoke test directly with:
 
@@ -116,7 +131,7 @@ The smoke test:
 
 - removes previous generated analysis/cache outputs,
 - runs ATLAS with the bundled initialization file,
-- automatically answers the two terminal prompts used during the test run,
+- supplies answers for cache cleanup, stage deletion and stage export,
 - checks that plots, reports, and ASCII files were created.
 
 Generated outputs are written under:
@@ -127,7 +142,7 @@ testing_pack/analysis/
 
 This folder is ignored by Git and should not be committed.
 
-## Running tests with pytest
+## Running the test suite
 
 Install the development dependencies first:
 
@@ -135,11 +150,19 @@ Install the development dependencies first:
 python -m pip install -e ".[dev]"
 ```
 
-Then run the integration test:
+Run the whole repository suite:
 
 ```bash
-python -m pytest -q tests/test_atlas_integration.py
+atlas-test
 ```
+
+Or select the integration test:
+
+```bash
+atlas-test --test atlas_integration
+```
+
+Desktop window tests are opt-in with `--gui`; the other GUI checks run normally.
 
 The pytest integration test calls the smoke-test command and verifies that the expected output files are produced.
 
@@ -159,7 +182,8 @@ The automatically generated reference pages are in:
 docs/generated/
 ```
 
-These generated pages document the initialization, configuration, and settings INI files. They are generated from the parser schemas and template flavor files, so they should not be edited manually.
+These generated pages document the initialization, configuration, settings and
+intercomparison INI files. They are generated from the parser schemas and template flavor files, so they should not be edited manually.
 
 ### Simple local documentation check
 
@@ -173,7 +197,7 @@ conda activate atlas_box
 Enter the repository root, meaning the folder that contains `mkdocs.yml`:
 
 ```bash
-cd atlas_dev
+cd ATLAS
 ```
 
 Install ATLAS with the documentation dependencies:
@@ -185,7 +209,7 @@ python -m pip install -e ".[docs]"
 Start the local documentation server:
 
 ```bash
-mkdocs serve
+mkdocs serve --config-file mkdocs.yml
 ```
 
 Open the local URL printed in the terminal. Usually it is:

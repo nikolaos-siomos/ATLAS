@@ -15,9 +15,59 @@ from datetime import datetime
 import numpy as np
 import argparse
 import requests
+import getpass
+import os
+import re
+import tempfile
+import warnings
+from urllib.parse import urljoin, urlsplit
 from .printouts import print_header
 from pprint import pprint
 from .error_classes import ConfigError, CustomWarning
+
+
+SCC_EXPORT_BASE_URL = "https://scc.imaa.cnr.it/admin/database/hoisystems/export"
+SCC_DOWNLOAD_TIMEOUT = (10, 60)  # Connection and per-read timeout, seconds.
+SCC_MAX_EXPORT_REDIRECTS = 3
+
+
+class SCCDownloadError(RuntimeError):
+    """A safe-to-display SCC download error, without credentials or response bodies."""
+
+
+class SCCAuthenticationError(SCCDownloadError):
+    """Missing, unavailable or rejected SCC credentials."""
+
+
+def _normalise_configuration_id(value) -> str:
+    text = str(value).strip()
+    if not re.fullmatch(r"[0-9]+", text) or len(text) > 18 or int(text) <= 0:
+        raise ValueError("scc_configuration_id must be a positive integer")
+    return str(int(text))
+
+
+def _prompt_scc_credentials() -> Tuple[str, str]:
+    """Prompt once per actual download; do not cache or persist either value."""
+    try:
+        username = input("SCC username: ").strip()
+        if not username or ":" in username:
+            raise SCCAuthenticationError("Enter a non-empty SCC username without a colon.")
+        with warnings.catch_warnings():
+            # getpass normally falls back to potentially visible input. Refuse
+            # that fallback rather than risking disclosure of the password.
+            warnings.simplefilter("error", getpass.GetPassWarning)
+            password = getpass.getpass("SCC password (hidden): ")
+    except getpass.GetPassWarning:
+        raise SCCAuthenticationError(
+            "Hidden password input is unavailable. Run get_scc_config in an interactive terminal."
+        ) from None
+    except EOFError:
+        raise SCCAuthenticationError(
+            "Credential input is unavailable. Run get_scc_config in an interactive terminal."
+        ) from None
+    if not password:
+        raise SCCAuthenticationError("The SCC password must not be empty.")
+    return username, password
 
 sections_map = {
     "System": {
@@ -104,6 +154,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     for name in ("scc_configuration_id", "output_folder"):
         if not getattr(args, name).strip():
             parser.error(f"--{name} must not be empty")
+    try:
+        args.scc_configuration_id = _normalise_configuration_id(args.scc_configuration_id)
+    except ValueError as error:
+        parser.error(str(error))
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     args.atlas_configuration_file = str(
         Path(args.output_folder)
@@ -166,28 +220,117 @@ def validate_bool(value, *, var_name: str = "value") -> bool:
     )
 
 
+def _export_id_for_url(url):
+    """Allow only this HTTPS host and export endpoint; never userinfo or queries."""
+    if not isinstance(url, str) or any(ord(char) < 32 or ord(char) == 127 for char in url):
+        return None
+    try:
+        parts, base = urlsplit(url), urlsplit(SCC_EXPORT_BASE_URL)
+        if (parts.scheme != "https" or parts.hostname != base.hostname
+                or (443 if parts.port is None else parts.port) != (443 if base.port is None else base.port)
+                or parts.username is not None or parts.password is not None
+                or parts.query or parts.fragment):
+            return None
+        match = re.fullmatch(re.escape(base.path.rstrip("/")) + r"/([0-9]+)/?", parts.path)
+        return match.group(1) if match else None
+    except ValueError:
+        return None
+
+
+def _redirect_rejection(target, status):
+    """Explain the redirect category without displaying URLs, cookies or tokens."""
+    try:
+        parts = urlsplit(target)
+        if "login" in parts.path.lower() or "signin" in parts.path.lower():
+            return SCCDownloadError(
+                "SCC redirected the export to a login page (HTTP {}). "
+                "This does not establish that the community password is wrong; "
+                "the export may require an additional web login or permission. "
+                "No credentials were sent to the redirected URL.".format(status))
+        if parts.scheme == "http":
+            return SCCDownloadError(
+                "SCC redirected the export to unencrypted HTTP (HTTP {}). "
+                "ATLAS requires an HTTPS export endpoint and did not forward credentials.".format(status))
+    except ValueError:
+        pass
+    return SCCDownloadError(
+        "SCC redirected outside the permitted HTTPS export URL (HTTP {}). "
+        "Only the same configuration export on the same HTTPS host is allowed; "
+        "credentials were not forwarded.".format(status))
+
+
 def download_with_auth(url: str, folder: str, username: str, password: str, filename: str = None) -> str:
+    configuration_id = _export_id_for_url(url)
+    if configuration_id is None:
+        raise SCCDownloadError("Refusing to send SCC credentials to an unexpected URL.")
     folder_path = Path(folder)
     folder_path.mkdir(parents=True, exist_ok=True)
 
     if filename is None:
-        filename = url.split("/")[-1] or "downloaded_file"
+        filename = urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1]
+    if filename in ("", ".", "..") or "/" in filename or "\\" in filename:
+        raise ValueError("The SCC download filename must be a filename without directories.")
     file_path = folder_path / filename
-
-    response = requests.get(url, auth=(username, password), stream=True)
-    if response.status_code == 401:
-        raise PermissionError("Unauthorized: check your username/password")
-    response.raise_for_status()
-
-    with open(file_path, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-
+    temporary_path = None
+    try:
+        current_url = url
+        for redirects in range(SCC_MAX_EXPORT_REDIRECTS + 1):
+            # Never delegate redirect handling to requests. Validate each target
+            # before sending credentials, including same-host redirects.
+            with requests.get(current_url, auth=(username, password), stream=True,
+                              timeout=SCC_DOWNLOAD_TIMEOUT, allow_redirects=False,
+                              verify=True) as response:
+                if response.status_code in (401, 403):
+                    raise SCCAuthenticationError(
+                        "SCC authentication was rejected or this account cannot access the configuration. "
+                        "Check your credentials/access, then run the command again."
+                    )
+                if response.status_code in (301, 302, 303, 307, 308):
+                    location = response.headers.get("Location")
+                    if not isinstance(location, str) or not location:
+                        raise SCCDownloadError("SCC returned a redirect without a usable Location header.")
+                    try:
+                        if any(ord(char) < 32 or ord(char) == 127 for char in location):
+                            raise ValueError("Invalid redirect")
+                        target = urljoin(current_url, location)
+                    except ValueError:
+                        raise SCCDownloadError("SCC returned an invalid redirect destination.") from None
+                    if _export_id_for_url(target) != configuration_id:
+                        raise _redirect_rejection(target, response.status_code)
+                    if redirects >= SCC_MAX_EXPORT_REDIRECTS:
+                        raise SCCDownloadError("SCC export exceeded the redirect limit. Please report this to the SCC service.")
+                    current_url = target
+                    continue
+                if response.status_code != 200:
+                    raise SCCDownloadError("SCC download failed (HTTP {}).".format(response.status_code))
+                if "text/html" in response.headers.get("Content-Type", "").lower():
+                    raise SCCDownloadError("SCC returned an HTML page instead of a configuration CSV. Check your access.")
+                with tempfile.NamedTemporaryFile(mode="wb", dir=folder_path,
+                                                 prefix=".scc-download-", suffix=".part",
+                                                 delete=False) as handle:
+                    temporary_path = Path(handle.name)
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            handle.write(chunk)
+                break
+        # Replace only after the entire response has been downloaded and closed.
+        os.replace(temporary_path, file_path)
+    except requests.exceptions.Timeout:
+        raise SCCDownloadError("The SCC download timed out. Please try again later.") from None
+    except requests.exceptions.RequestException:
+        raise SCCDownloadError("The SCC HTTPS download failed. Check your connection and certificate configuration.") from None
+    except UnicodeError:
+        raise SCCAuthenticationError("The supplied credentials cannot be encoded for SCC HTTP Basic authentication.") from None
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
     return str(file_path)
 
-    
+
 def _get_scc_file(output_folder: str, scc_configuration_id: str,
                   csv_output_folder: Optional[str] = None) -> str:
+
+    scc_configuration_id = _normalise_configuration_id(scc_configuration_id)
 
     output_folder = (Path(csv_output_folder) if csv_output_folder is not None
                      else Path(output_folder) / "scc_hoi")
@@ -197,9 +340,13 @@ def _get_scc_file(output_folder: str, scc_configuration_id: str,
     
     filename = f"scc_config_{scc_configuration_id}_{timestamp}.csv"
     
-    url = f"https://scc.imaa.cnr.it/admin/database/hoisystems/export/{scc_configuration_id}"
+    url = f"{SCC_EXPORT_BASE_URL}/{scc_configuration_id}"
     
-    scc_file_path = download_with_auth(url = url, folder = output_folder, filename = filename, username = "scc_user", password = "sccforever!")
+    username, password = _prompt_scc_credentials()
+    scc_file_path = download_with_auth(
+        url=url, folder=output_folder, filename=filename,
+        username=username, password=password,
+    )
 
     return(scc_file_path)
 
@@ -1047,6 +1194,7 @@ def export_scc_config(scc_configuration_id: str,
                       csv_output_folder: Optional[str] = None) -> Dict[str, Dict[str, List[str]]]:
     
     if scc_configuration_id != None:
+        scc_configuration_id = _normalise_configuration_id(scc_configuration_id)
         validate_string(atlas_configuration_file, var_name = "atlas_configuration_file")
         validate_string(scc_configuration_id,     var_name = "scc_configuration_id")
         validate_string(output_folder,            var_name = "output_folder")

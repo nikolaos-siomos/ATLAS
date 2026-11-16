@@ -1,578 +1,178 @@
-# Exported Processing Stages
+# Exporting Processing Stages
 
-ATLAS can export intermediate processor stages to disk and import them again later. This is useful when you want to inspect, reuse, or pass processed data to another script without repeating the full processing chain.
+An exported stage is a saved checkpoint of ATLAS processing. You can open its
+results later in Python without processing the raw measurements again.
+For whole-stage and partial-import examples, see
+[Importing processing stages](importing_processing_stages.md).
 
-The export utilities are provided by:
+## Export during a normal ATLAS run
+
+Set the stage names in the init file, for example:
+
+```ini
+[general_options]
+export_stages = pol_cal_complete
+```
+
+You can list several stages separated by commas. A blank/omitted `export_stages`
+uses the current default, `pol_cal_complete`.
+
+- **GUI:** before clicking **Start**, choose **Export stages** under **After
+  processing** in the Run tab. **Default** does not export stages. Exports run
+  after successful processing/reporting and replace existing exports with the
+  same names. If cache cleanup is also selected, export completes first.
+- **Terminal:** `atlas -i ...` asks about deleting existing exports and then
+  exporting the configured stages at the end of the run. Answer **No** to
+  deleting stages you want to keep, then **Yes** to export. Export replaces
+  existing stages with matching names. Shell prompt-answer overrides still apply.
+
+Exports are stored at:
+
+```text
+<output_folder>/exported/<stage_name>/
+```
+
+Here `output_folder` is the actual ATLAS output directory, which may differ from
+both the raw-data folder and the folder containing the INIs. See the
+[GUI documentation](atlas_gui.md) for its export and cleanup controls.
+
+## Export from Python code
+
+These examples are for code that already has an active ATLAS `processor`.
+Most users can export through the GUI or terminal prompt instead.
 
 ```python
-from utils.export_processing_stage import (
-    export_processing_stage,
-    export_processor_stage,
-    ask_export_processor_stage,
-    import_processing_stage,
-    import_processing_entry,
-    list_exported_stages,
-    inspect_exported_stages,
-    list_exported_stage_contents,
-    delete_exported_stage,
-    delete_all_exported_stages,
-)
-```
+from atlas_actris.utils.export_processing_stage import export_processor_stage
 
-The exported files are written under:
+output_folder = processor.processing_info["caller_info"]["output_folder"]
 
-```text
-caller_info["output_folder"]/exported/<stage_name>/
-```
-
-Each exported stage keeps the same nested structure used internally by ATLAS:
-
-```text
-stage_data
-└── qa_test_key
-    └── parameter_key
-        └── value
-```
-
-For example:
-
-```text
-pol_cal_complete
-├── ray
-│   ├── profile
-│   ├── profile_error
-│   ├── profile_mean
-│   ├── range
-│   ├── channel_info
-│   └── system_info
-├── pcb_p45
-│   └── ...
-└── pcb_m45
-    └── ...
-```
-
-Large numerical `xarray.DataArray` and `xarray.Dataset` objects are saved as Zarr. Mixed/object metadata, such as `system_info`, `channel_info`, `time_info`, and `pol_cal_info`, are saved with pickle. Zarr-backed arrays are reopened lazily when imported.
-
-## Export a processor stage
-
-The most convenient way to export a stage is to use `export_processor_stage()`. It extracts the stage from the active `processor` and writes it to the `exported` folder inside `caller_info["output_folder"]`.
-
-```python
-export_processor_stage(
+saved_path = export_processor_stage(
     processor=processor,
+    output_folder=output_folder,
     stage_name="pol_cal_complete",
 )
 ```
 
-This is equivalent to:
+`output_folder` is required. By default, an existing export raises
+`FileExistsError`. Add `overwrite=True` to replace it, or `ask=True` to ask
+before exporting. The prompt defaults to **No**; `default_answer=True` changes
+that default. A declined export returns `None`.
+
+The exporter prints an approximate size without computing lazy arrays for that
+estimate. Use `print_estimated_size=False` to hide it. Exporting normally computes
+and writes entries one at a time; the estimate can differ from the final size
+because of compression and metadata.
+
+To export only Rayleigh profiles, add `qa_tests=["ray"]` and
+`parameters=["profile"]`. A partial export can later import only the entries
+that were saved.
+
+To export several stages with one combined prompt:
 
 ```python
-stage_data = processor.export_test_from_stage("pol_cal_complete")
-caller_info = processor.processing_info["caller_info"]
+from atlas_actris.utils.export_processing_stage import export_processor_stages
 
+saved_paths = export_processor_stages(
+    processor=processor,
+    output_folder=output_folder,
+    stage_names=["preprocessing_complete", "pol_cal_complete"],
+    ask=True,
+)
+```
+
+Stages must be available in that processor. The return value maps stage names
+to their saved paths, or is empty if export is declined.
+
+If you already have a nested stage dictionary, export it directly:
+
+```python
+from atlas_actris.utils.export_processing_stage import export_processing_stage
+
+stage_data = processor.export_test_from_stage("pol_cal_complete")
 export_processing_stage(
     stage_data=stage_data,
     stage_name="pol_cal_complete",
-    caller_info=caller_info,
+    output_folder=output_folder,
 )
 ```
 
-The function returns the path of the exported stage folder.
+## Delete saved stages
 
-## Export with a terminal prompt
-
-To ask interactively before saving a stage, use `ask=True`:
+To delete one exported stage with confirmation:
 
 ```python
-export_processor_stage(
-    processor=processor,
-    stage_name="pol_cal_complete",
+from atlas_actris.utils.export_processing_stage import (
+    delete_exported_stage,
+    delete_all_exported_stages,
+)
+
+delete_exported_stage(
+    output_folder=output_folder,
+    stage_name=stage_name,
     ask=True,
 )
 ```
 
-or use the convenience wrapper:
+To delete everything inside the output folder's `exported/` directory:
 
 ```python
-ask_export_processor_stage(
-    processor=processor,
-    stage_name="pol_cal_complete",
-)
+delete_all_exported_stages(output_folder=output_folder)
 ```
 
-The terminal will ask something like:
-
-```text
-Export processing stage 'pol_cal_complete' to '<output_folder>/exported/pol_cal_complete'? [y/N]
-```
-
-Pressing Enter defaults to **No**. To make Enter default to **Yes**, use:
-
-```python
-export_processor_stage(
-    processor=processor,
-    stage_name="pol_cal_complete",
-    ask=True,
-    default_answer=True,
-)
-```
-
-## Estimated exported size
-
-Before export, ATLAS prints an estimated size:
-
-```text
--- Estimated exported size for stage 'pol_cal_complete': 512.34 MB (zarr arrays: 511.90 MB, pickle metadata: 450.12 KB, entries: 123)
-```
-
-The estimate is based on `xarray.nbytes` and does not compute lazy Dask arrays.
-
-To disable the printout:
-
-```python
-export_processor_stage(
-    processor=processor,
-    stage_name="pol_cal_complete",
-    print_estimated_size=False,
-)
-```
-
-## Avoid overwriting existing exports
-
-By default, exporting a stage that already exists raises an error. This prevents accidental data loss.
-
-```python
-export_processor_stage(
-    processor=processor,
-    stage_name="preprocessing_complete",
-)
-```
-
-If the stage already exists, use `overwrite=True` to replace it:
-
-```python
-export_processor_stage(
-    processor=processor,
-    stage_name="preprocessing_complete",
-    overwrite=True,
-)
-```
-
-## Export several stages
-
-You can save multiple stages from the same processing run. Each stage is written to a separate subfolder.
-
-```python
-export_processor_stage(
-    processor=processor,
-    stage_name="screening_complete",
-)
-
-export_processor_stage(
-    processor=processor,
-    stage_name="preprocessing_complete",
-)
-
-export_processor_stage(
-    processor=processor,
-    stage_name="pol_cal_complete",
-)
-```
-
-The output folder will look like:
-
-```text
-<output_folder>/exported/
-├── screening_complete/
-├── preprocessing_complete/
-└── pol_cal_complete/
-```
-
-## List exported stages
-
-To see which stages are available:
-
-```python
-stages = list_exported_stages(caller_info)
-print(stages)
-```
-
-Example output:
-
-```python
-["pol_cal_complete", "preprocessing_complete", "screening_complete"]
-```
-
-## Inspect exported stage contents before import
-
-Before importing data, you can inspect what is stored inside the exported folder. This is useful when you do not remember the available stage names, QA-test keys, or parameter keys.
-
-Use `inspect_exported_stages()` to print a readable tree:
-
-```python
-inspect_exported_stages(caller_info)
-```
-
-Example output:
-
-```text
--- Exported processing stages:
-pol_cal_complete/  (6 qa keys, 120 parameters)
-  ray/  (18 parameters)
-    - profile  [zarr_dataarray]
-    - profile_mean  [zarr_dataarray]
-    - profile_error  [zarr_dataarray]
-    - range  [zarr_dataarray]
-    - channel_info  [pickle]
-    - system_info  [pickle]
-    - pol_cal_info  [pickle]
-  pcb_p45/  (15 parameters)
-    - profile  [zarr_dataarray]
-    - profile_mean  [zarr_dataarray]
-    - pol_cal_ratio_mean  [zarr_dataarray]
-    - pol_cal_info  [pickle]
-```
-
-The function reads only the small manifest files. It does not open the Zarr arrays and it does not load the pickle files, so it is fast even for large exported stages.
-
-To inspect only one stage:
-
-```python
-inspect_exported_stages(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-)
-```
-
-To hide the storage type labels:
-
-```python
-inspect_exported_stages(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-    include_kinds=False,
-)
-```
-
-To also show the stored relative paths:
-
-```python
-inspect_exported_stages(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-    include_paths=True,
-)
-```
-
-You can also return the full inspection summary as a dictionary without printing anything:
-
-```python
-summary = inspect_exported_stages(
-    caller_info=caller_info,
-    print_tree=False,
-)
-```
-
-The returned object has the structure:
-
-```python
-summary[stage_name][qa_test_key][parameter_key] = {
-    "kind": "zarr_dataarray",
-    "path": "ray/profile/data.zarr",
-}
-```
-
-For a simpler dictionary containing only the available keys, use `list_exported_stage_contents()`:
-
-```python
-contents = list_exported_stage_contents(caller_info)
-```
-
-Example result:
-
-```python
-{
-    "pol_cal_complete": {
-        "ray": [
-            "profile",
-            "profile_mean",
-            "profile_error",
-            "range",
-            "channel_info",
-            "system_info",
-        ],
-        "pcb_p45": [
-            "profile",
-            "profile_mean",
-            "pol_cal_ratio_mean",
-            "pol_cal_info",
-        ],
-    }
-}
-```
-
-To get the available keys only for one stage:
-
-```python
-contents = list_exported_stage_contents(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-)
-```
-
-The inspection functions are intended to be used before partial import. For example:
-
-```python
-inspect_exported_stages(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-)
-
-ray_profile = import_processing_entry(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-    qa_test="ray",
-    parameter="profile",
-)
-```
-
-## Import a full stage
-
-To import a previously exported stage:
-
-```python
-data_pack = import_processing_stage(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-)
-```
-
-The returned object has the same nested dictionary structure:
-
-```python
-profile = data_pack["ray"]["profile"]
-channel_info = data_pack["ray"]["channel_info"]
-```
-
-Zarr-backed xarray objects are opened lazily, so importing the stage does not automatically load all large arrays into memory.
-
-## Import selected QA-test keys
-
-To import only selected first-level QA-test keys:
-
-```python
-data_pack = import_processing_stage(
-    caller_info=caller_info,
-    stage_name="preprocessing_complete",
-    qa_tests=["ray", "tlc_north"],
-)
-```
-
-You can also use the single-key shortcut:
-
-```python
-data_pack = import_processing_stage(
-    caller_info=caller_info,
-    stage_name="preprocessing_complete",
-    qa_test="ray",
-)
-```
-
-## Import selected parameters
-
-To import only selected parameter keys from all QA-test keys:
-
-```python
-profiles = import_processing_stage(
-    caller_info=caller_info,
-    stage_name="preprocessing_complete",
-    parameters=["profile", "range"],
-)
-```
-
-The single-parameter shortcut is:
-
-```python
-profiles = import_processing_stage(
-    caller_info=caller_info,
-    stage_name="preprocessing_complete",
-    parameter="profile",
-)
-```
-
-## Import one specific entry
-
-For fastest access, use `import_processing_entry()` when you only need one value.
-
-```python
-profile = import_processing_entry(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-    qa_test="ray",
-    parameter="profile",
-)
-```
-
-This opens only:
-
-```text
-<output_folder>/exported/pol_cal_complete/ray/profile/
-```
-
-and does not import the rest of the stage.
-
-## Import all parameters for one QA-test key
-
-To import all parameters under one QA-test key:
-
-```python
-ray_pack = import_processing_entry(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-    qa_test="ray",
-)
-```
-
-Then access entries as usual:
-
-```python
-profile = ray_pack["profile"]
-profile_error = ray_pack["profile_error"]
-```
-
-## Import one parameter from all QA-test keys
-
-To import one parameter wherever it exists in the stage:
-
-```python
-profiles = import_processing_entry(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-    parameter="profile",
-)
-```
-
-The returned object is still nested by QA-test key:
-
-```python
-ray_profile = profiles["ray"]["profile"]
-pcb_p45_profile = profiles["pcb_p45"]["profile"]
-```
-
-## Delete one exported stage
-
-To delete a specific saved stage:
-
-```python
-delete_exported_stage(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-)
-```
-
-To ask before deleting:
-
-```python
-delete_exported_stage(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-    ask=True,
-)
-```
-
-If you do not want an error when the stage is missing:
-
-```python
-delete_exported_stage(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-    missing_ok=True,
-)
-```
-
-## Delete all exported stages
-
-To remove all exported stages from the current output folder:
-
-```python
-delete_all_exported_stages(
-    caller_info=caller_info,
-)
-```
-
-By default this asks for confirmation, because it deletes the complete folder:
-
-```text
-<output_folder>/exported/
-```
-
-To delete without asking:
-
-```python
-delete_all_exported_stages(
-    caller_info=caller_info,
-    ask=False,
-)
-```
-
-## Recommended integration in an ATLAS run
-
-A typical workflow is to export important checkpoints after recipe execution:
-
-```python
-run_linear_recipe(
-    processor,
-    recipe=preprocessing_recipe,
-    initial_input="screening_complete",
-    checkout_id="preprocessing_complete",
-)
-
-ask_export_processor_stage(
-    processor=processor,
-    stage_name="preprocessing_complete",
-)
-
-run_linear_recipe(
-    processor,
-    recipe=pol_cal_recipe,
-    initial_input="preprocessing_complete",
-    checkout_id="pol_cal_complete",
-)
-
-ask_export_processor_stage(
-    processor=processor,
-    stage_name="pol_cal_complete",
-)
-```
-
-Later, in another script or notebook:
-
-```python
-from utils.export_processing_stage import import_processing_stage
-
-pol_cal_pack = import_processing_stage(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-)
-```
-
-or only read the exact profile needed:
-
-```python
-ray_profile = import_processing_entry(
-    caller_info=caller_info,
-    stage_name="pol_cal_complete",
-    qa_test="ray",
-    parameter="profile",
-)
-```
-
-## Notes and limitations
-
-- Zarr-backed xarray objects are opened lazily with `xr.open_zarr()`.
-- Object/mixed metadata are preserved with pickle.
-- Pickle files should only be loaded from trusted ATLAS outputs.
-- Existing stages are not overwritten unless `overwrite=True` is used.
-- Partial import is faster than importing a full stage because only the requested manifest entries are opened or loaded.
-- Inspection functions read only the stage manifests, not the actual Zarr arrays or pickle payloads.
-- The size estimate is approximate and may differ from the final disk usage because of Zarr metadata, compression, and filesystem overhead.
+Deletion of all stages asks by default. `ask=False` disables confirmation;
+`delete_exported_stage()` defaults to `ask=False`, so supply `ask=True` when
+confirmation is desired. For one stage, `missing_ok=True` ignores a missing
+export; deleting all already defaults to `missing_ok=True`. These operations
+delete stage exports, not the original measurement files or raw caches.
+
+## Storage and path checks
+
+Numerical xarray entries use Zarr; mixed/object metadata use typed JSON, with
+Zarr sidecars for nested numerical arrays. Imports reconstruct supported data
+types, rather than arbitrary Python classes. Unknown metadata tags and unsafe
+Zarr codecs are rejected. Consolidated Zarr metadata is ignored when opening
+arrays so it cannot bypass codec validation.
+
+Stage names and QA-test/entry keys must be nonempty single path components.
+Empty names, `.`/`..`, separators and drive prefixes are rejected. Manifest paths
+must be relative and remain inside their stage. The `exported` root and stage
+folders must be real directories, not symbolic links or junctions. Links inside
+a stage that escape it are rejected before reads, overwrites or deletion. The
+configured output folder itself may be a symbolic link. Batch export checks all
+selected targets before overwriting the first stage. These checks cover paths
+present when validated; avoid modifying a stage from another process during an
+operation.
+
+## File format and existing caches/exports
+
+New stage exports use `manifest.json` with format `atlas_processing_stage_export_v2`.
+Numeric xarray entries remain `data.zarr`. Other entries use `data.json`; a
+`data.json.arrays/` directory holds any referenced numeric arrays. Manifests
+and metadata are committed as JSON only after their referenced arrays are written.
+Numeric DataArray names are saved separately as `name.json` and restored on import.
+
+Raw cache paths remain under `<output_folder>/cache/<measurement>/`:
+signals/shots remain in `data.zarr`, metadata now use `metadata.json`, and the
+cache-wide source manifest is `source_manifest.json` (`atlas_raw_cache_v2`).
+The `cache` root must be a real directory; an explicitly configured output
+directory may still be a symbolic link.
+
+The first run encountering an old pickle cache reads the original measurements
+and writes a fresh cache, without opening old pickle files. This run can take
+longer; subsequent runs reuse the JSON cache if the measurements are unchanged.
+If an original measurement path is missing, ATLAS reports that it cannot rebuild
+and leaves the old cache untouched. Original measurement files are not modified.
+The source-manifest comparison still detects additions, removals, size changes,
+and modification times.
+
+Old exported stages are listed and can be deleted normally, but importing or
+inspecting their `manifest.pkl` raises an explicit legacy-format error. Regenerate
+those exports from the original data with the updated ATLAS. There is no automatic
+pickle loader or converter. Existing exported stages are not automatically deleted
+or rewritten by this migration.
+
+No new dependencies or configuration options are needed. These formats are
+cross-platform, but the format change means old ATLAS releases cannot read the
+new cache/export files. Numerical array and Zarr codec dependencies should still
+be kept updated; data-only serialization does not guarantee arbitrary inputs
+have reasonable sizes or are safe for every native decoder.

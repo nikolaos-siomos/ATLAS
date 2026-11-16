@@ -6,9 +6,9 @@ Utilities to export and import ATLAS processor stages.
 The exported layout is:
 
     output_folder/exported/<stage_name>/
-        manifest.pkl
+        manifest.json
         <qa_test>/<parameter>/data.zarr      # numeric xarray objects
-        <qa_test>/<parameter>/data.pkl       # object/mixed metadata or non-xarray objects
+        <qa_test>/<parameter>/data.json      # typed metadata; numeric array sidecars use Zarr
 
 The design intentionally writes each qa_test/parameter entry separately instead
 of merging all entries into one xarray.Dataset. This avoids conflicts when two
@@ -19,8 +19,9 @@ entries reuse the same dimension name with different sizes, for example
 from __future__ import annotations
 
 import os
+import ntpath
+from pathlib import Path
 import re
-import pickle
 import shutil
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Optional, Union
@@ -28,32 +29,92 @@ from typing import Any, Dict, Iterable, Optional, Union
 import numpy as np
 import xarray as xr
 
+from .safe_serialization import (read_json, write_json, read_metadata, write_metadata,
+                                 validate_metadata, validate_zarr_store, SerializationError)
+
 _DATAARRAY_VAR = "__dataarray__"
-_MANIFEST_NAME = "manifest.pkl"
+_MANIFEST_NAME = "manifest.json"
 
 
 def _safe_name(name: Any) -> str:
     """Return a filesystem-safe representation of a dictionary key."""
 
-    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name)).strip("_")
+    text = str(name)
+    if (not text.strip() or text.strip() in (".", "..")
+            or "/" in text or "\\" in text or ntpath.splitdrive(text)[0]
+            or any(ord(char) < 32 for char in text)):
+        raise ValueError(f"Unsafe exported-stage name or key: {text!r}")
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", text).strip("_")
+    if safe in (".", ".."):
+        raise ValueError(f"Unsafe exported-stage name or key: {text!r}")
     return safe or "unnamed"
 
 
+def _checked_child(root: str, path: str) -> str:
+    """Check a strict descendant, including existing symlink ancestors."""
+
+    try:
+        parent = Path(root).resolve()
+        child = Path(path).resolve()
+        child.relative_to(parent)
+        if child == parent:
+            raise ValueError("path addresses the containing directory")
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise ValueError(f"Unsafe exported-stage path {path!r}: must stay inside {root!r}") from exc
+    return path
+
+
+def _validate_tree_paths(path: str, root: Optional[str] = None) -> None:
+    """Reject escaping symlinks before reading a store or deleting a tree.
+
+    Do not follow directory links during the walk. Checks protect against
+    pre-existing unsafe paths, not concurrent replacement by another process.
+    """
+
+    boundary = path if root is None else root
+    def unreadable(error):
+        raise ValueError(f"Cannot validate exported-stage directory: {path!r}") from error
+
+    for directory, dirs, files in os.walk(path, followlinks=False, onerror=unreadable):
+        for name in dirs + files:
+            _checked_child(boundary, os.path.join(directory, name))
+
+
+def _entry_path(stage_dir: str, relative_path: str) -> str:
+    """Resolve a portable relative manifest path without leaving its stage."""
+
+    if not isinstance(relative_path, str) or not relative_path.strip():
+        raise ValueError("Exported-stage entry paths must be nonempty relative strings")
+    if (ntpath.isabs(relative_path) or ntpath.splitdrive(relative_path)[0] or ":" in relative_path
+            or ".." in relative_path.replace("\\", "/").split("/")
+            or any(ord(char) < 32 for char in relative_path)):
+        raise ValueError(f"Unsafe exported-stage entry path: {relative_path!r}")
+    path = os.path.join(stage_dir, relative_path.replace("\\", os.sep))
+    return _checked_child(stage_dir, path)
+
+
 def _export_root(output_folder: str) -> str:
-    """Return output_folder/exported, creating it if needed."""
+    """Validate output_folder/exported without creating directories."""
 
     if output_folder is None:
         raise ValueError("output_folder is required for stage export/import")
 
     root = os.path.join(output_folder, "exported")
-    os.makedirs(root, exist_ok=True)
+    if os.path.islink(root) or Path(root).resolve() != Path(output_folder).resolve() / "exported":
+        raise ValueError(f"The exported-stage root must not be a symbolic link: {root!r}")
+    _checked_child(output_folder, root)
     return root
 
 
 def _stage_dir(output_folder: str, stage_name: str) -> str:
     """Return the export folder of a specific stage."""
 
-    return os.path.join(_export_root(output_folder), _safe_name(stage_name))
+    name = _safe_name(stage_name)
+    root = _export_root(output_folder)
+    path = _checked_child(root, os.path.join(root, name))
+    if os.path.islink(path) or Path(path).resolve() != Path(root).resolve() / name:
+        raise ValueError(f"An exported-stage directory must not be a symbolic link: {path!r}")
+    return path
 
 
 def _ask_yes_no(question: str, default: bool = False) -> bool:
@@ -408,18 +469,6 @@ def _select_stage_data(
     return selected
 
 
-def _write_pickle(obj: Any, path: str) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-
-    with open(path, "wb") as f:
-        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-def _read_pickle(path: str) -> Any:
-    with open(path, "rb") as f:
-        return pickle.load(f)
-
-
 def _human_readable_size(nbytes: Union[int, float]) -> str:
     """Return a compact human-readable byte size."""
 
@@ -465,17 +514,11 @@ def _xarray_nbytes(obj: Union[xr.DataArray, xr.Dataset]) -> int:
     return total
 
 
-def _pickle_nbytes(obj: Any) -> int:
-    """Estimate pickle size by serializing to bytes.
-
-    This is intended mainly for small metadata objects. If serialization fails,
-    return zero rather than blocking the export.
-    """
-
-    try:
-        return len(pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL))
-    except Exception:
-        return 0
+def _metadata_nbytes(obj: Any) -> int:
+    """Cheap metadata estimate without computing lazy arrays."""
+    if isinstance(obj, (xr.DataArray, xr.Dataset)):
+        return _xarray_nbytes(obj)
+    return int(getattr(obj, "nbytes", 0)) or len(str(type(obj)))
 
 
 def estimate_processing_stage_size(
@@ -494,10 +537,10 @@ def estimate_processing_stage_size(
         raise TypeError("stage_data must be a dictionary")
 
     zarr_bytes = 0
-    pickle_bytes = 0
+    metadata_bytes = 0
     entries = 0
     xarray_entries = 0
-    pickle_entries = 0
+    metadata_entries = 0
 
     for qa_test, qa_dict in stage_data.items():
         if not isinstance(qa_dict, dict):
@@ -510,27 +553,27 @@ def estimate_processing_stage_size(
                 zarr_bytes += _xarray_nbytes(value)
                 xarray_entries += 1
             elif isinstance(value, (xr.DataArray, xr.Dataset)):
-                # Object/mixed xarray metadata are written with pickle. Use the
+                # Object/mixed xarray metadata are written as typed JSON and array sidecars. Use the
                 # xarray payload as a cheap lower-bound estimate and avoid any
                 # accidental expensive computation.
-                pickle_bytes += _xarray_nbytes(value)
-                pickle_entries += 1
+                metadata_bytes += _xarray_nbytes(value)
+                metadata_entries += 1
             else:
-                pickle_bytes += _pickle_nbytes(value)
-                pickle_entries += 1
+                metadata_bytes += _metadata_nbytes(value)
+                metadata_entries += 1
 
-    total_bytes = zarr_bytes + pickle_bytes
+    total_bytes = zarr_bytes + metadata_bytes
 
     return {
         "total_bytes": int(total_bytes),
         "zarr_bytes": int(zarr_bytes),
-        "pickle_bytes": int(pickle_bytes),
+        "metadata_bytes": int(metadata_bytes),
         "entries": int(entries),
         "xarray_entries": int(xarray_entries),
-        "pickle_entries": int(pickle_entries),
+        "metadata_entries": int(metadata_entries),
         "total_human": _human_readable_size(total_bytes),
         "zarr_human": _human_readable_size(zarr_bytes),
-        "pickle_human": _human_readable_size(pickle_bytes),
+        "metadata_human": _human_readable_size(metadata_bytes),
     }
 
 
@@ -541,7 +584,7 @@ def _print_stage_size_estimate(stage_name: str, estimate: Dict[str, Any]) -> Non
         f"-- Estimated exported size for stage '{stage_name}': "
         f"{estimate['total_human']} "
         f"(zarr arrays: {estimate['zarr_human']}, "
-        f"pickle metadata: {estimate['pickle_human']}, "
+        f"JSON metadata: {estimate['metadata_human']}, "
         f"entries: {estimate['entries']})"
     )
     print()
@@ -637,7 +680,8 @@ def _write_xarray_to_zarr(obj: Union[xr.DataArray, xr.Dataset], path: str) -> st
 def _read_xarray_from_zarr(path: str, kind: str) -> Union[xr.DataArray, xr.Dataset]:
     """Open one zarr entry lazily."""
 
-    ds = xr.open_zarr(path)
+    validate_zarr_store(path)
+    ds = xr.open_zarr(path, consolidated=False)
 
     if kind == "zarr_dataarray":
         return ds[_DATAARRAY_VAR]
@@ -652,27 +696,47 @@ def _read_export_manifest(output_folder: str, stage_name: str) -> tuple[str, Dic
     """Return exported stage directory and manifest."""
 
     in_dir = _stage_dir(output_folder, stage_name)
-    manifest_path = os.path.join(in_dir, _MANIFEST_NAME)
+    manifest_path = _entry_path(in_dir, _MANIFEST_NAME)
 
     if not os.path.isfile(manifest_path):
+        if os.path.isfile(os.path.join(in_dir, "manifest.pkl")):
+            raise SerializationError("Legacy pickle stage rejected without opening it. Regenerate this export from the original data.")
         raise FileNotFoundError(
             f"Could not find exported stage manifest: {manifest_path}"
         )
 
-    return in_dir, _read_pickle(manifest_path)
+    manifest = read_json(manifest_path)
+    if not isinstance(manifest, dict) or manifest.get("format") != "atlas_processing_stage_export_v2":
+        raise SerializationError("Unsupported stage format. Regenerate this export with the current ATLAS.")
+    if not isinstance(manifest.get("entries"), dict):
+        raise SerializationError("Stage manifest entries must be a dictionary")
+    for param_entries in manifest["entries"].values():
+        if not isinstance(param_entries, dict):
+            raise SerializationError("Stage manifest parameters must be a dictionary")
+        for entry in param_entries.values():
+            if not isinstance(entry, dict) or entry.get("kind") not in {"zarr_dataarray", "zarr_dataset", "json"}:
+                raise SerializationError("Unsupported stage entry kind; legacy pickle entries are not loaded")
+            _entry_path(in_dir, entry.get("path"))
+            if entry["kind"] == "zarr_dataarray":
+                _entry_path(in_dir, entry.get("name_path"))
+    return in_dir, manifest
 
 
 def _read_export_entry(in_dir: str, entry: Dict[str, Any]) -> Any:
     """Read one manifest entry only."""
 
     kind = entry["kind"]
-    path = os.path.join(in_dir, entry["path"])
+    path = _entry_path(in_dir, entry["path"])
 
     if kind in ["zarr_dataarray", "zarr_dataset"]:
-        return _read_xarray_from_zarr(path, kind)
+        _validate_tree_paths(path, root=in_dir)
+        result = _read_xarray_from_zarr(path, kind)
+        if kind == "zarr_dataarray":
+            result.name = read_metadata(_entry_path(in_dir, entry["name_path"]))
+        return result
 
-    if kind == "pickle":
-        return _read_pickle(path)
+    if kind == "json":
+        return read_metadata(path)
 
     raise ValueError(
         f"Unsupported export entry kind {kind!r} for "
@@ -681,7 +745,31 @@ def _read_export_entry(in_dir: str, entry: Dict[str, Any]) -> Any:
 
 
 def _entry_subdir(stage_dir: str, qa_test: str, parameter: str) -> str:
-    return os.path.join(stage_dir, _safe_name(qa_test), _safe_name(parameter))
+    return _checked_child(
+        stage_dir, os.path.join(stage_dir, _safe_name(qa_test), _safe_name(parameter))
+    )
+
+
+def _validate_export_data_paths(stage_dir: str, stage_data: Dict[str, Any]) -> None:
+    """Preflight every selected key before a stage is created or overwritten."""
+
+    if os.path.isdir(stage_dir):
+        _validate_tree_paths(stage_dir)
+    targets = set()
+    for qa_test, qa_dict in stage_data.items():
+        if not isinstance(qa_dict, dict):
+            raise TypeError(f"stage_data[{qa_test!r}] must be a dictionary of parameters")
+        _safe_name(qa_test)
+        for parameter in qa_dict:
+            target = os.path.normcase(_entry_subdir(stage_dir, qa_test, parameter))
+            if target in targets:
+                raise ValueError(f"Exported-stage keys resolve to the same directory: {target!r}")
+            targets.add(target)
+            value = qa_dict[parameter]
+            if isinstance(value, xr.DataArray):
+                validate_metadata(value.name)
+            if not isinstance(value, (xr.DataArray, xr.Dataset)) or _has_object_dtype_xarray(value):
+                validate_metadata(value)
 
 
 def export_processing_stage(
@@ -724,7 +812,7 @@ def export_processing_stage(
         If True, compute each xarray entry immediately before exporting it.
         Entries are computed one at a time to limit peak memory use. Numeric
         entries retain Zarr-safe chunking; object/mixed entries are fully
-        materialized before being pickled.
+        materialized before JSON metadata export.
     qa_tests
         Optional QA-test key or keys to export, for example ``"ray"`` or
         ``["ray", "pcb"]``. If omitted, all QA tests are exported.
@@ -763,6 +851,7 @@ def export_processing_stage(
         stage_name = str(stage_name)
 
     out_dir = _stage_dir(output_folder, stage_name)
+    _validate_export_data_paths(out_dir, stage_data)
 
     size_estimate = None
     if print_estimated_size or ask:
@@ -795,7 +884,7 @@ def export_processing_stage(
     manifest = {
         "stage_name": str(stage_name),
         "created_utc": datetime.now(timezone.utc).isoformat(),
-        "format": "atlas_processing_stage_export_v1",
+        "format": "atlas_processing_stage_export_v2",
         "entries": {},
     }
 
@@ -823,14 +912,14 @@ def export_processing_stage(
 
             # Numeric/lazy xarray objects are stored as zarr. Mixed object
             # arrays, such as system_info/channel_info/pol_cal_info, are stored
-            # with pickle to preserve their dtype and coordinates safely.
+            # with data-only JSON tags to preserve types and coordinates.
             if is_xarray and not has_object_dtype:
                 rel_path = os.path.relpath(os.path.join(entry_dir, "data.zarr"), out_dir)
                 kind = _write_xarray_to_zarr(value, os.path.join(out_dir, rel_path))
             else:
-                rel_path = os.path.relpath(os.path.join(entry_dir, "data.pkl"), out_dir)
-                _write_pickle(value, os.path.join(out_dir, rel_path))
-                kind = "pickle"
+                rel_path = os.path.relpath(os.path.join(entry_dir, "data.json"), out_dir)
+                write_metadata(value, os.path.join(out_dir, rel_path))
+                kind = "json"
 
             manifest["entries"][qa_key][param_key] = {
                 "kind": kind,
@@ -838,8 +927,12 @@ def export_processing_stage(
                 "qa_test": qa_key,
                 "parameter": param_key,
             }
+            if kind == "zarr_dataarray":
+                name_path = os.path.join(entry_dir, "name.json")
+                write_metadata(value.name, name_path)
+                manifest["entries"][qa_key][param_key]["name_path"] = os.path.relpath(name_path, out_dir)
 
-    _write_pickle(manifest, os.path.join(out_dir, _MANIFEST_NAME))
+    write_json(manifest, os.path.join(out_dir, _MANIFEST_NAME))
 
     return out_dir
 
@@ -856,7 +949,7 @@ def import_processing_stage(
     Import one exported processing stage.
 
     Xarray entries stored as Zarr are reopened lazily with ``xr.open_zarr``.
-    Pickled entries are loaded normally.
+    Metadata entries are read from typed JSON; legacy pickle exports are rejected.
 
     Parameters
     ----------
@@ -1045,6 +1138,7 @@ def delete_exported_stage(
             print(f"-- Skipping deletion of exported stage: {stage_name}")
             return None
 
+    _validate_tree_paths(stage_path)
     shutil.rmtree(stage_path)
     print(f"-- Deleted exported processing stage: {stage_path}")
     print()
@@ -1088,6 +1182,7 @@ def delete_all_exported_stages(
             print("-- Skipping deletion of all exported processing stages")
             return None
 
+    _validate_tree_paths(root)
     shutil.rmtree(root)
     print(f"-- Deleted all exported processing stages: {root}")
     print()
@@ -1118,10 +1213,10 @@ def estimate_processing_stages_size(
     per_stage: Dict[str, Dict[str, Any]] = {}
     total_bytes = 0
     zarr_bytes = 0
-    pickle_bytes = 0
+    metadata_bytes = 0
     entries = 0
     xarray_entries = 0
-    pickle_entries = 0
+    metadata_entries = 0
 
     for stage_name, stage_data in stages_data.items():
         estimate = estimate_processing_stage_size(stage_data)
@@ -1129,21 +1224,21 @@ def estimate_processing_stages_size(
 
         total_bytes += estimate["total_bytes"]
         zarr_bytes += estimate["zarr_bytes"]
-        pickle_bytes += estimate["pickle_bytes"]
+        metadata_bytes += estimate["metadata_bytes"]
         entries += estimate["entries"]
         xarray_entries += estimate["xarray_entries"]
-        pickle_entries += estimate["pickle_entries"]
+        metadata_entries += estimate["metadata_entries"]
 
     return {
         "total_bytes": int(total_bytes),
         "zarr_bytes": int(zarr_bytes),
-        "pickle_bytes": int(pickle_bytes),
+        "metadata_bytes": int(metadata_bytes),
         "entries": int(entries),
         "xarray_entries": int(xarray_entries),
-        "pickle_entries": int(pickle_entries),
+        "metadata_entries": int(metadata_entries),
         "total_human": _human_readable_size(total_bytes),
         "zarr_human": _human_readable_size(zarr_bytes),
-        "pickle_human": _human_readable_size(pickle_bytes),
+        "metadata_human": _human_readable_size(metadata_bytes),
         "per_stage": per_stage,
     }
 
@@ -1156,7 +1251,7 @@ def _print_stages_size_estimate(estimate: Dict[str, Any]) -> None:
         f"-- Estimated exported size for {len(per_stage)} stage(s): "
         f"{estimate['total_human']} "
         f"(zarr arrays: {estimate['zarr_human']}, "
-        f"pickle metadata: {estimate['pickle_human']}, "
+        f"JSON metadata: {estimate['metadata_human']}, "
         f"entries: {estimate['entries']})"
     )
 
@@ -1284,6 +1379,9 @@ def export_processing_stages(
         )
         for stage_name in stage_names
     }
+
+    for stage_name, stage_data in selected_stages_data.items():
+        _validate_export_data_paths(_stage_dir(output_folder, stage_name), stage_data)
 
     size_estimate = None
     if print_estimated_size or ask:
@@ -1422,11 +1520,15 @@ def list_exported_stages(output_folder: str) -> list[str]:
 
     root = _export_root(output_folder)
 
+    if not os.path.isdir(root):
+        return []
+
     return sorted(
         name
         for name in os.listdir(root)
-        if os.path.isdir(os.path.join(root, name))
-        and os.path.isfile(os.path.join(root, name, _MANIFEST_NAME))
+        if os.path.isdir(_stage_dir(output_folder, name))
+        and (os.path.isfile(_entry_path(_stage_dir(output_folder, name), _MANIFEST_NAME))
+             or os.path.isfile(_entry_path(_stage_dir(output_folder, name), "manifest.pkl")))
     )
 
 
@@ -1440,7 +1542,7 @@ def inspect_exported_stages(
     """Inspect saved processing stages without loading the exported data.
 
     The function reads only the small stage manifest files. It does not open
-    Zarr arrays and it does not unpickle the stored data entries, so it is fast
+    Zarr arrays and it does not load stored data entries, so it is fast
     even when the exported stages contain large lazy arrays.
 
     Parameters
@@ -1455,7 +1557,7 @@ def inspect_exported_stages(
         keys to the terminal.
     include_kinds
         If True, include the storage kind next to each parameter in the printed
-        tree, for example ``zarr_dataarray`` or ``pickle``.
+        tree, for example ``zarr_dataarray`` or ``json``.
     include_paths
         If True, include the relative stored path next to each parameter in the
         printed tree.
@@ -1466,7 +1568,7 @@ def inspect_exported_stages(
         Nested summary dictionary with this layout::
 
             summary[stage_name][qa_test][parameter] = {
-                "kind": "zarr_dataarray" | "zarr_dataset" | "pickle",
+                "kind": "zarr_dataarray" | "zarr_dataset" | "json",
                 "path": "relative/path/to/data",
             }
     """

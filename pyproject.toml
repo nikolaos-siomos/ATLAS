@@ -1,6 +1,6 @@
 [project]
 name = "atlas_actris"
-version = "1.3.0"
+version = "1.4.0"
 
 authors = [
     { name = "Nikolaos Siomos", email = "nikolaos.siomos@lmu.de" },
@@ -45,7 +45,11 @@ dependencies = [
 
     # Plotting
     "matplotlib>=3.8.0,<4",
-    "Pillow>=10.0.0,<12",
+    # Keep legacy Python support, but do not block newer Pillow security fixes.
+    # ATLAS explicitly restricts plot readers to PNG on every Python version.
+    "Pillow>=11.3.0,<12; python_version < '3.10'",
+    "Pillow>=12.2.0,<13; python_version >= '3.10' and python_version < '3.11'",
+    "Pillow>=13.0.0,<14; python_version >= '3.11'",
     
     # Layering
     "ltool>=2.0.6",
@@ -99,6 +103,7 @@ atlas-prepare-intercomparison = "atlas_actris.cli:prepare_intercomparison"
 atlas-signal-viewer = "atlas_actris.cli_viewer:main"
 atlas-smoke-test = "atlas_actris.testing.smoke_test:main"
 atlas-test = "atlas_actris.testing.test_runner:main"
+atlas-gui = "atlas_actris.cli_gui:main"
 atlas-signal-viewer-smoke-test = "atlas_actris.testing.signal_viewer_smoke_test:main"
 atlas-generate-templates = "atlas_actris.templates.generator:main"
 atlas-intercomparison = "atlas_actris.cli_intercomparison:main"
@@ -114,7 +119,7 @@ namespaces = false
 # Runtime-owned intercomparison defaults remain package data. Generated user
 # templates are written to the repository-root templates directory instead.
 [tool.setuptools.package-data]
-atlas_actris = ["intercomparison/*.ini", "molecular/meteorological_database.csv"]
+atlas_actris = ["intercomparison/*.ini", "molecular/meteorological_database.csv", "GUI/*.pdf", "GUI/*.txt", "GUI/examples/*.ini"]
 
 [build-system]
 requires = ["setuptools>=64", "wheel"]

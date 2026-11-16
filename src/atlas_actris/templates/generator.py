@@ -634,8 +634,9 @@ def _section_intro(section: str) -> str:
 
     intros = {
         "configuration": (
-            "Controls how ATLAS obtains or uses the system configuration, "
-            "including optional SCC HOI export behaviour."
+            "Configuration metadata and SCC-format options. ATLAS reads a local "
+            "configuration file; internal SCC HOI export is disabled. "
+            "Use get_scc_config separately to prepare a configuration."
         ),
         "explicit_paths": (
             "Defines the main input, configuration, settings, radiosonde, and "

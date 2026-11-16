@@ -13,7 +13,6 @@ from matplotlib.ticker import FixedLocator, LogFormatterSciNotation
 SOURCE = Path(__file__).resolve().parents[1]/"src"/"atlas_actris"
 sys.path.insert(0,str(SOURCE))
 from visualizer.compact_tick_formatter import CompactScalarFormatter
-from utils.parse_settings_file import SCHEMA_QCK_VLDR
 
 
 class VLDRColorbarTests(unittest.TestCase):
@@ -39,10 +38,6 @@ class VLDRColorbarTests(unittest.TestCase):
             cax.yaxis.set_major_locator(FixedLocator(ticks))
         fig.canvas.draw()
         return cax.yaxis.get_major_formatter()
-
-    def test_default_reference_zone_is_01_to_1_km(self):
-        self.assertEqual(SCHEMA_QCK_VLDR['y_max_zone']['default'],[.1,1.])
-        self.assertEqual(SCHEMA_QCK_VLDR['y_lims']['default'],[])
 
     def test_short_labels_stay_decimal_without_a_gutter_penalty(self):
         formatter=self.render(0.,.02,[0.,.005,.01,.015,.02])

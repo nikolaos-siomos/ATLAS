@@ -1,6 +1,10 @@
 # `atlas-smoke-test`
 
-Runs the packaged ATLAS smoke-test dataset through the main `atlas` CLI and validates that the expected plots, reports, and ASCII products are created.
+Runs the repository's ATLAS smoke-test dataset through the main `atlas` CLI and validates that the expected plots, reports, and ASCII products are created.
+
+The `testing_pack/` dataset is distributed with the source checkout, not inside
+the installed PyPI wheel. A PyPI-only installation needs a checkout or a separately
+available testing pack.
 
 ## Usage
 
@@ -18,16 +22,26 @@ An explicit testing-pack path can also be supplied:
 atlas-smoke-test /path/to/testing_pack
 ```
 
-Useful options include:
+| Option | Purpose / default |
+| --- | --- |
+| `--ini FILE` | Init filename within the testing pack. |
+| `--case-name NAME` | A single case directory name under `analysis/`; paths are rejected. |
+| `--timeout SECONDS` | Run timeout; default `1800`. |
+| `--keep-output` | Skip the runner's pre/post-run removal of the selected case's analysis output. |
+| `--yes-clean-cache y/n` | Answer ATLAS's cache-cleanup prompt; default `y`. |
+| `--yes-export-stage y/n` | Answer its stage-export prompt; default `N`. |
 
-```text
---ini FILE
---case-name NAME
---timeout SECONDS
---keep-output
-```
+The runner always answers **No** to deletion of existing stage exports during the
+ATLAS run. The smoke runner's own default cleanup still removes the selected
+`analysis/NAME` case folder afterwards.
 
-By default, the smoke test removes generated analysis files when it finishes. This keeps repeated local and CI test runs from accumulating large output folders. Cleanup also occurs after a failed run where possible.
+By default, the smoke test removes the selected case's old output before running
+and its generated output after validation, including after a failed run where
+possible. Other cases under `analysis/` and caches in raw measurement folders
+are preserved. The `analysis/` parent is removed only if it is empty.
+
+Cleanup rejects traversal paths, symbolic links and directory junctions beneath
+the chosen testing pack, rather than following them into other directories.
 
 ## Keeping generated outputs
 
@@ -37,7 +51,15 @@ Use `--keep-output` when debugging or manually inspecting the generated files:
 atlas-smoke-test --keep-output
 ```
 
-With this option, existing outputs are not removed before the test and newly generated outputs are retained afterwards. This is useful when checking plots, reports, cache contents, or a failing intermediate result. Because these files can be large, omit `--keep-output` during routine testing and continuous integration.
+With this option, the smoke runner does not remove the selected case folder before
+or after the test. ATLAS still receives `--yes-clean-cache y` by default, so its
+cache can be deleted during processing. To retain that cache too:
+
+```bash
+atlas-smoke-test --keep-output --yes-clean-cache n
+```
+
+Plots, reports and ASCII outputs are retained when the run succeeds. This is useful when checking plots, reports, cache contents, or a failing intermediate result. Because these files can be large, omit `--keep-output` during routine testing and continuous integration.
 
 ## Longer runs
 

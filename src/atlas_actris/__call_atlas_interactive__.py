@@ -9,10 +9,10 @@ Created on Tue Sep 19 17:43:26 2023
 # from __master__ import main as atlas_master
 import os
 from utils.cleaners import ask_clean_cache
+from utils.gui_post_run import validate_gui_post_run, run_gui_post_run
 from utils.filtering import filter_channels
 from utils.caller_utils import export_report
 from utils.find_radiosonde import find_radiosonde
-from utils.get_scc_config import export_scc_config
 from utils.parse_init_file import parse_call_atlas_ini
 from utils.parse_config_file import parse_atlas_config_file
 from utils.parse_init_file import fill_meteorological_defaults
@@ -61,15 +61,21 @@ cmd_args = call_parser()
 
 # Parse the initialization file
 caller_info = parse_call_atlas_ini(cmd_args)
+validate_gui_post_run(caller_info)
 
-# Export the config file from SCC HOI
-scc_info = export_scc_config(
-    scc_configuration_id = caller_info['scc_configuration_id'], 
-    atlas_configuration_file = caller_info['atlas_configuration_file'], 
-    export_hoi_cfg = caller_info['export_hoi_cfg'],
-    output_folder = caller_info['output_folder'],
-    scc_compatible_format = caller_info['scc_compatible_format']
-    )
+# Temporarily disabled by the init parser's internal export_hoi_cfg = "0".
+# Keep this branch for a deliberate future re-enable, but do not even import
+# the SCC downloader during normal processing while the mode is disabled.
+if caller_info['export_hoi_cfg'] in ('1', '2'):
+    from utils.get_scc_config import export_scc_config
+
+    scc_info = export_scc_config(
+        scc_configuration_id = caller_info['scc_configuration_id'],
+        atlas_configuration_file = caller_info['atlas_configuration_file'],
+        export_hoi_cfg = caller_info['export_hoi_cfg'],
+        output_folder = caller_info['output_folder'],
+        scc_compatible_format = caller_info['scc_compatible_format']
+        )
 
 # Parse the configuration file
 config_info = parse_atlas_config_file(caller_info['atlas_configuration_file'])
@@ -206,46 +212,51 @@ generate_background(
 # Create report
 export_report(caller_info)
 
-# Commandline promt to clean cache or not
-ask_clean_cache(caller_info)
-
-# Delete all exported stages
-delete_exported_answer = os.environ.get("ATLAS_DELETE_EXPORTED_ANSWER")
-
-if delete_exported_answer is None:
-    delete_all_exported_stages(
-        output_folder=caller_info['output_folder'],
-    )
-elif delete_exported_answer.strip().lower() in ["y", "yes"]:
-    delete_all_exported_stages(
-        output_folder=caller_info['output_folder'],
-        ask=False,
-    )
+# GUI choices run only after processing and reporting have succeeded.
+if os.environ.get("ATLAS_GUI_POST_RUN") == "1":
+    run_gui_post_run(processor, caller_info, export_processor_stages,
+                     delete_all_exported_stages, ask_clean_cache)
 else:
-    print("-- Skipping deletion of all exported processing stages")
+    # Commandline promt to clean cache or not
+    ask_clean_cache(caller_info)
 
-# Export latest stage
-export_stage_answer = os.environ.get("ATLAS_EXPORT_STAGE_ANSWER")
+    # Delete all exported stages
+    delete_exported_answer = os.environ.get("ATLAS_DELETE_EXPORTED_ANSWER")
 
-if export_stage_answer is None:
-    export_processor_stages(
-        processor=processor,
-        stage_names = caller_info['export_stages'],
-        output_folder = caller_info['output_folder'],
-        overwrite=True,
-        ask=True,
-        default_answer=False,
-        print_estimated_size=True,
-    )
-elif export_stage_answer.strip().lower() in ["y", "yes"]:
-    export_processor_stages(
-        processor=processor,
-        stage_names = caller_info['export_stages'],
-        output_folder = caller_info['output_folder'],
-        overwrite=True,
-        ask=False,
-        default_answer=False,
-        print_estimated_size=True,
-    )
-else:
-    print("-- Skipping export of processing stages")
+    if delete_exported_answer is None:
+        delete_all_exported_stages(
+            output_folder=caller_info['output_folder'],
+        )
+    elif delete_exported_answer.strip().lower() in ["y", "yes"]:
+        delete_all_exported_stages(
+            output_folder=caller_info['output_folder'],
+            ask=False,
+        )
+    else:
+        print("-- Skipping deletion of all exported processing stages")
+
+    # Export latest stage
+    export_stage_answer = os.environ.get("ATLAS_EXPORT_STAGE_ANSWER")
+
+    if export_stage_answer is None:
+        export_processor_stages(
+            processor=processor,
+            stage_names = caller_info['export_stages'],
+            output_folder = caller_info['output_folder'],
+            overwrite=True,
+            ask=True,
+            default_answer=False,
+            print_estimated_size=True,
+        )
+    elif export_stage_answer.strip().lower() in ["y", "yes"]:
+        export_processor_stages(
+            processor=processor,
+            stage_names = caller_info['export_stages'],
+            output_folder = caller_info['output_folder'],
+            overwrite=True,
+            ask=False,
+            default_answer=False,
+            print_estimated_size=True,
+        )
+    else:
+        print("-- Skipping export of processing stages")

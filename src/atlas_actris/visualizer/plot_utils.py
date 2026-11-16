@@ -13,6 +13,7 @@ from PIL import Image
 from xarray import DataArray
 from PIL import PngImagePlugin
 from utils.toolbox import round_it
+from utils.png_images import open_png
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from visualizer.smoothing import sliding_average_2D
@@ -32,7 +33,6 @@ def add_plot_metadata(plot_path, plot_metadata, plot_metadata_extra=None):
     - values are converted to strings
     """
 
-    im = Image.open(plot_path)
     meta = PngImagePlugin.PngInfo()
 
     def add_metadata_dict(metadata_dict):
@@ -58,16 +58,26 @@ def add_plot_metadata(plot_path, plot_metadata, plot_metadata_extra=None):
     if plot_metadata_extra is not None:
         add_metadata_dict(plot_metadata_extra)
 
-    im.save(plot_path, "png", pnginfo=meta)
+    # Decode only PNG, irrespective of the filename extension. Close the input
+    # before replacing it so in-place updates also work on Windows.
+    with open_png(plot_path) as source:
+        image = source.copy()
+    try:
+        image.save(plot_path, "PNG", pnginfo=meta)
+    finally:
+        image.close()
 
     return None
     
 def perform_color_reduction(color_reduction, plot_path):
     
     if color_reduction == True:
-        im = Image.open(plot_path)
-        im = im.convert('P', palette = Image.ADAPTIVE, colors = 255) 
-        im.save(plot_path)
+        with open_png(plot_path) as source:
+            image = source.convert('P', palette=Image.Palette.ADAPTIVE, colors=255)
+        try:
+            image.save(plot_path, "PNG")
+        finally:
+            image.close()
 
     return()
 

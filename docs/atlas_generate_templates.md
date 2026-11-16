@@ -71,4 +71,5 @@ Check the repository outputs:
 atlas-generate-templates --check
 ```
 
-After changing parser schemas or template metadata, rerun the generator. Editable reinstallation is only required when console-script definitions change.
+After changing parser schemas or template metadata, rerun the generator. Regeneration alone does not require reinstalling ATLAS. Reinstall after changing
+package metadata, dependencies or console-script definitions.

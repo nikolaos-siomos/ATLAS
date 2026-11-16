@@ -26,6 +26,11 @@ from utils.cookbook import collect_stages
 
 Number = Union[int, float]
 
+# Temporary internal-only setting. Never read this mode from INI/CLI input.
+# Future re-enabling requires restoring its SCHEMA/layout/template entries
+# and removing this forced default; the SCC implementation remains intact.
+DISABLED_INIT_DEFAULTS = {"export_hoi_cfg": "0"}
+
 # Maximum distance for database-provided Wyoming station defaults, in km.
 # Explicit init/CLI values are never restricted by this fallback limit.
 MAX_RADIOSONDE_DISTANCE_KM = 100.0
@@ -303,7 +308,6 @@ allowed_vertical_scales = ["range", "height_agl", "height_asl"]
 SCHEMA: Dict[str, Dict[str, Any]] = {
     # -------------------- [System] --------------------
     "scc_compatible_format":     {"dtype": bool, "default": False, "is_list": False, "category": "optional"},
-    "export_hoi_cfg":            {"dtype": str,  "default": "0",   "is_list": False, "category": "optional", "allowed": ["0", "1", "2"]},
     "scc_configuration_id":      {"dtype": str,  "default": None,  "is_list": False, "category": "optional"},
 
     "parent_folder":             {"dtype": str, "default": None, "is_list": False, "category": "optional", "check_path": "dir"},
@@ -383,7 +387,6 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
 INIT_FILE_SECTIONS: Dict[str, List[str]] = {
     "configuration": [
         "scc_compatible_format",
-        "export_hoi_cfg",
         "scc_configuration_id",
     ],
     "explicit_paths": [
@@ -511,7 +514,8 @@ explicit_path_keys = {
 def _raise_init_section_and_parameter_errors(config: configparser.ConfigParser) -> None:
     """Validate sections, unknown parameters, and key placement.
 
-    Valid parameter names are defined only by SCHEMA.  INIT_FILE_SECTIONS only
+    Active parameter names are defined by SCHEMA; disabled legacy entries in
+    DISABLED_INIT_DEFAULTS are accepted only to be ignored. INIT_FILE_SECTIONS
     defines where valid keys are allowed to appear in user-facing INI files.
     The returned caller_info dictionary remains flat and section-independent.
     """
@@ -532,6 +536,13 @@ def _raise_init_section_and_parameter_errors(config: configparser.ConfigParser) 
 
         for key in config[section].keys():
             key_str = str(key).strip()
+
+            # Older initialization files can retain this disabled entry. Its
+            # value is ignored, but all unrelated validation stays strict.
+            if key_str in DISABLED_INIT_DEFAULTS:
+                if section != "configuration":
+                    misplaced_parameters.append((section, key_str, "configuration"))
+                continue
 
             if key_str not in schema_keys:
                 unknown_parameters.append((section, key_str))
@@ -1264,8 +1275,8 @@ def _resolve_default_configuration_file(
 
         if require_existing_local_config and not os.path.isfile(default_cfg):
             raise ConfigError(
-                "atlas_configuration_file was not provided and export_hoi_cfg "
-                "is 0, so the default configuration file was expected at:\n"
+                "atlas_configuration_file was not provided, so the local "
+                "configuration file was expected at:\n"
                 f"{default_cfg}"
             )
 
@@ -1868,6 +1879,13 @@ def read_ini_file(
 
     _raise_init_section_and_parameter_errors(config)
 
+    for key in DISABLED_INIT_DEFAULTS:
+        if any(key in config[section] for section in config.sections()):
+            CustomWarning(
+                f"{key} is disabled and ignored in initialization files. "
+                "ATLAS uses the local configuration file; run get_scc_config separately if needed."
+            )
+
     raw_args: Dict[str, Any] = {}
     for section in config.sections():
         for key in SCHEMA:
@@ -1887,6 +1905,8 @@ def read_ini_file(
         else:
             parser_args[key] = [] if meta["is_list"] else meta["default"]
 
+    # Apply after CLI conversion so no supplied value can enable SCC export.
+    parser_args.update(DISABLED_INIT_DEFAULTS)
     return parser_args
 
 

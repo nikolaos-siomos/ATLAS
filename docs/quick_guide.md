@@ -42,9 +42,41 @@ ATLAS must be installed in a Python environment. This guide covers Python versio
    atlas-smoke-test
    ```
 
-The installation command installs the latest pre-release version. At the time this guide was written, that version was **{{ atlas_version }}**.
+The version documented here is **{{ atlas_version }}**. Add `--pre` to the
+installation command if you want to include pre-release versions.
 
 The `atlas-smoke-test` command can be executed from any directory.
+
+## Start the graphical interface (GUI)
+
+The GUI is included with ATLAS. It lets you edit the INI files and run ATLAS
+without typing the processing command each time.
+
+1. Activate the environment where you installed ATLAS (called `atlas_box` in
+   this guide):
+
+   ```bash
+   conda activate atlas_box
+   ```
+
+2. Start the GUI from any directory:
+
+   ```bash
+   atlas-gui
+   ```
+
+3. Click **Choose INI folder** and select the folder for your INI files. The GUI
+   loads available files and helps you prepare missing ones.
+4. Review the three INI tabs. Fill in the required configuration values and
+   save your files. Empty settings use ATLAS defaults.
+5. Open the **Run** tab and click **Start**. Progress and results appear there.
+
+On later launches, browsing starts in the last INI working directory when it is
+available. You still choose the folder or file yourself; nothing loads automatically.
+
+The GUI uses the same Python environment in which you started it. For details
+about browsing, saving, recovering missing files and running ATLAS, see the
+[GUI documentation](atlas_gui.md).
 
 ## Configuring ATLAS
 
@@ -156,3 +188,52 @@ After gaining some experience, you can:
 - Supply a radiosonde file manually and configure its parsing options if necessary.
 
 For more detail, see the [initialization reference](generated/initialization_reference.md), [settings reference](generated/settings_reference.md), and [meteorological profile selection guide](radiosonde_selection.md).
+
+## Import saved results in Python
+
+An exported stage is a saved processing checkpoint. Before a GUI run, select
+**Export stages** in the Run tab to save the stages configured in the init.
+The usual default is `pol_cal_complete`. Exports are stored inside the output
+folder's `exported/` directory.
+
+Later, open Python or a notebook in your ATLAS environment. Replace the example
+path below with the **output folder containing `exported/`**:
+
+```python
+from atlas_actris.utils.export_processing_stage import (
+    import_processing_stage,
+    import_processing_entry,
+)
+
+output_folder = "/path/to/ATLAS_output"
+stage_name = "pol_cal_complete"
+```
+
+To import the whole stage:
+
+```python
+stage = import_processing_stage(output_folder=output_folder, stage_name=stage_name)
+print(stage.keys())  # Available tests, such as "ray".
+```
+
+Alternatively, import only the profiles for the Rayleigh test:
+
+```python
+ray_profiles = import_processing_entry(
+    output_folder=output_folder,
+    stage_name=stage_name,
+    qa_test="ray",
+    parameter="profile",
+)
+print(ray_profiles)
+```
+
+The profiles database is saved under the singular key **`profile`**. The second
+example returns that value directly, without importing other tests or entries.
+It requires an export containing `ray` and `profile`; stage contents depend on
+the measurements and processing performed. Large numerical arrays are opened
+lazily, so importing does not immediately read all their values into memory.
+
+See [importing stages](importing_processing_stages.md) for how to list available
+stages, inspect their contents, and import other subsets. For saving checkpoints,
+see [exporting stages](exported_processing_stages.md).

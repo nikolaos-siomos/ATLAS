@@ -25,7 +25,6 @@ GENERATED_TEMPLATES_DIRECTORY = Path("templates")
 INIT_TEMPLATE_SECTIONS = {
     "configuration": [
         "scc_compatible_format",
-        "export_hoi_cfg",
         "scc_configuration_id",
     ],
     "explicit_paths": [
